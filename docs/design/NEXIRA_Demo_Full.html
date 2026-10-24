@@ -235,7 +235,7 @@ tr.click{cursor:pointer}
 .room{cursor:default}
 .legend2{display:flex;gap:12px;font-size:11px;color:var(--tx2);flex-wrap:wrap}
 .legend2 span{display:inline-flex;align-items:center;gap:5px}.legend2 i{width:8px;height:8px;display:inline-block}
-</style>
+#toasts .toast:nth-child(n+4){display:none}</style>
 </head>
 <body>
 <div id="app">
@@ -1235,7 +1235,6 @@ navBadge = function (k) {
   return '';
 };
 
-/* =============== HEALTH INTELLIGENCE =============== */
 const OUTBREAKS = [
   ['Cholera', 'Kenya · Coast & Nairobi counties', 'high', '2d ago', 'Case increase in informal settlements; water-safety advice for staff.', true],
   ['Dengue fever', 'Bangladesh · Dhaka division', 'med', '4d ago', 'Seasonal rise; mosquito-bite prevention recommended.', false],
@@ -1259,7 +1258,6 @@ R_.health = () => `<div class="banner">${ic('heart')}<div><b>Health intelligence
     <div class="card"><div class="bd"><button class="btn pri" onclick="toast('ok','Health advisory sent','Cholera guidance sent to Nairobi staff & registered citizens')">${ic('send', 'sm')}Send health advisory to Nairobi</button></div></div>
    </div></div>`;
 
-/* =============== NATURAL HAZARDS & CLIMATE =============== */
 const HAZ = [['eq', 'Earthquake M5.2', 'Southern Türkiye', 'Ankara mission · 210 km', 'low', '3h ago'], ['cy', 'Tropical cyclone (Cat 2) forecast', 'Bay of Bengal', 'Dhaka mission · landfall in 60 h', 'high', '1h ago'], ['fl', 'River flooding', 'Jakarta · Ciliwung', 'Jakarta mission · 2 staff homes', 'med', '5h ago'], ['ht', 'Extreme heat 46 °C', 'Riyadh', 'Riyadh mission · outdoor work limits', 'med', 'Today'], ['aq', 'Air quality AQI 310', 'New Delhi', 'New Delhi mission · masks advised', 'high', 'Today'], ['fr', 'Wildfire risk', 'Attica, Greece', 'No mission impact', 'low', 'Today']];
 const CLIM = [['Jakarta', 'Flood · sea-level', 82, 88], ['Dhaka', 'Cyclone · flood', 79, 86], ['New Delhi', 'Heat · air quality', 74, 83], ['Riyadh', 'Heat · dust', 70, 79], ['Manila', 'Typhoon · flood', 76, 81], ['Nairobi', 'Drought · flash flood', 41, 49], ['London', 'Flood (pluvial)', 22, 27]];
 R_.hazards = () => {
@@ -1275,7 +1273,6 @@ R_.hazards = () => {
     <div class="bd dim" style="font-size:11.5px">Used for site selection, lease renewals and continuity planning.</div></div></div>`;
 };
 
-/* =============== EVACUATION MANAGEMENT =============== */
 function evacList() {
   const ppl = AFFECTED.map((p, i) => ({ n: p.name, r: p.role, cat: p.deleg ? 'Delegation' : i === 8 || i === 13 || i === 11 || i === 4 ? 'Local staff' : 'Diplomatic staff', pp: i === 9 ? 'warn' : 'ok' }));
   ppl.push({ n: 'Dependants (6)', r: 'Family members', cat: 'Dependants', pp: 'ok' });
@@ -1296,12 +1293,12 @@ R_.evac = () => {
    </div></div>`;
 };
 function startEvac() {
+  if (Y.evac) return;
   Y.evac = true; toast('crit', 'EVACUATION ACTIVATED · EVP-NBO', 'Manifest locked · notifications sent · convoy assembling'); go('evac', true);
   const step = () => { if (Y.board >= 64) { toast('ok', 'NX-EVAC1 departed', '64 evacuees on board · ETA Dubai 4h 50m'); refresh('evac'); return; } Y.board = Math.min(64, Y.board + 4); refresh('evac'); later(step, 350); };
   later(step, 600);
 }
 
-/* =============== CONSULAR CRISIS PORTAL =============== */
 R_.consular = () => {
   const enq = [['Family of R. Odhiambo', 'Son is a student in Nairobi, not answering phone', 'Matched · safe 14:02', 'ok'], ['Family of J. Kamau', 'Business traveller at Hilton', 'Matched · safe 13:58', 'ok'], ['Employer · Gulfstar', '3 employees at Westlands site', 'In progress', 'med'], ['Family of S. Nasser', 'Tourist, last seen Moi Avenue', 'Escalated to consular officer', 'crit'], ['Family of M. Farah', 'Elderly parent, needs medication', 'Partner engaged · Kestrel', 'med']];
   return `${S.inc ? `<div class="banner ${Y.portal ? 'g' : 'a'}">${ic('users')}<div class="grow"><b>${Y.portal ? 'Crisis portal live for Kenya.' : 'Crisis portal not yet activated for Kenya.'}</b> ${Y.portal ? 'Citizens and families can self-report and enquire online.' : '47 calls queued at the consular hotline.'}</div>${Y.portal ? sev('ok', 'LIVE') : `<button class="btn red sm" onclick="Y.portal=true;toast('ok','Crisis portal activated','Public page live · SMS link sent to 212 registered citizens');go('consular',true)">Activate crisis portal</button>`}</div>` : ''}
@@ -1316,7 +1313,6 @@ R_.consular = () => {
      <div style="font-size:11px;color:#5F6B7C;margin-top:10px">Available in English · Arabic · French · 24/7 hotline</div></div></div></div></div>`;
 };
 
-/* =============== VIP & DELEGATION PROTECTION =============== */
 const VSEG = [['Arrival · Bole Intl. Airport (VIP terminal)', 'low', '24 Oct 09:30'], ['Motorcade · Airport → Hotel', 'med', '09:50 · 14 min'], ['Bilateral meeting · Ministry of Foreign Affairs', 'low', '11:00'], ['Business forum · Conference centre', 'med', '14:00 · 600 attendees'], ['Site visit · Industrial park', 'high', '25 Oct 10:00 · rally nearby'], ['Departure', 'low', '26 Oct 16:00']];
 R_.vip = () => `<div class="banner ${Y.vipLive ? 'g' : ''}">${ic('shield')}<div class="grow"><b>Visit VV-2026-031 · Minister's visit to Addis Ababa · 24–26 Oct.</b> Linked to trip TRP-8834; predictive risk shows Addis Ababa rising.</div>${Y.vipLive ? sev('ok', 'LIVE TRACKING') : `<button class="btn pri sm" onclick="Y.vipLive=true;toast('ok','Live tracking on','Close-protection team and motorcade now on the map');go('vip',true)">Start live tracking</button>`}</div>
   <div class="g4 mb">${K('Programme segments', 'route', VSEG.length, '1 rated High')}${K('Close-protection team', 'users', 8, '2 vehicles · 1 medic')}${K('Venues surveyed', 'building', '4 / 5', 'Industrial park pending')}${K('Visit risk', 'alert', 'MODERATE', 'Re-assessed 2h ago', '#FBB360')}</div>
@@ -1328,7 +1324,6 @@ R_.vip = () => `<div class="banner ${Y.vipLive ? 'g' : ''}">${ic('shield')}<div 
     <div class="card">${HD('check', 'Pre-visit checklist')}<div class="bd" style="padding:4px 10px">${tick('y', 'Threat assessment issued')}${tick('y', 'Host-nation security liaison confirmed')}${tick('y', 'Hospital & evacuation plan')}${tick('n', 'Industrial park venue survey', '<span class="dim" style="font-size:11px">due 23 Oct</span>')}</div></div>
    </div></div>`;
 
-/* =============== FLEET & ASSETS =============== */
 const FLEET = [['VH-01', 'Armoured SUV (B6)', 'Nairobi', 'Embassy garage', 82, 'ok'], ['VH-02', 'Armoured SUV (B6)', 'Nairobi', 'Haile Selassie Ave', 46, 'blk'], ['VH-03', 'Minibus 14-seat', 'Nairobi', 'Embassy garage', 90, 'ok'], ['VH-04', 'Pickup 4×4', 'Nairobi', 'Residence', 64, 'ok'], ['VH-05', 'Sedan (official)', 'Nairobi', 'Workshop', 30, 'maint'], ['VH-11', 'Armoured SUV (B6)', 'Addis Ababa', 'Embassy garage', 95, 'ok'], ['VH-21', 'Armoured SUV (B6)', 'Baghdad', 'Embassy garage', 77, 'ok'], ['GEN-NBO', 'Generator 250 kVA', 'Nairobi', 'Embassy', 72, 'ok'], ['SAT-NBO', 'Satellite terminal', 'Nairobi', 'Comms room', 100, 'ok']];
 R_.fleet = () => {
   const st = f => { if (f[5] === 'maint') return sev('nt', 'MAINTENANCE'); if (f[5] === 'blk' && S.inc) return sev('crit', 'BLOCKED · DRIVER SOS'); if (S.inc && f[2] === 'Nairobi' && f[0].startsWith('VH') && (evac() || Y.evac)) return sev('high', 'ASSIGNED · EVAC'); return sev('ok', 'AVAILABLE'); };
@@ -1343,7 +1338,6 @@ R_.fleet = () => {
    </div></div>`;
 };
 
-/* =============== WELLBEING & FAMILY LIAISON =============== */
 R_.welfare = () => {
   const ppl = AFFECTED.slice(0, 14).map((p, i) => [p.name, p.role, i === 8 ? 'high' : i === 9 ? 'med' : i % 5 === 0 ? 'low' : 'ok']);
   const lbl = { high: 'PRIORITY', med: 'FOLLOW UP', low: 'CHECK-IN', ok: 'OK' };
@@ -1357,14 +1351,12 @@ R_.welfare = () => {
    </div></div>`;
 };
 
-/* =============== DOCUMENT EXPIRY =============== */
 const DOCS = [['Hana Takeda', 'Nairobi', 'Diplomatic passport', 21, 'crit'], ['Peter Mwangi', 'Nairobi', 'Work permit', 45, 'med'], ['Noor Hamdan', 'Baghdad', 'Security clearance', 30, 'high'], ['Arjun Mehta', 'New Delhi', 'Residence permit', 58, 'med'], ['Dependant · Takeda family', 'Nairobi', 'Child passport', 12, 'crit'], ['Sophie Martin', 'Paris', 'Schengen accreditation', 75, 'low'], ['Mariam Saleh', 'Jakarta', 'Diplomatic visa', 88, 'low'], ['Lucas Silva', 'Brasília', 'Diplomatic passport', 210, 'ok']];
 R_.docs = () => `<div class="g4 mb">${K('Documents tracked', 'file', '4,812', 'Staff & dependants')}${K('Expiring < 30 days', 'alert', 6, '2 in Nairobi', '#FA999C', true)}${K('Expiring < 90 days', 'clock', 31, 'Renewal in progress: 19')}${K('Evacuation-ready', 'check', '98.7%', 'Valid travel docs')}</div>
   <div class="card">${HD('file', 'Expiring documents', 'Sorted by urgency', Y.docsSent ? sev('ok', 'REMINDERS SENT') : `<button class="btn pri sm" onclick="Y.docsSent=true;toast('ok','Reminders sent','6 staff and HR focal points notified');go('docs',true)">${ic('send', 'sm')}Send renewal reminders</button>`)}
    <table><thead><tr><th>Person</th><th>Mission</th><th>Document</th><th>Days left</th><th>Urgency</th><th>Impact</th></tr></thead><tbody>
    ${DOCS.map(d => `<tr><td><b>${d[0]}</b></td><td>${d[1]}</td><td>${d[2]}</td><td class="mono" style="color:${d[3] < 30 ? '#FA999C' : 'var(--tx)'}">${d[3]}</td><td>${sev(d[4], d[4] === 'ok' ? 'OK' : undefined)}</td><td style="font-size:11.5px">${d[1] === 'Nairobi' && d[3] < 30 ? '<span style="color:#FA999C">Could block evacuation</span>' : 'Renewal due'}</td></tr>`).join('')}</tbody></table></div>`;
 
-/* =============== EXERCISE & TRAINING =============== */
 const DRILLS = [['Civil unrest near mission', 'Nairobi', 'Live demo scenario', 91], ['Mission evacuation', 'Abuja', 'Full-scale', 78], ['Earthquake response', 'Ankara', 'Tabletop', 85], ['Cyber-physical attack', 'London', 'Tabletop', 88], ['Mass-casualty medical', 'Jakarta', 'Functional', 81]];
 R_.exercise = () => `<div class="g4 mb">${K('Exercises · 2026', 'target', 29, '7 scheduled in Q4')}${K('Average score', 'chart', '84 / 100', '<span class="up">▲ 6</span> vs 2025')}${K('Staff trained', 'users', '1,104', '82% of personnel')}${K('Scenario templates', 'layers', 18, 'Civil unrest · hazards · health · cyber')}</div>
   <div style="display:grid;grid-template-columns:1.3fr 1fr;gap:8px">
@@ -1376,7 +1368,6 @@ R_.exercise = () => `<div class="g4 mb">${K('Exercises · 2026', 'target', 29, '
     <div class="card">${HD('chart', 'Scoring breakdown · last exercise')}<div class="bd" style="display:grid;gap:8px">${[['Detection → alert', 95], ['Accountability (check-in)', 94], ['Decision speed', 86], ['Communication quality', 88], ['Plan adherence', 92]].map(s => `<div><div class="row" style="font-size:12px;margin-bottom:3px"><span class="grow">${s[0]}</span><span class="mono">${s[1]}</span></div><div class="bar"><i style="width:${s[1]}%"></i></div></div>`).join('')}</div></div>
    </div></div>`;
 
-/* =============== AFTER-ACTION REVIEW =============== */
 const AAR = [['Hana Takeda location confidence only 72% — calendar data not real-time', 'Enable mobile check-in for cultural attachés', 'HR / Security', 'high'], ['Gate 2 badge reader failed during incident', 'Install backup reader and UPS', 'Facilities', 'high'], ['Driver route crossed impact zone', 'Add geofence alerts to fleet telematics', 'Fleet', 'med'], ['Hotline overloaded before portal activation', 'Auto-activate crisis portal at Critical severity', 'Consular', 'med'], ['Fuel stock at 72 h during supplier delay', 'Raise minimum stock to 120 h', 'Logistics', 'low']];
 R_.aar = () => {
   if (!S.inc) return `<div class="card"><div class="empty"><div><div class="big">${ic('check', 'lg')}</div><h3 style="color:var(--tx);font-size:15px">No incident to review</h3><p style="margin-top:6px">Run the demo scenario; the review builds itself from the incident record.</p></div></div></div>`;
@@ -1391,7 +1382,7 @@ R_.aar = () => {
 };
 
 /* ================= Air Travel Tracking (simulated flight data) ================= */
-document.querySelector('svg symbol').parentNode.insertAdjacentHTML('beforeend', '<symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="5"/><path d="M12 12 19 5"/></symbol>');
+document.querySelector('svg symbol').parentNode.insertAdjacentHTML('beforeend', '<symbol id="i-radar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="5"/><path d="M12 12 19 5"/></symbol><symbol id="i-bot" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 8V4"/><circle cx="12" cy="3" r="1"/><circle cx="9" cy="14" r="1.2"/><circle cx="15" cy="14" r="1.2"/><path d="M2 13v3M22 13v3"/></symbol><symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol><symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>');
 const T_LOAD = Date.now(), SPEED = 30, EVAC_MS = 120000, DIV_MS = 40000;
 function initF() { return { sel: 'XW451', divManual: false, holdT: null, divT: null, divLanded: false, evacT: null, evacLanded: false, sig: '' }; }
 let F = initF();
@@ -1452,16 +1443,13 @@ function flightsSVG(u, labels) {
   });
   return o;
 }
-/* global map overlay */
 const _drawMap = drawMap; drawMap = function () { _drawMap(); const svg = $('#map'); if (!svg || S.vb.w < 5) return; const r = svg.getBoundingClientRect(); if (!r.width) return; const u = 1 / Math.min(r.width / S.vb.w, r.height / (S.vb.w / 2)); $('#ovl').insertAdjacentHTML('beforeend', flightsSVG(u, false)); };
 const _ops = R_.ops; R_.ops = () => _ops().replace('Threat</span></div>', 'Threat</span><span class="chip" style="color:#8ABBFF">✈ Officials airborne</span></div>');
 document.addEventListener('click', e => { const t = e.target.closest('[data-flid]'); if (t && !S.drag) { F.sel = t.dataset.flid; go('air'); } });
 
-/* nav */
 (function () { const o = { ...VIEWS }; Object.keys(VIEWS).forEach(k => delete VIEWS[k]); for (const [k, v] of Object.entries(o)) { VIEWS[k] = v; if (k === 'journeys') VIEWS.air = ['Air Travel Tracking', 'Travel · Officials in the air, delays & diversions', 'radar', 'MONITOR']; } NEWV.add('air'); })();
 const _navBadge2 = navBadge; navBadge = k => (k === 'air' && fState() === 'hold') ? '<span class="bdg">1</span>' : _navBadge2(k);
 
-/* screen */
 R_.air = () => {
   const st = fState(); const list = FLIGHTS.concat(S.inc ? [EVAC] : []);
   const sel = list.find(f => f.id === F.sel) || FLIGHTS[0]; const si = fInfo(sel);
@@ -1477,7 +1465,7 @@ R_.air = () => {
    <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
     <div class="card">${HD('radar', 'Live air picture', 'Only flights linked to our travellers · positions simulated')}<div class="bd" style="background:#0E1013;padding:0"><svg id="airmap" viewBox="0 70 1000 330" width="100%" style="display:block;max-height:380px"><g>${WORLD.map(d => `<path class="land" d="${d}"/>`).join('')}</g><g id="airovl"></g></svg></div></div>
     <div class="card">${HD('plane', 'Tracked flights', `${list.length} objects`)}<table><thead><tr><th>Flight</th><th>Travellers</th><th>Route</th><th>Progress</th><th>Altitude</th><th>ETA</th><th>Status</th></tr></thead><tbody>
-     ${list.map(f => { const i = fInfo(f); return `<tr class="click ${f.id === sel.id ? 'sel' : ''}" onclick="F.sel='${f.id}';go('air',true)"><td class="mono"><b>${f.no}</b></td><td>${f.who}</td><td>${f.from} → ${f.id === 'XW451' && st !== 'none' && st !== 'hold' ? 'MBA' : f.to}</td><td><div class="bar" style="width:70px"><i data-flp="${f.id}" style="width:${i.p * 100}%;${f.id === 'EVAC' ? 'background:#32A467' : f.id === 'XW451' && st !== 'none' ? 'background:#EC9A3C' : ''}"></i></div></td><td class="mono" style="font-size:11px">${i.alt}</td><td class="mono" data-fle="${f.id}">${i.eta}</td><td>${i.status}</td></tr>`; }).join('')}</tbody></table></div>
+     ${list.map(f => { const i = fInfo(f); return `<tr class="click ${f.id === sel.id ? 'sel' : ''}" onclick="F.sel='${f.id}';go('air',true)"><td class="mono"><b>${f.no}</b></td><td>${f.who}</td><td>${f.from} → ${f.id === 'XW451' && st !== 'none' && st !== 'hold' ? 'MBA' : f.to}</td><td><div class="bar" style="width:70px"><i data-flp="${f.id}" style="width:${i.p * 100}%;${f.id === 'EVAC' ? 'background:#32A467' : f.id === 'XW451' && st !== 'none' ? 'background:#EC9A3C' : ''}"></i></div></td><td class="mono" style="font-size:11px">${i.alt}</td><td class="mono">${i.eta}</td><td>${i.status}</td></tr>`; }).join('')}</tbody></table></div>
    </div>
    <div style="display:flex;flex-direction:column;gap:8px">
     <div class="card">${HD('plane', sel.no, `${AP[sel.from][0]} → ${si.dest}`)}<div class="bd" style="display:grid;gap:8px">
@@ -1497,7 +1485,6 @@ function updateAir() {
 }
 const _go = go; go = function (v, soft) { _go(v, soft); if (v === 'air') updateAir(); };
 
-/* links into other modules */
 const _incT = incTimeline; incTimeline = function () {
   let h = _incT(); if (!F.divT) return h;
   const ent = `<div style="--c:${C.am}"><span>${fmtT(new Date(S.t0 + 140000))}</span><b>Inbound XW 451 diverted to Mombasa</b> · 3 HQ staff</div>`;
@@ -1506,10 +1493,9 @@ const _incT = incTimeline; incTimeline = function () {
 const _sitrep = sitrep; sitrep = function () { const b = _sitrep(); if (!S.inc) return b; const k = b.findIndex(x => x[0] === 'h5' && x[1] === 'Recommendations'); b.splice(k, 0, ['li', `Air travel: inbound flight XW 451 with 3 HQ staff ${F.divT ? 'diverted to Mombasa' : 'holding near Nairobi; diversion to Mombasa recommended'}; onward travel on hold.`]); return b; };
 const _evacR = R_.evac; R_.evac = () => _evacR().replace('All evacuees boarded · NX-EVAC1 departed.</b>', `All evacuees boarded · NX-EVAC1 departed.</b> <button class="btn sm" onclick="F.sel='EVAC';go('air')">${ic('radar', 'sm')}Track flight</button>`);
 
-/* ticker */
 setInterval(() => {
   const now = Date.now();
-  if (S.inc && (F.divManual || S.scene >= 3) && !F.divT) { F.divT = now; toast('info', 'XW 451 diverted to Mombasa', '3 HQ staff · locations will update on landing'); }
+  if (S.inc && F.divManual && !F.divT) { F.divT = now; toast('info', 'XW 451 diverted to Mombasa', '3 HQ staff · locations will update on landing'); }
   if (F.divT && !F.divLanded && now - F.divT > DIV_MS) { F.divLanded = true; toast('ok', 'XW 451 landed in Mombasa', 'Travellers met by assistance partner'); }
   if (Y.evac && Y.board >= 64 && !F.evacT) F.evacT = now;
   if (F.evacT && !F.evacLanded && now - F.evacT > EVAC_MS) { F.evacLanded = true; toast('ok', 'NX-EVAC1 landed in Dubai', '64 evacuees · consular reception team on stand'); }
@@ -1519,8 +1505,218 @@ setInterval(() => {
   if (sig !== F.sig) { F.sig = sig; renderNav(); }
 }, 1000);
 
+/* ================= AI Agents + Decision Queue (simulated agents, human-in-the-loop) ================= */
+const LV = ['Auto', 'Auto + notice', 'Approve', 'Senior approval', 'Advise only'];
+const LVC = ['#72CA9B', '#8ABBFF', '#FBB360', '#FA999C', '#ABB3BF'];
+const AGENTS = {
+  watch: ['Watch Officer', 'Intel feeds · local-language OSINT · hazards', 0, 412, 97],
+  exposure: ['Exposure', 'People · trips · flights · sites', 0, 388, 99],
+  planner: ['Response Planner', 'Incidents · playbooks · BCPs', 2, 41, 90],
+  comms: ['Communications', 'Audiences · channels · languages', 2, 126, 84],
+  travel: ['Travel & Air', 'Bookings · flight status · routes', 2, 73, 88],
+  cyber: ['Cyber-Physical', 'SIEM · access control · CCTV', 2, 29, 86],
+  evac: ['Evacuation', 'Risk trend · seats · documents', 3, 6, 83],
+  forecast: ['Forecast', 'Predictive risk · events calendar', 2, 52, 79],
+  comply: ['Compliance & Readiness', 'Documents · drills · continuity plans', 1, 94, 95],
+  brief: ['Briefing', 'All platform data', 2, 61, 91]
+};
+function initA() { const lv = {}; Object.keys(AGENTS).forEach(k => lv[k] = AGENTS[k][2]); return { t0: Date.now(), cards: [], lv, paused: false, tab: 'pending', editing: null, rejecting: null, sig: '', log: [] }; }
+let A = initA();
+const _resetAll4 = resetAll; resetAll = function () { _resetAll4(); A = initA(); };
+const ago2 = t => fmtT(new Date(t));
+const aLog = (agent, msg) => { A.log.unshift([fmtT(new Date()), agent, msg]); A.log = A.log.slice(0, 30); };
+/* diversion and evacuation now go through human approval */
+setTimeout(() => { }, 0);
+
+/* ---------- card catalogue ---------- */
+const CAT = [
+  { k: 'fc-addis', ag: 'forecast', pro: 1, after: 3, when: () => true, floor: 2, by: 'Protocol & Security lead', dl: 1800,
+    t: 'Addis Ababa risk rising before the Minister’s visit (24–26 Oct)', p: 'Move the industrial-park site visit to 08:00 and add one close-protection vehicle to the motorcade.',
+    ev: ['Risk index forecast 63 → 78 within 14 days (Predictive Risk)', 'Rally planned 1.2 km from the industrial park on 25 Oct (local-language OSINT)', 'Venue survey for the industrial park not yet completed (VIP module)'],
+    src: ['Predictive Risk', 'OSINT', 'VIP & Delegation'], conf: 81, risk: 'Motorcade passes the rally at peak attendance; visit may be disrupted or cancelled at short notice.',
+    alt: ['Replace the site visit with a virtual tour', 'Keep programme; request host-nation police escort'], go: 'vip',
+    run: () => toast('ok', 'Visit change sent', 'Protocol office notified · Minister’s office to confirm') },
+  { k: 'cp-docs', ag: 'comply', pro: 1, after: 7, when: () => !Y.docsSent, floor: 1, by: 'HR focal point', dl: 3600,
+    t: '2 Nairobi travel documents could block an evacuation', p: 'Start urgent renewal of H. Takeda’s diplomatic passport (21 days) and her child’s passport (12 days); send reminders to 4 other staff.',
+    ev: ['Evacuation plan EVP-NBO requires 6 months’ passport validity for charter destination', 'Nairobi risk forecast trending up (Predictive Risk)', 'Renewal takes 10–14 days via HQ consular section'],
+    src: ['Document Expiry', 'Evacuation', 'Predictive Risk'], conf: 97, risk: 'Two people could be unable to board an evacuation flight.', alt: ['Issue emergency travel documents only if needed'], go: 'docs',
+    run: () => { Y.docsSent = true; toast('ok', 'Renewals started', '2 urgent renewals · 4 reminders sent'); }, undo: () => { Y.docsSent = false; } },
+  { k: 'hz-dhaka', ag: 'watch', pro: 1, after: 12, when: () => true, floor: 2, by: 'Security officer', dl: 2400,
+    t: 'Category 2 cyclone forecast to reach Dhaka in about 60 hours', p: 'Arm playbook PB-03 Severe weather for Dhaka (auto-trigger at 36 h), pre-position water, fuel and satellite phones.',
+    ev: ['Forecast track passes within 40 km of Dhaka (xWeather)', '15 staff and 2 dependants; 3 homes in flood-prone wards', 'Generator fuel at 58% (Fleet & Assets)'],
+    src: ['Natural Hazards', 'Fleet & Assets', 'People & Sites'], conf: 74, risk: 'Supplies may be unobtainable once the storm warning is public.', alt: ['Monitor only; reassess in 12 h'], go: 'hazards',
+    run: () => toast('ok', 'PB-03 armed for Dhaka', 'Trigger at 36 h · supply order raised') },
+  { k: 'tr-bgw', ag: 'travel', pro: 1, after: 17, when: () => !X.approved['TRP-8829'], floor: 2, by: 'Security officer', dl: 1200,
+    t: 'Baghdad → Erbil road move (TRP-8829) awaiting approval', p: 'Approve the trip with an armoured vehicle and escort; depart at 06:00 to avoid checkpoint congestion.',
+    ev: ['Route risk High on the northern corridor (Dragonfly)', 'Checkpoint delays above 2 h after 09:00 this week', 'Armoured vehicle VH-21 available'],
+    src: ['Journey Management', 'Fleet & Assets'], conf: 85, risk: 'Trip will slip or proceed without mitigations.', alt: ['Fly Baghdad → Erbil instead (1 seat available)'], go: 'journeys',
+    run: () => { X.approved['TRP-8829'] = 1; toast('ok', 'TRP-8829 approved', 'Escort booked · traveller briefed'); } },
+  { k: 'hl-chol', ag: 'comms', pro: 1, after: 22, when: () => true, floor: 2, by: 'Duty officer', dl: 3600, edit: true,
+    t: 'Cholera advisory recommended for Nairobi staff and citizens', p: 'Health advisory (EN/AR/FR/SW): Cholera cases are rising in Nairobi. Drink bottled or boiled water only, avoid street food, and seek care quickly if symptoms appear.',
+    ev: ['Cholera case increase in Nairobi county (Health Intelligence)', '8 of 17 staff not yet offered the cholera vaccine'],
+    src: ['Health Intelligence'], conf: 88, risk: 'Avoidable illness among staff and citizens.', alt: [], go: 'health',
+    run: c => toast('ok', 'Health advisory sent', '229 recipients · 4 languages') },
+
+  { k: 'in-watch', ag: 'watch', when: () => S.inc, floor: 0, t: 'Incident INC-2026-1042 created from 3 sources + an early local-language signal',
+    p: 'Fused Dataminr, MAX Security and Riskline reports with Swahili social posts into one Critical incident.', ev: ['Swahili posts detected about 6 min before global feeds', 'Three sources agree on location and type'], src: ['Intelligence Hub', 'OSINT'], conf: 92, go: 'incidents', run: () => { } },
+  { k: 'in-exp', ag: 'exposure', when: () => S.impact, floor: 0, t: 'Exposure computed for INC-2026-1042',
+    p: '2 sites · 14 staff · 3 delegates · 212 registered citizens · 1 inbound flight (XW 451) affected.', ev: ['Location confidence above 85% for 16 of 17 people'], src: ['People & Sites', 'Air Travel'], conf: 95, go: 'ops', run: () => { } },
+  { k: 'in-pb', ag: 'planner', when: () => S.inc, done: () => S.pb[0] !== 'pend', floor: 2, by: 'Duty officer', dl: 300,
+    t: 'Run playbook PB-07 · Civil unrest near mission', p: 'Execute PB-07: notify HoM, alert HQ, shelter in place and activate BCP-NBO, safety check-in, partner on standby, route B for approval.',
+    ev: ['Incident severity High, 1.9 km from the Embassy', 'PB-07 matches incident type and distance threshold', 'Last PB-07 exercise scored 91/100'], src: ['Incidents', 'Playbooks', 'Continuity'], conf: 92,
+    risk: 'Staff remain un-notified; accountability delayed.', alt: ['Notify HoM only and monitor for 15 min'], go: 'playbooks',
+    run: () => { if (S.scene === 2) goScene(3); else if (S.pb[0] === 'pend') runPlaybook(true); } },
+  { k: 'in-air', ag: 'travel', when: () => fState() === 'hold', done: () => !!F.divT, floor: 2, by: 'Travel desk', dl: 600,
+    t: 'Divert XW 451 to Mombasa (3 HQ staff on board)', p: 'Request diversion to Mombasa, book 3 rooms via Meridian Relocation and hold onward travel to Nairobi.',
+    ev: ['Flight holding near Nairobi; ETA +35 min', 'JKIA access roads affected by INC-2026-1042', 'Mombasa 42 min away; partner coverage confirmed'], src: ['Air Travel', 'Incidents', 'Assistance Partners'], conf: 87,
+    risk: 'Staff land into the incident area with restricted ground movement.', alt: ['Continue holding and land at JKIA', 'Return to Abu Dhabi'], go: 'air',
+    run: () => { F.divManual = true; } },
+  { k: 'in-cyb', ag: 'cyber', when: () => S.inc, done: () => X.cpxAck, floor: 2, by: 'Security officer', dl: 600,
+    t: 'Contain phishing campaign CPX-0042 exploiting the unrest', p: 'Block the lookalike domain, quarantine 23 messages, force MFA step-up for targeted accounts and warn staff.',
+    ev: ['Fake “evacuation instructions” emails to 23 Embassy mailboxes', '9 failed VPN logins; Gate 2 badge-reader fault within 4 min', 'Correlation score 0.87'], src: ['Cyber-Physical', 'SIEM'], conf: 89,
+    risk: 'Staff may follow false instructions during the crisis.', alt: ['Warn staff only'], go: 'cyber', run: () => { X.cpxAck = true; } },
+  { k: 'in-cons', ag: 'comms', when: () => S.inc && S.impact, done: () => Y.portal, floor: 2, by: 'Consular duty officer', dl: 600,
+    t: 'Activate the crisis portal for Kenya', p: 'Publish the Kenya crisis page and SMS the link to 212 registered citizens so they can self-report.',
+    ev: ['47 calls queued at the consular hotline', 'Family enquiries rising (58)'], src: ['Consular Portal', 'Check-in'], conf: 93, risk: 'Hotline overload; families wait for news.', alt: [], go: 'consular', run: () => { Y.portal = true; } },
+  { k: 'in-msg', ag: 'comms', when: () => S.pb[3] === 'done', floor: 2, by: 'Duty officer', dl: 600, edit: true,
+    t: 'Multilingual shelter advisory for 212 registered citizens', p: 'Civil unrest in central Nairobi. Stay indoors, avoid the CBD and Upper Hill, and reply SAFE or HELP. Updates every 2 hours.',
+    ev: ['Citizens in impact zone: 212', 'Languages: English · Arabic · French · Swahili'], src: ['Mass Notification', 'Consular'], conf: 90, risk: 'Citizens move through the unrest area.', alt: [], go: 'notify',
+    run: c => { X.camps.unshift(['NTF-' + (3120 + X.camps.length), c.p, 'Registered citizens · Kenya', 'SMS · WhatsApp · App', 212, 98.6, fmtT(new Date())]); toast('ok', 'Advisory sent', '212 citizens · 4 languages'); } },
+  { k: 'in-evac', ag: 'evac', when: () => S.pb[6] === 'done', done: () => Y.evac, floor: 3, by: ['Head of Mission', 'HQ Crisis Director'], dl: 900,
+    t: 'Pre-emptive evacuation of dependants, non-essential staff and citizens (EVP-NBO)', p: 'Activate EVP-NBO: convoy via approved Route B to Wilson Airport; charter NX-EVAC1 to Dubai for 64 people.',
+    ev: ['Unrest spreading toward Upper Hill (3 sources, last 40 min)', 'Route B approved by Head of Mission', 'Charter on 4 h standby: 64 seats needed of 72', '1 passport expiring — renewal under way'], src: ['Evacuation', 'Predictive Risk', 'Fleet', 'Document Expiry'], conf: 76,
+    risk: 'If routes close, later evacuation needs road crossing at Namanga (8 h).', alt: ['Shelter in place for 12 h and reassess', 'Use 30 held commercial seats at JKIA'], go: 'evac',
+    run: () => { const v = S.view; startEvac(); if (v === 'queue') go('queue', true); } },
+  { k: 'in-brief', ag: 'brief', when: () => !!S.ci && S.pb[7] === 'done', done: () => S.copState === 'done' && A.briefOk, floor: 2, by: 'Duty officer', dl: 900,
+    t: 'Situation report ready for the Minister’s office', p: 'Release SITREP-1042 (summary, people, actions, related cyber and supply-chain risks, recommendations).',
+    ev: ['Grounded on incident, check-in, playbook and SIEM records', 'All figures cite sources'], src: ['AI Copilot'], conf: 94, risk: 'Leadership briefed late or inconsistently.', alt: [], go: 'copilot',
+    run: () => { A.briefOk = true; if (S.copState !== 'done') { S.cop = []; ask(0, true); S.copState = 'done'; } toast('ok', 'SITREP released', 'Sent to the Minister’s office'); } }
+];
+const cdef = k => CAT.find(c => c.k === k);
+const effLv = c => Math.max(A.lv[c.ag], c.floor);
+
+/* ---------- engine ---------- */
+function agentTick() {
+  if (A.paused) return;
+  const el = (Date.now() - A.t0) / 1000;
+  CAT.forEach(d => {
+    if (A.cards.find(c => c.k === d.k)) return;
+    if (d.pro && el < d.after) return;
+    if (!d.when()) return;
+    if (d.done && d.done()) return;
+    const c = { k: d.k, ag: d.ag, t0: Date.now(), p: d.p, st: 'pending', appr: [], lv: effLv(d) };
+    A.cards.unshift(c);
+    if (c.lv === 0) { c.st = 'auto'; aLog(AGENTS[d.ag][0], d.t); return; }
+    if (c.lv === 1) { d.run(c); c.st = 'notice'; c.until = Date.now() + 30000; aLog(AGENTS[d.ag][0], 'Auto-executed with notice · ' + d.t); toast('info', `${AGENTS[d.ag][0]} agent acted`, d.t + ' · undo within 30 s'); return; }
+    aLog(AGENTS[d.ag][0], 'Proposed · ' + d.t);
+    toast('info', `${AGENTS[d.ag][0]} agent · new proposal`, d.t);
+  });
+  A.cards.forEach(c => { const d = cdef(c.k); if (c.st === 'pending' && d.done && d.done()) { c.st = 'superseded'; c.dt = Date.now(); } if (c.st === 'notice' && Date.now() > c.until) c.st = 'auto'; });
+}
+function decide(k, action, extra) {
+  const c = A.cards.find(x => x.k === k); const d = cdef(k); if (!c) return;
+  if (action === 'approve' || action === 'edit') {
+    if (action === 'edit') { const ta = document.getElementById('ed-' + k); if (ta) c.p = ta.value.trim() || c.p; c.edited = true; A.editing = null; }
+    const need = Array.isArray(d.by) ? d.by : [d.by];
+    c.appr.push([need[c.appr.length], fmtT(new Date())]);
+    if (c.appr.length < need.length) { toast('info', `Approval ${c.appr.length}/${need.length} recorded`, `Awaiting ${need[c.appr.length]}`); aLog('Human', `${need[c.appr.length - 1]} approved (1/${need.length}) · ${d.t}`); go('queue', true); return; }
+    c.st = c.edited ? 'edited' : 'approved'; c.dt = Date.now();
+    aLog('Human', `${c.edited ? 'Edited & approved' : 'Approved'} · ${d.t}`); d.run(c);
+    if (k !== 'in-evac') toast('ok', c.edited ? 'Edited & approved' : 'Approved', d.t);
+  }
+  if (action === 'reject') { c.st = 'rejected'; c.why = extra; c.dt = Date.now(); A.rejecting = null; aLog('Human', `Rejected (${extra}) · ${d.t}`); toast('info', 'Rejected · feedback sent to agent', extra); }
+  if (action === 'alt') { c.p = d.alt[extra]; c.edited = true; go('queue', true); return; }
+  if (action === 'undo') { if (d.undo) d.undo(); c.st = 'rejected'; c.why = 'Undone by human'; aLog('Human', 'Undid auto-action · ' + d.t); }
+  go(S.view, true);
+}
+const pending = () => A.cards.filter(c => c.st === 'pending').length;
+function dlText(c) { const d = cdef(c.k); const s = Math.round(d.dl - (Date.now() - c.t0) / 1000); if (s <= 0) return `<span style="color:#FA999C;font-weight:700">OVERDUE · escalated</span>`; return `Decide in <b class="mono">${Math.floor(s / 60)}:${pad(s % 60)}</b>`; }
+
+/* ---------- card UI ---------- */
+function cardHTML(c) {
+  const d = cdef(c.k); const ag = AGENTS[d.ag]; const lvl = c.lv;
+  const stB = { pending: '', auto: sev('ok', 'AUTO-EXECUTED'), notice: sev('low', 'AUTO · UNDO AVAILABLE'), approved: sev('ok', 'APPROVED'), edited: sev('ok', 'EDITED & APPROVED'), rejected: sev('nt', 'REJECTED'), superseded: sev('nt', 'ACTIONED MANUALLY') }[c.st];
+  const col = c.st === 'pending' ? (lvl === 3 ? '#CD4246' : '#EC9A3C') : c.st === 'rejected' || c.st === 'superseded' ? '#404854' : '#32A467';
+  const need = Array.isArray(d.by) ? d.by : [d.by];
+  const editing = A.editing === c.k, rejecting = A.rejecting === c.k;
+  const small = c.st === 'auto' || c.st === 'superseded';
+  return `<div class="card mb" style="border-left:3px solid ${col}">
+   <div class="hd" style="height:auto;padding:7px 10px;flex-wrap:wrap">${ic('bot')}<span class="chip">${ag[0]} agent</span>${d.pro && !S.inc ? '<span class="chip" style="color:#BDADFF">PROACTIVE</span>' : ''}<span class="chip" style="color:${LVC[lvl]}">${LV[lvl]}</span><b style="font-size:12.5px" class="grow">${d.t}</b>
+    ${c.st === 'pending' ? `<span class="dim" style="font-size:11px">${dlText(c)}</span>` : stB}<span class="mono dim" style="font-size:11px">${ago2(c.t0)}</span></div>
+   ${small ? `<div class="bd" style="padding:8px 10px;font-size:12px;color:var(--tx2)">${c.p}</div>` : `
+   <div class="bd" style="display:grid;grid-template-columns:1.25fr 1fr;gap:14px">
+    <div>
+     <div class="lbl">Proposed action</div>
+     ${editing ? `<textarea id="ed-${c.k}" rows="3" style="width:100%;background:#111418;border:1px solid #2D72D2;color:var(--tx);padding:8px;resize:vertical">${c.p}</textarea>` : `<div style="font-size:13px;font-weight:600;color:var(--tx);line-height:1.45">${c.p}</div>`}
+     ${c.edited && !editing ? '<div style="font-size:11px;color:#8ABBFF;margin-top:3px">Edited by human</div>' : ''}
+     <div class="lbl" style="margin-top:10px">Why the agent recommends this</div>
+     ${d.ev.map(e => `<div style="font-size:12px;color:var(--tx2);padding:2px 0">· ${e}</div>`).join('')}
+     <div class="row" style="gap:4px;margin-top:6px;flex-wrap:wrap">${d.src.map(s => `<span class="src"><i style="background:#4C90F0"></i>${s}</span>`).join('')}</div>
+    </div>
+    <div>
+     <div class="row" style="gap:10px;margin-bottom:8px"><div><div class="lbl" style="margin:0">Confidence</div><div class="mono" style="font-size:18px;color:${d.conf >= 85 ? '#72CA9B' : '#FBB360'}">${d.conf}%</div></div>
+      <div class="grow"><div class="lbl" style="margin:0">Approver</div><div style="font-size:12px">${need.map((n, i) => `${c.appr[i] ? '✓ ' : ''}${n}${c.appr[i] ? ` <span class="dim mono">${c.appr[i][1]}</span>` : ''}`).join('<br>')}</div></div></div>
+     ${d.risk ? `<div class="lbl">Risk if no action</div><div style="font-size:12px;color:#FA999C;margin-bottom:8px">${d.risk}</div>` : ''}
+     ${d.alt && d.alt.length ? `<div class="lbl">Alternatives considered</div>${d.alt.map((a, i) => `<div class="row" style="gap:6px;font-size:12px;padding:2px 0"><span class="grow dim">${a}</span>${c.st === 'pending' ? `<button class="btn sm" onclick="decide('${c.k}','alt',${i})">Use</button>` : ''}</div>`).join('')}` : ''}
+    </div></div>
+   ${c.st === 'pending' ? `<div style="padding:8px 10px;border-top:1px solid #111418;background:#252A31" class="row">
+     ${rejecting ? `<span class="dim" style="font-size:11.5px">Reason:</span>${['Not needed', 'Wrong timing', 'Insufficient evidence', 'Handled offline'].map(r => `<button class="btn sm" onclick="decide('${c.k}','reject','${r}')">${r}</button>`).join('')}<span class="grow"></span><button class="btn sm" onclick="A.rejecting=null;go('queue',true)">Cancel</button>`
+      : editing ? `<span class="grow dim" style="font-size:11.5px">Editing the agent’s proposal</span><button class="btn sm" onclick="A.editing=null;go('queue',true)">Cancel</button><button class="btn pri sm" onclick="decide('${c.k}','edit')">${ic('tick', 'sm')}Save & approve</button>`
+      : `<button class="btn pri sm" onclick="decide('${c.k}','approve')">${ic('tick', 'sm')}Approve${need.length > 1 ? ` as ${need[c.appr.length]} (${c.appr.length + 1}/${need.length})` : ''}</button><button class="btn sm" onclick="A.editing='${c.k}';go('queue',true)">${ic('edit', 'sm')}Edit</button><button class="btn sm" onclick="A.rejecting='${c.k}';go('queue',true)">${ic('x', 'sm')}Reject</button><span class="grow"></span><button class="btn sm" onclick="go('${d.go}')">Open ${VIEWS[d.go] ? VIEWS[d.go][0] : ''} →</button>`}</div>`
+      : c.st === 'notice' ? `<div style="padding:8px 10px;border-top:1px solid #111418;background:#252A31" class="row"><span class="grow dim" style="font-size:11.5px">Executed automatically under “Auto + notice” policy.</span><button class="btn sm" onclick="decide('${c.k}','undo')">${ic('reset', 'sm')}Undo</button></div>`
+      : c.st === 'rejected' ? `<div style="padding:6px 10px;font-size:11.5px" class="dim">Reason: ${c.why} · fed back to agent for tuning</div>` : ''}`}
+  </div>`;
+}
+
+/* ---------- screens ---------- */
+R_.queue = () => {
+  A.view = 'queue';
+  const all = A.cards; const tabs = { pending: all.filter(c => c.st === 'pending'), decided: all.filter(c => c.st !== 'pending'), all };
+  const list = tabs[A.tab];
+  const proN = all.filter(c => cdef(c.k).pro).length;
+  const dec = all.filter(c => c.dt && ['approved', 'edited', 'rejected'].includes(c.st));
+  const med = dec.length ? Math.round(dec.map(c => (c.dt - c.t0) / 1000).sort((a, b) => a - b)[Math.floor(dec.length / 2)]) : null;
+  const accepted = dec.filter(c => c.st !== 'rejected').length;
+  return `${A.paused ? `<div class="banner r">${ic('alert')}<div class="grow"><b>All agents paused (kill switch).</b> Platform has fallen back to manual playbooks; no new proposals will be raised.</div><button class="btn sm" onclick="A.paused=false;go('queue',true)">Resume agents</button></div>`
+      : `<div class="banner">${ic('bot')}<div class="grow"><b>${Object.keys(AGENTS).length} agents are monitoring your missions, people and travel.</b> They prepare decisions; a named human approves anything that sends messages, moves people or spends money.</div><button class="btn sm" onclick="go('agents')">Agent console →</button></div>`}
+  <div class="g4 mb">${K('Awaiting your decision', 'inbox', tabs.pending.length, tabs.pending.length ? 'Oldest first by deadline' : 'Queue clear', tabs.pending.length ? '#FBB360' : '#72CA9B')}${K('Raised proactively', 'trend', proN, 'Before any incident occurred')}${K('Median time to decide', 'clock', med === null ? '—' : med + ' s', 'This session')}${K('Accepted by humans', 'check', dec.length ? Math.round(accepted / dec.length * 100) + '%' : '—', `${dec.length} decisions this session`)}</div>
+  <div style="display:grid;grid-template-columns:1fr 320px;gap:8px">
+   <div><div class="row mb" style="gap:8px"><div class="tabs">${[['pending', `Pending (${tabs.pending.length})`], ['decided', `Decided (${tabs.decided.length})`], ['all', 'All']].map(([k, n]) => `<button class="${A.tab === k ? 'on' : ''}" onclick="A.tab='${k}';go('queue',true)">${n}</button>`).join('')}</div></div>
+    ${list.length ? list.map(cardHTML).join('') : `<div class="card"><div class="empty"><div><div class="big">${ic('inbox', 'lg')}</div><h3 style="color:var(--tx);font-size:15px">${A.tab === 'pending' ? 'No decisions waiting' : 'Nothing here yet'}</h3><p style="margin-top:6px">${A.paused ? 'Agents are paused.' : 'Agents will raise proposals as conditions change.'}</p></div></div></div>`}</div>
+   <div style="display:flex;flex-direction:column;gap:8px">
+    <div class="card">${HD('bot', 'Agent activity', 'Live')}<div class="bd log" style="max-height:330px;overflow:auto">${A.log.length ? A.log.map(l => `<div><span>${l[0]}</span><b style="color:${l[1] === 'Human' ? '#72CA9B' : '#8ABBFF'};font-weight:600">${l[1]}</b> · ${l[2]}</div>`).join('') : '<div class="dim" style="border:0">Agents are scanning…</div>'}</div></div>
+    <div class="card">${HD('shield', 'Decision policy')}<div class="bd" style="display:grid;gap:5px;font-size:12px">${LV.map((l, i) => `<div class="row" style="gap:8px"><span class="chip" style="color:${LVC[i]};min-width:104px">${l}</span><span class="dim">${['Enrich, match, update maps', 'Internal actions · 30 s undo', 'Staff alerts, partners, diversions', 'Evacuation, mission closure', 'Legal or diplomatic positions'][i]}</span></div>`).join('')}</div></div>
+   </div></div>`;
+};
+R_.agents = () => {
+  A.view = 'agents';
+  return `<div class="banner ${A.paused ? 'r' : 'g'}">${ic(A.paused ? 'pause' : 'bot')}<div class="grow"><b>${A.paused ? 'Agents paused.' : 'Agents active · running on sovereign infrastructure.'}</b> Agents act only through platform APIs with the same role-based permissions as people; every output is logged.</div><button class="btn ${A.paused ? 'pri' : 'red'} sm" onclick="A.paused=!A.paused;toast(A.paused?'crit':'ok',A.paused?'Kill switch engaged':'Agents resumed',A.paused?'All agents paused · manual playbooks in effect':'Proposals will resume');go('agents',true)">${A.paused ? 'Resume all agents' : 'Kill switch · pause all'}</button></div>
+  <div class="g4 mb">${K('Agents', 'bot', Object.keys(AGENTS).length, A.paused ? 'Paused' : 'All healthy', A.paused ? '#FA999C' : '')}${K('Proposals · 30 days', 'inbox', Object.values(AGENTS).reduce((a, g) => a + g[3], 0).toLocaleString(), 'Plus this session: ' + A.cards.length)}${K('Human override rate', 'users', '11%', '30 days · used to tune agents')}${K('Actions outside approval', 'shield', '0', 'Policy engine enforced', '#72CA9B')}</div>
+  <div class="card">${HD('bot', 'Agent roster', 'Set autonomy per agent · policy floors still apply (e.g. evacuation always needs senior approval)')}
+   <table><thead><tr><th>Agent</th><th>Watches</th><th>Autonomy level</th><th>Proposals · 30d</th><th>Accepted</th><th>This session</th><th>Status</th></tr></thead><tbody>
+   ${Object.entries(AGENTS).map(([k, g]) => { const mine = A.cards.filter(c => c.ag === k); return `<tr><td><div class="row" style="gap:8px">${ic('bot', 'sm')}<b>${g[0]}</b></div></td><td>${g[1]}</td><td><select onchange="A.lv['${k}']=+this.value;aLog('Human','Autonomy for ${g[0]} set to '+LV[+this.value]);go('agents',true)" style="background:#111418;border:1px solid #404854;color:${LVC[A.lv[k]]};padding:3px 6px">${LV.map((l, i) => `<option value="${i}" ${A.lv[k] === i ? 'selected' : ''}>${l}</option>`).join('')}</select></td><td class="mono">${g[3]}</td><td><div class="row" style="gap:6px"><div class="bar" style="width:50px"><i style="width:${g[4]}%"></i></div><span class="mono">${g[4]}%</span></div></td><td class="mono">${mine.length}</td><td>${A.paused ? sev('crit', 'PAUSED') : sev('ok', 'ACTIVE')}</td></tr>`; }).join('')}</tbody></table></div>
+  <div class="g2" style="margin-top:8px">
+   <div class="card">${HD('shield', 'Guardrails')}<div class="bd" style="padding:4px 10px">${tick('y', 'No external message, spend or movement of people without human approval')}${tick('y', 'Evacuation & mission closure need two approvers')}${tick('y', 'Every proposal cites sources and confidence')}${tick('y', 'Models hosted in-country · no external API calls')}${tick('y', 'Agents tested against exercise scenarios before go-live')}</div></div>
+   <div class="card">${HD('layers', 'Where agents sit in the architecture')}<div class="bd" style="font-size:12px;display:grid;gap:6px">${['Data platform & connectors', 'Intelligence & AI layer (fusion, scoring, LLM)', '▶ Agent orchestration + policy engine', 'Business modules (playbooks, comms, evacuation…)', 'Human approval · Decision Queue'].map((l, i) => `<div style="padding:6px 10px;background:${i === 2 ? 'rgba(45,114,210,.25)' : '#252A31'};border-left:3px solid ${i === 2 ? '#2D72D2' : '#404854'}">${l}</div>`).join('')}</div></div></div>`;
+};
+
+/* ---------- navigation, header pill, scenario hooks ---------- */
+(function () { const o = { ...VIEWS }; Object.keys(VIEWS).forEach(k => delete VIEWS[k]); VIEWS.queue = ['Decision Queue', 'Command · Agent proposals awaiting human decision', 'inbox', 'COMMAND']; VIEWS.agents = ['AI Agents', 'Command · Agent roster, autonomy & guardrails', 'bot', 'COMMAND']; Object.assign(VIEWS, o); NEWV.add('queue'); NEWV.add('agents'); })();
+const _navBadge3 = navBadge; navBadge = k => k === 'queue' && pending() ? `<span class="bdg">${pending()}</span>` : k === 'agents' && A.paused ? '<span class="bdg">II</span>' : _navBadge3(k);
+document.querySelector('header .sim').insertAdjacentHTML('beforebegin', '<button class="btn sm" id="agpill" onclick="go(\'queue\')" style="background:#2F343C"></button>');
+SCENES[0][1] = 'queue';
+const _goA = go; go = function (v, soft) { if (v !== 'queue' && v !== 'agents') A.view = v; _goA(v, soft); };
+setInterval(() => {
+  agentTick();
+  const n = pending(); const p = $('#agpill'); if (p) p.innerHTML = `${ic('bot', 'sm')}${A.paused ? 'Agents paused' : n ? `<b style="color:#FBB360">${n}</b>&nbsp;decision${n > 1 ? 's' : ''} pending` : 'Agents active'}`;
+  const sig = A.cards.map(c => c.k + c.st + c.appr.length).join() + A.paused;
+  if (sig !== A.sig) { A.sig = sig; renderNav(); if ((S.view === 'queue' || S.view === 'agents') && !A.editing && !A.rejecting) go(S.view, true); }
+  else if (S.view === 'queue') document.querySelectorAll('#view .hd .dim').forEach(() => { });
+  if (S.view === 'queue' && !A.editing) { /* refresh countdowns cheaply */ const cards = A.cards.filter(c => c.st === 'pending'); if (cards.length) go('queue', true); }
+}, 1000);
+
 /* boot */
-seedFeed(); renderPresenter(); go('ops');
+seedFeed(); renderPresenter(); go('queue');
 </script>
 </body>
 </html>

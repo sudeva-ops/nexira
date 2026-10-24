@@ -211,7 +211,7 @@ Each item gives a proposed resolution. Items marked **(schema)** would need an e
 → *Proposed:* the downgrade drops all objects the migration created, leaves the extensions and roles alone, and does not need to touch the audit TRUNCATE trigger (DROP TABLE is not blocked). The upgrade runs the v0.2 file verbatim, as Prompt 2 says.
 
 **G-28 · The committed demo is the wrong version (found during Prompt 1).** `docs/design/NEXIRA_Demo_Full.html` (md5 `0170a862…`) contains no Decision Queue and no AI Agents screens, and its navigation has no Audit entry. D-25 requires the "NEXIRA_Demo_Full 3.html" version.
-→ *Proposed:* replace the file with version 3 before Prompt 8; it is needed by Prompt 14. Until then, the shell builds its navigation from the D-25 list and uses the existing file for styling only.
+→ **Resolved 2026-10-24:** version 3 has been uploaded and stored as `docs/design/NEXIRA_Demo_Full.html` (md5 `b013ce39…`). The shell now follows its navigation groups: COMMAND (Decision Queue, AI Agents), MONITOR, RESPOND. Audit is not in the demo's navigation, so it sits under ADMIN.
 
 ---
 
