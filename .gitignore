@@ -1,0 +1,19 @@
+# secrets
+.env
+*.pem
+# python
+__pycache__/
+*.pyc
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+# node
+node_modules/
+dist/
+# tiles (built by `make tiles`)
+infra/tiles/
+# os / editor
+.DS_Store
+.idea/
+.vscode/
