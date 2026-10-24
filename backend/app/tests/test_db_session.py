@@ -2,7 +2,6 @@
 and server-generated columns (D-12, D-20)."""
 
 import uuid
-from collections.abc import AsyncIterator
 
 import pytest
 from sqlalchemy import func, select, text
@@ -17,13 +16,6 @@ from app.core.db import (
 )
 from app.models import ActionPolicy, Agent, AgentProposal, AuditLog, Mission
 from app.tests.conftest import DbUrls, create_tenant
-
-
-@pytest.fixture
-async def api_engine(db: DbUrls) -> AsyncIterator[AsyncEngine]:
-    engine = create_engine(db.api)
-    yield engine
-    await engine.dispose()
 
 
 def _mission(tenant: uuid.UUID, code: str) -> Mission:

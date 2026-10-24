@@ -148,3 +148,42 @@ body {
   min-height: 0;
   overflow: auto;
 }
+
+.nx-user {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nx-user-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+
+.nx-user-roles {
+  display: flex;
+  gap: 4px;
+  color: var(--nx-tx3);
+  font-size: 10px;
+}
+
+.nx-pad {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+}
+
+.nx-table {
+  width: 100%;
+}
+
+.nx-mono {
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.nx-dim {
+  color: var(--nx-tx3);
+}

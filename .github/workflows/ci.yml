@@ -46,13 +46,9 @@ jobs:
       - name: Test
         working-directory: backend
         run: uv run pytest
-
-  simulator:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-      - working-directory: simulator
+      # The simulator loads data through the backend and reuses its DB fixtures.
+      - name: Simulator lint and test
+        working-directory: simulator
         run: |
           uv sync --frozen --python 3.12
           uv run ruff check . && uv run ruff format --check . && uv run mypy

@@ -16,6 +16,7 @@ Start here:
 ```sh
 make up        # creates .env from .env.example on first run, builds and starts everything
 make migrate   # applies the schema (docs/schema/nexira_schema.sql v0.2) as nexira_owner
+make seed      # demo tenant, roles and demo users (more seed data in Prompt 4)
 ```
 
 | Service | URL | Notes |
@@ -27,6 +28,25 @@ make migrate   # applies the schema (docs/schema/nexira_schema.sql v0.2) as nexi
 | Redis | localhost:6379 | |
 
 All ports are bound to 127.0.0.1. Change them in `.env` if they clash with something already running.
+
+### Demo users
+
+Open http://localhost:3000 and sign in with one of these fictional users. The password for all of them is `DEMO_USER_PASSWORD` in `.env` (default `local-demo-pw`). Roles come from the database (`make seed`), not from Keycloak (D-04).
+
+| Username | Name | Roles |
+|---|---|---|
+| `admin` | Nora Lind | ADMIN |
+| `duty.officer` | Daniel Mercer | DUTY_OFFICER |
+| `security.officer` | Leila Nasser | SECURITY_OFFICER |
+| `hom.nairobi` | Layla Haddad | HEAD_OF_MISSION · NBO |
+| `hom.cairo` | Ahmed Farouk | HEAD_OF_MISSION · CAI (tests mission scope) |
+| `hq.director` | Miriam Okafor | HQ_CRISIS_DIRECTOR |
+| `travel.desk` | Tomas Reyes | TRAVEL_DESK |
+| `consular.officer` | Anika Shah | CONSULAR_OFFICER |
+| `viewer` | Victor Lowe | VIEWER |
+| `dual.role` | Elias Brandt | HEAD_OF_MISSION · NBO and HQ_CRISIS_DIRECTOR (tests the two-person rule) |
+
+The realm also has a `nexira-dev-cli` client that allows the password grant, for local scripts and tests only. It must not exist in a pilot realm.
 
 ### Database roles (D-01)
 

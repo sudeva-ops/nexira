@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core.db import get_engine, verify_connection_role
+from app.modules.audit.router import router as audit_router
+from app.modules.tenancy.router import router as tenancy_router
 
 
 @asynccontextmanager
@@ -21,6 +23,10 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
+
+
+app.include_router(tenancy_router)
+app.include_router(audit_router)
 
 
 @app.get("/api/health")
