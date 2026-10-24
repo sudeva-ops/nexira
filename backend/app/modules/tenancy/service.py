@@ -7,7 +7,7 @@ twice changes nothing and writes no second audit row.
 import uuid
 from dataclasses import dataclass
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -132,5 +132,39 @@ async def grant_role(
             "role_id": str(role_id),
             "mission_id": str(mission_id) if mission_id else None,
         },
+    )
+    return True
+
+
+async def ensure_reference_counter(
+    session: AsyncSession, *, prefix: str, with_year: bool, last_value: int, actor: Actor = SYSTEM
+) -> bool:
+    """Start a reference series (D-18), e.g. INC for the current UTC year at 1041 so the
+    next incident is INC-<year>-1042. An existing counter is never reset."""
+    created = await session.scalar(
+        text(
+            """
+            INSERT INTO reference_counter (tenant_id, prefix, year, last_value)
+            VALUES (current_tenant_id(), :prefix,
+                    CASE WHEN :with_year
+                         THEN extract(year FROM now() AT TIME ZONE 'UTC')::smallint
+                         ELSE 0 END,
+                    :last_value)
+            ON CONFLICT DO NOTHING
+            RETURNING year
+            """
+        ),
+        {"prefix": prefix, "with_year": with_year, "last_value": last_value},
+    )
+    if created is None:
+        return False
+    await audit.write(
+        session,
+        actor_type=actor.type,
+        actor_id=actor.id,
+        action="REFERENCE_COUNTER.CREATE",
+        entity_type="reference_counter",
+        entity_id=f"{prefix}:{created}",
+        details={"last_value": last_value},
     )
     return True
