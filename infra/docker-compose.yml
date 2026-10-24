@@ -1,0 +1,107 @@
+# Local development stack. Run through the Makefile, which passes --env-file ../.env.
+# All ports bind to 127.0.0.1 only.
+name: nexira
+
+x-api-env: &api-env
+  APP_ENV: ${APP_ENV:-local}
+  # D-01: the API connects as nexira_api only. No owner credentials here.
+  DATABASE_URL: postgresql+asyncpg://nexira_api:${NEXIRA_API_PASSWORD}@postgres:5432/${NEXIRA_DB:-nexira}
+  REDIS_URL: redis://redis:6379/0
+  OIDC_ISSUER: ${OIDC_ISSUER}
+  OIDC_JWKS_URL: http://keycloak:8080/realms/nexira-demo/protocol/openid-connect/certs
+  OIDC_AUDIENCE: ${OIDC_AUDIENCE}
+  HOME_TZ: ${HOME_TZ:-Asia/Dubai}
+  LLM_PROVIDER: ${LLM_PROVIDER:-stub}
+  LLM_BASE_URL: ${LLM_BASE_URL}
+  LLM_MODEL: ${LLM_MODEL}
+  WORKER_TENANT_IDS: ${WORKER_TENANT_IDS:-[]}
+  UNDO_WINDOW_S: ${UNDO_WINDOW_S:-300}
+
+services:
+  postgres:
+    build: ./postgres
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      NEXIRA_DB: ${NEXIRA_DB:-nexira}
+      NEXIRA_OWNER_PASSWORD: ${NEXIRA_OWNER_PASSWORD}
+      NEXIRA_API_PASSWORD: ${NEXIRA_API_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${NEXIRA_DB:-nexira}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      # Plan G-04: pin the issuer to the browser-facing URL, while the backend
+      # still reaches Keycloak on the internal network for JWKS.
+      KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8080}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import:ro
+    ports:
+      - "127.0.0.1:${KEYCLOAK_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # One-shot job: `make migrate`. The only service that gets the owner DSN (D-01).
+  migrate:
+    build: ../backend
+    profiles: ["tools"]
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *api-env
+      MIGRATIONS_DATABASE_URL: postgresql+asyncpg://nexira_owner:${NEXIRA_OWNER_PASSWORD}@postgres:5432/${NEXIRA_DB:-nexira}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build: ../backend
+    environment: *api-env
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        VITE_HOME_TZ: ${VITE_HOME_TZ:-Asia/Dubai}
+        VITE_DEMO_MODE: ${VITE_DEMO_MODE:-false}
+    volumes:
+      - ./tiles:/srv/tiles:ro
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  pgdata:

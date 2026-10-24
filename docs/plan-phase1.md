@@ -210,6 +210,9 @@ Each item gives a proposed resolution. Items marked **(schema)** would need an e
 **G-27 · Alembic downgrade and extensions.** The schema file runs `CREATE EXTENSION IF NOT EXISTS`, but the superuser owns the extensions (D-01).
 → *Proposed:* the downgrade drops all objects the migration created, leaves the extensions and roles alone, and does not need to touch the audit TRUNCATE trigger (DROP TABLE is not blocked). The upgrade runs the v0.2 file verbatim, as Prompt 2 says.
 
+**G-28 · The committed demo is the wrong version (found during Prompt 1).** `docs/design/NEXIRA_Demo_Full.html` (md5 `0170a862…`) contains no Decision Queue and no AI Agents screens, and its navigation has no Audit entry. D-25 requires the "NEXIRA_Demo_Full 3.html" version.
+→ *Proposed:* replace the file with version 3 before Prompt 8; it is needed by Prompt 14. Until then, the shell builds its navigation from the D-25 list and uses the existing file for styling only.
+
 ---
 
 ## 4. Questions before Prompt 1

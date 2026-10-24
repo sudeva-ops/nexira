@@ -1,0 +1,150 @@
+/* Layout and colours follow docs/design/NEXIRA_Demo_Full.html (visual reference only, D-25). */
+:root {
+  --nx-bg: #111418;
+  --nx-panel: #1c2127;
+  --nx-panel2: #252a31;
+  --nx-line: #111418;
+  --nx-tx: #f6f7f9;
+  --nx-tx2: #abb3bf;
+  --nx-tx3: #738091;
+  --nx-group: #5f6b7c;
+  --nx-active: #2d72d2;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--nx-bg);
+  color: var(--nx-tx);
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.nx-app {
+  display: grid;
+  grid-template-columns: 212px 1fr;
+  height: 100vh;
+}
+
+.nx-aside {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--nx-panel);
+  border-inline-end: 1px solid var(--nx-line);
+}
+
+.nx-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 12px;
+  flex: none;
+  background: var(--nx-panel2);
+  border-bottom: 1px solid var(--nx-line);
+}
+
+.nx-brand svg {
+  width: 20px;
+  height: 20px;
+}
+
+.nx-brand b {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.nx-aside nav {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-bottom: 6px;
+}
+
+.nx-nav-group {
+  padding: 10px 12px 3px;
+  color: var(--nx-group);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.nx-nav {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 12px;
+  color: var(--nx-tx2);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.nx-nav:hover {
+  background: var(--nx-panel2);
+  color: var(--nx-tx);
+  text-decoration: none;
+}
+
+.nx-nav-active,
+.nx-nav-active:hover {
+  background: var(--nx-active);
+  color: #fff;
+}
+
+.nx-main {
+  display: grid;
+  grid-template-rows: 44px 1fr;
+  min-width: 0;
+  min-height: 0;
+}
+
+.nx-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  background: var(--nx-panel2);
+  border-bottom: 1px solid var(--nx-line);
+}
+
+.nx-header h1 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nx-crumb {
+  color: var(--nx-tx3);
+  font-size: 11px;
+}
+
+.nx-grow {
+  flex: 1;
+}
+
+.nx-clock {
+  display: flex;
+  flex-direction: column;
+  text-align: end;
+  line-height: 1.25;
+  color: var(--nx-tx2);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+}
+
+.nx-clock b {
+  color: var(--nx-tx);
+  font-weight: 600;
+}
+
+.nx-view {
+  min-height: 0;
+  overflow: auto;
+}

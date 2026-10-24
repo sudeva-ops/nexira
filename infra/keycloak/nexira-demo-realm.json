@@ -1,0 +1,18 @@
+{
+  "realm": "nexira-demo",
+  "displayName": "NEXIRA demo (fictional users only)",
+  "enabled": true,
+  "sslRequired": "external",
+  "clients": [
+    {
+      "clientId": "nexira-web",
+      "name": "NEXIRA web app",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*", "http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:3000", "http://localhost:5173"],
+      "attributes": { "pkce.code.challenge.method": "S256" }
+    }
+  ]
+}
