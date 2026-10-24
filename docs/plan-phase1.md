@@ -231,7 +231,7 @@ Each item gives a proposed resolution. Items marked **(schema)** would need an e
   - Q7 · `UNDO_WINDOW_S` = 300.
   - Q10 · The simulator imports the backend package as a path dependency.
 
-Still open: the branch/PR part of Q9. For now each prompt gets a local branch.
+- Q9 (workflow) · From Prompt 3 on, each prompt is a branch pushed to the private GitHub repo `sudeva-ops/nexira` with a pull request. D-29 sign-offs are recorded in the PR (Prompts 0–2 recorded theirs in merge commits).
 
 1. **Tooling approval (decisions.md §9.1).** Is it confirmed that Claude Code and this repository host are approved for these "Internal" documents? I won't push to a remote until you say so.
 2. **Header clock.** Is "GST" Gulf Standard Time (UTC+4)? I'll make it a config key (`HOME_TZ`, default `Asia/Dubai`) unless you want something else.
