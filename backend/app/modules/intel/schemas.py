@@ -5,10 +5,17 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 
+class SourceRef(BaseModel):
+    code: str
+    name: str
+    simulated: bool  # D-19: shown as "<name> (simulated)", never "Connected"
+
+
 class SignalOut(BaseModel):
     id: int
     source_code: str
     source_name: str
+    source_simulated: bool
     external_id: str
     title: str
     provider_category: str | None
@@ -42,7 +49,7 @@ class IncidentOut(BaseModel):
     opened_at: datetime
     last_signal_at: datetime
     signal_count: int
-    sources: list[str]
+    sources: list[SourceRef]
 
 
 class IncidentEventOut(BaseModel):
@@ -61,6 +68,8 @@ class ExposureOut(BaseModel):
     name: str  # person name, site name or trip reference
     kind: str  # person_type, site_type, or "TRIP"
     mission_code: str | None
+    lat: float | None  # person: current location; site: its location; trip: none
+    lon: float | None
     distance_m: int | None
     confidence: int | None  # person: location confidence; trip: best traveller
     location_source: str | None  # person: primary_source of the current location
@@ -94,3 +103,21 @@ class StatusIn(BaseModel):
 
 class NoteIn(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
+
+
+class OperationsSummaryOut(BaseModel):
+    """OPS-03 KPI strip, computed from data (D-27)."""
+
+    missions: int
+    missions_elevated: int  # display risk MODERATE or above (plan G-22)
+    missions_critical: int
+    personnel: int  # active people other than citizens
+    personnel_located: int
+    avg_location_confidence: float | None
+    citizens: int
+    mission_sites: int  # D-23: site types other than HOTEL
+    trips_active: int  # starts_on <= today (UTC) <= ends_on
+    travellers_active: int
+    signals_24h: int
+    incidents_active: int
+    highest_active_severity: str | None

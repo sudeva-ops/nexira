@@ -15,13 +15,16 @@ from app.modules.intel.models import (
     IntelSource,
     RawSignal,
 )
+from app.modules.intel.normalise import severity_rank
 from app.modules.intel.schemas import (
     ExposureOut,
     ExposureSummaryOut,
     IncidentEventOut,
     IncidentOut,
+    OperationsSummaryOut,
     SignalOut,
 )
+from app.modules.people import queries as people_queries
 from app.modules.people.models import Mission
 
 
@@ -31,6 +34,7 @@ def _signals() -> Select[Any]:
             RawSignal,
             IntelSource.code.label("source_code"),
             IntelSource.name.label("source_name"),
+            (IntelSource.connector_type == "SIMULATED").label("source_simulated"),
             func.ST_Y(func.geometry(RawSignal.location)).label("lat"),
             func.ST_X(func.geometry(RawSignal.location)).label("lon"),
             Incident.id.label("incident_id"),
@@ -48,6 +52,7 @@ def _signal_out(row: Any) -> SignalOut:
         id=s.id,
         source_code=row.source_code,
         source_name=row.source_name,
+        source_simulated=row.source_simulated,
         external_id=s.external_id,
         title=s.title,
         provider_category=s.provider_category,
@@ -77,7 +82,18 @@ def _incidents() -> Select[Any]:
         select(
             IncidentSignal.incident_id,
             func.count().label("signal_count"),
-            func.array_agg(func.distinct(IntelSource.name)).label("sources"),
+            func.jsonb_agg(
+                func.distinct(
+                    func.jsonb_build_object(
+                        "code",
+                        IntelSource.code,
+                        "name",
+                        IntelSource.name,
+                        "simulated",
+                        IntelSource.connector_type == "SIMULATED",
+                    )
+                )
+            ).label("sources"),
         )
         .join(RawSignal, RawSignal.id == IncidentSignal.signal_id)
         .join(IntelSource, IntelSource.id == RawSignal.source_id)
@@ -112,7 +128,7 @@ def _incident_fields(row: Any) -> dict[str, Any]:
         "opened_at": i.opened_at,
         "last_signal_at": i.last_signal_at,
         "signal_count": row.signal_count,
-        "sources": sorted(row.sources or []),
+        "sources": sorted(row.sources or [], key=lambda src: src["name"]),
     }
 
 
@@ -139,6 +155,8 @@ _EXPOSURE = text(
            coalesce(p.full_name, s.name, t.reference) AS name,
            coalesce(p.person_type, s.site_type, 'TRIP') AS kind,
            m.code AS mission_code,
+           ST_Y(coalesce(l.location, s.location)::geometry) AS lat,
+           ST_X(coalesce(l.location, s.location)::geometry) AS lon,
            l.primary_source AS location_source,
            coalesce(l.place_label, t.destination) AS place_label
       FROM incident_exposure e
@@ -183,4 +201,43 @@ async def get_incident(
         [ExposureOut(**r._asdict()) for r in exposed],
         [_signal_out(r) for r in signals],
         [IncidentEventOut.model_validate(e, from_attributes=True) for e in events],
+    )
+
+
+_SUMMARY = text(
+    """
+    SELECT
+      (SELECT count(*) FROM person WHERE is_active AND person_type <> 'CITIZEN') AS personnel,
+      (SELECT count(*) FROM person p JOIN person_location_current l ON l.person_id = p.id
+        WHERE p.is_active AND p.person_type <> 'CITIZEN') AS personnel_located,
+      (SELECT round(avg(l.confidence), 1) FROM person p
+         JOIN person_location_current l ON l.person_id = p.id
+        WHERE p.is_active AND p.person_type <> 'CITIZEN') AS avg_location_confidence,
+      (SELECT count(*) FROM person WHERE is_active AND person_type = 'CITIZEN') AS citizens,
+      (SELECT count(*) FROM site WHERE site_type <> 'HOTEL') AS mission_sites,
+      (SELECT count(*) FROM trip
+        WHERE (now() AT TIME ZONE 'UTC')::date BETWEEN starts_on AND ends_on) AS trips_active,
+      (SELECT count(DISTINCT tt.person_id) FROM trip t JOIN trip_traveller tt ON tt.trip_id = t.id
+        WHERE (now() AT TIME ZONE 'UTC')::date BETWEEN t.starts_on AND t.ends_on)
+        AS travellers_active,
+      (SELECT count(*) FROM raw_signal WHERE received_at > now() - interval '24 hours')
+        AS signals_24h,
+      (SELECT count(*) FROM incident WHERE status = 'ACTIVE') AS incidents_active,
+      (SELECT severity FROM incident WHERE status = 'ACTIVE'
+        ORDER BY severity_rank(severity) DESC LIMIT 1) AS highest_active_severity
+    """
+)
+
+
+async def operations_summary(session: AsyncSession) -> OperationsSummaryOut:
+    missions = await people_queries.list_missions(session)
+    row = (await session.execute(_SUMMARY)).one()
+    values = row._asdict()
+    avg = values.pop("avg_location_confidence")
+    return OperationsSummaryOut(
+        missions=len(missions),
+        missions_elevated=sum(severity_rank(m.display_risk) >= 2 for m in missions),
+        missions_critical=sum(m.display_risk == "CRITICAL" for m in missions),
+        avg_location_confidence=float(avg) if avg is not None else None,
+        **values,
     )

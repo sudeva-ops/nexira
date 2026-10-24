@@ -3,10 +3,10 @@ COMPOSE := docker compose --env-file .env -f infra/docker-compose.yml
 APP_ENV ?= $(shell grep -E '^APP_ENV=' .env 2>/dev/null | cut -d= -f2)
 
 .PHONY: help env up down logs test test-backend test-simulator test-frontend \
-        lint lint-backend lint-simulator lint-frontend migrate seed reset-demo tiles
+        lint lint-backend lint-simulator lint-frontend migrate seed reset-demo tiles e2e
 
 help:
-	@echo "up | down | logs | test | lint | migrate | seed | reset-demo | tiles"
+	@echo "up | down | logs | test | lint | e2e | migrate | seed | reset-demo | tiles"
 
 env:
 	@test -f .env || (cp .env.example .env && echo "Created .env from .env.example")
@@ -31,6 +31,11 @@ test-simulator: env
 
 test-frontend:
 	cd frontend && npm run test
+
+# Playwright against the running stack (`make up`, then `make seed` or `make reset-demo`).
+e2e: env
+	cd frontend && npx playwright install chromium
+	set -a && . ./.env && set +a && cd frontend && npx playwright test
 
 lint: lint-backend lint-simulator lint-frontend
 
@@ -63,7 +68,7 @@ reset-demo: env
 	$(MAKE) migrate
 	$(MAKE) seed
 
-# D-24: builds PMTiles into infra/tiles/. Implemented in Prompt 8.
+# D-24: world (z0-6) and Nairobi (z0-15) PMTiles, fonts and sprites into infra/tiles/
+# (not committed). Downloads at build time only; the app works offline afterwards.
 tiles:
-	@mkdir -p infra/tiles
-	@echo "tiles: not implemented yet (Prompt 8)."
+	infra/scripts/build-tiles.sh

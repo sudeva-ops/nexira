@@ -190,7 +190,7 @@ Each item gives a proposed resolution. Items marked **(schema)** would need an e
 **G-21 · Validating edit-and-approve.** `edited_payload` could change what an action does, for example widening an advisory's audience. The policy level cannot change, because `action_type` is frozen.
 → *Proposed:* each action type has a Pydantic payload schema. `edited_payload` must pass the same schema, and for SEND_EXTERNAL_MESSAGE the audience cannot be widened beyond the original. The executor uses `edited_payload` when it is present. The audit row stores both payloads.
 
-**G-22 · Mission risk colour on the map.** The demo turns NBO red during the incident. Scene 0 needs NBO to be LOW. No document says who changes `mission.risk_level`.
+**G-22 · Mission risk colour on the map.** *(Implemented in Prompt 8: `GET /api/missions` returns `display_risk`.)* The demo turns NBO red during the incident. Scene 0 needs NBO to be LOW. No document says who changes `mission.risk_level`.
 → *Proposed:* the stored `risk_level` stays the baseline and is never changed automatically. The UI and API show `display_risk = max(risk_level, highest ACTIVE incident severity where incident.mission_id = mission.id)`. Labels for missions follow D-08.
 
 ### 3.4 Document and ID inconsistencies (no design impact)
