@@ -16,7 +16,8 @@ def run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    url = get_settings().migrations_database_url
+    # Tests pass their own database through config.attributes["url"].
+    url = context.config.attributes.get("url") or get_settings().migrations_database_url
     if not url:
         raise SystemExit("MIGRATIONS_DATABASE_URL (nexira_owner) is required to run migrations.")
     engine = create_async_engine(url)
