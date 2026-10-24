@@ -14,7 +14,7 @@ from app.tests.conftest import DbUrls, create_tenant
 
 T0 = datetime(2026, 10, 20, 6, 0, tzinfo=UTC)
 EPICENTRE = (-1.2841, 36.8233)
-KM_LAT = 1 / 111.32  # degrees of latitude per km
+KM_LAT = 1 / 110.574  # degrees of latitude per km near the equator (WGS84)
 
 SOURCES = [
     SourceIn(

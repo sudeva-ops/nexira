@@ -142,7 +142,7 @@ Each item gives a proposed resolution. Items marked **(schema)** would need an e
 **G-10 · Personnel totals: 926 vs about 1,300.** *(Implemented in Prompt 4.)* The demo's MISSIONS array adds up to **926** staff over 36 missions. The demo's "Personnel" KPI shows `926 + 412 = 1,338`. D-27 says "about 1,300 staff and delegates".
 → *Proposed:* seed exactly the per-mission staff numbers from the array as DIPLOMAT and LOCAL_STAFF (Nairobi = 14). Then add 412 more people as DEPENDANT, DELEGATE and CONTRACTOR, all outside Nairobi apart from the 3 delegates. That gives about 1,338, all computed from data (D-27).
 
-**G-11 · Trip "active today" breaks determinism.** *(Seed side implemented in Prompt 4; exposure uses `incident.opened_at` in Prompt 7.)* D-22 counts a trip only if `starts_on ≤ today ≤ ends_on`. Prompt 4 wants the seed to be identical every time it runs, and tests run on any date.
+**G-11 · Trip "active today" breaks determinism.** *(Implemented: seed side in Prompt 4, exposure in Prompt 7.)* D-22 counts a trip only if `starts_on ≤ today ≤ ends_on`. Prompt 4 wants the seed to be identical every time it runs, and tests run on any date.
 → *Proposed:* exposure judges the trip against `incident.opened_at::date` (UTC), not `now()`. The seed takes a `SCENARIO_DATE` (default: the seeding date) and sets TRP-8812 to `[SCENARIO_DATE − 1, SCENARIO_DATE + 3]`. The determinism test pins `SCENARIO_DATE`. Seed UUIDs are uuid5 values from natural keys, so `gen_random_uuid()` defaults are never used for seeded rows.
 
 **G-12 · What the Paris control signal should produce is not stated.** The signal sits on the Paris mission coordinates, so the Paris embassy and Paris staff will be exposed.
