@@ -8,6 +8,9 @@
   setting is empty and every tenant table returns zero rows. Request sessions
   come from app/core/security.get_db, which takes the tenant from the token.
 - READ COMMITTED isolation, which the audit chain relies on (D-20).
+- Importing this module registers every model (app.models), so foreign keys
+  resolve in any process that opens a session, such as a worker that only
+  imports the intel module.
 """
 
 import uuid
@@ -26,6 +29,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import Session, SessionTransaction
 
+import app.models  # noqa: F401  # registers every model; see the module docstring
 from app.core.config import get_settings
 from app.core.model_base import Base
 

@@ -88,7 +88,25 @@ POST /api/scenarios/NBO-CIVIL-UNREST/reset   # back to scene 0 as a new run; bus
 GET  /api/scenarios/NBO-CIVIL-UNREST         # state and scene list
 ```
 
-The player publishes to the Redis stream `nexira:events` and never writes business tables. Ingestion (Prompts 6 and 10) consumes the stream. Only scenes 1 (four signals) and 4 (check-in answers) contain data events; the other scenes need the platform or logged-in users.
+The player publishes to the Redis stream `nexira:events` and never writes business tables. The `worker` container consumes the stream (check-in answers follow in Prompt 10). Only scenes 1 (four signals) and 4 (check-in answers) contain data events; the other scenes need the platform or logged-in users.
+
+### Signals and incidents
+
+The `worker` container (`python -m app.workers`, same image as the backend) reads `RAW_SIGNAL` events from the stream. For each one it:
+
+1. stores a `raw_signal` row, ignoring a repeat of the same source and `external_id`;
+2. maps category and severity through that source's own maps, and discards the signal (with an audit entry) when a value is unknown;
+3. joins it to an active incident of the same category within 3 km and 60 min, or opens a new one (D-10).
+
+It then publishes `INCIDENT_CREATED` or `INCIDENT_UPDATED`. Any user with a role can read the results:
+
+```sh
+GET /api/signals?status=FUSED   # NEW, NORMALISED, FUSED or DISCARDED; newest first
+GET /api/incidents?status=ACTIVE
+GET /api/incidents/{id}         # with its signals and timeline
+```
+
+`make logs` shows the worker's output.
 
 ### Everyday commands
 
@@ -121,6 +139,7 @@ cd backend
 uv sync
 set -a; . ../.env; set +a
 uv run uvicorn app.main:app --reload
+uv run python -m app.workers      # in a second terminal: the stream consumer
 ```
 
 ## Repository layout

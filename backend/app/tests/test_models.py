@@ -1,5 +1,8 @@
 """The SQLAlchemy models mirror the migrated schema (tables, columns, nullability, keys)."""
 
+import subprocess
+import sys
+
 import asyncpg
 import pytest
 
@@ -62,3 +65,17 @@ async def test_model_primary_keys_match(db: DbUrls) -> None:
         db_pks.setdefault(r["table_name"], set()).add(r["column_name"])
     for name, table in Base.metadata.tables.items():
         assert {c.name for c in table.primary_key.columns} == db_pks[name], name
+
+
+def test_a_worker_process_registers_every_model() -> None:
+    """A fresh interpreter that imports only the worker must know every table, or
+    queries joining incident -> mission fail there (found on the real stack)."""
+    script = (
+        "import app.workers.__main__\n"
+        "from app.core.model_base import Base\n"
+        "print(len(Base.metadata.tables))\n"
+    )
+    out = subprocess.run(
+        [sys.executable, "-c", script], capture_output=True, text=True, check=True, timeout=60
+    )
+    assert int(out.stdout) == len(Base.metadata.tables)
