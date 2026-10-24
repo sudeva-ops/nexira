@@ -8,14 +8,14 @@ from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, Field, ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import audit
 from app.core.events import Event
 from app.modules.intel.fusion import Fused, fuse
-from app.modules.intel.models import IntelSource, RawSignal
+from app.modules.intel.models import Incident, IncidentEvent, IntelSource, RawSignal
 from app.modules.intel.normalise import normalise
 from app.modules.tenancy.service import SYSTEM, Actor
 
@@ -210,6 +210,63 @@ def incident_event(ingested: Ingested, tenant_id: uuid.UUID) -> Event | None:
             "signal_id": ingested.signal_id,
             "confidence": fused.confidence,
             "signal_severity": fused.signal_severity,
+            "change": "signal",
         },
         source="intel.fusion",
     )
+
+
+async def change_status(
+    session: AsyncSession, incident: Incident, status: str, actor: Actor
+) -> IncidentEvent:
+    """INC-07: set ACTIVE / MONITORING / CLOSED, on the timeline and in the audit log."""
+    previous = incident.status
+    incident.status = status
+    incident.closed_at = func.now() if status == "CLOSED" else None
+    event = IncidentEvent(
+        tenant_id=incident.tenant_id,
+        incident_id=incident.id,
+        event_type="STATUS",
+        summary=f"Status {previous} → {status}.",
+        actor_type=actor.type,
+        actor_id=actor.id,
+        data={"from": previous, "to": status},
+    )
+    session.add(event)
+    await session.flush()
+    await audit.write(
+        session,
+        actor_type=actor.type,
+        actor_id=actor.id,
+        action="INCIDENT.STATUS_CHANGE",
+        entity_type="incident",
+        entity_id=incident.reference,
+        details={"from": previous, "to": status},
+    )
+    return event
+
+
+async def add_note(
+    session: AsyncSession, incident: Incident, note: str, actor: Actor
+) -> IncidentEvent:
+    """INC-07: a free-text note on the incident timeline."""
+    event = IncidentEvent(
+        tenant_id=incident.tenant_id,
+        incident_id=incident.id,
+        event_type="NOTE",
+        summary=note,
+        actor_type=actor.type,
+        actor_id=actor.id,
+    )
+    session.add(event)
+    await session.flush()
+    await audit.write(
+        session,
+        actor_type=actor.type,
+        actor_id=actor.id,
+        action="INCIDENT.NOTE_ADD",
+        entity_type="incident",
+        entity_id=incident.reference,
+        details={"incident_event_id": event.id, "length": len(note)},
+    )
+    return event

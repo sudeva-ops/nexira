@@ -1,8 +1,8 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SignalOut(BaseModel):
@@ -55,6 +55,42 @@ class IncidentEventOut(BaseModel):
     data: dict[str, Any]
 
 
+class ExposureOut(BaseModel):
+    subject_type: str  # PERSON, SITE, TRIP
+    subject_id: uuid.UUID
+    name: str  # person name, site name or trip reference
+    kind: str  # person_type, site_type, or "TRIP"
+    mission_code: str | None
+    distance_m: int | None
+    confidence: int | None  # person: location confidence; trip: best traveller
+    location_source: str | None  # person: primary_source of the current location
+    place_label: str | None
+
+
+class ExposureSummaryOut(BaseModel):
+    """D-23 shape; the UI's Sites figure is mission_sites (site types other than HOTEL)."""
+
+    staff: int
+    delegates: int
+    citizens: int
+    people: int
+    sites: int
+    mission_sites: int
+    protected_sites: int
+    trips: int
+
+
 class IncidentDetailOut(IncidentOut):
+    mission_code: str | None
+    exposure_summary: ExposureSummaryOut
+    exposure: list[ExposureOut]
     signals: list[SignalOut]
     timeline: list[IncidentEventOut]
+
+
+class StatusIn(BaseModel):
+    status: Literal["ACTIVE", "MONITORING", "CLOSED"]
+
+
+class NoteIn(BaseModel):
+    text: str = Field(min_length=1, max_length=4000)

@@ -1,11 +1,13 @@
 """Read queries for the intel API (tenant-scoped by RLS like every other read)."""
 
 import uuid
+from dataclasses import asdict
 from typing import Any
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.intel import exposure
 from app.modules.intel.models import (
     Incident,
     IncidentEvent,
@@ -13,7 +15,14 @@ from app.modules.intel.models import (
     IntelSource,
     RawSignal,
 )
-from app.modules.intel.schemas import IncidentEventOut, IncidentOut, SignalOut
+from app.modules.intel.schemas import (
+    ExposureOut,
+    ExposureSummaryOut,
+    IncidentEventOut,
+    IncidentOut,
+    SignalOut,
+)
+from app.modules.people.models import Mission
 
 
 def _signals() -> Select[Any]:
@@ -124,12 +133,43 @@ async def list_incidents(
     return [IncidentOut(**_incident_fields(r)) for r in await session.execute(query)]
 
 
+_EXPOSURE = text(
+    """
+    SELECT e.subject_type, e.subject_id, e.distance_m, e.confidence,
+           coalesce(p.full_name, s.name, t.reference) AS name,
+           coalesce(p.person_type, s.site_type, 'TRIP') AS kind,
+           m.code AS mission_code,
+           l.primary_source AS location_source,
+           coalesce(l.place_label, t.destination) AS place_label
+      FROM incident_exposure e
+      LEFT JOIN person p ON e.subject_type = 'PERSON' AND p.id = e.subject_id
+      LEFT JOIN person_location_current l ON l.person_id = p.id
+      LEFT JOIN site s ON e.subject_type = 'SITE' AND s.id = e.subject_id
+      LEFT JOIN trip t ON e.subject_type = 'TRIP' AND t.id = e.subject_id
+      LEFT JOIN mission m ON m.id = coalesce(p.mission_id, s.mission_id)
+     WHERE e.incident_id = :incident_id
+     ORDER BY CASE e.subject_type WHEN 'SITE' THEN 0 WHEN 'TRIP' THEN 1 ELSE 2 END,
+              e.distance_m, name
+    """
+)
+
+
 async def get_incident(
     session: AsyncSession, incident_id: uuid.UUID
-) -> tuple[dict[str, Any], list[SignalOut], list[IncidentEventOut]] | None:
+) -> tuple[dict[str, Any], list[ExposureOut], list[SignalOut], list[IncidentEventOut]] | None:
     row = (await session.execute(_incidents().where(Incident.id == incident_id))).one_or_none()
     if row is None:
         return None
+    fields = _incident_fields(row)
+    fields["mission_code"] = (
+        await session.scalar(select(Mission.code).where(Mission.id == fields["mission_id"]))
+        if fields["mission_id"]
+        else None
+    )
+    fields["exposure_summary"] = ExposureSummaryOut(
+        **asdict(await exposure.exposure_counts(session, incident_id))
+    )
+    exposed = await session.execute(_EXPOSURE, {"incident_id": incident_id})
     signals = await session.execute(
         _signals().where(IncidentSignal.incident_id == incident_id).order_by(RawSignal.occurred_at)
     )
@@ -139,7 +179,8 @@ async def get_incident(
         .order_by(IncidentEvent.occurred_at, IncidentEvent.id)
     )
     return (
-        _incident_fields(row),
+        fields,
+        [ExposureOut(**r._asdict()) for r in exposed],
         [_signal_out(r) for r in signals],
         [IncidentEventOut.model_validate(e, from_attributes=True) for e in events],
     )

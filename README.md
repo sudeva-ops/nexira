@@ -98,12 +98,26 @@ The `worker` container (`python -m app.workers`, same image as the backend) read
 2. maps category and severity through that source's own maps, and discards the signal (with an audit entry) when a value is unknown;
 3. joins it to an active incident of the same category within 3 km and 60 min, or opens a new one (D-10).
 
-It then publishes `INCIDENT_CREATED` or `INCIDENT_UPDATED`. Any user with a role can read the results:
+It then publishes `INCIDENT_CREATED` or `INCIDENT_UPDATED`. A second consumer group recomputes the incident's exposure on each of those events:
+- people, sites and trips within the impact radius (D-22);
+- the incident's mission, taken from the nearest exposed site (D-06);
+- severity raised one level when a protected site is exposed (D-11).
+
+It then publishes `EXPOSURE_COMPUTED`.
+
+Any user with a role can read the results:
 
 ```sh
 GET /api/signals?status=FUSED   # NEW, NORMALISED, FUSED or DISCARDED; newest first
 GET /api/incidents?status=ACTIVE
-GET /api/incidents/{id}         # with its signals and timeline
+GET /api/incidents/{id}         # with exposure, signals and timeline
+```
+
+Duty and Security Officers and the HQ Crisis Director can change an incident's status and add notes, and so can the Head of Mission for the incident's mission. Consular Officers and the Travel Desk can add notes too. Both actions are audited and appear on the timeline (INC-07):
+
+```sh
+PATCH /api/incidents/{id}/status   {"status": "MONITORING"}   # ACTIVE, MONITORING or CLOSED
+POST  /api/incidents/{id}/notes    {"text": "..."}
 ```
 
 `make logs` shows the worker's output.
