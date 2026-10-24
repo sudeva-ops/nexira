@@ -220,7 +220,15 @@ Each item gives a proposed resolution. Items marked **(schema)** would need an e
 - Q8 · The named reviewer for 🔒 gates (D-29) is Sudev Achuthan.
 - Q9 · Commit the pending documentation changes before Prompt 1. Branch and PR workflow still open.
 
-Q2, Q4–Q7 and Q10 are still open. Unless told otherwise, Prompt 1 goes ahead with the proposed defaults.
+- Q2 · The header clock shows GST as UTC+4. Config key `HOME_TZ`, default `Asia/Dubai` (fixed UTC+4, no daylight saving).
+- Q4–Q7, Q10 · The proposed defaults are accepted:
+  - Q4 · Citizens are escalated as one group per campaign, personnel one by one.
+  - Q5 · Simulated delivery status changes and bulk seeding are not audited row by row.
+  - Q6 · Workers read their tenants from `WORKER_TENANT_IDS`.
+  - Q7 · `UNDO_WINDOW_S` = 300.
+  - Q10 · The simulator imports the backend package as a path dependency.
+
+Still open: the branch/PR part of Q9. For now each prompt gets a local branch.
 
 1. **Tooling approval (decisions.md §9.1).** Is it confirmed that Claude Code and this repository host are approved for these "Internal" documents? I won't push to a remote until you say so.
 2. **Header clock.** Is "GST" Gulf Standard Time (UTC+4)? I'll make it a config key (`HOME_TZ`, default `Asia/Dubai`) unless you want something else.
