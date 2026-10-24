@@ -17,3 +17,7 @@ infra/tiles/
 .DS_Store
 .idea/
 .vscode/
+
+# Playwright output
+frontend/test-results/
+frontend/playwright-report/

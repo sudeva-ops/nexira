@@ -130,7 +130,8 @@ make lint        # ruff, mypy --strict, eslint, tsc --noEmit
 make logs        # follow container logs
 make down        # stop (keeps the database volume)
 make reset-demo  # D-21: drop and recreate the local DB volume, then migrate + seed
-make tiles       # Prompt 8: builds self-hosted PMTiles into infra/tiles/
+make tiles       # D-24: map tiles, fonts and sprites into infra/tiles/ (downloads once)
+make e2e         # Playwright against the running stack
 ```
 
 `make reset-demo` only runs when `APP_ENV` is `local` or `demo`.
@@ -138,6 +139,33 @@ make tiles       # Prompt 8: builds self-hosted PMTiles into infra/tiles/
 ### Database tests
 
 Backend tests run against the real PostgreSQL + PostGIS from `make up`; there is no SQLite and no DB mock. The tests use `TEST_ADMIN_DATABASE_URL` (a superuser) only to create throwaway databases (`nexira_test`, `nexira_test_migrations`). They then migrate those databases as `nexira_owner` and run every assertion as `nexira_api`. Your `nexira` database is not touched.
+
+### Map and screens
+
+`make tiles` downloads the map data once (about 90 MB) into `infra/tiles/`, which is not committed:
+- `world.pmtiles` (zoom 0–6) and `nairobi.pmtiles` (zoom 0–15), extracted from a Protomaps daily build;
+- fonts and sprites for the dark style.
+
+The frontend container serves them at `/tiles/`. After that the map needs no internet connection (D-24).
+
+- `TILES_BUILD=YYYYMMDD make tiles` pins a build.
+- Without tiles, the map shows a plain background and still draws missions, incidents and people.
+
+The browser keeps one WebSocket per tab on `/ws` (PLT-05):
+- It sends the access token in its first message, never in the URL, and renews it every minute.
+- The server forwards only events for the user's tenant, with ids and counts and no personal data.
+- Screens then refetch through the REST API.
+
+Read APIs used by the screens, for any user with a role:
+
+```sh
+GET /api/missions                    # display_risk = max(baseline, worst ACTIVE incident) (plan G-22)
+GET /api/people?q=&in_zone=&limit=   # with location confidence and source; no phone or email
+GET /api/sites?q=                    # mission_property counts site types other than HOTEL (D-23)
+GET /api/operations/summary          # the KPI strip (D-27)
+```
+
+`make e2e` runs the Playwright test: scene 1 started through the API puts the incident on the map without a reload. It needs `make up` and seeded data, and it moves any ACTIVE incidents to MONITORING first.
 
 ### Frontend development with hot reload
 

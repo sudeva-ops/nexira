@@ -86,6 +86,11 @@ class Principal:
     subject: str
     email: str | None
     name: str | None
+    expires_at: float  # the token's exp claim (seconds since the epoch)
+
+
+class InvalidCredentialsError(Exception):
+    """The token is invalid or expired, or its issuer is not a known tenant."""
 
 
 @dataclass(frozen=True)
@@ -126,6 +131,32 @@ async def decode_token(token: str, jwks: JwksCache, settings: Settings) -> dict[
 bearer = HTTPBearer(auto_error=False)
 
 
+async def principal_from_token(
+    token: str, *, settings: Settings, jwks: JwksCache, engine: AsyncEngine
+) -> Principal:
+    """Validate a bearer token and resolve its tenant. The one implementation used
+    by HTTP requests (authenticate) and by the WebSocket (app/core/realtime.py)."""
+    try:
+        claims = await decode_token(token, jwks, settings)
+    except (jwt.InvalidTokenError, httpx.HTTPError):
+        raise InvalidCredentialsError from None
+
+    async with tenant_session(None, engine) as session:
+        tenant_id = await session.scalar(
+            text("SELECT resolve_tenant_by_issuer(:iss)"), {"iss": claims["iss"]}
+        )
+    if tenant_id is None:
+        raise InvalidCredentialsError
+
+    return Principal(
+        tenant_id=tenant_id,
+        subject=str(claims["sub"]),
+        email=claims.get("email"),
+        name=claims.get("name") or claims.get("preferred_username"),
+        expires_at=float(claims["exp"]),
+    )
+
+
 async def authenticate(
     request: Request,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
@@ -136,24 +167,13 @@ async def authenticate(
     if credentials is None:
         raise _unauthorized()
     try:
-        claims = await decode_token(credentials.credentials, jwks, settings)
-    except (jwt.InvalidTokenError, httpx.HTTPError):
-        raise _unauthorized() from None
-
-    async with tenant_session(None, engine) as session:
-        tenant_id = await session.scalar(
-            text("SELECT resolve_tenant_by_issuer(:iss)"), {"iss": claims["iss"]}
+        principal = await principal_from_token(
+            credentials.credentials, settings=settings, jwks=jwks, engine=engine
         )
-    if tenant_id is None:
-        raise _unauthorized()
-
-    request.state.tenant_id = tenant_id
-    return Principal(
-        tenant_id=tenant_id,
-        subject=str(claims["sub"]),
-        email=claims.get("email"),
-        name=claims.get("name") or claims.get("preferred_username"),
-    )
+    except InvalidCredentialsError:
+        raise _unauthorized() from None
+    request.state.tenant_id = principal.tenant_id
+    return principal
 
 
 async def get_db(
@@ -193,10 +213,19 @@ async def current_user(
         )
         await session.commit()
 
-    user = await session.scalar(select(AppUser).where(AppUser.external_id == principal.subject))
-    if user is None or not user.is_active:
+    user = await active_user(session, principal)
+    if user is None:
         # No row: the email already belongs to another account in this tenant.
         raise HTTPException(status.HTTP_403_FORBIDDEN, "No active account for this login")
+    return user
+
+
+async def active_user(session: AsyncSession, principal: Principal) -> CurrentUser | None:
+    """The active app_user for a principal, without creating one. The session must
+    be scoped to principal.tenant_id."""
+    user = await session.scalar(select(AppUser).where(AppUser.external_id == principal.subject))
+    if user is None or not user.is_active:
+        return None
     return CurrentUser(
         id=user.id,
         tenant_id=user.tenant_id,

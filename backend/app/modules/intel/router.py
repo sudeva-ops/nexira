@@ -22,6 +22,7 @@ from app.modules.intel.schemas import (
     IncidentEventOut,
     IncidentOut,
     NoteIn,
+    OperationsSummaryOut,
     SignalOut,
     StatusIn,
 )
@@ -59,6 +60,12 @@ async def list_incidents(
 ) -> list[IncidentOut]:
     """Most severe first, then newest."""
     return await queries.list_incidents(session, status=status, limit=limit)
+
+
+@router.get("/operations/summary")
+async def operations_summary(_user: Reader, session: Db) -> OperationsSummaryOut:
+    """OPS-03: the Global Operations KPI strip (D-27)."""
+    return await queries.operations_summary(session)
 
 
 @router.get("/incidents/{incident_id}")

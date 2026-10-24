@@ -168,20 +168,26 @@ async def test_signal_to_fused_incident_through_the_stream(
     await publisher.publish(  # a redelivered copy of the first signal
         Event(type="RAW_SIGNAL", tenant_id=tenant, payload=sent[0].payload, source="x")
     )
-    while len(published.events) < 3 and time.monotonic() - started < 5:
+    while len(published.events) < 6 and time.monotonic() - started < 5:
         await consumer.process_batch()
     elapsed = time.monotonic() - started
 
     assert [e.type for e in published.events] == [
+        "SIGNAL_INGESTED",
         "INCIDENT_CREATED",
+        "SIGNAL_INGESTED",
         "INCIDENT_UPDATED",
+        "SIGNAL_INGESTED",
         "INCIDENT_UPDATED",
     ]
+    ingested = [e.payload for e in published.events if e.type == "SIGNAL_INGESTED"]
+    assert [p["outcome"] for p in ingested] == ["FUSED"] * 3
     assert all(e.tenant_id == tenant for e in published.events)
     assert published.events[-1].payload["confidence"] == 92
     assert elapsed < 5
     await consumer.process_batch()  # the duplicate: handled, nothing published
-    assert len(published.events) == 3
+    assert len(published.events) == 6
     async with tenant_session(tenant, api_engine) as session:
         (incident,) = (await session.scalars(select(Incident))).all()
-    assert str(incident.id) == published.events[0].payload["incident_id"]
+    assert str(incident.id) == published.events[1].payload["incident_id"]
+    assert {p["incident_id"] for p in ingested} == {str(incident.id)}

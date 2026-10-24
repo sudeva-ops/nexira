@@ -1,6 +1,9 @@
 import { Icon, Tag } from "@blueprintjs/core";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 
+import { RealtimeProvider } from "../api/realtime";
+import { useRealtimeStatus } from "../api/realtimeContext";
+
 import { Clock } from "./Clock";
 import { SCREENS, type Screen } from "./screens";
 import { UserMenu } from "./UserMenu";
@@ -32,6 +35,17 @@ function NavList() {
   return <nav aria-label="Main">{items}</nav>;
 }
 
+function LiveIndicator() {
+  const status = useRealtimeStatus();
+  const label = { live: "LIVE", connecting: "CONNECTING", offline: "OFFLINE" }[status];
+  return (
+    <span className={`nx-live ${status}`} role="status" aria-label={`Realtime ${status}`}>
+      <i />
+      {label}
+    </span>
+  );
+}
+
 interface Props {
   onLogout: () => void;
 }
@@ -41,6 +55,7 @@ export function AppShell({ onLogout }: Props) {
   const current = SCREENS.find((s) => s.path === pathname);
 
   return (
+    <RealtimeProvider>
     <div className="nx-app">
       <aside className="nx-aside">
         <div className="nx-brand">
@@ -62,13 +77,15 @@ export function AppShell({ onLogout }: Props) {
           <Tag intent="warning" minimal>
             SIMULATED DATA
           </Tag>
+          <LiveIndicator />
           <Clock />
           <UserMenu onLogout={onLogout} />
         </header>
-        <section className="nx-view">
+        <section className={`nx-view${current?.path === "/operations" ? " full" : ""}`}>
           <Outlet />
         </section>
       </main>
     </div>
+    </RealtimeProvider>
   );
 }

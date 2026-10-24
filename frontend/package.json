@@ -8,21 +8,28 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "lint": "eslint . --max-warnings 0 && tsc --noEmit"
+    "lint": "eslint . --max-warnings 0 && tsc --noEmit && tsc --noEmit -p tsconfig.e2e.json",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@blueprintjs/core": "6.21.0",
+    "@protomaps/basemaps": "5.7.2",
     "@tanstack/react-query": "5.104.5",
     "keycloak-js": "26.2.4",
+    "maplibre-gl": "6.13.0",
+    "pmtiles": "4.5.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-router-dom": "7.18.4"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.0",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.8",
+    "@types/geojson": "7946.0.16",
+    "@types/node": "24.19.2",
     "@types/react": "18.3.31",
     "@types/react-dom": "18.3.7",
     "@vitejs/plugin-react": "6.1.2",

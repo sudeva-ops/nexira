@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.core.db import tenant_session
 from app.core.events import Event, Handler, Publisher
 from app.modules.intel import exposure
-from app.modules.intel.service import incident_event, ingest_signal
+from app.modules.intel.service import incident_event, ingest_signal, signal_event
 
 
 def raw_signal_handler(engine: AsyncEngine, publisher: Publisher) -> Handler:
@@ -22,9 +22,12 @@ def raw_signal_handler(engine: AsyncEngine, publisher: Publisher) -> Handler:
         async with tenant_session(event.tenant_id, engine) as session:
             ingested = await ingest_signal(session, event)
             await session.commit()
-        published = incident_event(ingested, event.tenant_id)
-        if published is not None:
-            await publisher.publish(published)
+        for published in (
+            signal_event(ingested, event.tenant_id),
+            incident_event(ingested, event.tenant_id),
+        ):
+            if published is not None:
+                await publisher.publish(published)
 
     return handle
 

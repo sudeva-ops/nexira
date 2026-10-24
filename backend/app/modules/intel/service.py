@@ -196,6 +196,22 @@ async def _reject(session: AsyncSession, event: Event, actor: Actor, reason: str
     return Ingested("REJECTED", reason=reason)
 
 
+def signal_event(ingested: Ingested, tenant_id: uuid.UUID) -> Event | None:
+    """SIGNAL_INGESTED, published after commit for every stored signal (live feed, OPS-02)."""
+    if ingested.signal_id is None:
+        return None  # rejected or a duplicate: nothing new is stored
+    return Event(
+        type="SIGNAL_INGESTED",
+        tenant_id=tenant_id,
+        payload={
+            "signal_id": ingested.signal_id,
+            "outcome": ingested.outcome,
+            "incident_id": str(ingested.fused.incident_id) if ingested.fused else None,
+        },
+        source="intel.fusion",
+    )
+
+
 def incident_event(ingested: Ingested, tenant_id: uuid.UUID) -> Event | None:
     """The INCIDENT_CREATED / INCIDENT_UPDATED event to publish after commit."""
     if ingested.fused is None:

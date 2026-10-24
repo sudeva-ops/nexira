@@ -55,7 +55,12 @@ async def test_incidents_list_and_detail(client: AsyncClient, idp: Idp, seeded: 
     ]
     nbo = listed[0]
     assert (nbo["confidence"], nbo["signal_count"], nbo["category"]) == (92, 3, "CIVIL_UNREST")
-    assert nbo["sources"] == ["Dataminr", "MAX Security", "Riskline"]
+    # D-19: the UI labels these "<name> (simulated)".
+    assert [(src["name"], src["simulated"]) for src in nbo["sources"]] == [
+        ("Dataminr", True),
+        ("MAX Security", True),
+        ("Riskline", True),
+    ]
     assert (round(nbo["lat"], 4), round(nbo["lon"], 4)) == (-1.2841, 36.8233)
     assert nbo["mission_id"] is None  # set by exposure (Prompt 7, D-06)
 
