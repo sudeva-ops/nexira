@@ -76,6 +76,20 @@ Only the one-shot `migrate` service receives the owner password; the backend con
 
 Current locations come from the Location Confidence Engine (`backend/app/modules/people/location.py`). The advisory templates in AR, FR and SW are marked `[REVIEW REQUIRED]` until a native speaker reviews them (D-15).
 
+### Scenario player
+
+The NBO-CIVIL-UNREST scenario (decisions.md §7) is stored by `make seed`. ADMIN or DUTY_OFFICER users drive it:
+
+```sh
+POST /api/scenarios/NBO-CIVIL-UNREST/next    # go to the next scene and play its events
+POST /api/scenarios/NBO-CIVIL-UNREST/pause   # stop, keeping the position and elapsed time
+POST /api/scenarios/NBO-CIVIL-UNREST/play    # resume the current scene
+POST /api/scenarios/NBO-CIVIL-UNREST/reset   # back to scene 0 as a new run; business data is kept (D-21)
+GET  /api/scenarios/NBO-CIVIL-UNREST         # state and scene list
+```
+
+The player publishes to the Redis stream `nexira:events` and never writes business tables. Ingestion (Prompts 6 and 10) consumes the stream. Only scenes 1 (four signals) and 4 (check-in answers) contain data events; the other scenes need the platform or logged-in users.
+
 ### Everyday commands
 
 ```sh

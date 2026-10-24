@@ -15,10 +15,12 @@ from app.modules.intel.service import SourceIn, ensure_sources
 from app.modules.people import location
 from app.modules.people.service import add_observations, ensure_mission, load_persons, load_sites
 from app.modules.playbooks.service import StepIn, ensure_playbook
+from app.modules.scenarios.service import ensure_scenario
 from app.modules.tenancy.service import ensure_reference_counter
 from app.modules.travel.service import ensure_trip
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from nexira_sim.scenarios import nbo_civil_unrest as nbo
 from nexira_sim.seed import data, world
 from nexira_sim.seed.identities import bootstrap_tenant, seed_identities
 from nexira_sim.seed.ids import seed_id
@@ -120,5 +122,13 @@ async def seed_all(
                 session, prefix="NTF", with_year=False, last_value=data.NTF_START
             ),
         ]
+        report["scenario"] = await ensure_scenario(
+            session,
+            scenario_id=seed_id(tenant_id, "scenario", nbo.CODE),
+            code=nbo.CODE,
+            name=nbo.NAME,
+            description=nbo.DESCRIPTION,
+            events=nbo.build_events(w, tenant_id),
+        )
         await session.commit()
     return report

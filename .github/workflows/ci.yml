@@ -11,6 +11,11 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-24.04
+    services:
+      redis:
+        image: redis:7.4-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 5s --health-retries 20
     env:
       POSTGRES_PASSWORD: ci-superuser
       NEXIRA_OWNER_PASSWORD: ci-owner
@@ -19,6 +24,7 @@ jobs:
       MIGRATIONS_DATABASE_URL: postgresql+asyncpg://nexira_owner:ci-owner@localhost:5432/nexira
       # Superuser for creating throwaway test databases only; assertions run as nexira_api.
       TEST_ADMIN_DATABASE_URL: postgresql://postgres:ci-superuser@localhost:5432/postgres
+      REDIS_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

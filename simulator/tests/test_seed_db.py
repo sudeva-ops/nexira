@@ -198,7 +198,7 @@ async def _snapshot(conn: asyncpg.Connection) -> dict[str, Any]:
     tables = [
         "mission", "site", "person", "location_observation", "person_location_current", "trip",
         "trip_traveller", "intel_source", "playbook", "playbook_step", "agent", "action_policy",
-        "app_user", "role", "user_role", "reference_counter",
+        "app_user", "role", "user_role", "reference_counter", "scenario", "scenario_event",
     ]  # fmt: skip
     snap: dict[str, Any] = {}
     for t in tables:
