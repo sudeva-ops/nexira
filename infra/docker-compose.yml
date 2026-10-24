@@ -91,6 +91,21 @@ services:
       redis:
         condition: service_healthy
 
+  # Stream consumers (plan G-01): same image, second entry point (app/workers).
+  # Phase 1 runs one replica; the consumer group lets more join later.
+  worker:
+    build: ../backend
+    command: ["python", "-m", "app.workers"]
+    environment: *api-env
+    healthcheck:
+      disable: true  # the image's check probes the API port
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   frontend:
     build:
       context: ../frontend
