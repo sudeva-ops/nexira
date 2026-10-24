@@ -136,22 +136,22 @@ Each item gives a proposed resolution. Items marked **(schema)** would need an e
 
 ### 3.2 Seed data and the scenario
 
-**G-09 · The Ambassador is missing from the coordinate table.** decisions.md §7 lists Hana Takeda, Peter Mwangi and "other 11 staff within 0.8 km of the Embassy" (13 people), but D-23 needs 14 staff. In the demo, Amb. Layla Haddad is at the **Residence** (Mobile GPS, 98%).
+**G-09 · The Ambassador is missing from the coordinate table.** *(Implemented in Prompt 4.)* decisions.md §7 lists Hana Takeda, Peter Mwangi and "other 11 staff within 0.8 km of the Embassy" (13 people), but D-23 needs 14 staff. In the demo, Amb. Layla Haddad is at the **Residence** (Mobile GPS, 98%).
 → *Proposed:* place her at the Residence coordinates (−1.2745, 36.7935), which is 3.6 km from the epicentre and inside 5 km. Put the other 11 within 0.8 km of the Embassy. Peter Mwangi and James Otieno are LOCAL_STAFF; the other 12 are DIPLOMAT.
 
-**G-10 · Personnel totals: 926 vs about 1,300.** The demo's MISSIONS array adds up to **926** staff over 36 missions. The demo's "Personnel" KPI shows `926 + 412 = 1,338`. D-27 says "about 1,300 staff and delegates".
+**G-10 · Personnel totals: 926 vs about 1,300.** *(Implemented in Prompt 4.)* The demo's MISSIONS array adds up to **926** staff over 36 missions. The demo's "Personnel" KPI shows `926 + 412 = 1,338`. D-27 says "about 1,300 staff and delegates".
 → *Proposed:* seed exactly the per-mission staff numbers from the array as DIPLOMAT and LOCAL_STAFF (Nairobi = 14). Then add 412 more people as DEPENDANT, DELEGATE and CONTRACTOR, all outside Nairobi apart from the 3 delegates. That gives about 1,338, all computed from data (D-27).
 
-**G-11 · Trip "active today" breaks determinism.** D-22 counts a trip only if `starts_on ≤ today ≤ ends_on`. Prompt 4 wants the seed to be identical every time it runs, and tests run on any date.
+**G-11 · Trip "active today" breaks determinism.** *(Seed side implemented in Prompt 4; exposure uses `incident.opened_at` in Prompt 7.)* D-22 counts a trip only if `starts_on ≤ today ≤ ends_on`. Prompt 4 wants the seed to be identical every time it runs, and tests run on any date.
 → *Proposed:* exposure judges the trip against `incident.opened_at::date` (UTC), not `now()`. The seed takes a `SCENARIO_DATE` (default: the seeding date) and sets TRP-8812 to `[SCENARIO_DATE − 1, SCENARIO_DATE + 3]`. The determinism test pins `SCENARIO_DATE`. Seed UUIDs are uuid5 values from natural keys, so `gen_random_uuid()` defaults are never used for seeded rows.
 
 **G-12 · What the Paris control signal should produce is not stated.** The signal sits on the Paris mission coordinates, so the Paris embassy and Paris staff will be exposed.
 → *Proposed:* send it from FACTAL as TRANSPORT_STRIKE / MODERATE. The tests assert: it is a separate incident; it is not escalated (signal severity is below HIGH); there is no START_PLAYBOOK proposal; and there is one Watch Officer and one Exposure proposal, both auto-executed. The tests do not assert Paris head counts.
 
-**G-13 · There is no Location Confidence Engine in any prompt.** PPL-03 (M) requires that the engine "computes current location and confidence", but Prompt 4 *seeds* `person_location_current` directly.
+**G-13 · There is no Location Confidence Engine in any prompt.** *(Implemented in Prompt 4.)* PPL-03 (M) requires that the engine "computes current location and confidence", but Prompt 4 *seeds* `person_location_current` directly.
 → *Proposed:* add a small deterministic engine to `people/service.py` in Prompt 4. Confidence is a per-source base weight times decay with age, and the strongest recent observation wins. The engine recomputes `person_location_current` from `location_observation`. The seed writes observations only and then runs the engine. The tests check the demo values: Hana 72 (CALENDAR_HR), Peter 91 (MOBILE_GPS), delegates 89 (TRAVEL_BOOKING), access control 97–99.
 
-**G-14 · The PB-07 step action types are not defined.** The demo shows 8 steps and campaigns NTF-3101 to 3104. Prompt 9 lists action types but does not map them to steps. One mismatch: step 7 ("Approve evacuation route B") also sends NTF-3104 in the demo, so it is not just a gate.
+**G-14 · The PB-07 step action types are not defined.** *(Seeded in Prompt 4.)* The demo shows 8 steps and campaigns NTF-3101 to 3104. Prompt 9 lists action types but does not map them to steps. One mismatch: step 7 ("Approve evacuation route B") also sends NTF-3104 in the demo, so it is not just a gate.
 → *Proposed:*
 
 | Step | Name | action_type | requires_approval_role | Effect |

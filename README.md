@@ -16,7 +16,7 @@ Start here:
 ```sh
 make up        # creates .env from .env.example on first run, builds and starts everything
 make migrate   # applies the schema (docs/schema/nexira_schema.sql v0.2) as nexira_owner
-make seed      # demo tenant, roles and demo users (more seed data in Prompt 4)
+make seed      # deterministic demo data: 36 missions, 2,550 fictional people, PB-07, agents
 ```
 
 | Service | URL | Notes |
@@ -58,6 +58,24 @@ The realm also has a `nexira-dev-cli` client that allows the password grant, for
 
 Only the one-shot `migrate` service receives the owner password; the backend container never does.
 
+### Seed data
+
+`make seed` loads fictional data through the backend service layer, as `nexira_api`. The only exception is the tenant row, which `nexira_owner` creates (plan G-03). The data is deterministic: random seed 42, and every timestamp comes from `SCENARIO_DATE` (default: today in UTC). Running it again changes nothing.
+
+| What | Count | Source |
+|---|---|---|
+| Missions | 36 (Baghdad, Islamabad, Abuja and Jakarta are MODERATE) | demo `MISSIONS` |
+| Sites | 73: an embassy and a residence per mission, plus the Nairobi delegation hotel | D-23 |
+| Personnel | 1,338: 926 mission staff plus 412 dependants, contractors and delegates | plan G-10 |
+| Registered citizens | 1,212: 212 inside the Nairobi zone, 1,000 elsewhere | D-23, D-27 |
+| Nairobi exposure | 229 people (14 staff, 3 delegates, 212 citizens), 3 sites, trip TRP-8812 | D-23 |
+| Intel sources | 8 simulated, plus OSINT (disabled) | D-09, D-10 |
+| Playbook | PB-07, 8 steps; step 7 needs HEAD_OF_MISSION | plan G-14 |
+| Agents and policies | 4 agents, 5 policies (START_EVACUATION is for tests only) | D-17 |
+| Reference counters | the next incident is `INC-<year>-1042`, the next campaign `NTF-3101` | D-18 |
+
+Current locations come from the Location Confidence Engine (`backend/app/modules/people/location.py`). The advisory templates in AR, FR and SW are marked `[REVIEW REQUIRED]` until a native speaker reviews them (D-15).
+
 ### Everyday commands
 
 ```sh
@@ -66,7 +84,6 @@ make lint        # ruff, mypy --strict, eslint, tsc --noEmit
 make logs        # follow container logs
 make down        # stop (keeps the database volume)
 make reset-demo  # D-21: drop and recreate the local DB volume, then migrate + seed
-make seed        # Prompt 4
 make tiles       # Prompt 8: builds self-hosted PMTiles into infra/tiles/
 ```
 

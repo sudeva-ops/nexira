@@ -32,7 +32,10 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "N", "S", "RUF", "SIM", "PT"]
-ignore = ["S101"]
+ignore = [
+  "S101",
+  "S311",  # seeded pseudo-randomness generates fictional data; nothing cryptographic
+]
 
 [tool.mypy]
 python_version = "3.12"
