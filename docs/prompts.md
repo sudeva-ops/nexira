@@ -50,7 +50,10 @@ Create the monorepo skeleton from AGENTS.md.
 - /frontend: Vite + React + TypeScript + Blueprint dark theme; app shell with the left
   navigation listing only the Phase 1 screens (D-25) and a header with a GST/UTC clock.
 - /simulator: empty Python package.
-- /infra/docker-compose.yml: postgres (postgis/postgis:16-3.4), redis, keycloak, backend, frontend.
+- /infra/docker-compose.yml: postgres, redis, keycloak, backend, frontend.
+  Postgres image: build infra/postgres/Dockerfile from docs/schema/checks/Dockerfile.postgres
+  (official postgres:16 + PostGIS package). Do NOT use postgis/postgis:16-3.4: it has no
+  arm64 build and runs under emulation on Apple Silicon.
 - /infra/postgres/init.sql, run once as the superuser:
   creates the extensions postgis and pgcrypto, the roles nexira_owner (LOGIN, no superuser),
   nexira_app (NOLOGIN) and nexira_api (LOGIN, IN ROLE nexira_app), and the database owned
@@ -75,6 +78,9 @@ Implement the database from docs/schema/nexira_schema.sql (v0.2).
   as server-generated so the app never writes them.
 - app/core/db.py: async session per request, connected as nexira_api; at the start of each
   transaction run SELECT set_config('app.tenant_id', :tid, true) (D-02).
+
+docs/schema/checks/ contains 35 SQL checks that already pass against this schema on
+PostgreSQL 16 + PostGIS. Port every one of them into pytest first, then add:
 
 Tests (real PostGIS, connected as nexira_api):
  a) migration upgrades and downgrades cleanly;
