@@ -228,7 +228,7 @@ The master spec's scenario covers all four phases. This is the **Phase 1 subset*
 | 18 | `audit_log.chain_seq`; hash chain trigger; TRUNCATE blocked; `audit_verify_chain()` | D-20 |
 | 19 | Grants for `nexira_app`; audit log is insert/read only | D-01 |
 
-The schema has been syntax-checked with the PostgreSQL 17 parser (all 94 statements and 9 PL/pgSQL functions). It has **not** yet been run against a live PostgreSQL 16 + PostGIS database; Prompt 2 does that and its tests are the real check.
+The schema has been applied to PostgreSQL 16 + PostGIS 3 (arm64) as `nexira_owner`, and the 35 checks in `docs/schema/checks/` pass when connected as `nexira_api`: tenant isolation, audit chain (including 40 concurrent writers), policy levels, two-person rule, kill switch and check-in history. Prompt 2 turns these into pytest tests.
 
 ## 9. Still open (needs a person, not a decision)
 

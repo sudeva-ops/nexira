@@ -1,0 +1,73 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    env:
+      POSTGRES_PASSWORD: ci-superuser
+      NEXIRA_OWNER_PASSWORD: ci-owner
+      NEXIRA_API_PASSWORD: ci-api
+      DATABASE_URL: postgresql+asyncpg://nexira_api:ci-api@localhost:5432/nexira
+      MIGRATIONS_DATABASE_URL: postgresql+asyncpg://nexira_owner:ci-owner@localhost:5432/nexira
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      # Service containers cannot be built, so start the PostGIS image from infra/postgres.
+      - name: Start PostgreSQL 16 + PostGIS
+        run: |
+          docker build -t nexira-postgres infra/postgres
+          docker run -d --name pg -p 5432:5432 \
+            -e POSTGRES_PASSWORD -e NEXIRA_OWNER_PASSWORD -e NEXIRA_API_PASSWORD \
+            nexira-postgres
+          for i in $(seq 1 60); do
+            docker exec pg pg_isready -U postgres -d nexira && exit 0
+            sleep 1
+          done
+          docker logs pg; exit 1
+      - name: Install
+        working-directory: backend
+        run: uv sync --frozen --python 3.12
+      - name: Lint
+        working-directory: backend
+        run: uv run ruff check . && uv run ruff format --check . && uv run mypy
+      - name: Migrate (as nexira_owner)
+        working-directory: backend
+        run: uv run alembic upgrade head
+      - name: Test
+        working-directory: backend
+        run: uv run pytest
+
+  simulator:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - working-directory: simulator
+        run: |
+          uv sync --frozen --python 3.12
+          uv run ruff check . && uv run ruff format --check . && uv run mypy
+          uv run pytest
+
+  frontend:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+          npm run test
+          npm run build
