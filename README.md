@@ -15,7 +15,7 @@ Start here:
 
 ```sh
 make up        # creates .env from .env.example on first run, builds and starts everything
-make migrate   # runs Alembic as nexira_owner (no revisions until Prompt 2)
+make migrate   # applies the schema (docs/schema/nexira_schema.sql v0.2) as nexira_owner
 ```
 
 | Service | URL | Notes |
@@ -51,6 +51,10 @@ make tiles       # Prompt 8: builds self-hosted PMTiles into infra/tiles/
 ```
 
 `make reset-demo` only runs when `APP_ENV` is `local` or `demo`.
+
+### Database tests
+
+Backend tests run against the real PostgreSQL + PostGIS from `make up`; there is no SQLite and no DB mock. The tests use `TEST_ADMIN_DATABASE_URL` (a superuser) only to create throwaway databases (`nexira_test`, `nexira_test_migrations`). They then migrate those databases as `nexira_owner` and run every assertion as `nexira_api`. Your `nexira` database is not touched.
 
 ### Frontend development with hot reload
 

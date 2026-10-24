@@ -17,6 +17,8 @@ jobs:
       NEXIRA_API_PASSWORD: ci-api
       DATABASE_URL: postgresql+asyncpg://nexira_api:ci-api@localhost:5432/nexira
       MIGRATIONS_DATABASE_URL: postgresql+asyncpg://nexira_owner:ci-owner@localhost:5432/nexira
+      # Superuser for creating throwaway test databases only; assertions run as nexira_api.
+      TEST_ADMIN_DATABASE_URL: postgresql://postgres:ci-superuser@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

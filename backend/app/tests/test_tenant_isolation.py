@@ -1,0 +1,251 @@
+"""Tenant isolation for EVERY tenant table (D-01, D-02, D-03, Prompt 2 b/c).
+
+The table list comes from the database catalogue (every public table with a
+tenant_id column), not from a hand-picked list. ROWS must provide one insert
+per catalogue table; test_every_tenant_table_has_a_row_factory fails if a table
+is added to the schema without one.
+"""
+
+import asyncio
+import uuid
+from dataclasses import dataclass
+
+import asyncpg
+import pytest
+
+from app.tests.conftest import DbUrls, create_tenant, set_tenant
+
+
+@dataclass(frozen=True)
+class Ids:
+    t: uuid.UUID
+    user: uuid.UUID
+    role: uuid.UUID
+    mission: uuid.UUID
+    person: uuid.UUID
+    trip: uuid.UUID
+    source: uuid.UUID
+    signal: int
+    incident: uuid.UUID
+    playbook: uuid.UUID
+    step: uuid.UUID
+    run: uuid.UUID
+    campaign: uuid.UUID
+    agent: uuid.UUID
+    proposal: uuid.UUID
+    scenario: uuid.UUID
+
+
+PT = "'SRID=4326;POINT(36.8245 -1.2838)'"
+
+# One INSERT per tenant table, in dependency order. {t} is the tenant id.
+ROWS: dict[str, str] = {
+    "app_user": "INSERT INTO app_user (id, tenant_id, external_id, email, display_name) "
+    "VALUES ('{user}', '{t}', 'sub-{user}', '{user}@x', 'U')",
+    "role": "INSERT INTO role (id, tenant_id, code, name) VALUES ('{role}', '{t}', 'VIEWER', 'V')",
+    "mission": "INSERT INTO mission (id, tenant_id, code, city, country_code, location) "
+    "VALUES ('{mission}', '{t}', 'NBO', 'Nairobi', 'KE', " + PT + ")",
+    "user_role": "INSERT INTO user_role (tenant_id, user_id, role_id, mission_id) "
+    "VALUES ('{t}', '{user}', '{role}', '{mission}')",
+    "site": "INSERT INTO site (tenant_id, mission_id, site_type, name, location) "
+    "VALUES ('{t}', '{mission}', 'EMBASSY', 'Embassy', " + PT + ")",
+    "person": "INSERT INTO person (id, tenant_id, mission_id, person_type, full_name) "
+    "VALUES ('{person}', '{t}', '{mission}', 'DIPLOMAT', 'Test Person')",
+    "location_observation": "INSERT INTO location_observation (tenant_id, person_id, source, "
+    "location, observed_at) VALUES ('{t}', '{person}', 'MANUAL', " + PT + ", now())",
+    "person_location_current": "INSERT INTO person_location_current (person_id, tenant_id, "
+    "location, confidence, primary_source) VALUES ('{person}', '{t}', " + PT + ", 90, 'MANUAL')",
+    "trip": "INSERT INTO trip (id, tenant_id, reference, origin, destination, starts_on, ends_on) "
+    "VALUES ('{trip}', '{t}', 'TRP-1', 'HQ', 'Nairobi', current_date, current_date)",
+    "trip_traveller": "INSERT INTO trip_traveller (tenant_id, trip_id, person_id) "
+    "VALUES ('{t}', '{trip}', '{person}')",
+    "intel_source": "INSERT INTO intel_source (id, tenant_id, code, name) "
+    "VALUES ('{source}', '{t}', 'SRC', 'Source')",
+    "raw_signal": "INSERT INTO raw_signal (id, tenant_id, source_id, external_id, title, "
+    "occurred_at) VALUES ({signal}, '{t}', '{source}', 'ext-1', 'Signal', now())",
+    "incident": "INSERT INTO incident (id, tenant_id, reference, title, category, severity, "
+    "signal_severity, location) VALUES ('{incident}', '{t}', 'INC-T', 'I', 'CIVIL_UNREST', "
+    "'HIGH', 'HIGH', " + PT + ")",
+    "incident_signal": "INSERT INTO incident_signal (tenant_id, incident_id, signal_id) "
+    "VALUES ('{t}', '{incident}', {signal})",
+    "incident_exposure": "INSERT INTO incident_exposure (tenant_id, incident_id, subject_type, "
+    "subject_id) VALUES ('{t}', '{incident}', 'PERSON', '{person}')",
+    "incident_event": "INSERT INTO incident_event (tenant_id, incident_id, event_type, summary, "
+    "actor_type) VALUES ('{t}', '{incident}', 'NOTE', 'n', 'SYSTEM')",
+    "playbook": "INSERT INTO playbook (id, tenant_id, code, name, category) "
+    "VALUES ('{playbook}', '{t}', 'PB-T', 'P', 'Security')",
+    "playbook_step": "INSERT INTO playbook_step (id, tenant_id, playbook_id, seq, name, "
+    "action_type) VALUES ('{step}', '{t}', '{playbook}', 1, 'S', 'TASK')",
+    "agent": "INSERT INTO agent (id, tenant_id, code, name) VALUES ('{agent}', '{t}', 'A', 'A')",
+    "action_policy": "INSERT INTO action_policy (tenant_id, action_type, min_autonomy_level, "
+    "approver_roles) VALUES ('{t}', 'START_PLAYBOOK', 2, '{{DUTY_OFFICER}}')",
+    "agent_proposal": "INSERT INTO agent_proposal (id, tenant_id, agent_id, proposal_key, "
+    "action_type, title, proposed_action) VALUES ('{proposal}', '{t}', '{agent}', 'k', "
+    "'START_PLAYBOOK', 't', 'p')",
+    # Step 1 is created by the trigger; this adds an undecided step 2.
+    "proposal_approval": "INSERT INTO proposal_approval (tenant_id, proposal_id, step_no, "
+    "required_role) VALUES ('{t}', '{proposal}', 2, 'HQ_CRISIS_DIRECTOR')",
+    "playbook_run": "INSERT INTO playbook_run (id, tenant_id, playbook_id, incident_id) "
+    "VALUES ('{run}', '{t}', '{playbook}', '{incident}')",
+    "playbook_run_step": "INSERT INTO playbook_run_step (tenant_id, run_id, step_id) "
+    "VALUES ('{t}', '{run}', '{step}')",
+    "notification_campaign": "INSERT INTO notification_campaign (id, tenant_id, reference, "
+    "campaign_type, message, channels, created_by_type) VALUES ('{campaign}', '{t}', 'NTF-T', "
+    "'CHECKIN', 'm', '{{APP}}', 'USER')",
+    "notification_delivery": "INSERT INTO notification_delivery (tenant_id, campaign_id, "
+    "person_id, channel) VALUES ('{t}', '{campaign}', '{person}', 'APP')",
+    "checkin_response": "INSERT INTO checkin_response (tenant_id, campaign_id, person_id, status) "
+    "VALUES ('{t}', '{campaign}', '{person}', 'SAFE')",
+    "reference_counter": "INSERT INTO reference_counter (tenant_id, prefix, year, last_value) "
+    "VALUES ('{t}', 'TST', 0, 1)",
+    "audit_log": "INSERT INTO audit_log (tenant_id, actor_type, action, entity_type) "
+    "VALUES ('{t}', 'SYSTEM', 'TEST', 'test')",
+    "scenario": "INSERT INTO scenario (id, tenant_id, code, name) "
+    "VALUES ('{scenario}', '{t}', 'SC', 'S')",
+    "scenario_event": "INSERT INTO scenario_event (tenant_id, scenario_id, scene_no, offset_ms, "
+    "event_type, payload) VALUES ('{t}', '{scenario}', 0, 0, 'RAW_SIGNAL', '{{}}')",
+    "scenario_run": "INSERT INTO scenario_run (tenant_id, scenario_id) "
+    "VALUES ('{t}', '{scenario}')",
+}
+
+# nexira_app has no UPDATE/DELETE on audit_log at all (D-20), so those fail with
+# a privilege error rather than touching zero rows.
+NO_UPDATE_DELETE = {"audit_log"}
+
+
+def sql_for(table: str, ids: Ids) -> str:
+    return ROWS[table].format(**ids.__dict__)
+
+
+@dataclass(frozen=True)
+class World:
+    a: Ids
+    b: uuid.UUID
+
+
+async def _build_world(db: DbUrls) -> World:
+    a = await create_tenant(db, "Isolation A")
+    b = await create_tenant(db, "Isolation B")
+    ids = Ids(
+        t=a,
+        signal=int(uuid.uuid4().int % 2**62),
+        **{name: uuid.uuid4() for name in Ids.__dataclass_fields__ if name not in ("t", "signal")},
+    )
+    conn = await asyncpg.connect(db.api_plain)
+    try:
+        await set_tenant(conn, a)
+        for table in ROWS:
+            await conn.execute(sql_for(table, ids))
+    finally:
+        await conn.close()
+    return World(a=ids, b=b)
+
+
+@pytest.fixture(scope="module")
+def world(db: DbUrls) -> World:
+    """Tenant A with one row in every tenant table (inserted as nexira_api), and an
+    empty tenant B."""
+    return asyncio.run(_build_world(db))
+
+
+async def _catalogue_tenant_tables(conn: asyncpg.Connection) -> set[str]:
+    rows = await conn.fetch(
+        """
+        SELECT c.table_name FROM information_schema.columns c
+          JOIN information_schema.tables t USING (table_schema, table_name)
+         WHERE c.table_schema = 'public' AND c.column_name = 'tenant_id'
+           AND t.table_type = 'BASE TABLE'
+        """
+    )
+    return {r["table_name"] for r in rows}
+
+
+async def test_every_tenant_table_has_a_row_factory(api: asyncpg.Connection) -> None:
+    assert await _catalogue_tenant_tables(api) == set(ROWS)
+
+
+async def test_every_tenant_table_forces_rls_with_tenant_policy(db: DbUrls) -> None:
+    """Catalogue check (plan G-02): RLS enabled AND forced, with the tenant_isolation
+    policy on both USING and WITH CHECK."""
+    conn = await asyncpg.connect(db.owner_plain)
+    try:
+        tables = await _catalogue_tenant_tables(conn)
+        rows = await conn.fetch(
+            """
+            SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity, p.qual, p.with_check
+              FROM pg_class c
+              LEFT JOIN pg_policies p
+                ON p.schemaname = 'public' AND p.tablename = c.relname
+               AND p.policyname = 'tenant_isolation'
+             WHERE c.relnamespace = 'public'::regnamespace AND c.relname = ANY($1::text[])
+            """,
+            list(tables),
+        )
+    finally:
+        await conn.close()
+    assert {r["relname"] for r in rows} == tables
+    expected = "(tenant_id = current_tenant_id())"
+    bad = [
+        r["relname"]
+        for r in rows
+        if not (
+            r["relrowsecurity"]
+            and r["relforcerowsecurity"]
+            and r["qual"] == expected
+            and r["with_check"] == expected
+        )
+    ]
+    assert bad == []
+
+
+@pytest.mark.parametrize("table", list(ROWS))
+async def test_tenant_a_sees_its_row(api: asyncpg.Connection, world: World, table: str) -> None:
+    await set_tenant(api, world.a.t)
+    assert await api.fetchval(f"SELECT count(*) FROM {table}") >= 1
+
+
+@pytest.mark.parametrize("table", list(ROWS))
+async def test_tenant_b_cannot_read_tenant_a_rows(
+    api: asyncpg.Connection, world: World, table: str
+) -> None:
+    await set_tenant(api, world.b)
+    assert await api.fetchval(f"SELECT count(*) FROM {table}") == 0
+
+
+@pytest.mark.parametrize("table", list(ROWS))
+async def test_tenant_b_cannot_update_or_delete_tenant_a_rows(
+    api: asyncpg.Connection, world: World, table: str
+) -> None:
+    await set_tenant(api, world.b)
+    if table in NO_UPDATE_DELETE:
+        for stmt in (f"UPDATE {table} SET tenant_id = tenant_id", f"DELETE FROM {table}"):
+            with pytest.raises(asyncpg.InsufficientPrivilegeError):
+                await api.execute(stmt)
+    else:
+        assert await api.execute(f"UPDATE {table} SET tenant_id = tenant_id") == "UPDATE 0"
+        assert await api.execute(f"DELETE FROM {table}") == "DELETE 0"
+    await set_tenant(api, world.a.t)
+    assert await api.fetchval(f"SELECT count(*) FROM {table}") >= 1
+
+
+@pytest.mark.parametrize("table", list(ROWS))
+async def test_tenant_b_cannot_insert_rows_for_tenant_a(
+    api: asyncpg.Connection, world: World, table: str
+) -> None:
+    await set_tenant(api, world.b)
+    with pytest.raises(asyncpg.InsufficientPrivilegeError, match="row-level security"):
+        await api.execute(sql_for(table, world.a))
+
+
+@pytest.mark.parametrize("table", [*ROWS, "tenant"])
+async def test_no_tenant_set_returns_zero_rows_without_error(
+    api: asyncpg.Connection, world: World, table: str
+) -> None:
+    await set_tenant(api, None)
+    assert await api.fetchval(f"SELECT count(*) FROM {table}") == 0
+
+
+async def test_no_tenant_set_cannot_insert(api: asyncpg.Connection, world: World) -> None:
+    await set_tenant(api, None)
+    with pytest.raises(asyncpg.InsufficientPrivilegeError, match="row-level security"):
+        await api.execute(sql_for("mission", world.a))

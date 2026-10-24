@@ -23,8 +23,8 @@ logs:
 # --- tests and linters run on the host (uv + npm) ------------------------------
 test: test-backend test-simulator test-frontend
 
-test-backend:
-	cd backend && uv run pytest
+test-backend: env
+	set -a && . ./.env && set +a && cd backend && uv run pytest
 
 test-simulator:
 	cd simulator && uv run pytest
