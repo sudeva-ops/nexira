@@ -3,6 +3,12 @@
   "displayName": "NEXIRA demo (fictional users only)",
   "enabled": true,
   "sslRequired": "external",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "bruteForceProtected": true,
+  "loginWithEmailAllowed": true,
+  "registrationAllowed": false,
   "clients": [
     {
       "clientId": "nexira-web",
@@ -10,9 +16,214 @@
       "publicClient": true,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["http://localhost:3000/*", "http://localhost:5173/*"],
-      "webOrigins": ["http://localhost:3000", "http://localhost:5173"],
-      "attributes": { "pkce.code.challenge.method": "S256" }
+      "implicitFlowEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:5173/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost:5173"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*##http://localhost:5173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "nexira-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "nexira-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "nexira-dev-cli",
+      "name": "Local scripts and tests only (password grant)",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "nexira-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "nexira-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "995dc67b-d4a3-5fe4-b88b-a5cfde48b1fc",
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@demo.nexira.invalid",
+      "emailVerified": true,
+      "firstName": "Nora",
+      "lastName": "Lind",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "ee950409-ac15-5111-9647-ec8a8bcc6288",
+      "username": "duty.officer",
+      "enabled": true,
+      "email": "duty.officer@demo.nexira.invalid",
+      "emailVerified": true,
+      "firstName": "Daniel",
+      "lastName": "Mercer",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "63c2f7b8-4101-5d89-9016-3e6f18810ced",
+      "username": "security.officer",
+      "enabled": true,
+      "email": "security.officer@demo.nexira.invalid",
+      "emailVerified": true,
+      "firstName": "Leila",
+      "lastName": "Nasser",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "50bd9c6b-b1ce-58d8-806f-7e6c77944033",
+      "username": "hom.nairobi",
+      "enabled": true,
+      "email": "hom.nairobi@demo.nexira.invalid",
+      "emailVerified": true,
+      "firstName": "Layla",
+      "lastName": "Haddad",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "07d1c30f-0ba4-55e1-bcf4-d52dff411671",
+      "username": "hom.cairo",
+      "enabled": true,
+      "email": "hom.cairo@demo.nexira.invalid",
+      "emailVerified": true,
+      "firstName": "Ahmed",
+      "lastName": "Farouk",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "10551be5-ec5b-54cd-b704-2f153052ca55",
+      "username": "hq.director",
+      "enabled": true,
+      "email": "hq.director@demo.nexira.invalid",
+      "emailVerified": true,
+      "firstName": "Miriam",
+      "lastName": "Okafor",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "9e3a1655-6ab2-5f30-9f29-66e9e3470919",
+      "username": "travel.desk",
+      "enabled": true,
+      "email": "travel.desk@demo.nexira.invalid",
+      "emailVerified": true,
+      "firstName": "Tomas",
+      "lastName": "Reyes",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "573aea57-8f14-5c8c-826e-1d431f6a1373",
+      "username": "consular.officer",
+      "enabled": true,
+      "email": "consular.officer@demo.nexira.invalid",
+      "emailVerified": true,
+      "firstName": "Anika",
+      "lastName": "Shah",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0d179d9c-aa13-5087-950a-e34263661ae2",
+      "username": "viewer",
+      "enabled": true,
+      "email": "viewer@demo.nexira.invalid",
+      "emailVerified": true,
+      "firstName": "Victor",
+      "lastName": "Lowe",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "65e0b914-fcd7-53ab-944d-55b804e93bb6",
+      "username": "dual.role",
+      "enabled": true,
+      "email": "dual.role@demo.nexira.invalid",
+      "emailVerified": true,
+      "firstName": "Elias",
+      "lastName": "Brandt",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
     }
   ]
 }

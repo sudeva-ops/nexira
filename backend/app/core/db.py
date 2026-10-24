@@ -5,7 +5,8 @@
   at startup and refuses to continue otherwise.
 - Every transaction starts with SELECT set_config('app.tenant_id', :tid, true)
   (D-02). The tenant is stored in session.info["tenant_id"]; with no tenant the
-  setting is empty and every tenant table returns zero rows.
+  setting is empty and every tenant table returns zero rows. Request sessions
+  come from app/core/security.get_db, which takes the tenant from the token.
 - READ COMMITTED isolation, which the audit chain relies on (D-20).
 """
 
@@ -15,7 +16,6 @@ from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Any
 
-from fastapi import Request
 from sqlalchemy import event, inspect, text
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import (
@@ -89,16 +89,9 @@ async def tenant_session(
         yield session
 
 
-async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
-    """FastAPI dependency: one session per request.
-
-    The tenant comes from request.state.tenant_id, which app/core/security.py sets
-    from the token issuer (Prompt 3). Until then there is no tenant, so tenant
-    tables return no rows.
-    """
-    tenant_id: uuid.UUID | None = getattr(request.state, TENANT_KEY, None)
-    async with tenant_session(tenant_id) as session:
-        yield session
+def engine_dependency() -> AsyncEngine:
+    """FastAPI dependency for the API engine; tests override it."""
+    return get_engine()
 
 
 class UnsafeDatabaseRoleError(RuntimeError):

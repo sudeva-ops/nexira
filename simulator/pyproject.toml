@@ -3,14 +3,21 @@ name = "nexira-sim"
 version = "0.1.0"
 description = "NEXIRA simulator: seed data and scenario player (fictional data only)"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = ["nexira-backend"]
 
 [dependency-groups]
 dev = [
   "pytest>=8.3",
+  "pytest-asyncio>=0.24",
+  "asyncpg-stubs>=0.30",
+  "httpx>=0.28",
   "ruff>=0.8",
   "mypy>=1.13",
 ]
+
+[tool.uv.sources]
+# Plan Q10: the seeder loads data through the backend service layer.
+nexira-backend = { path = "../backend", editable = true }
 
 [build-system]
 requires = ["hatchling>=1.25"]
@@ -34,4 +41,6 @@ files = ["nexira_sim", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 addopts = "-ra --strict-markers"

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { Clock } from "./Clock";
 import { SCREENS, type Screen } from "./screens";
+import { UserMenu } from "./UserMenu";
 
 function NavList() {
   let group: Screen["group"] | null = null;
@@ -31,7 +32,11 @@ function NavList() {
   return <nav aria-label="Main">{items}</nav>;
 }
 
-export function AppShell() {
+interface Props {
+  onLogout: () => void;
+}
+
+export function AppShell({ onLogout }: Props) {
   const { pathname } = useLocation();
   const current = SCREENS.find((s) => s.path === pathname);
 
@@ -58,6 +63,7 @@ export function AppShell() {
             SIMULATED DATA
           </Tag>
           <Clock />
+          <UserMenu onLogout={onLogout} />
         </header>
         <section className="nx-view">
           <Outlet />

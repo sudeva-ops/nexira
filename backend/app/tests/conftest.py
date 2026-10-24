@@ -20,7 +20,12 @@ import asyncpg
 import pytest
 from alembic import command
 from alembic.config import Config
+from httpx import AsyncClient
 from sqlalchemy.engine import make_url
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+from app.core.db import create_engine
+from app.tests.auth_helpers import Idp
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 TEST_DB = "nexira_test"
@@ -131,6 +136,27 @@ async def set_tenant(conn: asyncpg.Connection, tenant_id: uuid.UUID | None) -> N
     await conn.execute(
         "SELECT set_config('app.tenant_id', $1, false)", str(tenant_id) if tenant_id else ""
     )
+
+
+@pytest.fixture
+async def api_engine(db: DbUrls) -> AsyncIterator[AsyncEngine]:
+    """SQLAlchemy engine as nexira_api, like the app uses."""
+    engine = create_engine(db.api)
+    yield engine
+    await engine.dispose()
+
+
+@pytest.fixture
+async def idp(db: DbUrls, api_engine: AsyncEngine) -> Idp:
+    """A fresh tenant whose issuer is trusted by the app under test."""
+    tenant_id = await create_tenant(db, "Auth tenant")
+    return Idp(issuer=f"https://kc.test/realms/{tenant_id}", tenant_id=tenant_id, engine=api_engine)
+
+
+@pytest.fixture
+async def client(idp: Idp) -> AsyncIterator[AsyncClient]:
+    async for c in idp.client():
+        yield c
 
 
 @pytest.fixture

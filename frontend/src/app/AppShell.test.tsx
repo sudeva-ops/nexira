@@ -1,20 +1,21 @@
-import { render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { vi } from "vitest";
 
-import { App } from "./App";
+import { DUTY_OFFICER, mockApi, renderApp } from "../test/render";
 import { formatTime } from "./time";
 
-function renderAt(path: string) {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <App />
-    </MemoryRouter>,
-  );
-}
+beforeEach(() => {
+  mockApi({ "/api/me": { body: DUTY_OFFICER } });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("app shell", () => {
   it("lists exactly the Phase 1 screens in the navigation (D-25)", () => {
-    renderAt("/");
+    renderApp("/");
     const nav = screen.getByRole("navigation", { name: "Main" });
     const labels = within(nav)
       .getAllByRole("link")
@@ -35,14 +36,46 @@ describe("app shell", () => {
   });
 
   it("uses the Decision Queue as the home screen", () => {
-    renderAt("/");
+    renderApp("/");
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Decision Queue");
   });
 
   it("shows GST and UTC clocks in the header", () => {
-    renderAt("/incidents");
+    renderApp("/incidents");
     expect(screen.getByTestId("clock-home")).toBeInTheDocument();
     expect(screen.getByTestId("clock-utc")).toBeInTheDocument();
+  });
+});
+
+describe("user menu", () => {
+  it("shows the name and roles from GET /api/me with a bearer token", async () => {
+    const fetchMock = mockApi({ "/api/me": { body: DUTY_OFFICER } });
+    renderApp("/");
+    expect(await screen.findByTestId("user-name")).toHaveTextContent("Daniel Mercer");
+    expect(screen.getByTestId("user-roles")).toHaveTextContent("DUTY_OFFICER");
+    const init = fetchMock.mock.calls[0]?.[1];
+    expect(init?.headers).toMatchObject({ Authorization: "Bearer test-token" });
+  });
+
+  it("shows mission-scoped roles with their mission", async () => {
+    mockApi({
+      "/api/me": {
+        body: {
+          ...DUTY_OFFICER,
+          display_name: "Layla Haddad",
+          roles: [{ code: "HEAD_OF_MISSION", mission_id: "m1", mission_code: "NBO" }],
+        },
+      },
+    });
+    renderApp("/");
+    expect(await screen.findByTestId("user-roles")).toHaveTextContent("HEAD_OF_MISSION · NBO");
+  });
+
+  it("signs out", async () => {
+    const onLogout = vi.fn();
+    renderApp("/", onLogout);
+    await userEvent.click(await screen.findByRole("button", { name: "Sign out" }));
+    expect(onLogout).toHaveBeenCalledOnce();
   });
 });
 

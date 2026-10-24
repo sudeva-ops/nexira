@@ -119,13 +119,13 @@ Each item gives a proposed resolution. Items marked **(schema)** would need an e
 **G-03 · The tenant row can't be seeded as `nexira_api`.** Prompt 4 says the seed loads "through the backend service layer", but `nexira_api` has no INSERT on `tenant`.
 → *Proposed:* `make seed` runs a small bootstrap as `nexira_owner` that inserts the tenant row only, the same way as `checks/10_setup_owner.sql`. Everything else goes through the services as `nexira_api`.
 
-**G-04 · Keycloak issuer mismatch inside Docker.** The token `iss` is whatever URL the browser used, for example `http://localhost:8080/realms/nexira-demo`. The backend reaches Keycloak as `http://keycloak:8080`. Since the tenant is chosen by exact issuer match (D-04), the two must agree.
+**G-04 · Keycloak issuer mismatch inside Docker.** *(Implemented in Prompts 1 and 3.)* The token `iss` is whatever URL the browser used, for example `http://localhost:8080/realms/nexira-demo`. The backend reaches Keycloak as `http://keycloak:8080`. Since the tenant is chosen by exact issuer match (D-04), the two must agree.
 → *Proposed:* pin `KC_HOSTNAME` so the issuer is fixed. Seed `tenant.oidc_issuer` from `OIDC_ISSUER`, and fetch JWKS from a separate `OIDC_JWKS_URL` (the internal hostname). Validate `iss` exactly; never derive it from the request.
 
-**G-05 · Linking Keycloak users to roles.** Prompt 3 creates `app_user` on first login, but someone has to assign `user_role` to demo users before they can act.
+**G-05 · Linking Keycloak users to roles.** *(Implemented in Prompt 3.)* Prompt 3 creates `app_user` on first login, but someone has to assign `user_role` to demo users before they can act.
 → *Proposed:* the realm export fixes each demo user's `id` (which becomes `sub`). The seed creates the matching `app_user` (`external_id = sub`) and `user_role` rows. A user created on first login who has no seeded roles gets no roles, so they have no access beyond read-only screens (or none). Users are never given VIEWER by default.
 
-**G-06 · The audit trail panel conflicts with ADMIN-only audit access.** PB-04 and Prompt 11 show an audit trail panel on the playbook run screen for Duty Officers. Prompt 3 makes `GET /api/audit` ADMIN-only.
+**G-06 · The audit trail panel conflicts with ADMIN-only audit access.** *(Implemented in Prompt 3.)* PB-04 and Prompt 11 show an audit trail panel on the playbook run screen for Duty Officers. Prompt 3 makes `GET /api/audit` ADMIN-only.
 → *Proposed:* `GET /api/audit?entity_type=&entity_id=` is allowed for any role that can read that entity. The unfiltered Audit view and `GET /api/audit/verify` stay ADMIN-only.
 
 **G-07 · `GET /api/me/permissions` is used but never specified.** Prompts 11 and 14 rely on it, and no prompt defines it.

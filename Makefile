@@ -26,8 +26,8 @@ test: test-backend test-simulator test-frontend
 test-backend: env
 	set -a && . ./.env && set +a && cd backend && uv run pytest
 
-test-simulator:
-	cd simulator && uv run pytest
+test-simulator: env
+	set -a && . ./.env && set +a && cd simulator && uv run pytest
 
 test-frontend:
 	cd frontend && npm run test
@@ -48,8 +48,9 @@ lint-frontend:
 migrate: env
 	$(COMPOSE) run --rm --build migrate
 
+# Loads seed data through the backend service layer (identities now, the rest in Prompt 4).
 seed: env
-	@echo "seed: not implemented yet (Prompt 4)."
+	set -a && . ./.env && set +a && cd simulator && uv run python -m nexira_sim.seed
 
 # D-21: drops and recreates the LOCAL/DEMO database volume only, then migrates and
 # seeds. Refuses to run for any other APP_ENV. Never deletes audit rows in a live DB.

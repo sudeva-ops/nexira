@@ -51,6 +51,8 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      # Substituted into the realm import (${DEMO_USER_PASSWORD} placeholders).
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD}
       # Plan G-04: pin the issuer to the browser-facing URL, while the backend
       # still reaches Keycloak on the internal network for JWKS.
       KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8080}
@@ -95,6 +97,9 @@ services:
       args:
         VITE_HOME_TZ: ${VITE_HOME_TZ:-Asia/Dubai}
         VITE_DEMO_MODE: ${VITE_DEMO_MODE:-false}
+        VITE_OIDC_URL: ${VITE_OIDC_URL:-http://localhost:8080}
+        VITE_OIDC_REALM: ${VITE_OIDC_REALM:-nexira-demo}
+        VITE_OIDC_CLIENT_ID: ${VITE_OIDC_CLIENT_ID:-nexira-web}
     volumes:
       - ./tiles:/srv/tiles:ro
     ports:
