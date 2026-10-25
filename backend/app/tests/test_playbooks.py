@@ -21,6 +21,7 @@ from app.main import app
 from app.modules.audit.models import AuditLog
 from app.modules.intel.models import Incident, IncidentEvent
 from app.modules.intel.service import ensure_sources
+from app.modules.people.models import Mission
 from app.modules.playbooks import engine
 from app.modules.playbooks.models import Playbook, PlaybookRun, PlaybookRunStep, PlaybookStep
 from app.modules.playbooks.service import StepIn, ensure_playbook
@@ -29,6 +30,9 @@ from app.tests.auth_helpers import Idp
 from app.tests.fakes import ListPublisher
 from app.tests.intel_helpers import SOURCES, ingest, signal
 
+BROKEN = [
+    StepIn(1, "Notify nobody", "NOTIFY", {"audience": {"unknown": True}, "message": "x"}),
+]
 GATED = [
     StepIn(1, "Confirm incident", "TASK", {"summary": "confirmed"}),
     StepIn(2, "Partner standby", "PARTNER_REQUEST", {"partner": "Kestrel Medical"}),
@@ -63,11 +67,15 @@ async def world(client: AsyncClient, idp: Idp) -> World:
     }
     for sub, roles in grants.items():
         await idp.user(sub, roles)
-    step_ids = {"PB-T": [uuid.uuid4() for _ in GATED], "PB-2G": [uuid.uuid4() for _ in TWO_GATES]}
+    step_ids = {
+        "PB-T": [uuid.uuid4() for _ in GATED],
+        "PB-2G": [uuid.uuid4() for _ in TWO_GATES],
+        "PB-X": [uuid.uuid4() for _ in BROKEN],
+    }
     async with tenant_session(idp.tenant_id, idp.engine) as session:
         await ensure_sources(session, SOURCES)
         await ensure_reference_counter(session, prefix="INC", with_year=True, last_value=1041)
-        for code, steps in (("PB-T", GATED), ("PB-2G", TWO_GATES)):
+        for code, steps in (("PB-T", GATED), ("PB-2G", TWO_GATES), ("PB-X", BROKEN)):
             await ensure_playbook(
                 session,
                 playbook_id=uuid.uuid4(),
@@ -337,3 +345,49 @@ async def test_a_run_needs_an_active_incident(client: AsyncClient, idp: Idp, wor
     response = await start(client, idp, world)
     assert response.status_code == 409
     assert "ACTIVE" in response.json()["detail"]
+
+
+async def test_a_bad_step_config_fails_the_run_instead_of_retrying_forever(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    run_id = uuid.UUID((await start(client, idp, world, code="PB-X")).json()["id"])
+    assert await run_until_stop(idp, world, run_id) == "RUN_FAILED"
+    assert await engine.resumable_runs(idp.engine, idp.tenant_id) == []
+    run = (await client.get(f"/api/playbook-runs/{run_id}", headers=idp.headers("viewer"))).json()
+    assert run["status"] == "FAILED"
+    assert "unsupported audience" in run["steps"][0]["result"]["error"]
+    # The live-run slot is free again: the playbook can be started anew.
+    assert (await start(client, idp, world, code="PB-X")).status_code == 201
+
+
+async def test_a_failed_publish_after_commit_still_succeeds(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    class DownPublisher:
+        async def publish(self, event: object) -> None:
+            raise ConnectionError("redis down")
+
+    app.dependency_overrides[get_publisher] = DownPublisher
+    response = await start(client, idp, world)
+    assert response.status_code == 201
+    assert response.json()["status"] == "RUNNING"  # committed; the resume sweep continues it
+
+
+async def test_the_audit_names_only_roles_in_scope(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    async with tenant_session(idp.tenant_id, idp.engine) as session:
+        cai = await session.scalar(select(Mission.id).where(Mission.code == "CAI"))
+    await idp.user("hom.both", [("HEAD_OF_MISSION", world.nbo), ("HEAD_OF_MISSION", cai)])
+    run = (await start(client, idp, world)).json()
+    await run_until_stop(idp, world, uuid.UUID(run["id"]))
+    gate = world.step_ids["PB-T"][2]
+    assert (
+        await client.post(approve_url(run["id"], gate), headers=idp.headers("hom.both"))
+    ).status_code == 200
+    async with tenant_session(idp.tenant_id, idp.engine) as session:
+        approval = await session.scalar(
+            select(AuditLog).where(AuditLog.action == "PLAYBOOK.STEP_APPROVE")
+        )
+    assert approval is not None
+    assert approval.details["held"] == ["HEAD_OF_MISSION · NBO"]

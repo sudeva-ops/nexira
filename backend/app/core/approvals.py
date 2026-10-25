@@ -11,8 +11,10 @@ decide() checks, in this order, and refuses with the first failure:
 3. 403 the user already decided another step of the same subject (D-16: one
    person never fills two steps, even holding both roles);
 4. 403 the user lacks the role ('|' alternatives) within the mission scope.
-The database constraints (distinct-approver index, order triggers) remain the
-backstop; app/core/errors.py turns anything that still reaches them into 409.
+For agent proposals the database adds a backstop (the distinct-approver index and
+the order triggers on proposal_approval); app/core/errors.py turns those into 409.
+Playbook gates have no such constraint yet (proposed as PC-06): for them this
+check, made with the run row locked, is the only enforcement.
 
 Mission scope:
 - ANY_MISSION: the user holds the role at any scope. Used to gate endpoints.

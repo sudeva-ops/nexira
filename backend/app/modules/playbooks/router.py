@@ -6,6 +6,7 @@
 - Approving a gated step: approvals.decide() only (D-16); 403 or 409 otherwise.
 """
 
+import logging
 import uuid
 from typing import Annotated, Literal
 
@@ -13,13 +14,25 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.approvals import require_roles
-from app.core.events import Publisher, get_publisher
+from app.core.events import Event, Publisher, get_publisher
 from app.core.security import CurrentUser, current_user, get_db
 from app.modules.playbooks import queries, service
 from app.modules.playbooks.schemas import PlaybookOut, RunOut, StartRunIn
 from app.modules.tenancy.service import ROLES, Actor
 
+log = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api", tags=["playbooks"])
+
+
+async def _publish_after_commit(publisher: Publisher, event: Event) -> None:
+    """The change is committed; a failed publish must not turn it into an error.
+    The worker's resume sweep continues RUNNING runs (WORKER_TENANT_IDS)."""
+    try:
+        await publisher.publish(event)
+    except Exception:
+        log.exception("publishing %s failed after commit", event.type)
+
 
 Reader = Annotated[CurrentUser, Depends(require_roles(*ROLES))]
 User = Annotated[CurrentUser, Depends(current_user)]
@@ -68,7 +81,7 @@ async def start_run(body: StartRunIn, user: User, session: Db, publisher: Pub) -
     except service.RunNotAllowedError as e:
         raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from None
     await session.commit()
-    await publisher.publish(service.run_started_event(run))
+    await _publish_after_commit(publisher, service.run_started_event(run))
     out = await queries.get_run(session, run.id)
     assert out is not None
     return out
@@ -83,7 +96,7 @@ async def approve_step(
     except service.StepNotFoundError as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from None
     await session.commit()
-    await publisher.publish(service.step_approved_event(run, step_id))
+    await _publish_after_commit(publisher, service.step_approved_event(run, step_id))
     out = await queries.get_run(session, run.id)
     assert out is not None
     return out

@@ -184,8 +184,12 @@ async def _gate(
     playbook = await session.get_one(Playbook, run.playbook_id)
     mission_id = None
     if run.incident_id is not None:
+        # FOR SHARE: exposure cannot move the incident to another mission between
+        # this check and the commit. Locked after the run, as everywhere else.
         mission_id = await session.scalar(
-            select(Incident.mission_id).where(Incident.id == run.incident_id)
+            select(Incident.mission_id)
+            .where(Incident.id == run.incident_id)
+            .with_for_update(read=True)
         )
     others = await session.scalars(
         select(PlaybookRunStep.approved_by).where(
@@ -251,6 +255,7 @@ async def approve_step(
         f"{r.code}{' · ' + r.mission_code if r.mission_code else ''}"
         for r in roles
         if r.code in approvals.parse_role_codes(gate.required_role)
+        and (r.mission_id is None or r.mission_id == gate.mission_id)
     ]
     timeline(
         session,

@@ -31,7 +31,7 @@ from app.core.db import tenant_session
 from app.core.events import Event, Publisher
 from app.modules.intel import exposure
 from app.modules.intel.models import Incident, IncidentEvent
-from app.modules.notifications.service import CampaignIn, create_campaign
+from app.modules.notifications.service import AudienceError, CampaignIn, create_campaign
 from app.modules.playbooks.models import Playbook, PlaybookRun, PlaybookRunStep, PlaybookStep
 from app.modules.tenancy.service import Actor
 
@@ -41,6 +41,12 @@ FINISHED = ("DONE", "SKIPPED")
 
 class StepError(Exception):
     """A step's configuration cannot be executed; the run is marked FAILED."""
+
+
+# Errors that mean the step's configuration is wrong. Retrying cannot help, so the
+# run is marked FAILED instead of being resumed forever. Anything else (a lost
+# connection, a killed worker) rolls back and the step runs again on resume.
+CONFIG_ERRORS = (StepError, AudienceError, ValueError, KeyError, TypeError)
 
 
 @dataclass
@@ -238,7 +244,7 @@ async def advance_one(session: AsyncSession, run_id: uuid.UUID) -> Outcome | Non
     run_step.started_at = now
     try:
         summary, result = await _execute(session, run, playbook, step)
-    except StepError as e:
+    except CONFIG_ERRORS as e:
         run_step.status = "FAILED"
         run_step.completed_at = datetime.now(UTC)
         run_step.result = {"error": str(e)}
