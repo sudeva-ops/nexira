@@ -66,6 +66,9 @@ FORWARDED = frozenset(
         "CAMPAIGN_UPDATED",
         "CHECKIN_UPDATED",
         "CHECKIN_ESCALATED",
+        "PROPOSAL_CREATED",
+        "PROPOSAL_UPDATED",
+        "PROPOSAL_EXPIRED",  # plan G-18: a notice for holders of the open step's role
     }
 )
 

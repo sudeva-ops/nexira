@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.approvals import roles_of
 from app.core.security import CurrentUser, current_user, get_db
+from app.modules.agents import proposals
+from app.modules.agents.models import AgentProposal
 from app.modules.playbooks import service as playbooks
 from app.modules.playbooks.schemas import PermissionsOut
 from app.modules.tenancy.schemas import MeOut, RoleOut
@@ -33,14 +35,19 @@ async def me(
 
 @router.get("/me/permissions")
 async def my_permissions(
-    entity_type: Literal["playbook_run"],
+    entity_type: Literal["playbook_run", "agent_proposal"],
     entity_id: uuid.UUID,
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> PermissionsOut:
     """Plan G-07: the actions the caller may take on an entity now, computed by
-    approvals.can_decide(), the same code that enforces them. Agent proposals
-    are added in Prompt 12."""
+    approvals.can_decide(), the same code that enforces them."""
+    if entity_type == "agent_proposal":
+        proposal = await session.get(AgentProposal, entity_id)
+        allowed = proposal is not None and await proposals.can_decide(session, user, proposal)
+        return PermissionsOut(
+            entity_type=entity_type, entity_id=str(entity_id), decide_proposal=allowed
+        )
     return PermissionsOut(
         entity_type=entity_type,
         entity_id=str(entity_id),

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.db import tenant_session
 from app.core.events import Event, Handler, Publisher
+from app.modules.agents import proposals
 from app.modules.checkin import service as checkin
 from app.modules.notifications.service import complete_campaigns, dispatch, refresh_receipts
 
@@ -63,14 +64,19 @@ async def tick(
     adapter: str = "simulated",
     now: Now = _utcnow,
 ) -> None:
-    """The periodic pass: leftover deliveries, receipts, escalations."""
+    """The periodic pass: leftover deliveries, receipts, check-in escalations, and
+    overdue agent proposals (AGT-06)."""
     await dispatch_all(engine, tenant_id, publisher, adapter=adapter, now=now)
     async with tenant_session(tenant_id, engine) as session:
         completed = await complete_campaigns(session, now(), adapter)  # after split batches
         await refresh_receipts(session, now(), adapter)
         escalated = await checkin.escalate_due(session, now())
+        expired = await proposals.expire_overdue(session, now())
         await session.commit()
     for campaign in completed:
         await publisher.publish(checkin.updated_event(campaign, "CAMPAIGN_UPDATED"))
     for result in escalated:
         await publisher.publish(checkin.updated_event(result.campaign, "CHECKIN_ESCALATED"))
+    for outcome in expired:
+        for event in outcome.events:
+            await publisher.publish(event)
