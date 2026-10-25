@@ -9,7 +9,7 @@ from app.core.config import get_settings
 from app.core.db import get_engine, verify_connection_role
 from app.core.events import Publisher, RedisPublisher, StreamConsumer, get_redis
 from app.modules.agents.runner import agents_handler, observed_types
-from app.modules.checkin.consumer import response_handler
+from app.modules.checkin.consumer import clock_handler, response_handler
 from app.modules.intel.consumer import exposure_handler, raw_signal_handler
 from app.modules.notifications.consumer import campaign_handler, tick
 from app.modules.playbooks.consumer import resume_runs, run_handler
@@ -97,7 +97,10 @@ async def main() -> None:
             client,
             group="checkin",
             consumer=name,
-            handlers={"CHECKIN_RESPONSE": response_handler(engine, publisher)},
+            handlers={
+                "CHECKIN_RESPONSE": response_handler(engine, publisher),
+                "CHECKIN_CLOCK": clock_handler(engine, publisher),
+            },
         ),
     ]
     log.info("consumers started: intel, exposure, playbooks, notifications, agents, checkin")

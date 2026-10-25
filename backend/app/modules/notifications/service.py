@@ -101,14 +101,37 @@ async def demo_running(session: AsyncSession) -> bool:
     return found is not None
 
 
+async def demo_started_at(session: AsyncSession) -> datetime | None:
+    """When the running demo scenario run was first played (None if none is running)."""
+    started: datetime | None = await session.scalar(
+        text(
+            """
+            SELECT started_at FROM scenario_run
+             WHERE mode = 'DEMO' AND status = ANY(:running)
+             ORDER BY started_at DESC NULLS LAST
+             LIMIT 1
+            """
+        ),
+        {"running": list(DEMO_RUNNING)},
+    )
+    return started
+
+
 async def scenario_escalate_after_s(session: AsyncSession) -> int | None:
     """The check-in escalation time while a demo scenario is running
     (SCENARIO_SETTINGS, Prompt 5: 20 s for NBO-CIVIL-UNREST). Otherwise None, and
-    the campaign keeps its own value. Pilot tenants have no scenario runs."""
+    the campaign keeps its own value. Pilot tenants have no scenario runs.
+
+    Before the run reaches checkin_clock_scene (scene 4 for NBO-CIVIL-UNREST) it is
+    None too: that scene's CHECKIN_CLOCK event starts the clock (checkin.start_clock),
+    so a presenter who stays on scene 3 does not see escalation early."""
     value = await session.scalar(
         text(
             """
-            SELECT (e.payload ->> 'checkin_escalate_after_s')::int
+            SELECT CASE
+                     WHEN r.current_scene >= COALESCE((e.payload ->> 'checkin_clock_scene')::int, 0)
+                     THEN (e.payload ->> 'checkin_escalate_after_s')::int
+                   END
               FROM scenario_run r
               JOIN scenario_event e ON e.scenario_id = r.scenario_id
              WHERE r.mode = 'DEMO' AND r.status = ANY(:running)

@@ -27,7 +27,7 @@ MAX_LEN = 100_000  # approximate trim; streams are a transport, not the record
 
 @dataclass(frozen=True)
 class Event:
-    type: str  # RAW_SIGNAL, CHECKIN_RESPONSE, SCENE_START, SCENARIO_SETTINGS, ...
+    type: str  # RAW_SIGNAL, CHECKIN_RESPONSE, CHECKIN_CLOCK, SCENE_START, ...
     tenant_id: uuid.UUID
     payload: dict[str, Any]
     source: str  # e.g. "scenario:NBO-CIVIL-UNREST:<run id>"

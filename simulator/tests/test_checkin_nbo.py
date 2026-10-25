@@ -1,8 +1,9 @@
 """Scene 4 of NBO-CIVIL-UNREST: the safety check-in (decisions.md §7, Prompt 10).
 
-A demo scenario run is active, so the check-in escalates after 20 s. PB-07 runs to
-its approval gate (step 5 creates the check-in for 229 people), the dispatcher sends
-it, and the scenario's 188 CHECKIN_RESPONSE events go through the worker's handler.
+A demo scenario run is active. PB-07 runs to its approval gate (step 5 creates the
+check-in for 229 people) and the dispatcher sends it. Scene 4 starts the check-in
+clock (CHECKIN_CLOCK: escalation 20 s later, however long scene 3 took) and its 188
+CHECKIN_RESPONSE events go through the worker's handlers.
 """
 
 import uuid
@@ -11,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 from app.core.db import create_engine, tenant_session
 from app.core.events import Event
 from app.modules.checkin import service as checkin
-from app.modules.checkin.consumer import response_handler
+from app.modules.checkin.consumer import clock_handler, response_handler
 from app.modules.notifications.consumer import dispatch_all
 from app.modules.notifications.models import NotificationCampaign
 from app.modules.playbooks import engine as playbook_engine
@@ -62,21 +63,29 @@ async def test_scene_4_ends_at_15_1_1_and_168_4_40_and_escalates_hana_once(db: D
             assert (campaign.status, campaign.sent_at, campaign.escalate_after_s) == (
                 "SENT",
                 T0,
-                20,
+                600,  # scene 3: the scenario's 20 s have not started (D-07 default)
             )
             campaign_id = campaign.id
 
-        # Scene 4: every answer as the player publishes it.
-        handle = response_handler(engine, publisher)
-        for e in nbo.build_events(world.build(DAY, tenant_id), tenant_id):
-            if e.event_type == "CHECKIN_RESPONSE":
-                await handle(Event("CHECKIN_RESPONSE", tenant_id, dict(e.payload), "scenario"))
+        # Scene 4, 90 s after the check-in was sent: the clock event, then every answer.
+        scene_4 = T0 + timedelta(seconds=90)
+        handlers = {
+            "CHECKIN_CLOCK": clock_handler(engine, publisher, now=lambda: scene_4),
+            "CHECKIN_RESPONSE": response_handler(engine, publisher),
+        }
+        for e in sorted(
+            nbo.build_events(world.build(DAY, tenant_id), tenant_id), key=lambda e: e.offset_ms
+        ):
+            if e.scene_no == 4 and e.event_type in handlers:
+                await handlers[e.event_type](
+                    Event(e.event_type, tenant_id, dict(e.payload), "scenario")
+                )
 
         async with tenant_session(tenant_id, engine) as session:
             tallies = await checkin.tally(session, campaign_id)
-            assert await checkin.escalate_due(session, T0 + timedelta(seconds=19)) == []
-            first = await checkin.escalate_due(session, T0 + timedelta(seconds=20))
-            again = await checkin.escalate_due(session, T0 + timedelta(seconds=60))
+            assert await checkin.escalate_due(session, scene_4 + timedelta(seconds=19)) == []
+            first = await checkin.escalate_due(session, scene_4 + timedelta(seconds=20))
+            again = await checkin.escalate_due(session, scene_4 + timedelta(seconds=60))
             await session.commit()
     finally:
         await engine.dispose()
