@@ -88,3 +88,44 @@ async def test_api_cannot_touch_alembic_version(db: DbUrls) -> None:
 def test_migration_file_reads_the_copied_sql() -> None:
     source = (BACKEND_DIR / "migrations" / "versions" / "0001_initial_schema_v0_2.py").read_text()
     assert Path(MIGRATION_SQL).name in source
+
+
+async def _campaign_shape(admin_url: str) -> dict[str, object]:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        columns = await conn.fetch(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'notification_campaign' ORDER BY column_name"
+        )
+        checks = await conn.fetch(
+            "SELECT conname, pg_get_constraintdef(oid) AS def FROM pg_constraint "
+            "WHERE conrelid = 'notification_campaign'::regclass AND contype = 'c' ORDER BY conname"
+        )
+        triggers = await conn.fetch(
+            "SELECT tgname FROM pg_trigger "
+            "WHERE tgrelid = 'notification_campaign'::regclass AND NOT tgisinternal"
+        )
+        template = await conn.fetchval("SELECT to_regclass('message_template') IS NOT NULL")
+    finally:
+        await conn.close()
+    return {
+        "columns": [r["column_name"] for r in columns],
+        "checks": [(r["conname"], r["def"]) for r in checks],
+        "triggers": [r["tgname"] for r in triggers],
+        "message_template": template,
+    }
+
+
+def test_downgrading_0002_restores_0001_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0001")
+    at_0001 = asyncio.run(_campaign_shape(admin))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_campaign_shape(admin))
+    command.downgrade(cfg, "0001")
+    assert asyncio.run(_campaign_shape(admin)) == at_0001
+    assert at_head["message_template"] is True
+    assert "notification_campaign_approval_guard" in str(at_head["triggers"])
+    command.upgrade(cfg, "head")

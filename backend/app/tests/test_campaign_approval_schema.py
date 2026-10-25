@@ -74,6 +74,27 @@ async def test_a_second_person_approves_once(tenant: asyncpg.Connection) -> None
     )
 
 
+async def test_an_approval_cannot_be_cleared(tenant: asyncpg.Connection) -> None:
+    author, second = await user(tenant), await user(tenant)
+    campaign_id = await draft(tenant, author)
+    await approve(tenant, campaign_id, second)
+    with pytest.raises(REFUSED, match="approved_by cannot change once set"):
+        await tenant.execute(
+            "UPDATE notification_campaign SET approved_by = NULL WHERE id = $1", campaign_id
+        )
+
+
+async def test_the_submitter_cannot_approve_either(tenant: asyncpg.Connection) -> None:
+    """Someone other than the author submitted it: they cannot approve it themselves."""
+    author, submitter = await user(tenant), await user(tenant)
+    campaign_id = await draft(tenant, author)
+    await tenant.execute(
+        "UPDATE notification_campaign SET submitted_by = $2 WHERE id = $1", campaign_id, submitter
+    )
+    with pytest.raises(REFUSED, match="the author cannot approve"):
+        await approve(tenant, campaign_id, submitter)
+
+
 async def test_pending_approval_is_a_campaign_status(tenant: asyncpg.Connection) -> None:
     campaign_id = await draft(tenant, await user(tenant))
     assert (

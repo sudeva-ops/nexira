@@ -251,4 +251,6 @@ async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> No
     assert texts[1] == data.CITIZEN_ADVISORY
     assert "Paris" in texts[2]["en"]
     assert "Nairobi" not in texts[2]["en"]
-    assert all(not any(json.loads(r["reviewed"]).values()) for r in rows)
+    reviewed = [json.loads(r["reviewed"]) for r in rows]
+    assert all(set(r) == {"ar", "fr", "sw"} for r in reviewed)  # not English (D-15)
+    assert not any(any(r.values()) for r in reviewed)

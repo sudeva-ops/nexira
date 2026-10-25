@@ -111,7 +111,15 @@ async def seed_all(
         report["templates"] = await ensure_templates(
             session,
             [
-                TemplateIn(code, kind, mission, name, texts, {lang: False for lang in texts})
+                # English is the source text, not a translation: only AR/FR/SW are reviewed.
+                TemplateIn(
+                    code,
+                    kind,
+                    mission,
+                    name,
+                    texts,
+                    {lang: False for lang in texts if lang != "en"},
+                )
                 for code, kind, mission, name, texts in data.MESSAGE_TEMPLATES
             ],
         )
