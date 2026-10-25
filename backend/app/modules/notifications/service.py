@@ -253,7 +253,7 @@ async def dispatch(
     campaign_id: uuid.UUID | None = None,
     configured_adapter: str = "simulated",
 ) -> Dispatched:
-    """Send QUEUED deliveries (all campaigns, or one) through the channel adapter.
+    """Send QUEUED deliveries of SENDING campaigns (all, or one) through the channel adapter.
 
     Rows are claimed FOR UPDATE SKIP LOCKED, so two dispatchers never send the same
     delivery; the caller commits once per batch."""
@@ -262,7 +262,12 @@ async def dispatch(
         select(NotificationDelivery, NotificationCampaign, Person.preferred_lang)
         .join(NotificationCampaign, NotificationCampaign.id == NotificationDelivery.campaign_id)
         .join(Person, Person.id == NotificationDelivery.person_id)
-        .where(NotificationDelivery.status == "QUEUED")
+        .where(
+            NotificationDelivery.status == "QUEUED",
+            # Only a campaign that is being sent: never one pending approval (D-31) or
+            # one already finished, whatever deliveries were queued for it.
+            NotificationCampaign.status == "SENDING",
+        )
         .order_by(NotificationDelivery.id)
         .limit(DISPATCH_BATCH)
         .with_for_update(of=NotificationDelivery, skip_locked=True)
