@@ -113,7 +113,12 @@ ROWS: dict[str, str] = {
 # nexira_app has no UPDATE/DELETE on audit_log at all (D-20), so those fail with
 # a privilege error rather than touching zero rows.
 NO_UPDATE_DELETE = {"audit_log"}
-NO_DELETE = {"message_template", "notification_campaign"}  # PC-07, PC-10
+NO_DELETE = {  # PC-07, PC-10, PC-11
+    "message_template",
+    "notification_campaign",
+    "notification_delivery",
+    "checkin_response",
+}
 
 
 def sql_for(table: str, ids: Ids) -> str:

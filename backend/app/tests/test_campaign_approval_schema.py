@@ -1,6 +1,7 @@
-"""Migration 0002 (PC-07, PC-08, PC-10; D-31), checked as nexira_api: the database
-refuses self-approval in every form the review of Prompt 18 tried, keeps one generic
-template per code, and the API can delete neither templates nor campaigns."""
+"""Migration 0002 (PC-07, PC-08, PC-10, PC-11; D-31), checked as nexira_api: the
+database refuses self-approval in every form the reviews of Prompt 18 tried, binds an
+approval to the content that is sent, keeps one generic template per code, and the API
+can delete neither templates nor campaigns, deliveries or check-in answers."""
 
 import json
 import uuid
@@ -61,7 +62,7 @@ async def pending(conn: asyncpg.Connection, author: uuid.UUID) -> uuid.UUID:
 
 async def approve(conn: asyncpg.Connection, campaign_id: uuid.UUID, by: uuid.UUID) -> None:
     await conn.execute(
-        "UPDATE notification_campaign SET approved_by = $2, approved_at = now() WHERE id = $1",
+        "UPDATE notification_campaign SET approved_by = $2, status = 'SENDING' WHERE id = $1",
         campaign_id,
         by,
     )
@@ -129,7 +130,8 @@ async def test_rewriting_the_author_in_the_same_update_is_refused(
     for change, extra in rewrites:
         with pytest.raises(REFUSED, match="cannot change"):
             await tenant.execute(
-                f"UPDATE notification_campaign SET {change}, approved_by = $2 WHERE id = $1",
+                f"UPDATE notification_campaign SET {change}, approved_by = $2, "
+                "status = 'SENDING' WHERE id = $1",
                 campaign_id,
                 author,
                 *extra,
@@ -206,6 +208,88 @@ async def test_the_api_cannot_delete_campaigns(tenant: asyncpg.Connection) -> No
     await pending(tenant, await user(tenant))
     with pytest.raises(asyncpg.InsufficientPrivilegeError):
         await tenant.execute("DELETE FROM notification_campaign")
+
+
+# --- PC-11: what is approved is what is sent ---------------------------------------
+
+
+async def set_message(conn: asyncpg.Connection, campaign_id: uuid.UUID, text: str) -> None:
+    await conn.execute(
+        "UPDATE notification_campaign SET message = $2 WHERE id = $1", campaign_id, text
+    )
+
+
+async def test_a_draft_can_be_edited(tenant: asyncpg.Connection) -> None:
+    author = await user(tenant)
+    campaign_id = await campaign(tenant, created_by=str(author), submitted_by=None, status="DRAFT")
+    await set_message(tenant, campaign_id, "edited while a draft")
+
+
+async def test_the_content_is_frozen_while_pending(tenant: asyncpg.Connection) -> None:
+    campaign_id = await pending(tenant, await user(tenant))
+    for change in (
+        "message = 'swapped while pending'",
+        'translations = \'{"fr": "x"}\'',
+        "channels = '{SMS,EMAIL}'",
+        'audience_filter = \'{"person_types": ["CITIZEN"]}\'',
+        "campaign_type = 'ALERT'",
+    ):
+        with pytest.raises(REFUSED, match="content is frozen"):
+            await tenant.execute(
+                f"UPDATE notification_campaign SET {change} WHERE id = $1", campaign_id
+            )
+
+
+async def test_the_content_is_frozen_after_approval_and_cannot_go_back(
+    tenant: asyncpg.Connection,
+) -> None:
+    author, second = await user(tenant), await user(tenant)
+    campaign_id = await pending(tenant, author)
+    await approve(tenant, campaign_id, second)
+    with pytest.raises(REFUSED, match="content is frozen"):
+        await set_message(tenant, campaign_id, "swapped after approval")
+    for status in ("DRAFT", "PENDING_APPROVAL"):
+        with pytest.raises(REFUSED, match="an approved campaign cannot be"):
+            await tenant.execute(
+                "UPDATE notification_campaign SET status = $2 WHERE id = $1", campaign_id, status
+            )
+
+
+async def test_a_rejected_campaign_returns_to_draft_and_can_be_edited(
+    tenant: asyncpg.Connection,
+) -> None:
+    campaign_id = await pending(tenant, await user(tenant))
+    await tenant.execute(
+        "UPDATE notification_campaign SET status = 'DRAFT', rejection_reason = 'too broad' "
+        "WHERE id = $1",
+        campaign_id,
+    )
+    await set_message(tenant, campaign_id, "narrower, resubmitted later")
+
+
+async def test_the_approval_time_is_the_databases(tenant: asyncpg.Connection) -> None:
+    author, second = await user(tenant), await user(tenant)
+    campaign_id = await pending(tenant, author)
+    await tenant.execute(
+        "UPDATE notification_campaign SET approved_by = $2, status = 'SENDING', "
+        "approved_at = now() - interval '30 days' WHERE id = $1",
+        campaign_id,
+        second,
+    )
+    age = await tenant.fetchval(
+        "SELECT now() - approved_at FROM notification_campaign WHERE id = $1", campaign_id
+    )
+    assert age.total_seconds() < 60  # the backdated time was replaced
+
+
+async def test_an_approval_time_needs_an_approver(tenant: asyncpg.Connection) -> None:
+    campaign_id = await campaign(
+        tenant, created_by=str(await user(tenant)), submitted_by=None, status="SENT"
+    )
+    with pytest.raises(asyncpg.CheckViolationError):
+        await tenant.execute(
+            "UPDATE notification_campaign SET approved_at = now() WHERE id = $1", campaign_id
+        )
 
 
 # --- templates ---------------------------------------------------------------------

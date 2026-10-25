@@ -1,5 +1,5 @@
 """Message templates (PC-07) and campaign approval (PC-08, hardened by PC-10), for
-Mass Notification (D-31).
+Mass Notification (D-31), and PC-11 (approval binds the content).
 
 Runs as nexira_owner (D-01). nexira_backup reads the new table through the default
 privileges in infra/postgres/backup-grants.sql; nexira_app gets explicit grants here.
@@ -40,9 +40,11 @@ def downgrade() -> None:
     # Fails on purpose if a campaign is PENDING_APPROVAL: send or cancel it first.
     _execute_script(
         """
-        GRANT DELETE ON notification_campaign TO nexira_app;
+        GRANT DELETE ON notification_campaign, notification_delivery, checkin_response
+          TO nexira_app;
         DROP TRIGGER notification_campaign_approval_guard ON notification_campaign;
         DROP FUNCTION notification_campaign_approval_guard();
+        ALTER TABLE notification_campaign DROP CONSTRAINT notification_campaign_approved_check;
         ALTER TABLE notification_campaign DROP CONSTRAINT notification_campaign_submitted_check;
         ALTER TABLE notification_campaign
           DROP COLUMN rejection_reason, DROP COLUMN approved_at, DROP COLUMN approved_by,

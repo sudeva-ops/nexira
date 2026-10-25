@@ -41,6 +41,8 @@ ALTER TABLE notification_campaign
 
 ALTER TABLE notification_campaign ADD CONSTRAINT notification_campaign_submitted_check
   CHECK (status <> 'PENDING_APPROVAL' OR submitted_by IS NOT NULL);  -- PC-10 (5)
+ALTER TABLE notification_campaign ADD CONSTRAINT notification_campaign_approved_check
+  CHECK ((approved_by IS NULL) = (approved_at IS NULL));  -- PC-11 (3)
 
 -- Database backstop for D-31 (PC-08, hardened by PC-10 after the review of Prompt 18),
 -- as proposal_approval has for D-16:
@@ -48,7 +50,11 @@ ALTER TABLE notification_campaign ADD CONSTRAINT notification_campaign_submitted
 -- - the author and the submitter are frozen, so they cannot be rewritten to get past
 --   the check below, and an approval is never rewritten or cleared;
 -- - neither the author nor the submitter approves it. The author is compared as a uuid;
---   a user campaign whose author is not a uuid cannot be approved at all (fails closed).
+--   a user campaign whose author is not a uuid cannot be approved at all (fails closed);
+-- - PC-11: what is approved is what is sent. The content is frozen once the campaign
+--   leaves DRAFT, approving moves it on to SENDING in the same statement (an approved
+--   campaign is never DRAFT or PENDING_APPROVAL), and
+--   the approval time is the database's, set when the approval is recorded.
 CREATE FUNCTION notification_campaign_approval_guard() RETURNS trigger AS $$
 DECLARE
   author uuid;
@@ -58,6 +64,22 @@ BEGIN
       RAISE EXCEPTION 'notification_campaign: a campaign cannot be created approved';
     END IF;
     RETURN NEW;
+  END IF;
+  IF OLD.status <> 'DRAFT' AND (
+       NEW.campaign_type IS DISTINCT FROM OLD.campaign_type
+       OR NEW.message IS DISTINCT FROM OLD.message
+       OR NEW.translations IS DISTINCT FROM OLD.translations
+       OR NEW.channels IS DISTINCT FROM OLD.channels
+       OR NEW.audience_filter IS DISTINCT FROM OLD.audience_filter
+       OR NEW.template_id IS DISTINCT FROM OLD.template_id
+       OR NEW.incident_id IS DISTINCT FROM OLD.incident_id) THEN
+    -- escalate_after_s stays adjustable: a demo scene starts the check-in clock (D-07).
+    RAISE EXCEPTION 'notification_campaign: the content is frozen once it leaves DRAFT';
+  END IF;
+  -- Approving sends: the approval moves the campaign on (to SENDING) in the same
+  -- statement, and an approved campaign is never DRAFT or PENDING_APPROVAL again.
+  IF NEW.approved_by IS NOT NULL AND NEW.status IN ('DRAFT', 'PENDING_APPROVAL') THEN
+    RAISE EXCEPTION 'notification_campaign: an approved campaign cannot be %', NEW.status;
   END IF;
   IF NEW.created_by IS DISTINCT FROM OLD.created_by
      OR NEW.created_by_type IS DISTINCT FROM OLD.created_by_type THEN
@@ -92,6 +114,7 @@ BEGIN
     IF NEW.approved_by = NEW.submitted_by THEN
       RAISE EXCEPTION 'notification_campaign: the author cannot approve their own campaign (D-31)';
     END IF;
+    NEW.approved_at := now();  -- PC-11 (3): never a time supplied by the caller
   END IF;
   RETURN NEW;
 END;
@@ -103,3 +126,5 @@ CREATE TRIGGER notification_campaign_approval_guard
 -- PC-10 (6): no code deletes campaigns, and a deletion would cascade to the deliveries
 -- and check-in answers that are the evidence of what was sent.
 REVOKE DELETE ON notification_campaign FROM nexira_app;
+-- PC-11 (4): nor the deliveries and check-in answers themselves (no code deletes them).
+REVOKE DELETE ON notification_delivery, checkin_response FROM nexira_app;
