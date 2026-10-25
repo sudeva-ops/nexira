@@ -22,9 +22,13 @@ def test_every_scene_0_to_6_has_a_marker() -> None:
     assert markers == list(range(7))
 
 
-def test_checkin_escalation_setting_is_20_seconds() -> None:
+def test_checkin_escalates_20_seconds_into_scene_4() -> None:
     settings = [e for e in EVENTS if e.event_type == "SCENARIO_SETTINGS"]
-    assert [s.payload for s in settings] == [{"checkin_escalate_after_s": 20}]
+    assert [s.payload for s in settings] == [
+        {"checkin_escalate_after_s": 20, "checkin_clock_scene": 4}
+    ]
+    clock = [e for e in EVENTS if e.event_type == "CHECKIN_CLOCK"]
+    assert [(e.scene_no, e.offset_ms, e.payload) for e in clock] == [(4, 0, {"escalate_in_s": 20})]
 
 
 def test_scene_1_has_three_nairobi_signals_within_two_minutes_and_paris() -> None:

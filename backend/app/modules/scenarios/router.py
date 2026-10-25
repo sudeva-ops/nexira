@@ -28,8 +28,16 @@ def _state(scenario: Scenario, run: ScenarioRun, player: Player) -> ScenarioStat
     scenes = []
     for n in range(player.last_scene + 1):
         events = player.scene_events(n)
-        title = next((e.payload.get("name") for e in events if e.event_type == "SCENE_START"), "")
-        scenes.append(SceneOut(scene_no=n, name=str(title), events=len(events)))
+        marker = next((e.payload for e in events if e.event_type == "SCENE_START"), {})
+        expect = marker.get("expect")
+        scenes.append(
+            SceneOut(
+                scene_no=n,
+                name=str(marker.get("name", "")),
+                expect=str(expect) if expect else None,
+                events=len(events),
+            )
+        )
     return ScenarioStateOut(
         code=player.code,
         name=scenario.name,

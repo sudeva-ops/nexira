@@ -19,6 +19,7 @@ CODE = "NBO-CIVIL-UNREST"
 NAME = "Civil unrest near the Nairobi Embassy"
 DESCRIPTION = "Phase 1 acceptance scenario: scenes 0-6 from docs/decisions.md section 7."
 CHECKIN_ESCALATE_AFTER_S = 20  # Prompt 5; the platform default is 600 s (D-07)
+CHECKIN_CLOCK_SCENE = 4  # the 20 s run from the start of scene 4, not from sending
 
 SCENES = [
     (0, "Calm", "No active incidents; Decision Queue empty; NBO mission LOW"),
@@ -84,7 +85,20 @@ def build_events(w: World, tenant_id: uuid.UUID) -> list[EventIn]:
             0,
             0,
             "SCENARIO_SETTINGS",
-            {"checkin_escalate_after_s": CHECKIN_ESCALATE_AFTER_S},
+            {
+                "checkin_escalate_after_s": CHECKIN_ESCALATE_AFTER_S,
+                "checkin_clock_scene": CHECKIN_CLOCK_SCENE,
+            },
+        )
+    )
+    events.append(
+        _event(
+            tenant_id,
+            "checkin:clock",
+            CHECKIN_CLOCK_SCENE,
+            0,
+            "CHECKIN_CLOCK",
+            {"escalate_in_s": CHECKIN_ESCALATE_AFTER_S},
         )
     )
 
@@ -117,7 +131,7 @@ def build_events(w: World, tenant_id: uuid.UUID) -> list[EventIn]:
     answers: list[tuple[uuid.UUID, str, str]] = []
     for p in personnel:
         if p.full_name == "Hana Takeda":
-            continue  # no response: escalated after 20 s
+            continue  # no response: escalated 20 s into scene 4
         answers.append((p.id, "NEED_HELP" if p.full_name == "Peter Mwangi" else "SAFE", "APP"))
     shuffled = rng.sample(citizens, len(citizens))
     answers += [(p.id, "SAFE", rng.choice(["SMS", "WHATSAPP", "APP"])) for p in shuffled[:168]]

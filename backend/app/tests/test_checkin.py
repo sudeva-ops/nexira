@@ -14,7 +14,7 @@ from app.core.events import Event, get_publisher
 from app.main import app
 from app.modules.audit.models import AuditLog
 from app.modules.checkin import service
-from app.modules.checkin.consumer import response_handler
+from app.modules.checkin.consumer import clock_handler, response_handler
 from app.modules.intel import exposure
 from app.modules.intel.models import Incident, IncidentEvent
 from app.modules.intel.service import ensure_sources
@@ -47,8 +47,11 @@ class World:
     publisher: ListPublisher
 
 
-async def make_world(idp: Idp, *, demo_run: str | None = None) -> World:
-    """demo_run: the status of a demo scenario run to create (None = no run)."""
+async def make_world(
+    idp: Idp, *, demo_run: str | None = None, clock_scene: int | None = None
+) -> World:
+    """demo_run: the status of a demo scenario run to create (None = no run).
+    clock_scene: the scene that starts the check-in clock (the run is at scene 0)."""
     nbo, cai = await idp.mission("NBO"), await idp.mission("CAI")
     grants: dict[str, list[tuple[str, uuid.UUID | None]]] = {
         "duty": [("DUTY_OFFICER", None)],
@@ -85,7 +88,15 @@ async def make_world(idp: Idp, *, demo_run: str | None = None) -> World:
                 code="DEMO",
                 name="Demo",
                 description="",
-                events=[EventIn(0, 0, "SCENARIO_SETTINGS", {"checkin_escalate_after_s": 20})],
+                events=[
+                    EventIn(
+                        0,
+                        0,
+                        "SCENARIO_SETTINGS",
+                        {"checkin_escalate_after_s": 20}
+                        | ({} if clock_scene is None else {"checkin_clock_scene": clock_scene}),
+                    )
+                ],
             )
             scenario = await get_scenario(session, "DEMO")
             assert scenario is not None
@@ -298,6 +309,63 @@ async def test_an_idle_presenter_run_does_not_shorten_escalation(
 ) -> None:
     w = await make_world(idp, demo_run="IDLE")  # opened, never played
     assert (await summary(client, idp, w))["escalate_after_s"] == 600
+
+
+def clock_event(idp: Idp, seconds: object = 20) -> Event:
+    return Event("CHECKIN_CLOCK", idp.tenant_id, {"escalate_in_s": seconds}, "scenario:test")
+
+
+async def test_before_the_clock_scene_the_demo_does_not_shorten_escalation(
+    client: AsyncClient, idp: Idp
+) -> None:
+    w = await make_world(idp, demo_run="PAUSED", clock_scene=4)  # still on scene 0
+    assert (await summary(client, idp, w))["escalate_after_s"] == 600
+
+
+async def test_the_clock_scene_starts_escalation_once(client: AsyncClient, idp: Idp) -> None:
+    w = await make_world(idp, demo_run="PAUSED", clock_scene=4)
+    handle = clock_handler(idp.engine, w.publisher, now=lambda: NOW + timedelta(seconds=100))
+    event = clock_event(idp)
+    await handle(event)
+    await handle(event)  # redelivered: the clock is not pushed back
+    assert (await summary(client, idp, w))["escalate_after_s"] == 120  # 100 s sent + 20 s
+    assert await escalate(idp, NOW + timedelta(seconds=119)) == []
+    assert [sorted(r.personnel) for r in await escalate(idp, NOW + timedelta(seconds=120))] == [
+        ["Grace", "Hana", "Peter"]
+    ]
+    async with tenant_session(idp.tenant_id, idp.engine) as session:
+        started = list(
+            await session.scalars(
+                select(AuditLog.details).where(AuditLog.action == "CHECKIN.CLOCK_START")
+            )
+        )
+    assert started == [{"before": 600, "after": 120}]
+    assert [e.type for e in w.publisher.events][-1:] == ["CHECKIN_UPDATED"]
+
+
+async def rejections(idp: Idp) -> int:
+    async with tenant_session(idp.tenant_id, idp.engine) as session:
+        count = await session.scalar(
+            select(func.count()).where(AuditLog.action == "CHECKIN.REJECT")
+        )
+    return count or 0
+
+
+async def test_clock_events_need_a_running_demo(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    await clock_handler(idp.engine, world.publisher)(clock_event(idp))
+    assert (await summary(client, idp, world))["escalate_after_s"] == 600
+    assert await rejections(idp) == 1
+
+
+async def test_clock_events_need_a_valid_time(client: AsyncClient, idp: Idp) -> None:
+    w = await make_world(idp, demo_run="PLAYING", clock_scene=4)
+    handle = clock_handler(idp.engine, w.publisher)
+    for bad in ("20", 0, 3601):
+        await handle(clock_event(idp, bad))
+    assert (await summary(client, idp, w))["escalate_after_s"] == 600
+    assert await rejections(idp) == 3
 
 
 async def test_simulated_answers_need_a_running_demo(

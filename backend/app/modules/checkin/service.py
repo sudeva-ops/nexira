@@ -8,8 +8,11 @@
   audit row; citizens who have not answered get one aggregate event per campaign.
   Both happen once: the CHECKIN.ESCALATE audit rows (always written, unlike the
   timeline event, which needs an incident) are checked with the campaign locked.
+- In a demo, a scene can start the clock (CHECKIN_CLOCK, start_clock): open
+  check-ins of the run then escalate a set time after that scene, not after sending.
 """
 
+import math
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -248,6 +251,60 @@ async def escalate_due(session: AsyncSession, now: datetime) -> list[Escalated]:
         if result.personnel or result.citizens:
             done.append(result)
     return done
+
+
+async def start_clock(
+    session: AsyncSession,
+    *,
+    escalate_in_s: int,
+    since: datetime | None,
+    now: datetime,
+    actor: Actor,
+) -> list[NotificationCampaign]:
+    """A demo scene starts the check-in clock: each open check-in created since the
+    run started escalates escalate_in_s from now (escalate_after_s still counts from
+    sent_at, D-07). Once per campaign: the CHECKIN.CLOCK_START audit rows are checked
+    with the campaigns locked, so a redelivered event changes nothing."""
+    query = (
+        select(NotificationCampaign)
+        .where(
+            NotificationCampaign.campaign_type == "CHECKIN",
+            NotificationCampaign.status.in_(OPEN),
+        )
+        .with_for_update()
+    )
+    if since is not None:
+        query = query.where(NotificationCampaign.created_at >= since)
+    campaigns = list(await session.scalars(query))
+    started = set(
+        await session.scalars(
+            select(AuditLog.entity_id).where(
+                AuditLog.action == "CHECKIN.CLOCK_START",
+                AuditLog.entity_type == "notification_campaign",
+            )
+        )
+    )
+    changed: list[NotificationCampaign] = []
+    for campaign in campaigns:
+        if campaign.reference in started:
+            continue
+        elapsed = 0
+        if campaign.sent_at is not None:
+            elapsed = max(0, math.ceil((now - campaign.sent_at).total_seconds()))
+        before = campaign.escalate_after_s
+        campaign.escalate_after_s = elapsed + escalate_in_s
+        await audit.write(
+            session,
+            actor_type=actor.type,
+            actor_id=actor.id,
+            action="CHECKIN.CLOCK_START",
+            entity_type="notification_campaign",
+            entity_id=campaign.reference,
+            details={"before": before, "after": campaign.escalate_after_s},
+        )
+        changed.append(campaign)
+    await session.flush()
+    return changed
 
 
 async def _escalate(

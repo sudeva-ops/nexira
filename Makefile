@@ -3,10 +3,10 @@ COMPOSE := docker compose --env-file .env -f infra/docker-compose.yml
 APP_ENV ?= $(shell grep -E '^APP_ENV=' .env 2>/dev/null | cut -d= -f2)
 
 .PHONY: help env up down logs test test-backend test-simulator test-frontend \
-        lint lint-backend lint-simulator lint-frontend migrate seed reset-demo tiles e2e
+        lint lint-backend lint-simulator lint-frontend migrate seed reset-demo tiles e2e acceptance
 
 help:
-	@echo "up | down | logs | test | lint | e2e | migrate | seed | reset-demo | tiles"
+	@echo "up | down | logs | test | lint | e2e | acceptance | migrate | seed | reset-demo | tiles"
 
 env:
 	@test -f .env || (cp .env.example .env && echo "Created .env from .env.example")
@@ -35,7 +35,14 @@ test-frontend:
 # Playwright against the running stack (`make up`, then `make seed` or `make reset-demo`).
 e2e: env
 	cd frontend && npx playwright install chromium
-	set -a && . ./.env && set +a && cd frontend && npx playwright test
+	set -a && . ./.env && set +a && cd frontend && npx playwright test --grep-invert "Phase 1 acceptance"
+
+# Prompt 15: the whole Phase 1 acceptance scenario (decisions.md §7) from a fresh
+# demo database; prints the performance numbers (frontend/test-results/performance.json).
+acceptance: env reset-demo up
+	$(COMPOSE) restart backend worker
+	cd frontend && npx playwright install chromium
+	set -a && . ./.env && set +a && cd frontend && npx playwright test e2e/acceptance.spec.ts
 
 lint: lint-backend lint-simulator lint-frontend
 

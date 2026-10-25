@@ -2,6 +2,7 @@ import { Icon, Tag } from "@blueprintjs/core";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { useAgents, usePendingCount } from "../api/proposals";
+import { PresenterBar } from "../presenter/PresenterBar";
 import { RealtimeProvider } from "../api/realtime";
 import { useRealtimeStatus } from "../api/realtimeContext";
 
@@ -106,6 +107,7 @@ export function AppShell({ onLogout }: Props) {
         <section className={`nx-view${current?.path === "/operations" ? " full" : ""}`}>
           <Outlet />
         </section>
+        <PresenterBar />
       </main>
     </div>
     </RealtimeProvider>
