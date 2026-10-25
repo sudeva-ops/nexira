@@ -58,6 +58,7 @@ export interface Proposal {
   executed_at: string | null;
   approvals: ApprovalStep[];
   can_decide: boolean;
+  can_edit: boolean; // the server decides: editable type, and you decide step 1
   can_dismiss: boolean;
   can_undo: boolean;
 }

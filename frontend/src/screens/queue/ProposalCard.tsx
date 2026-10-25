@@ -33,23 +33,31 @@ function errorText(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong";
 }
 
-/** The text an edit changes: the message of an outgoing message, else the description. */
-function editable(p: Proposal): { label: string; value: string } {
-  if (p.action_type === "SEND_EXTERNAL_MESSAGE" && typeof p.action_payload.message === "string") {
-    const edited = p.edited_payload?.message;
-    return { label: "Message (English)", value: typeof edited === "string" ? edited : p.action_payload.message };
-  }
-  return { label: "Proposed action", value: p.edited_action ?? p.proposed_action };
+// The payload field an edit changes (backend actions.EDITABLE_FIELD). Edits always
+// change what runs, never only the description.
+const EDIT_FIELD: Record<string, { key: string; label: string }> = {
+  SEND_EXTERNAL_MESSAGE: { key: "message", label: "Message (English)" },
+  LOG_INFO: { key: "text", label: "Note" },
+  POST_INTERNAL_NOTE: { key: "text", label: "Note" },
+};
+
+function editable(p: Proposal): { key: string; label: string; value: string } | null {
+  const field = EDIT_FIELD[p.action_type];
+  if (!field) return null;
+  const current = p.edited_payload?.[field.key] ?? p.action_payload[field.key];
+  return { ...field, value: typeof current === "string" ? current : "" };
 }
 
 export function ProposalCard({ p }: { p: Proposal }) {
   const pending = p.status === "PENDING";
-  const undoable = p.status === "AUTO_EXECUTED" && p.can_undo;
-  const now = useNow(pending || undoable);
+  const undoWindow = p.status === "AUTO_EXECUTED" && p.can_undo;
+  const now = useNow(pending || undoWindow);
+  // The server's flag is as of the last fetch; the window can close in between.
+  const undoable = undoWindow && !!p.undo_until && now < new Date(p.undo_until).getTime();
   const decide = useDecide(p.id);
   const [mode, setMode] = useState<"idle" | "edit" | "reject">("idle");
   const field = editable(p);
-  const [draft, setDraft] = useState(field.value);
+  const [draft, setDraft] = useState(field?.value ?? "");
   const level = p.effective_level;
   const colour = pending
     ? level >= 3
@@ -66,10 +74,9 @@ export function ProposalCard({ p }: { p: Proposal }) {
   const canAct = p.can_decide || p.can_dismiss;
 
   const saveEdit = () =>
+    field &&
     decide.mutate(
-      p.action_type === "SEND_EXTERNAL_MESSAGE"
-        ? { kind: "edit", edited_payload: { ...p.action_payload, message: draft } }
-        : { kind: "edit", edited_action: draft },
+      { kind: "edit", edited_payload: { ...p.action_payload, [field.key]: draft } },
       { onSuccess: () => setMode("idle") },
     );
 
@@ -103,8 +110,8 @@ export function ProposalCard({ p }: { p: Proposal }) {
       ) : (
         <div className="nx-bd nx-proposal-body">
           <div>
-            <div className="nx-lbl">{mode === "edit" ? field.label : "Proposed action"}</div>
-            {mode === "edit" ? (
+            <div className="nx-lbl">{mode === "edit" && field ? field.label : "Proposed action"}</div>
+            {mode === "edit" && field ? (
               <TextArea
                 aria-label={field.label}
                 fill
@@ -210,7 +217,7 @@ export function ProposalCard({ p }: { p: Proposal }) {
                 intent="primary"
                 icon="tick"
                 text="Save & approve"
-                disabled={!draft.trim() || draft === field.value}
+                disabled={!draft.trim() || draft === field?.value}
                 onClick={saveEdit}
               />
             </>
@@ -226,7 +233,7 @@ export function ProposalCard({ p }: { p: Proposal }) {
                     loading={decide.isPending}
                     onClick={() => decide.mutate({ kind: "approve" })}
                   />
-                  {p.approvals.every((a) => a.decision === null) && (
+                  {p.can_edit && field && (
                     <Button size="small" icon="edit" text="Edit" onClick={() => setMode("edit")} />
                   )}
                 </>

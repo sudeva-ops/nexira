@@ -684,3 +684,32 @@ async def test_the_roster_shows_watches_and_acceptance(
     planner = next(a for a in roster if a["code"] == "RESPONSE_PLANNER")
     assert planner["watches"] == ["EXPOSURE_COMPUTED"]
     assert (planner["proposals_total"], planner["accepted_pct"]) == (2, 50.0)
+
+
+async def test_an_edit_must_change_what_runs(client: AsyncClient, idp: Idp, world: World) -> None:
+    """Review of Prompt 14: a new description alone would let the approvers read
+    one thing while another executes."""
+    evac = await propose(idp, world, "RESPONSE_PLANNER", "START_EVACUATION", {"route": "B"})
+    text_only = await post(
+        client,
+        idp,
+        f"/proposals/{evac.id}/edit-approve",
+        "hom.nbo",
+        {"edited_action": "Evacuate via route A"},
+    )
+    assert text_only.status_code == 409
+    assert (await stored(idp, evac.id)).edited_action is None
+    message = await propose(idp, world, "COMMUNICATIONS", "SEND_EXTERNAL_MESSAGE", MESSAGE)
+    playbook = await propose(
+        idp, world, "RESPONSE_PLANNER", "START_PLAYBOOK", {"playbook_code": "PB-T"}
+    )
+
+    async def can_edit(sub: str, proposal_id: uuid.UUID) -> bool:
+        body = (await client.get(f"/api/proposals/{proposal_id}", headers=idp.headers(sub))).json()
+        allowed: bool = body["can_edit"]
+        return allowed
+
+    assert await can_edit("duty", message.id) is True
+    assert await can_edit("viewer", message.id) is False
+    assert await can_edit("duty", playbook.id) is False  # use an alternative instead
+    assert await can_edit("hom.nbo", evac.id) is False

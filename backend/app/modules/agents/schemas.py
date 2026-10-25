@@ -44,6 +44,7 @@ class ProposalOut(BaseModel):
     approvals: list[ApprovalStepOut]
     # What the caller may do now, from the same checks the actions enforce (plan G-07):
     can_decide: bool  # approve, edit-and-approve, reject, use an alternative
+    can_edit: bool  # edit-and-approve: editable type, and the caller decides step 1
     can_dismiss: bool  # reject level-4 advice
     can_undo: bool  # undo a level-1 action inside its window
 

@@ -328,6 +328,18 @@ async def _next_step(
     )
 
 
+async def can_edit(session: AsyncSession, user: CurrentUser, proposal: AgentProposal) -> bool:
+    """Whether approve() would accept an edit from this user now: an editable type,
+    and the user would decide step 1 (only the first approver edits)."""
+    if not actions.editable(proposal.action_type):
+        return False
+    try:
+        step = await _next_step(session, proposal, lock=False)
+    except ProposalError:
+        return False
+    return step.row.step_no == 1 and (await approvals.can_decide(session, user, step.gate)).allowed
+
+
 async def can_decide(session: AsyncSession, user: CurrentUser, proposal: AgentProposal) -> bool:
     """Plan G-07: whether approve() would accept this user now (the same gate)."""
     try:
@@ -363,12 +375,15 @@ async def approve(
     if edited:
         if step.row.step_no != 1:
             raise ProposalError("Only the first approver can edit a proposal")
-        if edited_payload is not None:
-            try:
-                actions.check_edit(proposal.action_type, proposal.action_payload, edited_payload)
-            except actions.ActionError as e:
-                raise ProposalError(str(e)) from None
-            proposal.edited_payload = edited_payload
+        # An edit changes what runs (edited_payload); a new description alone would
+        # let the approvers read one thing while another executes.
+        if edited_payload is None:
+            raise ProposalError("An edit must change the action itself (edited_payload)")
+        try:
+            actions.check_edit(proposal.action_type, proposal.action_payload, edited_payload)
+        except actions.ActionError as e:
+            raise ProposalError(str(e)) from None
+        proposal.edited_payload = edited_payload
         if edited_action is not None:
             proposal.edited_action = edited_action
 

@@ -56,6 +56,7 @@ function proposal(over: Partial<Proposal>): Proposal {
       },
     ],
     can_decide: true,
+    can_edit: false,
     can_dismiss: false,
     can_undo: false,
     ...over,
@@ -76,6 +77,7 @@ const ADVISORY = proposal({
     audience: { exposed: true, person_types: ["CITIZEN"] },
   },
   alternatives: [],
+  can_edit: true,
 });
 const NOTE = proposal({
   id: "p3",
@@ -183,6 +185,21 @@ describe("Decision Queue", () => {
       edited_action: null,
       edited_payload: { ...ADVISORY.action_payload, message: "Stay indoors. Avoid the CBD." },
     });
+  });
+
+  it("shows Edit only when the server says so", async () => {
+    setup(DUTY_OFFICER, [proposal({})]);
+    renderApp("/");
+    const card = await screen.findByRole("article", { name: /Run PB-07/ });
+    expect(within(card).queryByRole("button", { name: "Edit" })).toBeNull(); // can_edit false
+  });
+
+  it("hides undo once the window has closed", async () => {
+    setup(DUTY_OFFICER, [{ ...NOTE, undo_until: iso(-1) }]);
+    renderApp("/");
+    await userEvent.click(screen.getByRole("tab", { name: /Decided/ }));
+    const card = await screen.findByRole("article", { name: /Log new incident/ });
+    expect(within(card).queryByRole("button", { name: "Undo" })).toBeNull();
   });
 
   it("offers undo inside the window", async () => {

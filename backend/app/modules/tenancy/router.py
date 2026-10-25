@@ -50,6 +50,7 @@ async def my_permissions(
             entity_type=entity_type,
             entity_id=str(entity_id),
             decide_proposal=await proposals.can_decide(session, user, proposal),
+            edit_proposal=await proposals.can_edit(session, user, proposal),
             dismiss_proposal=await proposals.can_dismiss(session, user, proposal),
             undo_proposal=await proposals.can_undo(session, user, proposal),
         )

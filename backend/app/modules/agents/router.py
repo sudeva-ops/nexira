@@ -104,6 +104,7 @@ async def proposal_out(
                 incident_reference=incidents.get(p.incident_id) if p.incident_id else None,
                 approvals=steps.get(p.id, []),
                 can_decide=await proposals.can_decide(session, user, p),
+                can_edit=await proposals.can_edit(session, user, p),
                 can_dismiss=await proposals.can_dismiss(session, user, p),
                 can_undo=await proposals.can_undo(session, user, p),
             )
@@ -278,7 +279,7 @@ _ACTIVITY_TEXT = {
     "PROPOSAL.EXPIRE": "expired",
     "AGENTS.PAUSE": "paused all agents",
     "AGENTS.RESUME": "resumed all agents",
-    "AGENT.UPDATE": "changed agent autonomy",
+    "AGENT.UPDATE": "changed the autonomy or status of",
 }
 
 
@@ -286,7 +287,12 @@ _ACTIVITY_TEXT = {
 async def agent_activity(
     _user: Reader, session: Db, limit: Annotated[int, Query(ge=1, le=200)] = 50
 ) -> list[ActivityOut]:
-    """DQ-06: the latest agent and decision activity, newest first."""
+    """DQ-06: the latest agent and decision activity, newest first.
+
+    An explicit exception to plan G-06 (unfiltered audit reads are ADMIN-only): it
+    reads only the agent and decision actions listed in _ACTIVITY_TEXT and returns
+    a fixed projection (agent name, "Human" or "System", a verb, the proposal
+    title or agent name), never audit details or user ids."""
     rows = list(
         await session.scalars(
             select(AuditLog)
@@ -321,6 +327,8 @@ async def agent_activity(
             else "System"
         )
         verb = _ACTIVITY_TEXT[r.action]
+        if r.action == "AGENT.UPDATE":
+            verb = f"{verb} {names.get(r.entity_id or '', r.entity_id or 'an agent')}"
         out.append(
             ActivityOut(
                 occurred_at=r.occurred_at,
