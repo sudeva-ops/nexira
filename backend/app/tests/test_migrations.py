@@ -106,6 +106,9 @@ async def _campaign_shape(admin_url: str) -> dict[str, object]:
             "WHERE tgrelid = 'notification_campaign'::regclass AND NOT tgisinternal"
         )
         template = await conn.fetchval("SELECT to_regclass('message_template') IS NOT NULL")
+        can_delete = await conn.fetchval(
+            "SELECT has_table_privilege('nexira_app', 'notification_campaign', 'DELETE')"
+        )
     finally:
         await conn.close()
     return {
@@ -113,6 +116,7 @@ async def _campaign_shape(admin_url: str) -> dict[str, object]:
         "checks": [(r["conname"], r["def"]) for r in checks],
         "triggers": [r["tgname"] for r in triggers],
         "message_template": template,
+        "api_can_delete": can_delete,  # revoked by PC-10, restored by the downgrade
     }
 
 
@@ -127,5 +131,7 @@ def test_downgrading_0002_restores_0001_exactly(fresh: DbUrls) -> None:
     command.downgrade(cfg, "0001")
     assert asyncio.run(_campaign_shape(admin)) == at_0001
     assert at_head["message_template"] is True
+    assert at_0001["api_can_delete"] is True
+    assert at_head["api_can_delete"] is False
     assert "notification_campaign_approval_guard" in str(at_head["triggers"])
     command.upgrade(cfg, "head")
