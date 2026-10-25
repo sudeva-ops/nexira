@@ -19,6 +19,18 @@ const STATE: ScenarioState = {
   scenes: NAMES.map((name, i) => ({ scene_no: i, name, expect: `Expect ${i}`, events: 1 })),
 };
 
+const FRANCE: ScenarioState = {
+  ...STATE,
+  code: "FRA-NATIONAL-PROTESTS",
+  name: "Nationwide protests in France",
+  scenes: ["Calm", "Paris marches", "Nationwide", "Second day"].map((name, i) => ({
+    scene_no: i,
+    name,
+    expect: `France ${i}`,
+    events: 1,
+  })),
+};
+
 function setup(me: Me) {
   return mockApi({
     "/api/me": { body: me },
@@ -27,6 +39,7 @@ function setup(me: Me) {
     "/api/agents/activity": { body: [] },
     "/api/scenarios/NBO-CIVIL-UNREST": { body: STATE },
     "/api/scenarios/NBO-CIVIL-UNREST/next": { body: { ...STATE, status: "PLAYING", current_scene: 1 } },
+    "/api/scenarios/FRA-NATIONAL-PROTESTS": { body: FRANCE },
     "/api/incidents": { body: [] },
     "/api/signals": { body: [] },
     "/api/missions": { body: [] },
@@ -71,5 +84,18 @@ describe("Presenter bar", () => {
     ).toBe(true);
     // Scene 1 is watched on Global Operations.
     expect(await screen.findByRole("heading", { level: 1, name: "Global Operations" })).toBeInTheDocument();
+  });
+
+  it("switches to the France scenario", async () => {
+    vi.stubEnv("VITE_DEMO_MODE", "true");
+    const fetchMock = setup(DUTY_OFFICER);
+    renderApp("/");
+    const bar = await screen.findByRole("toolbar", { name: "Presenter" });
+    await userEvent.selectOptions(within(bar).getByLabelText("Scenario"), "FRA-NATIONAL-PROTESTS");
+    expect(await within(bar).findByText("France 0")).toBeInTheDocument();
+    expect(within(bar).getAllByText(/^\d$/)).toHaveLength(4); // scenes 0-3, not Nairobi's 0-6
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/scenarios/FRA-NATIONAL-PROTESTS")).toBe(
+      true,
+    );
   });
 });
