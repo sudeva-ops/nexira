@@ -38,6 +38,7 @@ class Settings(BaseSettings):
 
     worker_tenant_ids: list[str] = Field(default_factory=list)  # plan G-01
     undo_window_s: int = 300  # plan G-17
+    playbook_step_delay_s: float = 0.0  # demo pacing between playbook steps
 
 
 @lru_cache

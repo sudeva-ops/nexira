@@ -1,10 +1,13 @@
-from typing import Annotated
+import uuid
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.approvals import roles_of
 from app.core.security import CurrentUser, current_user, get_db
+from app.modules.playbooks import service as playbooks
+from app.modules.playbooks.schemas import PermissionsOut
 from app.modules.tenancy.schemas import MeOut, RoleOut
 
 router = APIRouter(prefix="/api", tags=["tenancy"])
@@ -25,4 +28,21 @@ async def me(
             RoleOut(code=g.code, mission_id=g.mission_id, mission_code=g.mission_code)
             for g in grants
         ],
+    )
+
+
+@router.get("/me/permissions")
+async def my_permissions(
+    entity_type: Literal["playbook_run"],
+    entity_id: uuid.UUID,
+    user: Annotated[CurrentUser, Depends(current_user)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> PermissionsOut:
+    """Plan G-07: the actions the caller may take on an entity now, computed by
+    approvals.can_decide(), the same code that enforces them. Agent proposals
+    are added in Prompt 12."""
+    return PermissionsOut(
+        entity_type=entity_type,
+        entity_id=str(entity_id),
+        approve_step=await playbooks.approvable_steps(session, user, entity_id),
     )

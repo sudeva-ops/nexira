@@ -140,6 +140,23 @@ make e2e         # Playwright against the running stack
 
 Backend tests run against the real PostgreSQL + PostGIS from `make up`; there is no SQLite and no DB mock. The tests use `TEST_ADMIN_DATABASE_URL` (a superuser) only to create throwaway databases (`nexira_test`, `nexira_test_migrations`). They then migrate those databases as `nexira_owner` and run every assertion as `nexira_api`. Your `nexira` database is not touched.
 
+### Playbooks and approvals
+
+A Duty or Security Officer starts a playbook for an ACTIVE incident; the worker runs its steps in order:
+
+```sh
+POST /api/playbook-runs   {"playbook_code": "PB-07", "incident_id": "..."}
+GET  /api/playbook-runs/{id}                          # steps with status, timestamps, results
+POST /api/playbook-runs/{id}/steps/{step_id}/approve  # gated steps (PB-07 step 7)
+GET  /api/me/permissions?entity_type=playbook_run&entity_id=...   # steps you may approve now
+```
+
+- **Approvals:** `app/core/approvals.py` (`decide()`) checks every approval: role, mission scope from the incident, step order, and that no person decides two steps (D-05, D-16). Refusals are 403 or 409.
+- **Step effects:** NOTIFY and CHECKIN steps create notification campaigns (NTF-3101 and on); sending them comes in Prompt 10.
+- **No duplicates:** each step runs in one transaction with the run locked, so a worker restart never runs a step twice.
+- **Resuming:** the worker resumes RUNNING runs for the tenants in `WORKER_TENANT_IDS`.
+- **Pacing:** `PLAYBOOK_STEP_DELAY_S` adds a pause between steps for demos.
+
 ### Map and screens
 
 `make tiles` downloads the map data once (about 90 MB) into `infra/tiles/`, which is not committed:

@@ -16,6 +16,7 @@ x-api-env: &api-env
   LLM_MODEL: ${LLM_MODEL}
   WORKER_TENANT_IDS: ${WORKER_TENANT_IDS:-[]}
   UNDO_WINDOW_S: ${UNDO_WINDOW_S:-300}
+  PLAYBOOK_STEP_DELAY_S: ${PLAYBOOK_STEP_DELAY_S:-0}
 
 services:
   postgres:
