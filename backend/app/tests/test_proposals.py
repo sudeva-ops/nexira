@@ -624,3 +624,63 @@ async def test_a_mission_scoped_admin_cannot_pause_the_tenant(
         nbo = await session.scalar(text("SELECT id FROM mission WHERE code = 'NBO'"))
     await idp.user("admin.nbo", [("ADMIN", nbo)])
     assert (await post(client, idp, "/agents/pause-all", "admin.nbo")).status_code == 403
+
+
+# --- Prompt 14: what the screens are told ---------------------------------------------------
+
+
+async def test_undo_and_dismiss_are_reported_by_the_same_checks(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    await set_level(idp, "WATCH_OFFICER", 1)
+    noticed = await propose(idp, world, "WATCH_OFFICER", "LOG_INFO", {"text": "Note"})
+    advice = await propose(idp, world, "WATCH_OFFICER", "CLOSE_AIRSPACE", {"x": 1})
+
+    async def flags(sub: str, proposal_id: uuid.UUID) -> tuple[bool, bool, bool]:
+        body = (await client.get(f"/api/proposals/{proposal_id}", headers=idp.headers(sub))).json()
+        return body["can_decide"], body["can_dismiss"], body["can_undo"]
+
+    assert await flags("duty", noticed.id) == (False, False, True)
+    assert await flags("viewer", noticed.id) == (False, False, False)
+    assert await flags("duty", advice.id) == (False, True, False)
+    assert await flags("consular", advice.id) == (False, False, False)
+    perms = await client.get(
+        "/api/me/permissions",
+        params={"entity_type": "agent_proposal", "entity_id": str(noticed.id)},
+        headers=idp.headers("duty"),
+    )
+    assert perms.json()["undo_proposal"] is True
+    await post(client, idp, f"/proposals/{noticed.id}/undo", "duty")
+    assert await flags("duty", noticed.id) == (False, False, False)  # undone: nothing left
+
+
+async def test_activity_log_names_agents_not_people(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    p = await propose(idp, world, "RESPONSE_PLANNER", "START_PLAYBOOK", {"playbook_code": "PB-T"})
+    await post(client, idp, f"/proposals/{p.id}/reject", "duty", {"reason": "Not needed"})
+    log = (await client.get("/api/agents/activity", headers=idp.headers("viewer"))).json()
+    assert [(e["actor"], e["text"]) for e in log[:2]] == [
+        ("Human", "rejected START_PLAYBOOK proposal"),
+        ("Response Planner", "proposed START_PLAYBOOK proposal"),
+    ]
+
+
+async def test_the_roster_shows_watches_and_acceptance(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    for reason in ("a", None):
+        p = await propose(
+            idp, world, "RESPONSE_PLANNER", "START_PLAYBOOK", {"playbook_code": "PB-T"}
+        )
+        if reason:
+            await post(client, idp, f"/proposals/{p.id}/reject", "duty", {"reason": reason})
+        else:
+            async with tenant_session(idp.tenant_id, idp.engine) as session:
+                await session.execute(update(Incident).values(status="ACTIVE"))
+                await session.commit()
+            await post(client, idp, f"/proposals/{p.id}/approve", "duty")
+    roster = (await client.get("/api/agents", headers=idp.headers("viewer"))).json()["agents"]
+    planner = next(a for a in roster if a["code"] == "RESPONSE_PLANNER")
+    assert planner["watches"] == ["EXPOSURE_COMPUTED"]
+    assert (planner["proposals_total"], planner["accepted_pct"]) == (2, 50.0)

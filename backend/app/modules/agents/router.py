@@ -20,8 +20,10 @@ from app.core.config import Settings, get_settings
 from app.core.events import Publisher, get_publisher
 from app.core.security import CurrentUser, current_user, get_db
 from app.modules.agents import proposals
+from app.modules.agents.agents import AGENTS
 from app.modules.agents.models import Agent, AgentProposal, ProposalApproval
 from app.modules.agents.schemas import (
+    ActivityOut,
     AgentOut,
     AgentPatch,
     AgentsStateOut,
@@ -31,6 +33,7 @@ from app.modules.agents.schemas import (
     ProposalOut,
     RejectIn,
 )
+from app.modules.audit.models import AuditLog
 from app.modules.intel.models import Incident
 from app.modules.tenancy.models import AppUser
 from app.modules.tenancy.service import ROLES
@@ -101,6 +104,8 @@ async def proposal_out(
                 incident_reference=incidents.get(p.incident_id) if p.incident_id else None,
                 approvals=steps.get(p.id, []),
                 can_decide=await proposals.can_decide(session, user, p),
+                can_dismiss=await proposals.can_dismiss(session, user, p),
+                can_undo=await proposals.can_undo(session, user, p),
             )
         )
     return out
@@ -221,16 +226,20 @@ async def undo(proposal_id: uuid.UUID, user: User, session: Db, publisher: Pub) 
 
 
 async def _agents_state(session: AsyncSession) -> AgentsStateOut:
+    decided_ok = AgentProposal.status.in_(("APPROVED", "EDITED_APPROVED"))
     counts = {
-        agent_id: (pending, total)
-        for agent_id, pending, total in await session.execute(
+        agent_id: (pending, total, accepted, rejected)
+        for agent_id, pending, total, accepted, rejected in await session.execute(
             select(
                 AgentProposal.agent_id,
                 func.count().filter(AgentProposal.status == "PENDING"),
                 func.count(),
+                func.count().filter(decided_ok),
+                func.count().filter(AgentProposal.status == "REJECTED"),
             ).group_by(AgentProposal.agent_id)
         )
     }
+    watches = {agent.code: sorted(agent.observes) for agent in AGENTS}
     agents = await session.scalars(select(Agent).order_by(Agent.code))
     return AgentsStateOut(
         paused=await proposals.agents_paused(session),
@@ -242,12 +251,86 @@ async def _agents_state(session: AsyncSession) -> AgentsStateOut:
                 autonomy_level=a.autonomy_level,
                 is_enabled=a.is_enabled,
                 model_ref=a.model_ref,
-                proposals_pending=counts.get(a.id, (0, 0))[0],
-                proposals_total=counts.get(a.id, (0, 0))[1],
+                watches=watches.get(a.code, []),
+                proposals_pending=counts.get(a.id, (0, 0, 0, 0))[0],
+                proposals_total=counts.get(a.id, (0, 0, 0, 0))[1],
+                accepted_pct=_pct(*counts.get(a.id, (0, 0, 0, 0))[2:]),
             )
             for a in agents
         ],
     )
+
+
+def _pct(accepted: int, rejected: int) -> float | None:
+    decided = accepted + rejected
+    return round(100 * accepted / decided, 1) if decided else None
+
+
+_ACTIVITY_TEXT = {
+    "PROPOSAL.CREATE": "proposed",
+    "PROPOSAL.EXECUTE": "executed",
+    "PROPOSAL.FAIL": "failed",
+    "PROPOSAL.APPROVE": "approved",
+    "PROPOSAL.EDIT_APPROVE": "edited and approved",
+    "PROPOSAL.REJECT": "rejected",
+    "PROPOSAL.USE_ALTERNATIVE": "chose an alternative for",
+    "PROPOSAL.UNDO": "undid",
+    "PROPOSAL.EXPIRE": "expired",
+    "AGENTS.PAUSE": "paused all agents",
+    "AGENTS.RESUME": "resumed all agents",
+    "AGENT.UPDATE": "changed agent autonomy",
+}
+
+
+@router.get("/agents/activity")
+async def agent_activity(
+    _user: Reader, session: Db, limit: Annotated[int, Query(ge=1, le=200)] = 50
+) -> list[ActivityOut]:
+    """DQ-06: the latest agent and decision activity, newest first."""
+    rows = list(
+        await session.scalars(
+            select(AuditLog)
+            .where(AuditLog.action.in_(list(_ACTIVITY_TEXT)))
+            .order_by(AuditLog.chain_seq.desc())
+            .limit(limit)
+        )
+    )
+    proposal_ids = [
+        uuid.UUID(r.entity_id) for r in rows if r.entity_type == "agent_proposal" and r.entity_id
+    ]
+    titles = dict(
+        (
+            await session.execute(
+                select(AgentProposal.id, AgentProposal.title).where(
+                    AgentProposal.id.in_(proposal_ids)
+                )
+            )
+        ).all()
+    )
+    names = {a.code: a.name for a in await session.scalars(select(Agent))}
+    out = []
+    for r in rows:
+        proposal_id = (
+            uuid.UUID(r.entity_id) if r.entity_type == "agent_proposal" and r.entity_id else None
+        )
+        actor = (
+            names.get(r.actor_id or "", r.actor_id or "Agent")
+            if r.actor_type == "AGENT"
+            else "Human"
+            if r.actor_type == "USER"
+            else "System"
+        )
+        verb = _ACTIVITY_TEXT[r.action]
+        out.append(
+            ActivityOut(
+                occurred_at=r.occurred_at,
+                actor=actor,
+                action=r.action,
+                proposal_id=proposal_id,
+                text=f"{verb} {titles.get(proposal_id, '')}".strip() if proposal_id else verb,
+            )
+        )
+    return out
 
 
 @router.get("/agents")

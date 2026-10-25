@@ -1265,3 +1265,169 @@ body {
   font-size: 11px;
   text-align: center;
 }
+
+/* --- Decision Queue and AI Agents (Prompt 14) ---------------------------------------- */
+.nx-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-left: 3px solid #2d72d2;
+  background: rgba(45, 114, 210, 0.12);
+}
+
+.nx-banner.red {
+  border-left-color: #cd4246;
+  background: rgba(205, 66, 70, 0.14);
+}
+
+.nx-banner.green {
+  border-left-color: #32a467;
+  background: rgba(50, 164, 103, 0.12);
+}
+
+.nx-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  background: #2f343c;
+  color: var(--nx-tx2);
+  font-size: 11.5px;
+  text-decoration: none;
+}
+
+.nx-pill b {
+  color: #fbb360;
+}
+
+.nx-queue {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 8px;
+}
+
+.nx-mb {
+  margin-bottom: 8px;
+}
+
+.nx-proposal {
+  margin-bottom: 8px;
+}
+
+.nx-proposal-hd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--nx-panel2);
+  border-bottom: 1px solid var(--nx-line);
+}
+
+.nx-proposal-hd b {
+  font-size: 12.5px;
+}
+
+.nx-proactive {
+  color: #bdadff;
+}
+
+.nx-deadline {
+  color: var(--nx-tx3);
+  font-size: 11px;
+}
+
+.nx-deadline.over {
+  color: #fa999c;
+  font-weight: 700;
+}
+
+.nx-proposal-body {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 14px;
+}
+
+.nx-proposal-compact {
+  color: var(--nx-tx2);
+}
+
+.nx-proposal-action {
+  color: var(--nx-tx);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.nx-edited {
+  margin-top: 3px;
+  color: #8abbff;
+  font-size: 11px;
+}
+
+.nx-mt {
+  margin-top: 10px;
+}
+
+.nx-mt-s {
+  margin-top: 6px;
+}
+
+.nx-wrap {
+  flex-wrap: wrap;
+}
+
+.nx-evidence {
+  padding: 2px 0;
+  color: var(--nx-tx2);
+}
+
+.nx-proposal-facts {
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.nx-conf-v {
+  color: #fbb360;
+  font-size: 18px;
+}
+
+.nx-conf-v.hi {
+  color: #72ca9b;
+}
+
+.nx-approver {
+  font-size: 12px;
+}
+
+.nx-risk {
+  margin-bottom: 8px;
+  color: #fa999c;
+}
+
+.nx-alt {
+  padding: 2px 0;
+}
+
+.nx-proposal-ft {
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-top: 1px solid var(--nx-line);
+  background: var(--nx-panel2);
+}
+
+.nx-activity {
+  max-height: 330px;
+}
+
+.nx-agent {
+  color: #8abbff;
+}
+
+.nx-policy,
+.nx-guardrails {
+  display: grid;
+  gap: 6px;
+}

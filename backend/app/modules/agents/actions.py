@@ -226,6 +226,11 @@ async def execute(
     return await action.execute(session, model, ctx)
 
 
+def can_undo(action_type: str) -> bool:
+    action = ACTIONS.get(action_type)
+    return action is not None and action.undo is not None
+
+
 async def undo(
     session: AsyncSession, action_type: str, result: dict[str, Any], ctx: Context
 ) -> None:

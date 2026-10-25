@@ -44,9 +44,14 @@ async def my_permissions(
     approvals.can_decide(), the same code that enforces them."""
     if entity_type == "agent_proposal":
         proposal = await session.get(AgentProposal, entity_id)
-        allowed = proposal is not None and await proposals.can_decide(session, user, proposal)
+        if proposal is None:
+            return PermissionsOut(entity_type=entity_type, entity_id=str(entity_id))
         return PermissionsOut(
-            entity_type=entity_type, entity_id=str(entity_id), decide_proposal=allowed
+            entity_type=entity_type,
+            entity_id=str(entity_id),
+            decide_proposal=await proposals.can_decide(session, user, proposal),
+            dismiss_proposal=await proposals.can_dismiss(session, user, proposal),
+            undo_proposal=await proposals.can_undo(session, user, proposal),
         )
     return PermissionsOut(
         entity_type=entity_type,

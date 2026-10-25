@@ -118,7 +118,7 @@ describe("Response Playbooks", () => {
     expect(within(steps).getByTestId("step-5")).toHaveTextContent("NTF-3103 · 229 recipients");
     expect(within(steps).getByTestId("step-6")).toHaveTextContent("(simulated)");
     expect(within(steps).getByTestId("step-7")).toHaveTextContent("Awaiting approval");
-    expect(within(steps).getByTestId("step-7")).toHaveTextContent("Requires Head of mission approval");
+    expect(within(steps).getByTestId("step-7")).toHaveTextContent("Requires Head of Mission approval");
     expect(screen.getByText("6/8 complete")).toBeInTheDocument();
     expect(await screen.findByLabelText("Audit trail")).toHaveTextContent(
       "PLAYBOOK.STEP_AWAIT_APPROVAL · step 7",
@@ -138,7 +138,7 @@ describe("Response Playbooks", () => {
   it("lets the Nairobi Head of Mission approve step 7", async () => {
     const fetchMock = setup(HOM_NAIROBI, ["s7"]);
     renderApp("/playbooks");
-    await userEvent.click(await screen.findByRole("button", { name: "Approve as Head of mission" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Approve as Head of Mission" }));
     const approvals = fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/approve"));
     expect(approvals.map(([url, init]) => [String(url), init?.method])).toEqual([
       ["/api/playbook-runs/run-1/steps/s7/approve", "POST"],
