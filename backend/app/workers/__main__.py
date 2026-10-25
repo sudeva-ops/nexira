@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.core.config import get_settings
 from app.core.db import get_engine, verify_connection_role
 from app.core.events import Publisher, RedisPublisher, StreamConsumer, get_redis
+from app.modules.agents.runner import agents_handler, observed_types
 from app.modules.checkin.consumer import response_handler
 from app.modules.intel.consumer import exposure_handler, raw_signal_handler
 from app.modules.notifications.consumer import campaign_handler, tick
@@ -86,12 +87,20 @@ async def main() -> None:
         ),
         StreamConsumer(
             client,
+            group="agents",
+            consumer=name,
+            handlers=dict.fromkeys(
+                observed_types(), agents_handler(engine, publisher, settings.undo_window_s)
+            ),
+        ),
+        StreamConsumer(
+            client,
             group="checkin",
             consumer=name,
             handlers={"CHECKIN_RESPONSE": response_handler(engine, publisher)},
         ),
     ]
-    log.info("consumers started: intel, exposure, playbooks, notifications, checkin")
+    log.info("consumers started: intel, exposure, playbooks, notifications, agents, checkin")
     try:
         async with asyncio.TaskGroup() as tasks:
             for consumer in consumers:
