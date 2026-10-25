@@ -29,6 +29,7 @@ REFUSAL_PREFIXES = (
     "agent ",  # agent is disabled
     "agent_proposal:",  # frozen proposal fields (D-12)
     "proposal_approval:",  # approval order and decided-once (D-16)
+    "notification_campaign:",  # no self-approval, approval never rewritten (D-31)
 )
 
 

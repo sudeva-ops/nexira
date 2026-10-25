@@ -54,7 +54,8 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
 
     command.upgrade(cfg, "head")
     upgraded = asyncio.run(_snapshot(admin))
-    assert len(upgraded["tables"] - before["tables"]) == 33 + 1  # schema tables + alembic_version
+    # The schema's 33 tables, message_template (0002) and alembic_version.
+    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 1
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
 

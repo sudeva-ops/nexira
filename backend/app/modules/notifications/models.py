@@ -2,11 +2,36 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, Text, text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.model_base import Base, created_at, tenant_fk, uuid_pk
+
+
+class MessageTemplate(Base):
+    """A message per mission and kind, with a generic fallback (mission_id NULL).
+    Pre-written translations only, each marked reviewed or not (D-15, D-31, PC-07)."""
+
+    __tablename__ = "message_template"
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    tenant_id: Mapped[uuid.UUID] = tenant_fk()
+    code: Mapped[str] = mapped_column(Text, nullable=False)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    mission_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("mission.id")
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    texts: Mapped[dict[str, str]] = mapped_column(JSONB, nullable=False)
+    reviewed: Mapped[dict[str, bool]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'")
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    created_at: Mapped[datetime] = created_at()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
 
 
 class NotificationCampaign(Base):
@@ -35,6 +60,18 @@ class NotificationCampaign(Base):
         Integer, nullable=False, server_default=text("600")
     )  # D-07
     created_at: Mapped[datetime] = created_at()
+    # PC-08: second-person approval for campaigns that reach citizens (D-31).
+    template_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("message_template.id")
+    )
+    submitted_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("app_user.id")
+    )
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("app_user.id")
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rejection_reason: Mapped[str | None] = mapped_column(Text)
 
 
 class NotificationDelivery(Base):
