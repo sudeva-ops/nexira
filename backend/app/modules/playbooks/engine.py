@@ -284,10 +284,22 @@ async def advance_one(session: AsyncSession, run_id: uuid.UUID) -> Outcome | Non
         details={"seq": step.seq, "action_type": step.action_type, **result},
     )
     await session.flush()
-    return Outcome(
-        "STEP_DONE",
-        [_event(run, "PLAYBOOK_STEP", step_id=str(step.id), seq=step.seq, step_status="DONE")],
-    )
+    events = [_event(run, "PLAYBOOK_STEP", step_id=str(step.id), seq=step.seq, step_status="DONE")]
+    if "campaign_id" in result:
+        # The deliveries are queued in this transaction (outbox); the dispatcher sends them.
+        events.append(
+            Event(
+                type="CAMPAIGN_QUEUED",
+                tenant_id=run.tenant_id,
+                payload={
+                    "campaign_id": result["campaign_id"],
+                    "reference": result["reference"],
+                    "incident_id": str(run.incident_id),
+                },
+                source="playbook.engine",
+            )
+        )
+    return Outcome("STEP_DONE", events)
 
 
 Sleep = Callable[[float], Awaitable[None]]

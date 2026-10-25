@@ -157,6 +157,23 @@ GET  /api/me/permissions?entity_type=playbook_run&entity_id=...   # steps you ma
 - **Resuming:** the worker resumes RUNNING runs for the tenants in `WORKER_TENANT_IDS`.
 - **Pacing:** `PLAYBOOK_STEP_DELAY_S` adds a pause between steps for demos.
 
+### Notifications and safety check-in
+
+- **Sending:** NOTIFY and CHECKIN steps create a campaign and queue one delivery per recipient and channel in the same transaction (an outbox). The worker sends the queued deliveries through the channel adapter.
+- **Simulated channels only:** Phase 1 has only `CHANNEL_ADAPTER=simulated`, so nothing leaves the platform (CHK-04). Deliveries move SENT → DELIVERED → READ over a few seconds.
+- **Answers:** check-in answers come from the simulator (scene 4) and from staff through the API (D-28):
+
+```sh
+POST /api/checkin/{campaign_id}/respond   {"person_id": "...", "status": "SAFE" | "NEED_HELP"}
+GET  /api/checkin/{campaign_id}/summary    # personnel and citizens: safe / need_help / pending / accounted %
+GET  /api/checkin/{campaign_id}/people?group=personnel&status=PENDING
+GET  /api/campaigns?incident_id=...        # campaigns with delivery counts
+```
+
+- **Latest answer counts:** every answer is kept, and the latest one counts.
+- **Escalation:** after `escalate_after_s` (600 s; 20 s while a demo scenario runs), each silent staff member is escalated once, and silent citizens are escalated once as a group (plan G-19).
+- **Worker settings:** escalation, and catching up on unsent deliveries, run in the worker for the tenants in `WORKER_TENANT_IDS`.
+
 ### Map and screens
 
 `make tiles` downloads the map data once (about 90 MB) into `infra/tiles/`, which is not committed:

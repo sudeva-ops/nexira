@@ -8,10 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from app.core.config import get_settings
 from app.core.db import get_engine, verify_connection_role
 from app.core.events import Publisher, RedisPublisher, StreamConsumer, get_redis
+from app.modules.checkin.consumer import response_handler
 from app.modules.intel.consumer import exposure_handler, raw_signal_handler
+from app.modules.notifications.consumer import campaign_handler, tick
 from app.modules.playbooks.consumer import resume_runs, run_handler
 
 RESUME_EVERY_S = 60
+TICK_EVERY_S = 2  # dispatch leftovers, delivery receipts, check-in escalation
 
 log = logging.getLogger("app.workers")
 
@@ -29,6 +32,18 @@ async def resume_loop(
         except Exception:
             log.exception("resuming playbook runs failed")
         await asyncio.sleep(RESUME_EVERY_S)
+
+
+async def tick_loop(
+    engine: AsyncEngine, publisher: Publisher, tenant_ids: list[uuid.UUID], adapter: str
+) -> None:
+    while True:
+        for tenant_id in tenant_ids:
+            try:
+                await tick(engine, tenant_id, publisher, adapter=adapter)
+            except Exception:
+                log.exception("notifications tick failed for %s", tenant_id)
+        await asyncio.sleep(TICK_EVERY_S)
 
 
 async def main() -> None:
@@ -61,8 +76,22 @@ async def main() -> None:
             consumer=name,
             handlers={"PLAYBOOK_RUN_STARTED": on_run, "PLAYBOOK_STEP_APPROVED": on_run},
         ),
+        StreamConsumer(
+            client,
+            group="notifications",
+            consumer=name,
+            handlers={
+                "CAMPAIGN_QUEUED": campaign_handler(engine, publisher, settings.channel_adapter)
+            },
+        ),
+        StreamConsumer(
+            client,
+            group="checkin",
+            consumer=name,
+            handlers={"CHECKIN_RESPONSE": response_handler(engine, publisher)},
+        ),
     ]
-    log.info("consumers started: intel, exposure, playbooks")
+    log.info("consumers started: intel, exposure, playbooks, notifications, checkin")
     try:
         async with asyncio.TaskGroup() as tasks:
             for consumer in consumers:
@@ -70,6 +99,7 @@ async def main() -> None:
             tasks.create_task(
                 resume_loop(engine, publisher, tenant_ids, settings.playbook_step_delay_s)
             )
+            tasks.create_task(tick_loop(engine, publisher, tenant_ids, settings.channel_adapter))
     finally:
         await client.aclose()
         await engine.dispose()
