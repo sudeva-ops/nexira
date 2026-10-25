@@ -1,6 +1,6 @@
-"""Migration 0002 (PC-07, PC-08, D-31), checked as nexira_api: the database refuses
-self-approval and a rewritten approval, keeps one generic template per code, and the
-API can never delete a template."""
+"""Migration 0002 (PC-07, PC-08, PC-10; D-31), checked as nexira_api: the database
+refuses self-approval in every form the review of Prompt 18 tried, keeps one generic
+template per code, and the API can delete neither templates nor campaigns."""
 
 import json
 import uuid
@@ -11,6 +11,7 @@ import pytest
 from app.tests.conftest import DbUrls, create_tenant, set_tenant
 
 REFUSED = asyncpg.RaiseError  # the trigger's RAISE EXCEPTION (P0001)
+SELF = "the author cannot approve their own campaign"
 
 
 @pytest.fixture
@@ -31,18 +32,31 @@ async def user(conn: asyncpg.Connection) -> uuid.UUID:
     return user_id
 
 
-async def draft(conn: asyncpg.Connection, author: uuid.UUID) -> uuid.UUID:
+async def campaign(
+    conn: asyncpg.Connection,
+    *,
+    created_by: str,
+    submitted_by: uuid.UUID | None,
+    status: str = "PENDING_APPROVAL",
+    approved_by: uuid.UUID | None = None,
+) -> uuid.UUID:
     campaign_id = uuid.uuid4()
     await conn.execute(
         "INSERT INTO notification_campaign (id, tenant_id, reference, campaign_type, message, "
-        "channels, created_by_type, created_by, submitted_by, status) VALUES ($1, "
-        "current_tenant_id(), $2, 'ADVISORY', 'm', '{SMS}', 'USER', $3, $4, 'PENDING_APPROVAL')",
+        "channels, created_by_type, created_by, submitted_by, status, approved_by) VALUES ($1, "
+        "current_tenant_id(), $2, 'ADVISORY', 'm', '{SMS}', 'USER', $3, $4, $5, $6)",
         campaign_id,
         f"NTF-{campaign_id.hex[:6]}",
-        str(author),
-        author,
+        created_by,
+        submitted_by,
+        status,
+        approved_by,
     )
     return campaign_id
+
+
+async def pending(conn: asyncpg.Connection, author: uuid.UUID) -> uuid.UUID:
+    return await campaign(conn, created_by=str(author), submitted_by=author)
 
 
 async def approve(conn: asyncpg.Connection, campaign_id: uuid.UUID, by: uuid.UUID) -> None:
@@ -53,54 +67,148 @@ async def approve(conn: asyncpg.Connection, campaign_id: uuid.UUID, by: uuid.UUI
     )
 
 
-async def test_the_author_cannot_approve_their_own_campaign(tenant: asyncpg.Connection) -> None:
-    author = await user(tenant)
-    campaign_id = await draft(tenant, author)
-    with pytest.raises(REFUSED, match="notification_campaign: the author cannot approve"):
-        await approve(tenant, campaign_id, author)
+async def approved_by(conn: asyncpg.Connection, campaign_id: uuid.UUID) -> uuid.UUID | None:
+    value: uuid.UUID | None = await conn.fetchval(
+        "SELECT approved_by FROM notification_campaign WHERE id = $1", campaign_id
+    )
+    return value
+
+
+# --- what must work ---------------------------------------------------------------
 
 
 async def test_a_second_person_approves_once(tenant: asyncpg.Connection) -> None:
     author, second, third = await user(tenant), await user(tenant), await user(tenant)
-    campaign_id = await draft(tenant, author)
+    campaign_id = await pending(tenant, author)
     await approve(tenant, campaign_id, second)
+    assert await approved_by(tenant, campaign_id) == second
     with pytest.raises(REFUSED, match="approved_by cannot change once set"):
         await approve(tenant, campaign_id, third)
-    assert (
-        await tenant.fetchval(
-            "SELECT approved_by FROM notification_campaign WHERE id = $1", campaign_id
-        )
-        == second
+
+
+async def test_playbook_campaigns_are_unaffected(tenant: asyncpg.Connection) -> None:
+    """Phase 1 campaigns (PB-07, agents) are created SENDING and completed by the
+    dispatcher; the guard never gets in their way."""
+    await tenant.execute(
+        "INSERT INTO notification_campaign (tenant_id, reference, campaign_type, message, "
+        "channels, created_by_type, created_by, status) VALUES (current_tenant_id(), 'NTF-PB', "
+        "'CHECKIN', 'm', '{APP}', 'PLAYBOOK', 'PB-07', 'SENDING')"
+    )
+    await tenant.execute(
+        "UPDATE notification_campaign SET status = 'SENT', sent_at = now(), "
+        "escalate_after_s = 120 WHERE reference = 'NTF-PB'"
     )
 
 
-async def test_an_approval_cannot_be_cleared(tenant: asyncpg.Connection) -> None:
+# --- self-approval, in every form the review tried ---------------------------------
+
+
+async def test_the_author_cannot_approve(tenant: asyncpg.Connection) -> None:
+    author = await user(tenant)
+    with pytest.raises(REFUSED, match=SELF):
+        await approve(tenant, await pending(tenant, author), author)
+
+
+async def test_the_submitter_cannot_approve(tenant: asyncpg.Connection) -> None:
+    author, submitter = await user(tenant), await user(tenant)
+    campaign_id = await campaign(tenant, created_by=str(author), submitted_by=submitter)
+    with pytest.raises(REFUSED, match=SELF):
+        await approve(tenant, campaign_id, submitter)
+
+
+async def test_rewriting_the_author_in_the_same_update_is_refused(
+    tenant: asyncpg.Connection,
+) -> None:
+    author, other = await user(tenant), await user(tenant)
+    campaign_id = await pending(tenant, author)
+    rewrites: list[tuple[str, tuple[object, ...]]] = [
+        ("created_by = $3, submitted_by = $4", (str(other), other)),
+        ("created_by_type = 'PLAYBOOK'", ()),
+        ("created_by = upper(created_by)", ()),
+    ]
+    for change, extra in rewrites:
+        with pytest.raises(REFUSED, match="cannot change"):
+            await tenant.execute(
+                f"UPDATE notification_campaign SET {change}, approved_by = $2 WHERE id = $1",
+                campaign_id,
+                author,
+                *extra,
+            )
+    assert await approved_by(tenant, campaign_id) is None
+
+
+async def test_an_upper_case_author_is_still_the_author(tenant: asyncpg.Connection) -> None:
+    """The author is compared as a uuid, not as text."""
+    author, submitter = await user(tenant), await user(tenant)
+    campaign_id = await campaign(tenant, created_by=str(author).upper(), submitted_by=submitter)
+    with pytest.raises(REFUSED, match=SELF):
+        await approve(tenant, campaign_id, author)
+
+
+async def test_an_author_that_is_not_a_uuid_cannot_be_approved(
+    tenant: asyncpg.Connection,
+) -> None:
+    submitter, approver = await user(tenant), await user(tenant)
+    campaign_id = await campaign(tenant, created_by="not-a-uuid", submitted_by=submitter)
+    with pytest.raises(REFUSED, match="author is unknown"):
+        await approve(tenant, campaign_id, approver)
+
+
+# --- approval only from PENDING_APPROVAL, never rewritten --------------------------
+
+
+async def test_a_campaign_cannot_be_created_approved(tenant: asyncpg.Connection) -> None:
+    author, other = await user(tenant), await user(tenant)
+    with pytest.raises(REFUSED, match="cannot be created approved"):
+        await campaign(tenant, created_by=str(author), submitted_by=author, approved_by=other)
+
+
+@pytest.mark.parametrize("status", ["DRAFT", "CANCELLED", "SENT"])
+async def test_only_a_pending_campaign_can_be_approved(
+    tenant: asyncpg.Connection, status: str
+) -> None:
+    author, other = await user(tenant), await user(tenant)
+    campaign_id = await campaign(tenant, created_by=str(author), submitted_by=author, status=status)
+    with pytest.raises(REFUSED, match="only a campaign pending approval"):
+        await approve(tenant, campaign_id, other)
+
+
+async def test_an_approval_cannot_be_cleared_or_redated(tenant: asyncpg.Connection) -> None:
     author, second = await user(tenant), await user(tenant)
-    campaign_id = await draft(tenant, author)
+    campaign_id = await pending(tenant, author)
     await approve(tenant, campaign_id, second)
     with pytest.raises(REFUSED, match="approved_by cannot change once set"):
         await tenant.execute(
             "UPDATE notification_campaign SET approved_by = NULL WHERE id = $1", campaign_id
         )
+    with pytest.raises(REFUSED, match="approved_at cannot change once set"):
+        await tenant.execute(
+            "UPDATE notification_campaign SET approved_at = now() - interval '1 day' WHERE id = $1",
+            campaign_id,
+        )
 
 
-async def test_the_submitter_cannot_approve_either(tenant: asyncpg.Connection) -> None:
-    """Someone other than the author submitted it: they cannot approve it themselves."""
-    author, submitter = await user(tenant), await user(tenant)
-    campaign_id = await draft(tenant, author)
-    await tenant.execute(
-        "UPDATE notification_campaign SET submitted_by = $2 WHERE id = $1", campaign_id, submitter
-    )
-    with pytest.raises(REFUSED, match="the author cannot approve"):
-        await approve(tenant, campaign_id, submitter)
+async def test_the_submitter_cannot_be_rewritten(tenant: asyncpg.Connection) -> None:
+    author, other = await user(tenant), await user(tenant)
+    campaign_id = await pending(tenant, author)
+    with pytest.raises(REFUSED, match="submitted_by cannot change once set"):
+        await tenant.execute(
+            "UPDATE notification_campaign SET submitted_by = $2 WHERE id = $1", campaign_id, other
+        )
 
 
-async def test_pending_approval_is_a_campaign_status(tenant: asyncpg.Connection) -> None:
-    campaign_id = await draft(tenant, await user(tenant))
-    assert (
-        await tenant.fetchval("SELECT status FROM notification_campaign WHERE id = $1", campaign_id)
-        == "PENDING_APPROVAL"
-    )
+async def test_pending_approval_needs_a_submitter(tenant: asyncpg.Connection) -> None:
+    with pytest.raises(asyncpg.CheckViolationError):
+        await campaign(tenant, created_by=str(await user(tenant)), submitted_by=None)
+
+
+async def test_the_api_cannot_delete_campaigns(tenant: asyncpg.Connection) -> None:
+    await pending(tenant, await user(tenant))
+    with pytest.raises(asyncpg.InsufficientPrivilegeError):
+        await tenant.execute("DELETE FROM notification_campaign")
+
+
+# --- templates ---------------------------------------------------------------------
 
 
 async def template(conn: asyncpg.Connection, code: str, texts: dict[str, str]) -> None:

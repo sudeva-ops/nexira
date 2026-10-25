@@ -39,18 +39,59 @@ ALTER TABLE notification_campaign
   ADD COLUMN approved_at      timestamptz,
   ADD COLUMN rejection_reason text;
 
--- Database backstop for D-31, as proposal_approval has for D-16: the author (or the
--- submitter) never approves their own campaign, and an approval is never rewritten.
+ALTER TABLE notification_campaign ADD CONSTRAINT notification_campaign_submitted_check
+  CHECK (status <> 'PENDING_APPROVAL' OR submitted_by IS NOT NULL);  -- PC-10 (5)
+
+-- Database backstop for D-31 (PC-08, hardened by PC-10 after the review of Prompt 18),
+-- as proposal_approval has for D-16:
+-- - a campaign is never created approved, and is approved only while PENDING_APPROVAL;
+-- - the author and the submitter are frozen, so they cannot be rewritten to get past
+--   the check below, and an approval is never rewritten or cleared;
+-- - neither the author nor the submitter approves it. The author is compared as a uuid;
+--   a user campaign whose author is not a uuid cannot be approved at all (fails closed).
 CREATE FUNCTION notification_campaign_approval_guard() RETURNS trigger AS $$
+DECLARE
+  author uuid;
 BEGIN
-  IF TG_OP = 'UPDATE' AND OLD.approved_by IS NOT NULL
-     AND NEW.approved_by IS DISTINCT FROM OLD.approved_by THEN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.approved_by IS NOT NULL OR NEW.approved_at IS NOT NULL THEN
+      RAISE EXCEPTION 'notification_campaign: a campaign cannot be created approved';
+    END IF;
+    RETURN NEW;
+  END IF;
+  IF NEW.created_by IS DISTINCT FROM OLD.created_by
+     OR NEW.created_by_type IS DISTINCT FROM OLD.created_by_type THEN
+    RAISE EXCEPTION 'notification_campaign: the author cannot change';
+  END IF;
+  IF OLD.submitted_by IS NOT NULL AND NEW.submitted_by IS DISTINCT FROM OLD.submitted_by THEN
+    RAISE EXCEPTION 'notification_campaign: submitted_by cannot change once set';
+  END IF;
+  IF OLD.approved_by IS NOT NULL AND NEW.approved_by IS DISTINCT FROM OLD.approved_by THEN
     RAISE EXCEPTION 'notification_campaign: approved_by cannot change once set';
   END IF;
-  IF NEW.approved_by IS NOT NULL
-     AND ((NEW.created_by_type = 'USER' AND NEW.approved_by::text = NEW.created_by)
-          OR NEW.approved_by = NEW.submitted_by) THEN
-    RAISE EXCEPTION 'notification_campaign: the author cannot approve their own campaign (D-31)';
+  IF OLD.approved_at IS NOT NULL AND NEW.approved_at IS DISTINCT FROM OLD.approved_at THEN
+    RAISE EXCEPTION 'notification_campaign: approved_at cannot change once set';
+  END IF;
+  IF OLD.approved_by IS NULL AND NEW.approved_by IS NOT NULL THEN
+    IF OLD.status <> 'PENDING_APPROVAL' THEN
+      RAISE EXCEPTION 'notification_campaign: only a campaign pending approval can be approved';
+    END IF;
+    IF NEW.created_by_type = 'USER' THEN
+      BEGIN
+        author := NEW.created_by::uuid;
+      EXCEPTION WHEN invalid_text_representation OR null_value_not_allowed THEN
+        author := NULL;
+      END;
+      IF author IS NULL THEN
+        RAISE EXCEPTION 'notification_campaign: the author is unknown, so it cannot be approved';
+      END IF;
+      IF NEW.approved_by = author THEN
+        RAISE EXCEPTION 'notification_campaign: the author cannot approve their own campaign (D-31)';
+      END IF;
+    END IF;
+    IF NEW.approved_by = NEW.submitted_by THEN
+      RAISE EXCEPTION 'notification_campaign: the author cannot approve their own campaign (D-31)';
+    END IF;
   END IF;
   RETURN NEW;
 END;
@@ -58,3 +99,7 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER notification_campaign_approval_guard
   BEFORE INSERT OR UPDATE ON notification_campaign
   FOR EACH ROW EXECUTE FUNCTION notification_campaign_approval_guard();
+
+-- PC-10 (6): no code deletes campaigns, and a deletion would cascade to the deliveries
+-- and check-in answers that are the evidence of what was sent.
+REVOKE DELETE ON notification_campaign FROM nexira_app;
