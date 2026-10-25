@@ -16,7 +16,7 @@ For the product owner and the coding agent. It maps MN-01..12 (`docs/requirement
 | 08 Test send | phone preview panel on the Check-in screen (D-28) | A preview-only endpoint: text per channel, SMS segment count; audit `CAMPAIGN.TEST_SEND` (G-7) | 20, 21 |
 | 09 Funnel | delivery statuses, and the worker publishes `CAMPAIGN_UPDATED`, which `/ws` forwards | Counts per campaign and channel in `GET /api/campaigns/{id}` | 20, 21 |
 | 10 History | `GET /api/campaigns` (incident filter) | Filters for kind, status, mission and incident; show creator and approver | 20, 21 |
-| 11 Fallback (Should) | adapter never fails; one delivery per person **per channel** | Needs a delivery mode (G-1, **needs a decision**) and simulated failures (G-6) | 20 |
+| 11 Fallback (Should) | adapter never fails; one delivery per person **per channel** | **Deferred** (G-1) | — |
 | 12 Audit | `CAMPAIGN.CREATE`, `CAMPAIGN.SEND`, `CAMPAIGN.DISPATCHED` | `CAMPAIGN.DRAFT`, `.EDIT`, `.SUBMIT`, `.APPROVE`, `.REJECT`, `.CANCEL`, `.TEST_SEND` | 20 |
 
 ## 2. API (Prompt 20)
@@ -40,7 +40,7 @@ For the product owner and the coding agent. It maps MN-01..12 (`docs/requirement
 
 ## 3. Gaps and conflicts, with proposed answers
 
-**G-1 · Fallback conflicts with all-channel delivery. Needs a decision.**
+**G-1 · Fallback conflicts with all-channel delivery. Decided (2026-10-25): MN-11 is dropped from this module.** PC-09 is not proposed. The analysis is kept for when real gateways arrive:
 - Today a campaign queues one delivery per person on **every** channel, enforced by `UNIQUE (campaign_id, person_id, channel)`. That is right for PB-07, where the alert goes out by APP, SMS and VOICE at once.
 - MN-11 ("try the next channel after a failure") only makes sense if the channels are an ordered preference.
 - **Proposal (PC-09, a schema change):** `notification_campaign.delivery_mode text NOT NULL DEFAULT 'ALL' CHECK (delivery_mode IN ('ALL', 'FALLBACK'))`.
@@ -49,7 +49,7 @@ For the product owner and the coding agent. It maps MN-01..12 (`docs/requirement
   - The composer offers both; the default is `ALL`.
 - **Alternative with no schema change:** drop MN-11 from this module (it is a Should).
 
-**G-2 · "Not the author" through the existing Gate.**
+**G-2 · "Not the author" through the existing Gate. Confirmed by the product owner (2026-10-25).**
 - `Gate.deciders_of_other_steps` already refuses someone who decided another step. Submitting counts as step 1 and approving as step 2, so passing `{author}` there enforces MN-05 with no change to `approvals.py` (🔒).
 - The refusal then reads "The same person cannot decide two steps (D-16)". That is accurate, because composing and submitting is the first step.
 - The PC-08 trigger is the database backstop.
@@ -66,7 +66,7 @@ For the product owner and the coding agent. It maps MN-01..12 (`docs/requirement
 
 **G-5 · `created_by` is text.** PC-08's trigger compares `approved_by::text = created_by` when `created_by_type = 'USER'`. That is what PC-08 says.
 
-**G-6 · Simulated failures are a channel-adapter change (🔒, D-29).**
+**G-6 · Simulated failures. Not needed, now that MN-11 is dropped.** The channel adapter stays unchanged. The analysis, for later:
 - `SimulatedChannelAdapter.receipt` never returns FAILED. MN-11 needs a deterministic failure share, from a hash of the provider ref against `SIMULATED_FAILURE_RATE`.
 - It is refused outside `local` and `demo`. The default is 0, so Phase 1 behaviour is unchanged.
 - This sits in Prompt 20, which is already 🔒.
@@ -94,10 +94,9 @@ For the product owner and the coding agent. It maps MN-01..12 (`docs/requirement
   - `updated_at` trigger.
 - **`notification_campaign`** gets the PC-08 columns. The status CHECK is dropped and recreated with `PENDING_APPROVAL`.
 - **`notification_campaign_approval_guard` trigger** (BEFORE UPDATE): refuses `approved_by::text = created_by` for user campaigns, and any change to `approved_by` once it is set.
-- **PC-09 (`delivery_mode`)**, only if approved (G-1).
 - **Backup role:** `nexira_backup` gets SELECT through the default privileges in `backup-grants.sql`; `test_backup_role` confirms it.
 - **Downgrade** reverses everything. `test_migrations` round-trips it.
 
-## 5. Decisions needed from the product owner
-1. **G-1:** approve PC-09 (`delivery_mode`, so fallback is possible), or drop MN-11 from this module.
-2. Confirm G-2: "submitting is the first step", so the D-16 message is shown to an author who tries to approve their own campaign.
+## 5. Decisions from the product owner (2026-10-25, PR #17)
+1. **G-1:** MN-11 is dropped from this module; there is no PC-09.
+2. **G-2:** confirmed. Submitting is the first step, and an author who tries to approve their own campaign gets the D-16 refusal.
