@@ -22,14 +22,19 @@ from nexira_sim.seed.load import seed_all
 DAY = date(2026, 10, 20)
 
 
-async def seeded_incident(db: DbUrls, engine: AsyncEngine, tenant_id: uuid.UUID) -> uuid.UUID:
+async def seed(db: DbUrls, engine: AsyncEngine, tenant_id: uuid.UUID) -> None:
+    """A fully seeded tenant (people, missions, playbooks, agents, the scenario)."""
     await seed_all(
         engine,
         owner_dsn=db.owner,
-        issuer=f"https://kc.test/realms/pb07-{tenant_id}",
+        issuer=f"https://kc.test/realms/scene-{tenant_id}",
         scenario_date=DAY,
         tenant_id=tenant_id,
     )
+
+
+async def seeded_incident(db: DbUrls, engine: AsyncEngine, tenant_id: uuid.UUID) -> uuid.UUID:
+    await seed(db, engine, tenant_id)
     incidents, out = ListPublisher(), ListPublisher()
     on_signal = raw_signal_handler(engine, incidents)
     on_incident = exposure_handler(engine, out)
