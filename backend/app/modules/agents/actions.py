@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.events import Event
 from app.modules.intel import service as intel
-from app.modules.intel.models import Incident, IncidentEvent
+from app.modules.intel.models import Incident
 from app.modules.notifications.channels import CHANNELS
 from app.modules.notifications.service import CampaignIn, campaign_queued_event, create_campaign
 from app.modules.playbooks import service as playbooks
@@ -92,13 +92,11 @@ async def _note(session: AsyncSession, payload: NotePayload, ctx: Context) -> di
 
 
 async def _retract_note(session: AsyncSession, result: dict[str, Any], ctx: Context) -> None:
-    """D-13: undo marks the entry retracted (the history stays)."""
-    event = await session.get(IncidentEvent, int(result["incident_event_id"]))
-    if event is None:
-        raise ActionError("the note no longer exists")
-    event.data = {**event.data, "retracted": True}
-    event.summary = f"[Retracted] {event.summary}"
-    await session.flush()
+    """D-13: undo marks the entry retracted (the history stays), through the intel service."""
+    try:
+        await intel.retract_note(session, int(result["incident_event_id"]), ctx.agent_actor)
+    except LookupError:
+        raise ActionError("the note no longer exists") from None
 
 
 async def _start_playbook(
@@ -202,12 +200,20 @@ def check_edit(action_type: str, original: dict[str, Any], edited: dict[str, Any
     if action_type == "SEND_EXTERNAL_MESSAGE":
         if edited.get("audience") != original.get("audience"):
             raise ActionError("an edit cannot change the audience")
+        if edited.get("campaign_type", "ADVISORY") != original.get("campaign_type", "ADVISORY"):
+            raise ActionError("an edit cannot change the campaign type")
         if not set(edited.get("channels", [])) <= set(original.get("channels", [])):
             raise ActionError("an edit cannot add channels")
         if not set(edited.get("channels", [])) <= set(CHANNELS):
             raise ActionError("unknown channel")
-    if action_type == "START_PLAYBOOK" and edited != original:
-        raise ActionError("a START_PLAYBOOK proposal cannot be edited; use an alternative")
+        # D-15: translations are reviewed templates. An edit may drop a language,
+        # never change or add one. The English text may be reworded by the approver.
+        original_translations = original.get("translations") or {}
+        for lang, text in (edited.get("translations") or {}).items():
+            if original_translations.get(lang) != text:
+                raise ActionError("an edit cannot change or add reviewed translations (D-15)")
+    if action_type in ("START_PLAYBOOK", "START_EVACUATION") and edited != original:
+        raise ActionError(f"a {action_type} proposal cannot be edited; use an alternative")
 
 
 async def execute(

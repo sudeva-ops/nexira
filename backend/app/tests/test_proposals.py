@@ -1,6 +1,7 @@
 """Agent proposals: policy levels, decisions, execution, undo, expiry, kill switch
 (AGT-01..08, D-12..D-17, PC-05, plan G-18, G-21, Prompt 12)."""
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -15,6 +16,7 @@ from app.core.db import tenant_session
 from app.core.events import get_publisher
 from app.main import app
 from app.modules.agents import proposals
+from app.modules.agents.actions import ActionError
 from app.modules.agents.models import Agent, AgentProposal
 from app.modules.agents.service import AgentIn, PolicyIn, ensure_agents, ensure_policies
 from app.modules.audit.models import AuditLog
@@ -484,3 +486,141 @@ async def test_permissions_for_a_proposal(client: AsyncClient, idp: Idp, world: 
         return allowed
 
     assert (await may("hom.nbo"), await may("hom.cai"), await may("hq")) == (True, False, False)
+
+
+# --- review of Prompt 12 -----------------------------------------------------------------
+
+
+async def test_nothing_can_be_decided_after_the_deadline(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    p = await propose(idp, world, "RESPONSE_PLANNER", "START_PLAYBOOK", {"playbook_code": "PB-T"})
+    async with tenant_session(idp.tenant_id, idp.engine) as session:
+        # The expiry job has not run yet; the deadline has passed.
+        await session.execute(
+            text(
+                "UPDATE agent_proposal SET deadline_at = now() - interval '1 second' WHERE id = :id"
+            ),
+            {"id": p.id},
+        )
+        await session.commit()
+    late = await post(client, idp, f"/proposals/{p.id}/approve", "duty")
+    assert late.status_code == 409
+    assert "deadline" in late.json()["detail"]
+    listed = (await client.get(f"/api/proposals/{p.id}", headers=idp.headers("duty"))).json()
+    assert listed["can_decide"] is False
+
+
+@pytest.mark.parametrize(
+    ("change", "allowed"),
+    [
+        ({"campaign_type": "CHECKIN"}, False),  # would start check-in tracking
+        ({"translations": {"fr": "Autre texte"}}, False),  # D-15: reviewed templates
+        ({"translations": {"ar": "نص"}}, False),  # adding a language
+        ({"translations": {}}, True),  # dropping a language
+        ({"message": "Reworded by the approver."}, True),
+    ],
+)
+async def test_what_an_edit_may_change(
+    client: AsyncClient, idp: Idp, world: World, change: dict[str, Any], allowed: bool
+) -> None:
+    p = await propose(idp, world, "COMMUNICATIONS", "SEND_EXTERNAL_MESSAGE", MESSAGE)
+    response = await post(
+        client,
+        idp,
+        f"/proposals/{p.id}/edit-approve",
+        "duty",
+        {"edited_payload": {**MESSAGE, **change}},
+    )
+    assert (response.status_code == 200) is allowed
+
+
+async def test_an_evacuation_route_cannot_be_edited(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    p = await propose(idp, world, "RESPONSE_PLANNER", "START_EVACUATION", {"route": "B"})
+    response = await post(
+        client,
+        idp,
+        f"/proposals/{p.id}/edit-approve",
+        "hom.nbo",
+        {"edited_payload": {"route": "C"}},
+    )
+    assert response.status_code == 409
+
+
+async def test_alternatives_must_be_well_formed(idp: Idp, world: World) -> None:
+    with pytest.raises(ActionError, match="each alternative needs"):
+        await propose(
+            idp,
+            world,
+            "RESPONSE_PLANNER",
+            "START_PLAYBOOK",
+            {"playbook_code": "PB-T"},
+            alternatives=[{"label": "No type", "action_payload": {}}],
+        )
+
+
+async def test_an_alternative_already_proposed_is_refused(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    alt = {
+        "label": "Note",
+        "action_type": "START_EVACUATION",
+        "action_payload": {"route": "B"},
+        "rationale": "r",
+    }
+    p = await propose(
+        idp,
+        world,
+        "RESPONSE_PLANNER",
+        "START_PLAYBOOK",
+        {"playbook_code": "PB-T"},
+        key="K1",
+        alternatives=[alt],
+    )
+    # Something else already holds the alternative's key.
+    await propose(
+        idp, world, "RESPONSE_PLANNER", "START_EVACUATION", {"route": "B"}, key="K1:alt:0"
+    )
+    response = await post(client, idp, f"/proposals/{p.id}/use-alternative", "duty", {"index": 0})
+    assert response.status_code == 409
+    assert (await stored(idp, p.id)).status == "PENDING"
+
+
+async def test_without_a_mission_only_unscoped_holders_decide(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    await idp.user("hom.hq", [("HEAD_OF_MISSION", None)])
+    async with tenant_session(idp.tenant_id, idp.engine) as session:
+        await session.execute(update(Incident).values(mission_id=None))
+        await session.commit()
+    p = await propose(idp, world, "RESPONSE_PLANNER", "START_EVACUATION", {"route": "B"})
+    assert (
+        await post(client, idp, f"/proposals/{p.id}/approve", "hom.nbo")
+    ).status_code == 403  # D-06
+    assert (await post(client, idp, f"/proposals/{p.id}/approve", "hom.hq")).status_code == 200
+
+
+async def test_concurrent_approvals_execute_once(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    await idp.user("sec", [("SECURITY_OFFICER", None)])
+    p = await propose(idp, world, "RESPONSE_PLANNER", "START_PLAYBOOK", {"playbook_code": "PB-T"})
+    results = await asyncio.gather(
+        post(client, idp, f"/proposals/{p.id}/approve", "duty"),
+        post(client, idp, f"/proposals/{p.id}/approve", "sec"),
+    )
+    assert sorted(r.status_code for r in results) == [200, 409]
+    async with tenant_session(idp.tenant_id, idp.engine) as session:
+        runs = list(await session.scalars(select(PlaybookRun)))
+    assert len(runs) == 1
+
+
+async def test_a_mission_scoped_admin_cannot_pause_the_tenant(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    async with tenant_session(idp.tenant_id, idp.engine) as session:
+        nbo = await session.scalar(text("SELECT id FROM mission WHERE code = 'NBO'"))
+    await idp.user("admin.nbo", [("ADMIN", nbo)])
+    assert (await post(client, idp, "/agents/pause-all", "admin.nbo")).status_code == 403

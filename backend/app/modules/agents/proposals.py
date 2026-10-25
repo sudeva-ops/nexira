@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import DBAPIError
@@ -81,6 +82,16 @@ def _agent_actor(agent_code: str) -> Actor:
 # --- creation ---------------------------------------------------------------------------
 
 
+class Alternative(BaseModel):
+    """D-14: {"label", "action_type", "action_payload", "rationale"}."""
+
+    model_config = ConfigDict(extra="forbid")
+    label: str = Field(min_length=1)
+    action_type: str = Field(min_length=1)
+    action_payload: dict[str, Any]
+    rationale: str
+
+
 @dataclass(frozen=True)
 class ProposalIn:
     agent_code: str
@@ -104,9 +115,13 @@ async def create(
     at once if the database made it level 0 or 1."""
     actions.validate(spec.action_type, spec.action_payload)
     for alternative in spec.alternatives:
-        actions.validate(
-            str(alternative.get("action_type")), dict(alternative.get("action_payload") or {})
-        )
+        try:
+            alt = Alternative.model_validate(alternative)
+        except ValidationError:
+            raise actions.ActionError(
+                "each alternative needs label, action_type, action_payload and rationale"
+            ) from None
+        actions.validate(alt.action_type, alt.action_payload)
     agent = await session.scalar(select(Agent).where(Agent.code == spec.agent_code))
     if agent is None:
         raise ProposalError(f"unknown agent {spec.agent_code}")
@@ -274,11 +289,17 @@ class _Step:
     gate: approvals.Gate
 
 
-async def _next_step(session: AsyncSession, proposal: AgentProposal, lock: bool = True) -> _Step:
+async def _next_step(
+    session: AsyncSession, proposal: AgentProposal, lock: bool = True, now: datetime | None = None
+) -> _Step:
     """The next undecided approval step, as a Gate for approvals.decide(). With
-    lock=False it only reads (can_decide, for showing buttons)."""
+    lock=False it only reads (can_decide, for showing buttons). Past deadline_at
+    nothing can be decided: the proposal is for the expiry job (AGT-06), even if
+    that has not run yet."""
     if proposal.status != "PENDING":
         raise ProposalError(f"The proposal is {proposal.status}")
+    if proposal.deadline_at is not None and proposal.deadline_at <= (now or datetime.now(UTC)):
+        raise ProposalError("The decision deadline has passed")
     if proposal.effective_level == 4:
         raise ProposalError("Advise-only: this proposal cannot be executed")
     if proposal.effective_level not in REQUIRED_STEPS:
@@ -335,7 +356,7 @@ async def approve(
     change the action, and the original action_payload stays as it was."""
     now = now or datetime.now(UTC)
     proposal = await _locked(session, proposal_id)
-    step = await _next_step(session, proposal)
+    step = await _next_step(session, proposal, now=now)
     await approvals.decide(session, user, step.gate)
 
     edited = edited_payload is not None or edited_action is not None
@@ -426,7 +447,7 @@ async def reject(
         ):
             raise approvals.ApprovalDeniedError(approvals.Verdict(False, 403, "Forbidden"))
     else:
-        step = await _next_step(session, proposal)
+        step = await _next_step(session, proposal, now=now)
         await approvals.decide(session, user, step.gate)
         step.row.decided_by = user.id
         step.row.decision = "REJECT"
@@ -495,6 +516,8 @@ async def use_alternative(
         ),
         undo_window_s=undo_window_s,
     )
+    if not created.created:
+        raise ProposalError("This alternative was already proposed")
     proposal.status = "SUPERSEDED"
     proposal.superseded_by = created.proposal.id
     proposal.decided_at = datetime.now(UTC)

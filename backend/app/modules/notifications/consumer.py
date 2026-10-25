@@ -67,10 +67,15 @@ async def tick(
     """The periodic pass: leftover deliveries, receipts, check-in escalations, and
     overdue agent proposals (AGT-06)."""
     await dispatch_all(engine, tenant_id, publisher, adapter=adapter, now=now)
+    # Separate transactions: a failure in one concern does not roll back the others.
     async with tenant_session(tenant_id, engine) as session:
         completed = await complete_campaigns(session, now(), adapter)  # after split batches
         await refresh_receipts(session, now(), adapter)
+        await session.commit()
+    async with tenant_session(tenant_id, engine) as session:
         escalated = await checkin.escalate_due(session, now())
+        await session.commit()
+    async with tenant_session(tenant_id, engine) as session:
         expired = await proposals.expire_overdue(session, now())
         await session.commit()
     for campaign in completed:

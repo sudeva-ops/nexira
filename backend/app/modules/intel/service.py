@@ -286,3 +286,14 @@ async def add_note(
         details={"incident_event_id": event.id, "length": len(note)},
     )
     return event
+
+
+async def retract_note(session: AsyncSession, event_id: int, actor: Actor) -> IncidentEvent:
+    """D-13: undoing a note marks it retracted; the history stays (audited by the caller)."""
+    event = await session.get(IncidentEvent, event_id)
+    if event is None or event.event_type != "NOTE":
+        raise LookupError("note not found")
+    event.data = {**event.data, "retracted": True, "retracted_by": f"{actor.type}:{actor.id}"}
+    event.summary = f"[Retracted] {event.summary}"
+    await session.flush()
+    return event

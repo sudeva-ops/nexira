@@ -40,7 +40,8 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["agents"])
 
 Reader = Annotated[CurrentUser, Depends(require_roles(*ROLES))]
-Admin = Annotated[CurrentUser, Depends(require_roles("ADMIN"))]
+# Agents and the kill switch are tenant-wide: an unscoped ADMIN grant only.
+Admin = Annotated[CurrentUser, Depends(require_roles("ADMIN", mission_id=None))]
 User = Annotated[CurrentUser, Depends(current_user)]
 Db = Annotated[AsyncSession, Depends(get_db)]
 Pub = Annotated[Publisher, Depends(get_publisher)]
