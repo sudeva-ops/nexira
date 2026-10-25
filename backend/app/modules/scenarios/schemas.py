@@ -6,6 +6,7 @@ from pydantic import BaseModel
 class SceneOut(BaseModel):
     scene_no: int
     name: str
+    expect: str | None  # the expected result, shown by the presenter bar
     events: int
 
 
