@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import insert, select, text, update
+from sqlalchemy import func, insert, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import audit
@@ -87,23 +87,38 @@ class CampaignIn:
     escalate_after_s: int = DEFAULT_ESCALATE_AFTER_S
 
 
+# A demo is running only once a scenario has been played: an IDLE run (created
+# when someone opens the presenter bar) does not count.
+DEMO_RUNNING = ("PLAYING", "PAUSED")
+
+
+async def demo_running(session: AsyncSession) -> bool:
+    """Whether this tenant has a demo scenario run in progress."""
+    found = await session.scalar(
+        text("SELECT 1 FROM scenario_run WHERE mode = 'DEMO' AND status = ANY(:running) LIMIT 1"),
+        {"running": list(DEMO_RUNNING)},
+    )
+    return found is not None
+
+
 async def scenario_escalate_after_s(session: AsyncSession) -> int | None:
-    """The check-in escalation time of an active demo scenario run, if any
-    (SCENARIO_SETTINGS, Prompt 5: 20 s for NBO-CIVIL-UNREST). Pilot tenants have no
-    scenario runs, so they always use the campaign's own value."""
+    """The check-in escalation time while a demo scenario is running
+    (SCENARIO_SETTINGS, Prompt 5: 20 s for NBO-CIVIL-UNREST). Otherwise None, and
+    the campaign keeps its own value. Pilot tenants have no scenario runs."""
     value = await session.scalar(
         text(
             """
             SELECT (e.payload ->> 'checkin_escalate_after_s')::int
               FROM scenario_run r
               JOIN scenario_event e ON e.scenario_id = r.scenario_id
-             WHERE r.mode = 'DEMO' AND r.status IN ('IDLE', 'PLAYING', 'PAUSED')
+             WHERE r.mode = 'DEMO' AND r.status = ANY(:running)
                AND e.event_type = 'SCENARIO_SETTINGS'
                AND e.payload ? 'checkin_escalate_after_s'
              ORDER BY r.started_at DESC NULLS LAST
              LIMIT 1
             """
-        )
+        ),
+        {"running": list(DEMO_RUNNING)},
     )
     return int(value) if value is not None else None
 
@@ -141,6 +156,7 @@ async def create_campaign(
         created_by=created_by,
         escalate_after_s=escalate_after_s,
         status="SENDING" if recipients else "SENT",
+        sent_at=None if recipients else func.now(),  # nothing to send: done now
     )
     session.add(row)
     await session.flush()
@@ -230,7 +246,6 @@ async def dispatch(
     )
     if campaign_id is not None:
         query = query.where(NotificationDelivery.campaign_id == campaign_id)
-    touched: dict[uuid.UUID, NotificationCampaign] = {}
     for delivery, campaign, lang in (await session.execute(query)).all():
         adapter = adapter_for(delivery.channel, configured_adapter)
         message = campaign.translations.get(lang or "", campaign.message)
@@ -245,32 +260,45 @@ async def dispatch(
         delivery.provider_ref = sent.provider_ref
         delivery.updated_at = now
         result.sent[delivery.channel] += 1
-        touched[campaign.id] = campaign
     await session.flush()
-    for campaign in touched.values():
-        left = await session.scalar(
-            select(NotificationDelivery.id)
+    result.completed = await complete_campaigns(session, now, configured_adapter)
+    return result
+
+
+async def complete_campaigns(
+    session: AsyncSession, now: datetime, configured_adapter: str = "simulated"
+) -> list[NotificationCampaign]:
+    """Mark SENDING campaigns with no QUEUED delivery left as SENT, each exactly once.
+
+    A single conditional UPDATE decides, so two dispatchers that split a campaign
+    cannot both complete it, and the campaign is completed by whichever pass runs
+    after the last batch committed (every dispatch and every worker tick sweeps)."""
+    rows = await session.scalars(
+        update(NotificationCampaign)
+        .where(
+            NotificationCampaign.status == "SENDING",
+            ~select(NotificationDelivery.id)
             .where(
-                NotificationDelivery.campaign_id == campaign.id,
+                NotificationDelivery.campaign_id == NotificationCampaign.id,
                 NotificationDelivery.status == "QUEUED",
             )
-            .limit(1)
+            .exists(),
         )
-        if left is None and campaign.status == "SENDING":
-            campaign.status = "SENT"
-            campaign.sent_at = now
-            await audit.write(
-                session,
-                actor_type=DISPATCHER.type,
-                actor_id=DISPATCHER.id,
-                action="CAMPAIGN.DISPATCHED",
-                entity_type="notification_campaign",
-                entity_id=campaign.reference,
-                details={"adapter": configured_adapter},
-            )
-            result.completed.append(campaign)
-    await session.flush()
-    return result
+        .values(status="SENT", sent_at=now)
+        .returning(NotificationCampaign)
+    )
+    completed = list(rows)
+    for campaign in completed:
+        await audit.write(
+            session,
+            actor_type=DISPATCHER.type,
+            actor_id=DISPATCHER.id,
+            action="CAMPAIGN.DISPATCHED",
+            entity_type="notification_campaign",
+            entity_id=campaign.reference,
+            details={"adapter": configured_adapter},
+        )
+    return completed
 
 
 async def refresh_receipts(

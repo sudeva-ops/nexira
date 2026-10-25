@@ -60,8 +60,10 @@ async def record_response(
     channel: str | None,
     note: str | None,
     actor: Actor,
+    source_event_id: str | None = None,
 ) -> CheckinResponse:
-    """Store one answer (history is kept; the latest counts) and audit it."""
+    """Store one answer (history is kept; the latest counts) and audit it.
+    source_event_id: the stream event it came from, recorded for idempotency."""
     campaign = await session.get(NotificationCampaign, campaign_id)
     if campaign is None or campaign.campaign_type != "CHECKIN":
         raise CheckinError("Not a check-in campaign")
@@ -117,9 +119,23 @@ async def record_response(
             "status": status,
             "channel": channel,
             "response_id": response.id,
+            **({"event_id": source_event_id} if source_event_id else {}),
         },
     )
     return response
+
+
+async def already_recorded(session: AsyncSession, event_id: str) -> bool:
+    """Whether a stream event's answer is already stored (redelivery after a crash)."""
+    found = await session.scalar(
+        select(AuditLog.id)
+        .where(
+            AuditLog.action == "CHECKIN.RESPOND",
+            AuditLog.details["event_id"].as_string() == event_id,
+        )
+        .limit(1)
+    )
+    return found is not None
 
 
 def updated_event(campaign: NotificationCampaign, kind: str = "CHECKIN_UPDATED") -> Event:

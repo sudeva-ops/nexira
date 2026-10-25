@@ -38,7 +38,8 @@ async def test_scene_4_ends_at_15_1_1_and_168_4_40_and_escalates_hana_once(db: D
         async with tenant_session(tenant_id, engine) as session:
             scenario = await get_scenario(session, nbo.CODE)
             assert scenario is not None
-            await active_run(session, scenario.id, None)  # the demo is running
+            demo = await active_run(session, scenario.id, None)
+            demo.status = "PAUSED"  # scene 1 has played: the demo is running
             duty = await user(session, "duty.officer")
             run = await playbooks.start_run(
                 session,

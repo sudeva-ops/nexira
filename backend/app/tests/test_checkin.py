@@ -47,7 +47,8 @@ class World:
     publisher: ListPublisher
 
 
-async def make_world(idp: Idp, *, demo_run: bool = False) -> World:
+async def make_world(idp: Idp, *, demo_run: str | None = None) -> World:
+    """demo_run: the status of a demo scenario run to create (None = no run)."""
     nbo, cai = await idp.mission("NBO"), await idp.mission("CAI")
     grants: dict[str, list[tuple[str, uuid.UUID | None]]] = {
         "duty": [("DUTY_OFFICER", None)],
@@ -78,7 +79,7 @@ async def make_world(idp: Idp, *, demo_run: bool = False) -> World:
             + [ObservationIn(outsider, "MANUAL", 30.0, 31.0, NOW - timedelta(minutes=5))],
         )
         await location.recompute(session, NOW)
-        if demo_run:
+        if demo_run is not None:
             await ensure_scenario(
                 session,
                 code="DEMO",
@@ -88,7 +89,8 @@ async def make_world(idp: Idp, *, demo_run: bool = False) -> World:
             )
             scenario = await get_scenario(session, "DEMO")
             assert scenario is not None
-            await active_run(session, scenario.id, None)
+            run = await active_run(session, scenario.id, None)
+            run.status = demo_run
         await session.commit()
     now_signal = signal("DATAMINR", "High")
     now_signal.payload["occurred_at"] = NOW.isoformat()
@@ -269,34 +271,56 @@ async def test_non_responders_are_escalated_once(
 async def test_a_demo_scenario_run_shortens_escalation_to_20_seconds(
     client: AsyncClient, idp: Idp
 ) -> None:
-    w = await make_world(idp, demo_run=True)
+    w = await make_world(idp, demo_run="PAUSED")
     summary_body = await summary(client, idp, w)
     assert summary_body["escalate_after_s"] == 20
     assert await escalate(idp, NOW + timedelta(seconds=19)) == []
     assert len(await escalate(idp, NOW + timedelta(seconds=20))) == 1
 
 
-async def test_simulator_answers_go_to_the_latest_open_check_in(
+def sim_event(idp: Idp, person: uuid.UUID, status: str, **extra: object) -> Event:
+    return Event(
+        "CHECKIN_RESPONSE",
+        idp.tenant_id,
+        {
+            "person_id": str(person),
+            "status": status,
+            "channel": "SMS",
+            "campaign": "latest_open_checkin",
+            **extra,
+        },
+        "scenario:test",
+    )
+
+
+async def test_an_idle_presenter_run_does_not_shorten_escalation(
+    client: AsyncClient, idp: Idp
+) -> None:
+    w = await make_world(idp, demo_run="IDLE")  # opened, never played
+    assert (await summary(client, idp, w))["escalate_after_s"] == 600
+
+
+async def test_simulated_answers_need_a_running_demo(
     client: AsyncClient, idp: Idp, world: World
 ) -> None:
+    await response_handler(idp.engine, world.publisher)(sim_event(idp, world.ids["Hana"], "SAFE"))
+    personnel = (await summary(client, idp, world))["personnel"]
+    assert isinstance(personnel, dict)
+    assert personnel["safe"] == 0  # a stray or forged event cannot mark anyone SAFE
+
+
+async def test_simulator_answers_go_to_the_latest_open_check_in(
+    client: AsyncClient, idp: Idp
+) -> None:
+    world = await make_world(idp, demo_run="PLAYING")
     handle = response_handler(idp.engine, world.publisher)
-
-    def event(person: uuid.UUID, status: str) -> Event:
-        return Event(
-            "CHECKIN_RESPONSE",
-            idp.tenant_id,
-            {
-                "person_id": str(person),
-                "status": status,
-                "channel": "SMS",
-                "campaign": "latest_open_checkin",
-            },
-            "scenario:test",
-        )
-
-    await handle(event(world.ids["Hana"], "SAFE"))
-    await handle(event(uuid.uuid4(), "SAFE"))  # no open check-in: rejected
-    await handle(event(world.ids["Grace"], "MAYBE"))  # bad status: rejected
+    first = sim_event(idp, world.ids["Hana"], "SAFE")
+    await handle(first)
+    await handle(first)  # redelivered after a crash: recorded once
+    await handle(sim_event(idp, uuid.uuid4(), "SAFE"))  # no open check-in: rejected
+    await handle(sim_event(idp, world.ids["Grace"], "MAYBE"))  # bad status: rejected
+    await handle(sim_event(idp, world.ids["Grace"], "SAFE", channel="PIGEON"))  # rejected
+    await handle(sim_event(idp, world.ids["Grace"], "SAFE", note="x" * 1001))  # rejected
     personnel = (await summary(client, idp, world))["personnel"]
     assert isinstance(personnel, dict)
     assert personnel["safe"] == 1
@@ -311,7 +335,7 @@ async def test_simulator_answers_go_to_the_latest_open_check_in(
         actor = await session.scalar(
             select(AuditLog.actor_id).where(AuditLog.action == "CHECKIN.RESPOND")
         )
-    assert actions == ["CHECKIN.RESPOND", "CHECKIN.REJECT", "CHECKIN.REJECT"]
+    assert actions == ["CHECKIN.RESPOND"] + ["CHECKIN.REJECT"] * 4
     assert actor == "channel.simulated"
 
 

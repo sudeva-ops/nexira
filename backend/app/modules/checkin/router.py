@@ -115,8 +115,10 @@ async def people(
     group: Literal["personnel", "citizens"] | None = None,
     status: Annotated[Literal["SAFE", "NEED_HELP", "PENDING"] | None, Query()] = None,
 ) -> list[CheckinPersonOut]:
-    """Recipients with their latest answer: need help first, then pending, then safe."""
+    """Recipients with their latest answer: need help first, then pending, then safe.
+    Free-text notes are shown only to staff who may record answers."""
     campaign = await _checkin(session, campaign_id)
+    show_notes = await user_has_role(session, _user, RESPOND_ROLES)
     rows = await session.execute(
         _PEOPLE,
         {
@@ -126,7 +128,9 @@ async def people(
             "status": status,
         },
     )
-    return [CheckinPersonOut(**r._asdict()) for r in rows]
+    return [
+        CheckinPersonOut(**{**r._asdict(), "note": r.note if show_notes else None}) for r in rows
+    ]
 
 
 @router.post("/{campaign_id}/respond", status_code=201)

@@ -228,6 +228,67 @@ async def test_a_crash_before_commit_resends_with_the_same_key(
         assert d.provider_ref == again.provider_ref
 
 
+async def test_a_campaign_split_between_dispatchers_is_completed_once(
+    api_engine: AsyncEngine, world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two dispatchers each take part of a campaign and commit; neither can see the
+    other's rows as sent, so the next pass (every dispatch and tick sweeps) completes it."""
+    row = await campaign(api_engine, world)
+    monkeypatch.setattr(service, "DISPATCH_BATCH", 2)
+    async with (
+        tenant_session(world.tenant, api_engine) as a,
+        tenant_session(world.tenant, api_engine) as b,
+    ):
+        first = await dispatch(a, T0)
+        second = await dispatch(b, T0)  # SKIP LOCKED: the other two rows
+        assert sum(first.sent.values()) == sum(second.sent.values()) == 2
+        assert first.completed == second.completed == []  # neither sees the other's
+        await a.commit()
+        await b.commit()
+    async with tenant_session(world.tenant, api_engine) as session:
+        assert (
+            await session.scalar(
+                select(NotificationCampaign.status).where(NotificationCampaign.id == row.id)
+            )
+            == "SENDING"
+        )
+    later = await run_dispatch(api_engine, world, T0 + timedelta(seconds=2))
+    assert [c.id for c in later.completed] == [row.id]
+    assert (await run_dispatch(api_engine, world)).completed == []  # once
+    async with tenant_session(world.tenant, api_engine) as session:
+        stored = await session.get_one(NotificationCampaign, row.id)
+        dispatched = await session.scalar(
+            select(func.count())
+            .select_from(AuditLog)
+            .where(AuditLog.action == "CAMPAIGN.DISPATCHED")
+        )
+    assert (stored.status, stored.sent_at, dispatched) == ("SENT", T0 + timedelta(seconds=2), 1)
+
+
+async def test_a_campaign_with_nobody_to_send_to_is_done_at_once(
+    api_engine: AsyncEngine, world: World
+) -> None:
+    async with tenant_session(world.tenant, api_engine) as session:
+        row, recipients = await create_campaign(
+            session,
+            incident_id=world.incident_id,
+            campaign=CampaignIn(
+                campaign_type="ALERT",
+                message="x",
+                channels=["APP"],
+                audience={"mission": "incident", "role_titles": ["Nobody"]},
+            ),
+            created_by_type="USER",
+            created_by="test",
+            actor=SYSTEM,
+        )
+        await session.commit()
+        await session.refresh(row)
+    assert recipients == 0
+    assert row.status == "SENT"
+    assert row.sent_at is not None
+
+
 async def test_receipts_are_telemetry(api_engine: AsyncEngine, world: World) -> None:
     await campaign(api_engine, world)
     await run_dispatch(api_engine, world)
