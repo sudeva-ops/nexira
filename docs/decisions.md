@@ -144,7 +144,7 @@ Messages to people outside the platform are never undoable.
 
 ## 5. UI, map and naming
 
-**D-25 · UI reference and scope.** The UI reference is **`NEXIRA_Demo_Full 3.html`** (the version with the Decision Queue), stored as `docs/design/NEXIRA_Demo_Full.html`. Treat it as a **visual reference only**: do not port its code, state handling or patching pattern.
+**D-25 · UI reference and scope.** (Amended by D-30 for the pilot.) The UI reference is **`NEXIRA_Demo_Full 3.html`** (the version with the Decision Queue), stored as `docs/design/NEXIRA_Demo_Full.html`. Treat it as a **visual reference only**: do not port its code, state handling or patching pattern.
 
 | Build in Phase 1 | Do not build in Phase 1 |
 |---|---|
@@ -167,6 +167,30 @@ Messages to people outside the platform are never undoable.
 - channel adapters
 
 Record each sign-off in the PR.
+
+## 6a. Pilot scope (after Phase 1)
+
+**D-30 · Pilot modules.** This amends D-25. Agreed with the product owner on 2026-10-25, after Phase 1 was complete (Prompts 0–16). The pilot adds modules from the master specification's Phase 2 that can be built and demonstrated on simulated data. The modules that need a real feed or a local model wait.
+
+| Build for the pilot, in this order | Wait for real feeds or a local model |
+|---|---|
+| 1. **Mass Notification** (NTF), including per-mission message templates (D-31) | AI Risk Copilot (COP), Briefing agent: need a local model server (AGR-08) |
+| 2. **Journey Management** (JRN) | Local-Language OSINT (OSN): needs a real feed, licensing and a privacy review |
+| 3. **Air Travel Tracking** (AIR), on simulated flights | Integrations console (INT): needs real connectors |
+| 4. **Travel & Air agent** | Real SMS, email or WhatsApp delivery: channels stay simulated (D-19, AGENTS.md) |
+| 5. **Assistance Partners** (AST), only if the pilot customer asks for it | |
+
+Rules:
+- **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
+- **Same process as Phase 1.** One branch and PR per prompt. 🔒 prompts follow D-29. Schema changes go through `docs/schema/proposed-changes.md` first. Simulated data only.
+- **The Phase 1 acceptance scenario (§7) must keep passing** after every pilot prompt.
+
+**D-31 · Mass Notification rules.** Requirements MN-01 to MN-12 in `docs/requirements-pilot.md`.
+- **Draft, then send.** A user composes a campaign as a DRAFT. Nothing is queued until it is sent. Sending uses the same campaign and delivery tables and the same simulated adapter as playbooks and agents.
+- **Second person for citizens.** A campaign whose audience includes **citizens** needs a **second person** to approve it before it is sent. The approver is a different user from the author and holds `DUTY_OFFICER|CONSULAR_OFFICER`, checked through `app/core/approvals.py` (D-05, D-16). A campaign to staff and delegates only can be sent by its author, if the author holds `DUTY_OFFICER|SECURITY_OFFICER`. Every step is audited.
+- **Templates per mission, with a fallback.** Message templates are stored per mission and campaign kind, with a generic template as the fallback. PB-07 and the Communications agent take the advisory from the incident's mission template. This replaces the advisory text that is fixed to Nairobi in the PB-07 seed.
+- **Translations.** D-15 still applies: pre-written translations only, no machine translation. A translation not yet reviewed keeps its `REVIEW REQUIRED` marker. With `APP_ENV=pilot`, a campaign cannot be sent with an unreviewed translation.
+- **Test send.** "Send to self" renders the message for each channel in the preview panel and writes an audit row. It creates no deliveries.
 
 ---
 
