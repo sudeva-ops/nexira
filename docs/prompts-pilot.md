@@ -1,4 +1,4 @@
-# NEXIRA · Pilot prompts for the AI coding tool · v0.1 (draft for approval)
+# NEXIRA · Pilot prompts for the AI coding tool · v0.1
 
 For the coding agent, after the product owner approves `docs/requirements-pilot.md`. They continue the numbering of `docs/prompts.md`, which ended at Prompt 16. The rules are the same:
 - one prompt at a time, in order, with one branch and one PR per prompt;
@@ -26,7 +26,7 @@ No code changes.
 
 ### Prompt 18 · Templates and campaign approval columns (migration) 🔒
 ```
-Only after the product owner approves PC-07 and PC-08 in docs/schema/proposed-changes.md.
+PC-07 and PC-08 were approved by the product owner on 2026-10-25 (PR #16).
 
 - New Alembic migration (never edit 0001):
   - message_template (PC-07) with FORCE RLS, the tenant_isolation policy and grants to

@@ -1,8 +1,8 @@
-# NEXIRA · Pilot modules: requirements · v0.1 (draft for approval)
+# NEXIRA · Pilot modules: requirements · v0.1
 
 For the product owner, who approves this document; then for the coding agent, which builds from `docs/prompts-pilot.md`. It adds to `docs/requirements.md` (the Phase 1 PRD) and follows `docs/decisions.md`, in particular D-30 (pilot scope) and D-31 (Mass Notification rules).
 
-**Status:** Mass Notification is written in full and waiting for approval. The other pilot modules are only outlined (§7). Each will be written and approved before it is built.
+**Status:** Mass Notification was **approved by the product owner on 2026-10-25** (PR #16), with the defaults for the questions in §8. The other pilot modules are only outlined (§7). Each will be written and approved before it is built.
 
 ---
 
@@ -88,8 +88,8 @@ The Nairobi acceptance scenario and the France scenario still pass. The France s
 | Travel & Air agent | the agent framework | action policies for diversion and rebooking (level 2, Travel Desk) |
 | Assistance Partners (AST-01..04) | nothing | only if the pilot customer wants it |
 
-## 8. Open questions for the product owner
+## 8. Questions answered by the product owner (2026-10-25)
 
-1. Is the second-person rule right (citizens only)? Or should every campaign above a size, for example 50 people, need a second person?
-2. Who maintains templates in the pilot: Consular Officers, or HQ only (ADMIN)?
-3. Is the channel fallback (MN-11) wanted in the pilot, or should it wait for real gateways?
+1. **Second person:** for campaigns that reach citizens only (MN-05 as written). Size alone does not trigger it.
+2. **Templates:** maintained by `ADMIN` and `CONSULAR_OFFICER` (§4 as written).
+3. **Channel fallback (MN-11):** wanted in the pilot, on the simulated adapter, as a Should.
