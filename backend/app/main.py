@@ -7,6 +7,7 @@ from app.core import errors
 from app.core.db import get_engine, verify_connection_role
 from app.core.realtime import hub
 from app.core.realtime import router as realtime_router
+from app.modules.agents.router import router as agents_router
 from app.modules.audit.router import router as audit_router
 from app.modules.checkin.router import router as checkin_router
 from app.modules.intel.router import router as intel_router
@@ -46,6 +47,7 @@ app.include_router(people_router)
 app.include_router(playbooks_router)
 app.include_router(notifications_router)
 app.include_router(checkin_router)
+app.include_router(agents_router)
 app.include_router(realtime_router)
 
 

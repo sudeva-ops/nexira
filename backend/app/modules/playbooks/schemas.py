@@ -57,4 +57,5 @@ class PermissionsOut(BaseModel):
 
     entity_type: str
     entity_id: str
-    approve_step: list[uuid.UUID] = []
+    approve_step: list[uuid.UUID] = []  # playbook_run: steps the caller may approve
+    decide_proposal: bool = False  # agent_proposal: may decide its next step
