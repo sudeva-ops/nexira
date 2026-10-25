@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core import errors
+from app.core.config import get_settings
 from app.core.db import get_engine, verify_connection_role
 from app.core.realtime import hub
 from app.core.realtime import router as realtime_router
@@ -29,28 +30,42 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     await engine.dispose()
 
 
-app = FastAPI(
-    title="NEXIRA API",
-    version="0.1.0",
-    docs_url="/api/docs",
-    openapi_url="/api/openapi.json",
-    lifespan=lifespan,
-)
-errors.install(app)
+# D-21: the scenario player (presenter bar) and its reset exist for demos only.
+DEMO_ENVS = frozenset({"local", "demo", "test"})
 
 
-app.include_router(tenancy_router)
-app.include_router(audit_router)
-app.include_router(scenarios_router)
-app.include_router(intel_router)
-app.include_router(people_router)
-app.include_router(playbooks_router)
-app.include_router(notifications_router)
-app.include_router(checkin_router)
-app.include_router(agents_router)
-app.include_router(realtime_router)
+def create_app(app_env: str) -> FastAPI:
+    """The API. A pilot has no scenario API and no interactive API docs."""
+    demo = app_env in DEMO_ENVS
+    api = FastAPI(
+        title="NEXIRA API",
+        version="0.1.0",
+        docs_url="/api/docs" if demo else None,
+        redoc_url=None,
+        openapi_url="/api/openapi.json" if demo else None,
+        lifespan=lifespan,
+    )
+    errors.install(api)
+    for router in (
+        tenancy_router,
+        audit_router,
+        intel_router,
+        people_router,
+        playbooks_router,
+        notifications_router,
+        checkin_router,
+        agents_router,
+        realtime_router,
+    ):
+        api.include_router(router)
+    if demo:
+        api.include_router(scenarios_router)
+    api.add_api_route("/api/health", health)
+    return api
 
 
-@app.get("/api/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+app = create_app(get_settings().app_env)

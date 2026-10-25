@@ -1,0 +1,140 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $fullname := include "nexira.fullname" . }}
+{{- $np := .Values.networkPolicy }}
+# Default: nothing in, nothing out, for every pod of this release (NFR 1).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-default-deny
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes: [Ingress, Egress]
+---
+# frontend: from the ingress controller; to the API only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-frontend
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "nexira.selector" (list . "frontend") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    {{- if not $np.ingressFrom.namespaceSelector }}{{ fail "networkPolicy.ingressFrom.namespaceSelector is required (the ingress controller's namespace)" }}{{ end }}
+    - from:
+        - namespaceSelector: {{ toYaml $np.ingressFrom.namespaceSelector | nindent 12 }}
+      ports:
+        - { protocol: TCP, port: 8080 }
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {{- include "nexira.selector" (list . "backend") | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: 8000 }
+    {{- include "nexira.egress.dns" . | nindent 4 }}
+---
+# backend: from the frontend; to PostgreSQL, Redis, the IdP (JWKS) and the LLM gateway.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-backend
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "nexira.selector" (list . "backend") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {{- include "nexira.selector" (list . "frontend") | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: 8000 }
+  egress:
+    {{- include "nexira.egress.db" . | nindent 4 }}
+    {{- include "nexira.egress.redis" . | nindent 4 }}
+    {{- $idp := include "nexira.peers" .Values.oidc.egress }}
+    {{- if not $idp }}{{ fail "oidc.egress needs ipBlocks or selectors (the IdP, for JWKS)" }}{{ end }}
+    - to: {{- $idp | nindent 8 }}
+      ports:
+      {{- range .Values.oidc.egress.ports }}
+        - { protocol: TCP, port: {{ . }} }
+      {{- end }}
+    {{- include "nexira.egress.llm" . | nindent 4 }}
+    {{- include "nexira.egress.dns" . | nindent 4 }}
+---
+# worker: no ingress; to PostgreSQL, Redis and the LLM gateway.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-worker
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "nexira.selector" (list . "worker") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  egress:
+    {{- include "nexira.egress.db" . | nindent 4 }}
+    {{- include "nexira.egress.redis" . | nindent 4 }}
+    {{- include "nexira.egress.llm" . | nindent 4 }}
+    {{- include "nexira.egress.dns" . | nindent 4 }}
+---
+# migrate, before anything else exists: the pre-install hook would otherwise run
+# with open egress on the first install. Created as a hook, before the Job.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-migrate-hook
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-20"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  podSelector:
+    matchLabels: {{- include "nexira.selector" (list . "migrate") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  egress:
+    {{- include "nexira.egress.db" . | nindent 4 }}
+    {{- include "nexira.egress.dns" . | nindent 4 }}
+---
+# migrate and backup: to PostgreSQL only.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-db-jobs
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - { key: app.kubernetes.io/instance, operator: In, values: [{{ .Release.Name | quote }}] }
+      - { key: app.kubernetes.io/component, operator: In, values: [migrate, backup] }
+  policyTypes: [Ingress, Egress]
+  egress:
+    {{- include "nexira.egress.db" . | nindent 4 }}
+    {{- include "nexira.egress.dns" . | nindent 4 }}
+{{- if .Values.redis.enabled }}
+---
+# redis: from the backend and worker only; no egress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-redis
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "nexira.selector" (list . "redis") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {{- include "nexira.selector" (list . "backend") | nindent 14 }}
+        - podSelector:
+            matchLabels: {{- include "nexira.selector" (list . "worker") | nindent 14 }}
+      ports:
+        - { protocol: TCP, port: 6379 }
+{{- end }}
+{{- end }}

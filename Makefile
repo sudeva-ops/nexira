@@ -3,10 +3,11 @@ COMPOSE := docker compose --env-file .env -f infra/docker-compose.yml
 APP_ENV ?= $(shell grep -E '^APP_ENV=' .env 2>/dev/null | cut -d= -f2)
 
 .PHONY: help env up down logs test test-backend test-simulator test-frontend \
-        lint lint-backend lint-simulator lint-frontend migrate seed reset-demo tiles e2e acceptance
+        lint lint-backend lint-simulator lint-frontend migrate seed reset-demo tiles e2e acceptance \
+        backup restore-test helm-check
 
 help:
-	@echo "up | down | logs | test | lint | e2e | acceptance | migrate | seed | reset-demo | tiles"
+	@echo "up | down | logs | test | lint | e2e | acceptance | migrate | seed | reset-demo | tiles | backup | restore-test | helm-check"
 
 env:
 	@test -f .env || (cp .env.example .env && echo "Created .env from .env.example")
@@ -79,3 +80,27 @@ reset-demo: env
 # (not committed). Downloads at build time only; the app works offline afterwards.
 tiles:
 	infra/scripts/build-tiles.sh
+
+# --- backups (Prompt 16, NFR 7; docs/runbooks/backup-restore.md) ----------------
+# A pg_dump as nexira_backup into ./backups (git-ignored).
+backup: env
+	$(COMPOSE) run --rm --build backup
+
+# Back up, restore into a scratch database, verify (RLS, audit chains, row counts), drop it.
+restore-test: env
+	$(COMPOSE) run --rm --build restore-test
+
+# --- Helm chart (infra/helm/nexira): lint, render and validate against the
+# Kubernetes schemas, with pinned images instead of host installs.
+HELM_IMAGE := alpine/helm:3.19.0
+KUBECONFORM_IMAGE := ghcr.io/yannh/kubeconform:v0.7.0
+helm-check:
+	for values in pilot openshift; do \
+	  docker run --rm -v "$(CURDIR)/infra/helm:/charts" -w /charts $(HELM_IMAGE) lint nexira --strict \
+	    -f nexira/ci/$$values-values.yaml || exit 1; \
+	  docker run --rm -v "$(CURDIR)/infra/helm:/charts" -w /charts $(HELM_IMAGE) template nexira nexira \
+	    -f nexira/ci/$$values-values.yaml > infra/helm/.rendered.yaml || exit 1; \
+	  docker run --rm -v "$(CURDIR)/infra/helm:/charts" $(KUBECONFORM_IMAGE) -strict -summary \
+	    -kubernetes-version 1.30.0 -skip Route /charts/.rendered.yaml || exit 1; \
+	  sh infra/helm/check-render.sh infra/helm/.rendered.yaml $$values || exit 1; \
+	done

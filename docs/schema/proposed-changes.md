@@ -16,3 +16,7 @@ Changes to `docs/schema/nexira_schema.sql` (v0.2) that are **proposed, not appro
 These are part of migration 0001, but they are not changes to the schema file:
 
 - `REVOKE ALL ON alembic_version FROM nexira_app`. Alembic creates `alembic_version` before the schema runs, so the schema's `GRANT ... ON ALL TABLES` also covered it, and the API could have changed migration state. Tested in `app/tests/test_migrations.py`.
+
+## Cluster bootstrap (outside the schema), awaiting D-29 sign-off
+
+- **`nexira_backup` role** (Prompt 16): `infra/postgres/backup-role.sql` (the role) and `backup-grants.sql` (CONNECT, USAGE, SELECT on the tables and sequences of `public`, and default privileges for tables `nexira_owner` creates later), both included by `init.sql`. LOGIN, BYPASSRLS; no write, create or superuser rights; not `pg_read_all_data`. It exists because FORCE RLS stops `nexira_owner` from running `pg_dump`. It is a role and grants change, not a schema change, so there is no Alembic migration; existing clusters run both files once (`docs/runbooks/backup-restore.md`). Tested in `backend/app/tests/test_backup_role.py`. Review item: `docs/security-review.md` §2.

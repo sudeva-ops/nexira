@@ -29,3 +29,10 @@ def test_owner_dsn_is_optional_for_the_api(monkeypatch: pytest.MonkeyPatch) -> N
 async def test_stub_llm_is_deterministic() -> None:
     llm = StubLLM()
     assert await llm.complete("hi") == await llm.complete("hi") == "[stub] hi"
+
+
+def test_an_unset_app_env_means_pilot(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fails closed (Prompt 16): a forgotten APP_ENV never turns on the demo APIs."""
+    monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://nexira_api:x@db/nexira")
+    monkeypatch.delenv("APP_ENV", raising=False)
+    assert Settings(_env_file=None).app_env == "pilot"

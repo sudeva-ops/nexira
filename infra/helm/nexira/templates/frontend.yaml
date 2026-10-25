@@ -1,0 +1,67 @@
+{{- $fullname := include "nexira.fullname" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-frontend
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels: {{- include "nexira.selector" (list . "frontend") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "nexira.selector" (list . "frontend") | nindent 8 }}
+      annotations:
+        checksum/nginx: {{ include (print $.Template.BasePath "/frontend-configmap.yaml") . | sha256sum }}
+    spec:
+      {{- include "nexira.podCommon" (dict "root" . "hook" false) | nindent 6 }}
+      containers:
+        - name: frontend
+          image: {{ include "nexira.image" (list . .Values.images.frontend) }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          securityContext: {{- include "nexira.containerSecurityContext" . | nindent 12 }}
+          ports:
+            - { name: http, containerPort: 8080 }
+          readinessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /, port: http }
+            periodSeconds: 10
+          resources: {{- toYaml .Values.frontend.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+            - { name: nginx, mountPath: /etc/nginx/conf.d/default.conf, subPath: default.conf }
+            - { name: nginx, mountPath: /etc/nginx/snippets/security-headers.conf, subPath: security-headers.conf }
+            - { name: tiles, mountPath: /srv/tiles, readOnly: true }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+        - name: nginx
+          configMap: { name: {{ $fullname }}-frontend }
+        - name: tiles
+          {{- if .Values.frontend.tiles.existingClaim }}
+          persistentVolumeClaim: { claimName: {{ .Values.frontend.tiles.existingClaim }}, readOnly: true }
+          {{- else }}
+          emptyDir: {}  # no tiles: the map has no basemap (see NOTES)
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-frontend
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "nexira.selector" (list . "frontend") | nindent 4 }}
+  ports:
+    - { name: http, port: 8080, targetPort: http }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $fullname }}-frontend
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {{- include "nexira.selector" (list . "frontend") | nindent 6 }}

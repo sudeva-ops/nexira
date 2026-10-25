@@ -1,0 +1,66 @@
+{{- if .Values.redis.enabled }}
+{{- $fullname := include "nexira.fullname" . }}
+# Internal event stream (Redis Streams). AOF on, so a restart keeps unread events;
+# the database stays the source of truth (outbox, D-20). Password required.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $fullname }}-redis
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  serviceName: {{ $fullname }}-redis
+  replicas: 1
+  selector:
+    matchLabels: {{- include "nexira.selector" (list . "redis") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "nexira.selector" (list . "redis") | nindent 8 }}
+    spec:
+      {{- include "nexira.podCommon" (dict "root" . "hook" false) | nindent 6 }}
+      containers:
+        - name: redis
+          image: {{ include "nexira.image" (list . .Values.images.redis) }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          command: ["sh", "-c"]
+          args:
+            - exec redis-server --appendonly yes --dir /data --protected-mode yes
+              --requirepass "$REDIS_PASSWORD" --rename-command FLUSHALL "" --rename-command FLUSHDB ""
+              --rename-command CONFIG ""
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: {{ include "nexira.secret" (list . "redis") }}, key: REDIS_PASSWORD }
+          securityContext: {{- include "nexira.containerSecurityContext" . | nindent 12 }}
+          ports:
+            - { name: redis, containerPort: 6379 }
+          readinessProbe:
+            tcpSocket: { port: redis }
+            periodSeconds: 5
+          resources: {{- toYaml .Values.redis.resources | nindent 12 }}
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with .Values.redis.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests: { storage: {{ .Values.redis.storage }} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-redis
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "nexira.selector" (list . "redis") | nindent 4 }}
+  ports:
+    - { name: redis, port: 6379, targetPort: redis }
+{{- end }}

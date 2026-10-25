@@ -30,8 +30,16 @@ export async function as(request: APIRequestContext, username: string) {
   };
 }
 
+/** Content-Security-Policy violations seen by pages from signedIn() (Prompt 16). */
+export const cspViolations: string[] = [];
+
 export async function signedIn(browser: Browser, username: string, start = "/"): Promise<Page> {
   const page = await (await browser.newContext({ viewport: { width: 1440, height: 900 } })).newPage();
+  page.on("console", (message) => {
+    if (message.type() === "error" && message.text().includes("Content Security Policy")) {
+      cspViolations.push(`${page.url()}: ${message.text()}`);
+    }
+  });
   await page.goto(start);
   await page.locator("#username").fill(username);
   await page.locator("#password").fill(PASSWORD);

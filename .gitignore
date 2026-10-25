@@ -11,6 +11,9 @@ __pycache__/
 # node
 node_modules/
 dist/
+# backups (`make backup`) and rendered Helm output (`make helm-check`)
+backups/
+infra/helm/.rendered.yaml
 # tiles (built by `make tiles`)
 infra/tiles/
 # os / editor

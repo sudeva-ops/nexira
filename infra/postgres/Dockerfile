@@ -4,5 +4,5 @@ FROM postgres:16-bookworm
 RUN apt-get update \
  && apt-get install -y --no-install-recommends postgresql-16-postgis-3 \
  && rm -rf /var/lib/apt/lists/*
-COPY init.sql /nexira/init.sql
+COPY init.sql backup-role.sql backup-grants.sql /nexira/
 COPY 00-nexira-init.sh /docker-entrypoint-initdb.d/00-nexira-init.sh

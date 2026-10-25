@@ -28,6 +28,8 @@ from app.core.db import create_engine
 from app.tests.auth_helpers import Idp
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
+# The backup role's per-database grants, applied as init.sql applies them (Prompt 16).
+BACKUP_GRANTS = (BACKEND_DIR.parent / "infra" / "postgres" / "backup-grants.sql").read_text()
 TEST_DB = "nexira_test"
 
 
@@ -90,6 +92,7 @@ async def _recreate_database(admin_url: str, name: str) -> None:
     )
     try:
         await db.execute("CREATE EXTENSION postgis; CREATE EXTENSION pgcrypto;")
+        await db.execute(BACKUP_GRANTS)
     finally:
         await db.close()
 
