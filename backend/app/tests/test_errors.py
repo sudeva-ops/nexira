@@ -24,6 +24,7 @@ class DriverError(Exception):
         ("P0001", "<class 'RaiseError'>: proposal_approval: step 1 already decided", True),
         ("P0001", "<class 'RaiseError'>: agent_proposal: effective_level ... immutable", True),
         ("P0001", "<class 'RaiseError'>: notification_campaign: the author cannot approve", True),
+        ("P0001", "<class 'RaiseError'>: notification_delivery: campaign ... cannot change", True),
         # Faults, not conflicts:
         ("P0001", "<class 'RaiseError'>: next_reference: app.tenant_id is not set", False),
         ("P0001", "<class 'RaiseError'>: audit_log is append-only", False),

@@ -112,12 +112,11 @@ ROWS: dict[str, str] = {
 
 # nexira_app has no UPDATE/DELETE on audit_log at all (D-20), so those fail with
 # a privilege error rather than touching zero rows.
-NO_UPDATE_DELETE = {"audit_log"}
-NO_DELETE = {  # PC-07, PC-10, PC-11
+NO_UPDATE_DELETE = {"audit_log", "checkin_response"}  # append-only (D-20, D-07)
+NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELETE)
     "message_template",
     "notification_campaign",
     "notification_delivery",
-    "checkin_response",
 }
 
 

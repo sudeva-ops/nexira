@@ -171,7 +171,8 @@ async def test_only_a_pending_campaign_can_be_approved(
 ) -> None:
     author, other = await user(tenant), await user(tenant)
     campaign_id = await campaign(tenant, created_by=str(author), submitted_by=author, status=status)
-    with pytest.raises(REFUSED, match="only a campaign pending approval"):
+    # DRAFT reaches the approval check; CANCELLED and SENT are final (PC-12).
+    with pytest.raises(REFUSED, match=r"only a campaign pending approval|status cannot go"):
         await approve(tenant, campaign_id, other)
 
 
@@ -248,8 +249,8 @@ async def test_the_content_is_frozen_after_approval_and_cannot_go_back(
     await approve(tenant, campaign_id, second)
     with pytest.raises(REFUSED, match="content is frozen"):
         await set_message(tenant, campaign_id, "swapped after approval")
-    for status in ("DRAFT", "PENDING_APPROVAL"):
-        with pytest.raises(REFUSED, match="an approved campaign cannot be"):
+    for status in ("DRAFT", "PENDING_APPROVAL"):  # refused by PC-11 or PC-12, whichever is first
+        with pytest.raises(REFUSED, match=r"an approved campaign cannot be|status cannot go"):
             await tenant.execute(
                 "UPDATE notification_campaign SET status = $2 WHERE id = $1", campaign_id, status
             )
@@ -290,6 +291,140 @@ async def test_an_approval_time_needs_an_approver(tenant: asyncpg.Connection) ->
         await tenant.execute(
             "UPDATE notification_campaign SET approved_at = now() WHERE id = $1", campaign_id
         )
+
+
+# --- PC-12: status only moves forward; evidence is not rewritten -------------------
+
+
+async def status(conn: asyncpg.Connection, campaign_id: uuid.UUID, to: str) -> None:
+    await conn.execute(
+        "UPDATE notification_campaign SET status = $2 WHERE id = $1", campaign_id, to
+    )
+
+
+@pytest.mark.parametrize(
+    ("start", "to"),
+    [
+        ("SENDING", "DRAFT"),
+        ("SENT", "DRAFT"),
+        ("SENT", "PENDING_APPROVAL"),
+        ("CANCELLED", "DRAFT"),
+        ("SENT", "CANCELLED"),
+        ("SENDING", "CANCELLED"),
+        ("CANCELLED", "SENDING"),
+    ],
+)
+async def test_sent_and_cancelled_campaigns_never_reopen(
+    tenant: asyncpg.Connection, start: str, to: str
+) -> None:
+    author = await user(tenant)
+    campaign_id = await campaign(tenant, created_by=str(author), submitted_by=None, status=start)
+    with pytest.raises(REFUSED, match="status cannot go"):
+        await status(tenant, campaign_id, to)
+
+
+async def test_a_pending_campaign_is_sent_only_with_an_approval(
+    tenant: asyncpg.Connection,
+) -> None:
+    campaign_id = await pending(tenant, await user(tenant))
+    with pytest.raises(REFUSED, match="status cannot go from PENDING_APPROVAL to SENDING"):
+        await status(tenant, campaign_id, "SENDING")
+
+
+async def test_approving_goes_to_sending_and_nowhere_else(tenant: asyncpg.Connection) -> None:
+    author, second = await user(tenant), await user(tenant)
+    campaign_id = await pending(tenant, author)
+    with pytest.raises(REFUSED):
+        await tenant.execute(
+            "UPDATE notification_campaign SET approved_by = $2, status = 'SENT' WHERE id = $1",
+            campaign_id,
+            second,
+        )
+
+
+async def test_the_forward_path_works(tenant: asyncpg.Connection) -> None:
+    author, second = await user(tenant), await user(tenant)
+    campaign_id = await campaign(tenant, created_by=str(author), submitted_by=None, status="DRAFT")
+    await tenant.execute(
+        "UPDATE notification_campaign SET status = 'PENDING_APPROVAL', submitted_by = $2 "
+        "WHERE id = $1",
+        campaign_id,
+        author,
+    )
+    await approve(tenant, campaign_id, second)
+    await tenant.execute(
+        "UPDATE notification_campaign SET status = 'SENT', sent_at = now() WHERE id = $1",
+        campaign_id,
+    )
+    with pytest.raises(REFUSED, match="sent_at cannot change"):
+        await tenant.execute(
+            "UPDATE notification_campaign SET sent_at = now() + interval '1 year' WHERE id = $1",
+            campaign_id,
+        )
+
+
+async def test_reference_and_created_at_are_frozen(tenant: asyncpg.Connection) -> None:
+    campaign_id = await pending(tenant, await user(tenant))
+    for change in ("reference = 'NTF-FAKE'", "created_at = '2000-01-01'"):
+        with pytest.raises(REFUSED, match="cannot change"):
+            await tenant.execute(
+                f"UPDATE notification_campaign SET {change} WHERE id = $1", campaign_id
+            )
+
+
+async def test_a_rejection_reason_only_on_rejection(tenant: asyncpg.Connection) -> None:
+    author, second = await user(tenant), await user(tenant)
+    campaign_id = await pending(tenant, author)
+    await approve(tenant, campaign_id, second)
+    with pytest.raises(REFUSED, match="rejection reason is written only on rejection"):
+        await tenant.execute(
+            "UPDATE notification_campaign SET rejection_reason = 'never approved' WHERE id = $1",
+            campaign_id,
+        )
+
+
+async def test_the_escalation_time_must_be_positive(tenant: asyncpg.Connection) -> None:
+    campaign_id = await campaign(
+        tenant, created_by=str(await user(tenant)), submitted_by=None, status="SENT"
+    )
+    with pytest.raises(asyncpg.CheckViolationError):
+        await tenant.execute(
+            "UPDATE notification_campaign SET escalate_after_s = -5 WHERE id = $1", campaign_id
+        )
+
+
+async def test_a_delivery_keeps_its_campaign_person_and_channel(
+    tenant: asyncpg.Connection,
+) -> None:
+    author = await user(tenant)
+    first = await campaign(tenant, created_by=str(author), submitted_by=None, status="SENDING")
+    other = await campaign(tenant, created_by=str(author), submitted_by=None, status="SENDING")
+    person = uuid.uuid4()
+    await tenant.execute(
+        "INSERT INTO person (id, tenant_id, person_type, full_name) "
+        "VALUES ($1, current_tenant_id(), 'CITIZEN', 'Fictional Person')",
+        person,
+    )
+    delivery = await tenant.fetchval(
+        "INSERT INTO notification_delivery (tenant_id, campaign_id, person_id, channel) "
+        "VALUES (current_tenant_id(), $1, $2, 'SMS') RETURNING id",
+        first,
+        person,
+    )
+    await tenant.execute(
+        "UPDATE notification_delivery SET status = 'SENT', provider_ref = 'SIM-1' WHERE id = $1",
+        delivery,
+    )
+    for change, value in (("campaign_id", other), ("channel", "EMAIL")):
+        with pytest.raises(REFUSED, match="notification_delivery: campaign, person and channel"):
+            await tenant.execute(
+                f"UPDATE notification_delivery SET {change} = $2 WHERE id = $1", delivery, value
+            )
+
+
+async def test_check_in_answers_cannot_be_edited(tenant: asyncpg.Connection) -> None:
+    with pytest.raises(asyncpg.InsufficientPrivilegeError):
+        await tenant.execute("UPDATE checkin_response SET status = 'SAFE'")
 
 
 # --- templates ---------------------------------------------------------------------
