@@ -351,3 +351,40 @@ async def test_the_service_refuses_non_checkin_campaigns(idp: Idp, world: World)
                 note=None,
                 actor=Actor(type="SYSTEM", id="test"),
             )
+
+
+async def test_users_can_escalate_now_and_only_once(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    await answer(client, idp, world, "Peter", "SAFE")
+    url = f"/api/checkin/{world.campaign_id}/escalate"
+    assert (await client.post(url, headers=idp.headers("viewer"))).status_code == 403
+    assert (await client.post(url, headers=idp.headers("hom.cai"))).status_code == 403
+    first = await client.post(url, headers=idp.headers("hom.nbo"))
+    assert first.status_code == 200
+    assert first.json() == {"personnel": ["Grace", "Hana"], "citizens": 3}
+    again = await client.post(url, headers=idp.headers("duty"))
+    assert again.json() == {"personnel": [], "citizens": 0}  # once
+    assert await escalate(idp, NOW + timedelta(days=1)) == []  # the timer adds nothing
+    async with tenant_session(idp.tenant_id, idp.engine) as session:
+        actors = set(
+            await session.scalars(
+                select(AuditLog.actor_type).where(AuditLog.action == "CHECKIN.ESCALATE")
+            )
+        )
+    assert actors == {"USER"}
+
+
+async def test_live_responses_are_newest_first(client: AsyncClient, idp: Idp, world: World) -> None:
+    await answer(client, idp, world, "Peter", "SAFE")
+    await answer(client, idp, world, "Grace", "NEED_HELP")
+    await answer(client, idp, world, "Peter", "NEED_HELP")
+    rows = (
+        await client.get(
+            f"/api/checkin/{world.campaign_id}/responses", headers=idp.headers("viewer")
+        )
+    ).json()
+    assert [(r["full_name"], r["status"]) for r in rows] == [
+        ("Peter", "NEED_HELP"),
+        ("Grace", "NEED_HELP"),
+    ]

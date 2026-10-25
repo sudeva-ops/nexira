@@ -20,6 +20,7 @@ from app.core.security import CurrentUser, current_user, get_db
 from app.modules.checkin import service
 from app.modules.checkin.schemas import (
     CheckinPersonOut,
+    EscalatedOut,
     RespondIn,
     ResponseOut,
     SummaryOut,
@@ -133,17 +134,72 @@ async def people(
     ]
 
 
+_RESPONSES = text(
+    """
+    SELECT l.person_id, p.full_name, p.person_type, p.role_title, m.code AS mission_code,
+           l.status, l.channel, l.note, l.responded_at, false AS escalated
+      FROM v_checkin_latest l
+      JOIN person p ON p.id = l.person_id
+      LEFT JOIN mission m ON m.id = p.mission_id
+     WHERE l.campaign_id = :campaign_id
+     ORDER BY l.responded_at DESC, p.full_name
+     LIMIT :limit
+    """
+)
+
+
+@router.get("/{campaign_id}/responses")
+async def responses(
+    campaign_id: uuid.UUID,
+    _user: Reader,
+    session: Db,
+    limit: Annotated[int, Query(ge=1, le=500)] = 50,
+) -> list[CheckinPersonOut]:
+    """The live list: each person's latest answer, newest first."""
+    campaign = await _checkin(session, campaign_id)
+    show_notes = await user_has_role(session, _user, RESPOND_ROLES)
+    rows = await session.execute(_RESPONSES, {"campaign_id": campaign.id, "limit": limit})
+    return [
+        CheckinPersonOut(**{**r._asdict(), "note": r.note if show_notes else None}) for r in rows
+    ]
+
+
+async def _may_respond(
+    session: AsyncSession, user: CurrentUser, campaign: NotificationCampaign
+) -> None:
+    mission_id = await session.scalar(
+        text("SELECT mission_id FROM incident WHERE id = :id"), {"id": campaign.incident_id}
+    )
+    if not await user_has_role(session, user, RESPOND_ROLES, mission_id):
+        raise HTTPException(403, "Forbidden")
+
+
+@router.post("/{campaign_id}/escalate")
+async def escalate(campaign_id: uuid.UUID, user: User, session: Db, publisher: Pub) -> EscalatedOut:
+    """Escalate non-responders now (once per person, once for citizens, D-07)."""
+    campaign = await _checkin(session, campaign_id)
+    await _may_respond(session, user, campaign)
+    try:
+        result = await service.escalate_now(
+            session, campaign.id, Actor(type="USER", id=str(user.id))
+        )
+    except service.CheckinError as e:
+        raise HTTPException(409, str(e)) from None
+    await session.commit()
+    try:
+        await publisher.publish(service.updated_event(campaign, "CHECKIN_ESCALATED"))
+    except Exception:
+        log.exception("publishing CHECKIN_ESCALATED failed after commit")
+    return EscalatedOut(personnel=result.personnel, citizens=result.citizens)
+
+
 @router.post("/{campaign_id}/respond", status_code=201)
 async def respond(
     campaign_id: uuid.UUID, body: RespondIn, user: User, session: Db, publisher: Pub
 ) -> ResponseOut:
     """CHK-02: record an answer for a recipient (D-28: also the phone preview panel)."""
     campaign = await _checkin(session, campaign_id)
-    mission_id = await session.scalar(
-        text("SELECT mission_id FROM incident WHERE id = :id"), {"id": campaign.incident_id}
-    )
-    if not await user_has_role(session, user, RESPOND_ROLES, mission_id):
-        raise HTTPException(403, "Forbidden")
+    await _may_respond(session, user, campaign)
     try:
         response = await service.record_response(
             session,

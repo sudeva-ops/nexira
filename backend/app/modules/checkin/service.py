@@ -213,6 +213,19 @@ class Escalated:
     citizens: int  # escalated as one aggregate (0 = none this time)
 
 
+async def escalate_now(session: AsyncSession, campaign_id: uuid.UUID, actor: Actor) -> Escalated:
+    """A user escalates non-responders before the timer ("Escalate non-responders",
+    Prompt 11). The same once-only rules apply; the user is the actor."""
+    campaign = await session.scalar(
+        select(NotificationCampaign).where(NotificationCampaign.id == campaign_id).with_for_update()
+    )
+    if campaign is None or campaign.campaign_type != "CHECKIN":
+        raise CheckinError("Not a check-in campaign")
+    if campaign.status not in OPEN:
+        raise CheckinError(f"Check-in {campaign.reference} is {campaign.status}")
+    return await _escalate(session, campaign, actor, reason="by a user")
+
+
 async def escalate_due(session: AsyncSession, now: datetime) -> list[Escalated]:
     """Escalate non-responders of every open check-in whose time has come (D-07)."""
     campaigns = await session.scalars(
@@ -229,13 +242,17 @@ async def escalate_due(session: AsyncSession, now: datetime) -> list[Escalated]:
         sent_at = campaign.sent_at
         if sent_at is None or now < sent_at + timedelta(seconds=campaign.escalate_after_s):
             continue
-        result = await _escalate(session, campaign)
+        result = await _escalate(
+            session, campaign, ESCALATOR, reason=f"after {campaign.escalate_after_s} s"
+        )
         if result.personnel or result.citizens:
             done.append(result)
     return done
 
 
-async def _escalate(session: AsyncSession, campaign: NotificationCampaign) -> Escalated:
+async def _escalate(
+    session: AsyncSession, campaign: NotificationCampaign, actor: Actor, reason: str
+) -> Escalated:
     previous = await session.scalars(
         select(AuditLog.details).where(
             AuditLog.action == "CHECKIN.ESCALATE",
@@ -259,14 +276,14 @@ async def _escalate(session: AsyncSession, campaign: NotificationCampaign) -> Es
         _event(
             session,
             campaign,
-            f"{name} has not answered {campaign.reference} after "
-            f"{campaign.escalate_after_s} s: escalated.",
+            f"{name} has not answered {campaign.reference}: escalated {reason}.",
             {"scope": "person", "person_id": str(person_id)},
+            actor,
         )
         await audit.write(
             session,
-            actor_type=ESCALATOR.type,
-            actor_id=ESCALATOR.id,
+            actor_type=actor.type,
+            actor_id=actor.id,
             action="CHECKIN.ESCALATE",
             entity_type="notification_campaign",
             entity_id=campaign.reference,
@@ -278,14 +295,15 @@ async def _escalate(session: AsyncSession, campaign: NotificationCampaign) -> Es
         _event(
             session,
             campaign,
-            f"{silent_citizens} citizens have not answered {campaign.reference} after "
-            f"{campaign.escalate_after_s} s: escalated to the consular team.",
+            f"{silent_citizens} citizens have not answered {campaign.reference}: "
+            f"escalated to the consular team {reason}.",
             {"scope": "citizens", "count": silent_citizens},
+            actor,
         )
         await audit.write(
             session,
-            actor_type=ESCALATOR.type,
-            actor_id=ESCALATOR.id,
+            actor_type=actor.type,
+            actor_id=actor.id,
             action="CHECKIN.ESCALATE",
             entity_type="notification_campaign",
             entity_id=campaign.reference,
@@ -297,7 +315,11 @@ async def _escalate(session: AsyncSession, campaign: NotificationCampaign) -> Es
 
 
 def _event(
-    session: AsyncSession, campaign: NotificationCampaign, summary: str, data: dict[str, object]
+    session: AsyncSession,
+    campaign: NotificationCampaign,
+    summary: str,
+    data: dict[str, object],
+    actor: Actor,
 ) -> None:
     if campaign.incident_id is None:
         return
@@ -307,8 +329,8 @@ def _event(
             incident_id=campaign.incident_id,
             event_type="ESCALATION",  # D-07 (plan G-25)
             summary=summary,
-            actor_type=ESCALATOR.type,
-            actor_id=ESCALATOR.id,
+            actor_type=actor.type,
+            actor_id=actor.id,
             data={"campaign_id": str(campaign.id), **data},
         )
     )

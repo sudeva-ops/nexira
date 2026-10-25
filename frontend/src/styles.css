@@ -856,3 +856,412 @@ body {
   flex-direction: column;
   gap: 6px;
 }
+
+/* --- Response Playbooks (Prompt 11) ------------------------------------------- */
+.nx-pbgrid {
+  display: grid;
+  grid-template-columns: 270px 1fr 340px;
+  gap: 8px;
+  height: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.nx-scroll {
+  overflow: auto;
+  min-height: 0;
+}
+
+.nx-pbitem {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-bottom: 1px solid var(--nx-panel2);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.nx-pbitem.on {
+  border-left: 3px solid #2d72d2;
+  background: rgba(45, 114, 210, 0.18);
+}
+
+.nx-pbitem .c {
+  color: var(--nx-tx3);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.nx-pbitem .t {
+  margin-top: 2px;
+  font-weight: 600;
+}
+
+.nx-run {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px;
+}
+
+.nx-progress {
+  display: block;
+  height: 4px;
+}
+
+.nx-step {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+
+.nx-step:not(:last-child)::after {
+  position: absolute;
+  top: 28px;
+  bottom: 2px;
+  left: 12px;
+  width: 1px;
+  background: #404854;
+  content: "";
+}
+
+.nx-step.done:not(:last-child)::after {
+  background: #32a467;
+}
+
+.nx-step .ic {
+  z-index: 1;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid #404854;
+  background: var(--nx-panel);
+  color: var(--nx-tx3);
+  transition: 0.3s;
+}
+
+.nx-step.done .ic {
+  border-color: #32a467;
+  background: rgba(50, 164, 103, 0.2);
+  color: #72ca9b;
+}
+
+.nx-step.run .ic {
+  border-color: #4c90f0;
+  color: #4c90f0;
+}
+
+.nx-step.await .ic {
+  border-color: #ec9a3c;
+  background: rgba(236, 154, 60, 0.15);
+  color: #ec9a3c;
+}
+
+.nx-step.fail .ic {
+  border-color: #cd4246;
+  color: #fa999c;
+}
+
+.nx-step .tt {
+  color: var(--nx-tx);
+  font-weight: 600;
+}
+
+.nx-step.pend .tt {
+  color: var(--nx-tx3);
+}
+
+.nx-step .ds {
+  margin-top: 1px;
+  color: var(--nx-tx3);
+  font-size: 11.5px;
+}
+
+.nx-step .meta {
+  margin-left: auto;
+  color: var(--nx-tx3);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.nx-await {
+  color: #fbb360;
+}
+
+.nx-running {
+  margin-top: 3px;
+  color: #8abbff;
+  font-size: 11px;
+}
+
+.nx-step-actions {
+  margin-top: 8px;
+}
+
+.nx-log {
+  flex: 1;
+  overflow: auto;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
+}
+
+.nx-log div {
+  padding: 5px 0;
+  border-bottom: 1px dashed #2f343c;
+  color: var(--nx-tx2);
+}
+
+.nx-log span {
+  margin-right: 8px;
+  color: var(--nx-tx3);
+}
+
+/* --- Safety Check-in (Prompt 11) ---------------------------------------------- */
+.nx-cigrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 320px;
+  gap: 8px;
+}
+
+.nx-safe {
+  color: #72ca9b;
+}
+
+.nx-help {
+  color: #fa999c;
+}
+
+.nx-pending {
+  color: #fbb360;
+}
+
+.nx-ci-donut {
+  justify-content: center;
+  gap: 22px;
+  padding: 18px;
+}
+
+.nx-donut {
+  position: relative;
+}
+
+.nx-donut-arc {
+  transition: stroke-dasharray 0.6s, stroke-dashoffset 0.6s;
+}
+
+.nx-donut-c {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+}
+
+.nx-donut-c .nx-mono {
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.nx-ci-legend {
+  display: grid;
+  gap: 8px;
+}
+
+.nx-citizens {
+  display: flex;
+  height: 8px;
+}
+
+.nx-citizens i {
+  display: block;
+  height: 100%;
+  transition: width 0.6s;
+}
+
+.nx-ci-counts {
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.nx-responses {
+  max-height: 560px;
+}
+
+.nx-ci-time {
+  width: 64px;
+  font-size: 11px;
+  text-align: end;
+}
+
+.nx-phone-label {
+  margin-bottom: 8px;
+  color: var(--nx-tx3);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+.nx-phone {
+  position: relative;
+  overflow: hidden;
+  width: 280px;
+  height: 570px;
+  margin: 0 auto;
+  border: 10px solid #2f343c;
+  border-radius: 36px;
+  background: #000;
+  box-shadow:
+    0 0 0 1px #404854,
+    0 20px 40px rgba(0, 0, 0, 0.7);
+}
+
+.nx-phone .scr {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 46px 14px 14px;
+  background: radial-gradient(circle at 30% 20%, #1f3a63, #111418 60%);
+}
+
+.nx-phone .notch {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  z-index: 2;
+  width: 96px;
+  height: 26px;
+  border-radius: 20px;
+  background: #000;
+  transform: translateX(-50%);
+}
+
+.nx-phone .time {
+  margin-top: 10px;
+  color: #fff;
+  font-size: 52px;
+  font-weight: 300;
+  text-align: center;
+}
+
+.nx-phone .date {
+  color: #c7d2fe;
+  font-size: 13px;
+  text-align: center;
+}
+
+.nx-phone .ntf {
+  margin-top: auto;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(20px);
+  color: #fff;
+}
+
+.nx-phone .ntf .h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 11px;
+}
+
+.nx-phone .ntf .ap {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  background: #2d72d2;
+}
+
+.nx-push {
+  margin-left: auto;
+}
+
+.nx-phone .ntf .b {
+  margin: 8px 0 4px;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.nx-phone .ntf .x {
+  color: #e2e8f0;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.nx-phone-who {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.nx-phone .ntf .acts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.nx-phone .ntf .acts button {
+  padding: 10px;
+  border: 0;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nx-phone .ntf .acts .safe {
+  background: #32a467;
+}
+
+.nx-phone .ntf .acts .help {
+  background: #cd4246;
+}
+
+.nx-center {
+  text-align: center;
+}
+
+.nx-phone-ok {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin: 4px auto 10px;
+  border-radius: 50%;
+  background: #32a467;
+}
+
+.nx-phone-ok.help {
+  background: #cd4246;
+}
+
+.nx-phone-reset {
+  margin-top: 10px;
+  border: 0;
+  background: none;
+  color: #8abbff;
+  cursor: pointer;
+}
+
+.nx-phone-hint {
+  margin-top: 8px;
+  color: var(--nx-tx3);
+  font-size: 11px;
+  text-align: center;
+}

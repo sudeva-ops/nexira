@@ -37,6 +37,11 @@ class CheckinPersonOut(BaseModel):
     escalated: bool
 
 
+class EscalatedOut(BaseModel):
+    personnel: list[str]
+    citizens: int
+
+
 class RespondIn(BaseModel):
     person_id: uuid.UUID
     status: Literal["SAFE", "NEED_HELP"]
