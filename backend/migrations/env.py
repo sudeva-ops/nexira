@@ -1,6 +1,7 @@
 """Alembic environment. Migrations run as nexira_owner, never as nexira_api (D-01)."""
 
 import asyncio
+import os
 
 from alembic import context
 from sqlalchemy.engine import Connection
@@ -16,8 +17,13 @@ def run_migrations(connection: Connection) -> None:
 
 
 async def run_async_migrations() -> None:
-    # Tests pass their own database through config.attributes["url"].
-    url = context.config.attributes.get("url") or get_settings().migrations_database_url
+    # Tests pass their own database through config.attributes["url"]. The Helm
+    # migrate Job has only the owner DSN (no DATABASE_URL), so read it directly.
+    url = (
+        context.config.attributes.get("url")
+        or os.environ.get("MIGRATIONS_DATABASE_URL")
+        or get_settings().migrations_database_url
+    )
     if not url:
         raise SystemExit("MIGRATIONS_DATABASE_URL (nexira_owner) is required to run migrations.")
     engine = create_async_engine(url)

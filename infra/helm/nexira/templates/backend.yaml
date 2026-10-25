@@ -1,0 +1,61 @@
+{{- $fullname := include "nexira.fullname" . }}
+# The API. Connects as nexira_api only (D-01); gets the api Secret and nothing else.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-backend
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels: {{- include "nexira.selector" (list . "backend") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "nexira.selector" (list . "backend") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      {{- include "nexira.podCommon" . | nindent 6 }}
+      containers:
+        - name: backend
+          image: {{ include "nexira.image" (list . .Values.images.backend) }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          securityContext: {{- include "nexira.containerSecurityContext" . | nindent 12 }}
+          envFrom:
+            - configMapRef: { name: {{ $fullname }}-config }
+            - secretRef: { name: {{ include "nexira.secret" (list . "api") }} }
+          ports:
+            - { name: http, containerPort: 8000 }
+          readinessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /api/health, port: http }
+            periodSeconds: 10
+            failureThreshold: 6
+          resources: {{- toYaml .Values.backend.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-backend
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+spec:
+  selector: {{- include "nexira.selector" (list . "backend") | nindent 4 }}
+  ports:
+    - { name: http, port: 8000, targetPort: http }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $fullname }}-backend
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {{- include "nexira.selector" (list . "backend") | nindent 6 }}

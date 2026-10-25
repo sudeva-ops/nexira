@@ -1,0 +1,40 @@
+# Values for `make helm-check` only: OpenShift, an external Redis, a local LLM
+# gateway and chart-made Secrets (a test cluster). No real hosts or passwords.
+openshift: true
+secrets:
+  create: true
+  values:
+    apiDatabaseUrl: postgresql+asyncpg://nexira_api:example@postgres.databases.svc:5432/nexira
+    ownerDatabaseUrl: postgresql+asyncpg://nexira_owner:example@postgres.databases.svc:5432/nexira
+    backupPassword: example
+    redisUrl: redis://:example@redis.cache.svc:6379/0
+database:
+  host: postgres.databases.svc
+  egress:
+    ipBlocks: ["10.20.30.0/28"]
+redis:
+  enabled: false
+  egress:
+    namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: cache } }
+oidc:
+  issuer: https://idp.example.internal/realms/nexira
+  jwksUrl: https://idp.example.internal/realms/nexira/protocol/openid-connect/certs
+  publicOrigin: https://idp.example.internal
+  egress:
+    namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: keycloak } }
+    ports: [8443]
+llm:
+  provider: openai_compatible
+  baseUrl: http://vllm.ai.svc:8000/v1
+  model: llama3.1:8b
+  egress:
+    namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: ai } }
+route:
+  enabled: true
+  host: nexira.apps.example.internal
+networkPolicy:
+  ingressFrom:
+    namespaceSelector: { matchLabels: { network.openshift.io/policy-group: ingress } }
+  dns:
+    namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: openshift-dns } }
+    podSelector: { matchLabels: { dns.operator.openshift.io/daemonset-dns: default } }

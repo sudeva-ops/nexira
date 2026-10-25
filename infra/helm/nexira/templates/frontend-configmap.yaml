@@ -1,0 +1,53 @@
+{{- $fullname := include "nexira.fullname" . }}
+# nginx for the single-page app and its reverse proxy to the API and WebSocket.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-frontend
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+data:
+  # Same as frontend/nginx.conf, with the backend Service instead of Docker DNS.
+  default.conf: |
+    server {
+      listen 8080;
+      server_name _;
+      root /usr/share/nginx/html;
+      server_tokens off;
+      client_max_body_size 1m;
+      include /etc/nginx/snippets/security-headers.conf;
+
+      location /api/ {
+        include /etc/nginx/snippets/security-headers.conf;
+        add_header Cache-Control "no-store" always;  # personal data: never cached (ASVS 8.2.1)
+        proxy_pass http://{{ $fullname }}-backend.{{ .Release.Namespace }}.svc:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+      }
+
+      location /ws {
+        proxy_pass http://{{ $fullname }}-backend.{{ .Release.Namespace }}.svc:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 1h;
+      }
+
+      location /tiles/ {
+        alias /srv/tiles/;
+        include /etc/nginx/snippets/security-headers.conf;
+      }
+
+      location / {
+        try_files $uri /index.html;
+      }
+    }
+  # frontend/security-headers.conf.template, plus HSTS: a pilot is served over TLS only.
+  security-headers.conf: |
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; worker-src 'self' blob:; child-src blob:; connect-src 'self' {{ required "oidc.publicOrigin is required" .Values.oidc.publicOrigin }}; frame-ancestors 'none'; base-uri 'self'; form-action 'self' {{ .Values.oidc.publicOrigin }}; object-src 'none'" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    add_header Cross-Origin-Opener-Policy "same-origin" always;

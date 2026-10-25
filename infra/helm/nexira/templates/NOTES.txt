@@ -1,0 +1,21 @@
+NEXIRA {{ .Chart.AppVersion }} is installed as release {{ .Release.Name }} (APP_ENV=pilot).
+
+Before first use (docs/runbooks/pilot-deployment.md):
+  - The database must have been bootstrapped with infra/postgres/init.sql
+    (nexira_owner, nexira_app, nexira_api, nexira_backup).
+  - Seed the pilot tenant and its users' roles; there is no demo data in a pilot.
+{{- if not .Values.secrets.create }}
+  - Secrets used: {{ include "nexira.secret" (list . "api") }} (API), {{ include "nexira.secret" (list . "owner") }} (migrations),
+    {{ include "nexira.secret" (list . "backup") }} (backups){{ if .Values.redis.enabled }}, {{ include "nexira.secret" (list . "redis") }} (Redis){{ end }}.
+{{- else }}
+  - WARNING: secrets.create is true: passwords are in your values file. Test clusters only.
+{{- end }}
+{{- if not .Values.frontend.tiles.existingClaim }}
+  - WARNING: frontend.tiles.existingClaim is empty: the map has no basemap (D-24).
+{{- end }}
+{{- if not .Values.networkPolicy.enabled }}
+  - WARNING: network policies are off: egress is not restricted (NFR 1).
+{{- end }}
+{{- if .Values.backup.enabled }}
+  - Backups: {{ .Values.backup.schedule }} UTC, kept {{ .Values.backup.keepDays }} days. Test a restore after install.
+{{- end }}

@@ -27,6 +27,7 @@ services:
       NEXIRA_DB: ${NEXIRA_DB:-nexira}
       NEXIRA_OWNER_PASSWORD: ${NEXIRA_OWNER_PASSWORD}
       NEXIRA_API_PASSWORD: ${NEXIRA_API_PASSWORD}
+      NEXIRA_BACKUP_PASSWORD: ${NEXIRA_BACKUP_PASSWORD}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
@@ -82,6 +83,43 @@ services:
       postgres:
         condition: service_healthy
 
+  # One-shot jobs: `make backup` and `make restore-test` (Prompt 16, NFR 7). The
+  # PostgreSQL image has pg_dump 16; the scripts are those the Helm CronJob runs.
+  backup:
+    build: ./postgres
+    profiles: ["tools"]
+    entrypoint: ["/opt/nexira-backup/backup.sh"]
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${NEXIRA_DB:-nexira}
+      PGUSER: nexira_backup
+      PGPASSWORD: ${NEXIRA_BACKUP_PASSWORD}
+      BACKUP_DIR: /backups
+    volumes:
+      - ./helm/nexira/files/backup:/opt/nexira-backup:ro
+      - ../backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  restore-test:
+    build: ./postgres
+    profiles: ["tools"]
+    entrypoint: ["/opt/nexira-backup/restore-test.sh"]
+    environment:
+      PGHOST: postgres
+      PGDATABASE: ${NEXIRA_DB:-nexira}
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_SUPERUSER_PASSWORD}
+      BACKUP_PASSWORD: ${NEXIRA_BACKUP_PASSWORD}
+      BACKUP_DIR: /backups
+    volumes:
+      - ./helm/nexira/files/backup:/opt/nexira-backup:ro
+      - ../backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   backend:
     build: ../backend
     environment: *api-env
@@ -120,7 +158,7 @@ services:
     volumes:
       - ./tiles:/srv/tiles:ro
     ports:
-      - "127.0.0.1:${FRONTEND_PORT:-3000}:80"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:8080"
     depends_on:
       backend:
         condition: service_healthy

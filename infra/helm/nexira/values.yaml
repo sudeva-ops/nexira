@@ -1,0 +1,163 @@
+# NEXIRA pilot deployment (Prompt 16). Runbook: docs/runbooks/pilot-deployment.md.
+# Nothing here reaches the internet at run time: images come from your registry,
+# the database, IdP and LLM gateway are yours, and the network policies only allow
+# egress to them (NFR 1).
+
+# Prefix for every image, e.g. registry.example.internal/nexira (air-gapped mirror).
+imageRegistry: ""
+imagePullSecrets: []
+images:
+  backend: { repository: nexira-backend, tag: "0.1.0" }
+  # Build with VITE_DEMO_MODE=false and the pilot IdP's VITE_OIDC_URL/REALM/CLIENT_ID:
+  # those are baked into the bundle and the CSP at build time.
+  frontend: { repository: nexira-frontend, tag: "0.1.0" }
+  # infra/postgres: pg_dump/pg_restore 16 for the backup CronJob.
+  postgresTools: { repository: nexira-postgres, tag: "0.1.0" }
+  redis: { repository: redis, tag: "7.4-alpine" }
+pullPolicy: IfNotPresent
+
+# OpenShift assigns the UID and fsGroup itself (restricted-v2 SCC): leave them unset.
+openshift: false
+
+# --- Secrets (D-01): one per database user; none of them is shared --------------
+# Pilots keep these in a vault and sync them into Kubernetes (External Secrets,
+# Vault Agent, sealed secrets). Name the existing Secrets here. Keys:
+#   api:    DATABASE_URL (nexira_api), REDIS_URL       -> backend, worker
+#   owner:  MIGRATIONS_DATABASE_URL (nexira_owner)     -> migrate Job only
+#   backup: PGPASSWORD (nexira_backup)                 -> backup CronJob only
+#   redis:  REDIS_PASSWORD                             -> the in-chart Redis only
+secrets:
+  # true only for throwaway test clusters: the chart then creates the four Secrets
+  # from the values below, which puts the passwords in your values file.
+  create: false
+  existing:
+    api: nexira-api
+    owner: nexira-db-owner
+    backup: nexira-db-backup
+    redis: nexira-redis
+  values:
+    apiDatabaseUrl: ""
+    ownerDatabaseUrl: ""
+    backupPassword: ""
+    redisPassword: ""
+    redisUrl: ""
+
+# --- PostgreSQL 16 + PostGIS 3 (yours; bootstrapped with infra/postgres/init.sql) --
+database:
+  host: ""
+  port: 5432
+  name: nexira
+  # Where the database is, for the egress policy: CIDRs and/or in-cluster selectors.
+  egress:
+    ipBlocks: []          # e.g. ["10.20.30.0/28"]
+    namespaceSelector: {} # e.g. { matchLabels: { kubernetes.io/metadata.name: databases } }
+    podSelector: {}
+
+# --- Redis (internal event stream). In-chart by default, with AOF on a volume. -----
+redis:
+  enabled: true
+  storage: 2Gi
+  storageClass: ""
+  # When enabled is false, REDIS_URL in the api Secret points at your Redis; allow it:
+  egress:
+    port: 6379
+    ipBlocks: []
+    namespaceSelector: {}
+    podSelector: {}
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { memory: 512Mi }
+
+# --- Identity provider (Keycloak, D-04). The only external egress allowed. -------
+oidc:
+  issuer: ""        # e.g. https://idp.example.internal/realms/nexira
+  jwksUrl: ""       # e.g. https://idp.example.internal/realms/nexira/protocol/openid-connect/certs
+  audience: nexira-api
+  # The browser-facing IdP origin, for the frontend CSP when the chart serves the config.
+  publicOrigin: ""  # e.g. https://idp.example.internal
+  egress:
+    ports: [443]
+    ipBlocks: []
+    namespaceSelector: {}
+    podSelector: {}
+
+# --- Local LLM gateway (app/core/llm.py, AGT-09). stub = no model calls. ----------
+llm:
+  provider: stub    # or openai_compatible (vLLM / Ollama inside your network)
+  baseUrl: ""
+  model: ""
+  egress:
+    ports: [8000]
+    ipBlocks: []
+    namespaceSelector: {}
+    podSelector: {}
+
+app:
+  homeTz: Asia/Dubai
+  undoWindowS: 300
+  # JSON list of tenant UUIDs the worker serves (plan G-01).
+  workerTenantIds: []
+
+backend:
+  replicas: 2
+  resources:
+    requests: { cpu: 250m, memory: 384Mi }
+    limits: { memory: 1Gi }
+
+worker:
+  # Phase 1 runs one worker; its loops are safe to run twice (SKIP LOCKED), but
+  # one replica keeps playbook pacing simple.
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 768Mi }
+
+frontend:
+  replicas: 2
+  # Map tiles (D-24, `make tiles`): a volume holding world.pmtiles etc.
+  tiles:
+    existingClaim: ""
+  resources:
+    requests: { cpu: 50m, memory: 64Mi }
+    limits: { memory: 256Mi }
+
+migrate:
+  # A Helm hook before install and upgrade, as nexira_owner (D-01).
+  enabled: true
+
+# --- Nightly backup (NFR 7): pg_dump as nexira_backup to a volume ----------------
+backup:
+  enabled: true
+  schedule: "0 22 * * *"   # 22:00 UTC = 02:00 GST
+  keepDays: 14
+  storage: 20Gi
+  storageClass: ""          # use an encrypted class (NFR 2: AES-256 at rest)
+  existingClaim: ""
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { memory: 512Mi }
+
+# --- Exposure: TLS terminates at the ingress or route (NFR 2: TLS 1.3) ------------
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  tlsSecret: ""
+  annotations: {}
+route:
+  # OpenShift Route with edge TLS, instead of an Ingress.
+  enabled: false
+  host: ""
+
+networkPolicy:
+  enabled: true
+  # Who may reach the frontend: the ingress controller's or router's namespace.
+  ingressFrom:
+    namespaceSelector:
+      matchLabels: { kubernetes.io/metadata.name: ingress-nginx }
+  # Cluster DNS (OpenShift: openshift-dns / dns-default).
+  dns:
+    namespaceSelector:
+      matchLabels: { kubernetes.io/metadata.name: kube-system }
+    podSelector:
+      matchLabels: { k8s-app: kube-dns }

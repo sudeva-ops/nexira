@@ -20,6 +20,7 @@ jobs:
       POSTGRES_PASSWORD: ci-superuser
       NEXIRA_OWNER_PASSWORD: ci-owner
       NEXIRA_API_PASSWORD: ci-api
+      NEXIRA_BACKUP_PASSWORD: ci-backup
       DATABASE_URL: postgresql+asyncpg://nexira_api:ci-api@localhost:5432/nexira
       MIGRATIONS_DATABASE_URL: postgresql+asyncpg://nexira_owner:ci-owner@localhost:5432/nexira
       # Superuser for creating throwaway test databases only; assertions run as nexira_api.
@@ -33,7 +34,7 @@ jobs:
         run: |
           docker build -t nexira-postgres infra/postgres
           docker run -d --name pg -p 5432:5432 \
-            -e POSTGRES_PASSWORD -e NEXIRA_OWNER_PASSWORD -e NEXIRA_API_PASSWORD \
+            -e POSTGRES_PASSWORD -e NEXIRA_OWNER_PASSWORD -e NEXIRA_API_PASSWORD -e NEXIRA_BACKUP_PASSWORD \
             nexira-postgres
           for i in $(seq 1 60); do
             docker exec pg pg_isready -U postgres -d nexira && exit 0
@@ -75,3 +76,11 @@ jobs:
           npm run lint
           npm run test
           npm run build
+
+  # Prompt 16: the Helm chart lints, renders and validates against the Kubernetes
+  # schemas for both example value sets (pinned helm and kubeconform images).
+  helm:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: make helm-check

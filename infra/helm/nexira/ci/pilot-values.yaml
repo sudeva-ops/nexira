@@ -1,0 +1,23 @@
+# Values for `make helm-check` only: a plausible pilot, no real hosts or passwords.
+imageRegistry: registry.example.internal/nexira
+database:
+  host: postgres.databases.svc
+  egress:
+    namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: databases } }
+    podSelector: { matchLabels: { app: nexira-postgres } }
+oidc:
+  issuer: https://idp.example.internal/realms/nexira
+  jwksUrl: https://idp.example.internal/realms/nexira/protocol/openid-connect/certs
+  publicOrigin: https://idp.example.internal
+  egress:
+    ipBlocks: ["10.40.0.10/32"]
+app:
+  workerTenantIds: ["00000000-0000-4000-8000-000000000001"]
+frontend:
+  tiles:
+    existingClaim: nexira-tiles
+ingress:
+  enabled: true
+  className: nginx
+  host: nexira.example.internal
+  tlsSecret: nexira-tls

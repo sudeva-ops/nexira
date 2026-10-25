@@ -2,7 +2,7 @@ import fs from "node:fs";
 
 import { expect, type Page, test } from "@playwright/test";
 
-import { as, fixture, PASSWORD, signedIn, until } from "./support";
+import { as, cspViolations, fixture, PASSWORD, signedIn, until } from "./support";
 
 // Phase 1 acceptance (decisions.md §7, Prompt 15): scenes 0-6 of NBO-CIVIL-UNREST
 // on the real stack, from `make reset-demo` (run it with `make acceptance`). The
@@ -198,6 +198,7 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
   expect(new Set(decisions.map((e) => e.actor_type))).toEqual(new Set(["USER"]));
   const verify = await admin.get<{ intact: boolean; first_broken_seq: number | null }>("/api/audit/verify");
   expect(verify).toMatchObject({ intact: true, first_broken_seq: null });
+  expect(cspViolations).toEqual([]); // the security headers break nothing (Prompt 16)
 
   fs.mkdirSync("test-results", { recursive: true });
   fs.writeFileSync("test-results/performance.json", JSON.stringify(perf, null, 2));

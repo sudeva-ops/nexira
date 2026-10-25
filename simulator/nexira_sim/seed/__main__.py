@@ -2,7 +2,8 @@
 
 Needs DATABASE_URL (nexira_api), MIGRATIONS_DATABASE_URL (nexira_owner, used only
 to create the tenant row) and OIDC_ISSUER. SCENARIO_DATE (YYYY-MM-DD) is optional
-and defaults to today in UTC (plan G-11).
+and defaults to today in UTC (plan G-11). Refuses to run unless APP_ENV is local or
+demo: the fictional demo world must never be loaded into a pilot (Prompt 16).
 """
 
 import asyncio
@@ -17,6 +18,8 @@ from nexira_sim.seed.load import seed_all
 
 
 async def main() -> None:
+    if os.environ.get("APP_ENV") not in ("local", "demo"):
+        sys.exit("seed refused: APP_ENV must be local or demo")
     try:
         api_dsn = os.environ["DATABASE_URL"]
         owner_dsn = os.environ["MIGRATIONS_DATABASE_URL"]

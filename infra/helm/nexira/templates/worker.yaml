@@ -1,0 +1,34 @@
+{{- $fullname := include "nexira.fullname" . }}
+# Stream consumers and timers (plan G-01): same image, second entry point.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}-worker
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  strategy: { type: Recreate }
+  selector:
+    matchLabels: {{- include "nexira.selector" (list . "worker") | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "nexira.selector" (list . "worker") | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      {{- include "nexira.podCommon" . | nindent 6 }}
+      containers:
+        - name: worker
+          image: {{ include "nexira.image" (list . .Values.images.backend) }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          command: ["python", "-m", "app.workers"]
+          securityContext: {{- include "nexira.containerSecurityContext" . | nindent 12 }}
+          envFrom:
+            - configMapRef: { name: {{ $fullname }}-config }
+            - secretRef: { name: {{ include "nexira.secret" (list . "api") }} }
+          resources: {{- toYaml .Values.worker.resources | nindent 12 }}
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }

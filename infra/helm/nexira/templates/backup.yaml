@@ -1,0 +1,80 @@
+{{- if .Values.backup.enabled }}
+{{- $fullname := include "nexira.fullname" . }}
+# Nightly pg_dump as nexira_backup (NFR 7; docs/runbooks/backup-restore.md). The
+# scripts are files/backup/, the same ones `make backup` runs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullname }}-backup-scripts
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+data:
+{{ (.Files.Glob "files/backup/*.sh").AsConfig | indent 2 }}
+{{- if not .Values.backup.existingClaim }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ $fullname }}-backups
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/resource-policy: keep  # uninstalling the release never deletes backups
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- with .Values.backup.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests: { storage: {{ .Values.backup.storage }} }
+{{- end }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $fullname }}-backup
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels: {{- include "nexira.selector" (list . "backup") | nindent 12 }}
+        spec:
+          {{- include "nexira.podCommon" . | nindent 10 }}
+          restartPolicy: Never
+          containers:
+            - name: backup
+              image: {{ include "nexira.image" (list . .Values.images.postgresTools) }}
+              imagePullPolicy: {{ .Values.pullPolicy }}
+              command: ["sh", "/opt/nexira-backup/backup.sh"]
+              securityContext: {{- include "nexira.containerSecurityContext" . | nindent 16 }}
+              env:
+                - { name: PGHOST, value: {{ required "database.host is required" .Values.database.host | quote }} }
+                - { name: PGPORT, value: {{ .Values.database.port | quote }} }
+                - { name: PGDATABASE, value: {{ .Values.database.name | quote }} }
+                - { name: PGUSER, value: nexira_backup }
+                - { name: PGSSLMODE, value: prefer }
+                - { name: BACKUP_DIR, value: /backups }
+                - { name: BACKUP_KEEP_DAYS, value: {{ .Values.backup.keepDays | quote }} }
+              envFrom:
+                - secretRef: { name: {{ include "nexira.secret" (list . "backup") }} }
+              resources: {{- toYaml .Values.backup.resources | nindent 16 }}
+              volumeMounts:
+                - { name: scripts, mountPath: /opt/nexira-backup, readOnly: true }
+                - { name: backups, mountPath: /backups }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - name: scripts
+              configMap: { name: {{ $fullname }}-backup-scripts }
+            - name: backups
+              persistentVolumeClaim:
+                claimName: {{ .Values.backup.existingClaim | default (printf "%s-backups" $fullname) }}
+            - { name: tmp, emptyDir: {} }
+{{- end }}
