@@ -4,9 +4,11 @@ import { Route, Routes } from "react-router-dom";
 import type { ReactElement } from "react";
 
 import { AuditScreen } from "../screens/audit/AuditScreen";
+import { CheckinScreen } from "../screens/checkin/CheckinScreen";
 import { IncidentsScreen } from "../screens/incidents/IncidentsScreen";
 import { OperationsScreen } from "../screens/operations/OperationsScreen";
 import { PeopleScreen } from "../screens/people/PeopleScreen";
+import { PlaybooksScreen } from "../screens/playbooks/PlaybooksScreen";
 import { AppShell } from "./AppShell";
 import { SCREENS } from "./screens";
 
@@ -15,6 +17,8 @@ const BUILT: Record<string, ReactElement> = {
   "/operations": <OperationsScreen />,
   "/incidents": <IncidentsScreen />,
   "/people": <PeopleScreen />,
+  "/playbooks": <PlaybooksScreen />,
+  "/checkin": <CheckinScreen />,
   "/audit": <AuditScreen />,
 };
 

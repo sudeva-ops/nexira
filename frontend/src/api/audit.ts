@@ -28,6 +28,20 @@ export function useAuditLog(limit = 200) {
   });
 }
 
+/** Any role may read the audit trail of one entity (plan G-06). */
+export function useEntityAudit(entityType: string, entityId: string | undefined) {
+  return useQuery({
+    queryKey: ["audit", entityType, entityId ?? ""],
+    queryFn: () =>
+      apiGet<AuditEntry[]>("/api/audit", {
+        entity_type: entityType,
+        entity_id: entityId ?? "",
+        limit: 100,
+      }),
+    enabled: !!entityId,
+  });
+}
+
 export function useAuditVerify(enabled: boolean) {
   return useQuery({
     queryKey: ["audit-verify"],

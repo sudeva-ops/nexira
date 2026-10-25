@@ -1,7 +1,9 @@
 import type { QueryKey } from "@tanstack/react-query";
 
+import { checkinKeys } from "./checkin";
 import { keys } from "./intel";
 import { peopleKeys } from "./people";
+import { playbookKeys } from "./playbooks";
 
 // PLT-05: one WebSocket per tab (backend: app/core/realtime.py). Events carry ids
 // only; screens refetch through the REST API, so the cache stays the single
@@ -38,6 +40,21 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
       ];
     case "INCIDENT_NOTE_ADDED":
       return incident;
+    case "PLAYBOOK_RUN_STARTED":
+    case "PLAYBOOK_RUN_UPDATED":
+    case "PLAYBOOK_STEP":
+    case "PLAYBOOK_STEP_APPROVED": {
+      const runId = typeof event.data.run_id === "string" ? [playbookKeys.run(event.data.run_id)] : [];
+      return [playbookKeys.runs, playbookKeys.permissions, ["audit"], ...runId, ...incident];
+    }
+    case "CAMPAIGN_QUEUED":
+    case "CAMPAIGN_UPDATED":
+    case "CHECKIN_UPDATED":
+    case "CHECKIN_ESCALATED": {
+      const campaignId =
+        typeof event.data.campaign_id === "string" ? [checkinKeys.checkin(event.data.campaign_id)] : [];
+      return [checkinKeys.campaigns, ...campaignId, ...incident];
+    }
     default:
       return [];
   }

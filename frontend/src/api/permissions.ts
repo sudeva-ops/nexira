@@ -22,3 +22,23 @@ export function canChangeIncidentStatus(me: Me | undefined, missionId: string | 
 export function canAddIncidentNote(me: Me | undefined, missionId: string | null): boolean {
   return holds(me, NOTE_ROLES, missionId);
 }
+
+// backend/app/modules/playbooks/service.py START_ROLES and
+// backend/app/modules/checkin/router.py RESPOND_ROLES. Step approvals do not use
+// this file: they come from GET /api/me/permissions (approvals.can_decide()).
+const START_ROLES = ["DUTY_OFFICER", "SECURITY_OFFICER"];
+const RESPOND_ROLES = [
+  "DUTY_OFFICER",
+  "SECURITY_OFFICER",
+  "CONSULAR_OFFICER",
+  "HEAD_OF_MISSION",
+  "HQ_CRISIS_DIRECTOR",
+];
+
+export function canStartPlaybook(me: Me | undefined, missionId: string | null): boolean {
+  return holds(me, START_ROLES, missionId);
+}
+
+export function canRecordCheckin(me: Me | undefined, missionId: string | null): boolean {
+  return holds(me, RESPOND_ROLES, missionId);
+}
