@@ -59,7 +59,8 @@ advisory contains no "Nairobi", "CBD" or "Upper Hill"; the generic fallback fill
 
 ### Prompt 20 · Composer backend: draft, approve, send 🔒
 ```
-MN-01, MN-02, MN-05 to MN-08, MN-11, MN-12. Touches channel adapters (D-29).
+MN-01, MN-02, MN-05 to MN-08, MN-12 (MN-11 deferred, plan G-1). 🔒 because it adds the
+second-person approval for external messages. The channel adapters are not changed.
 - POST /api/campaigns (create a DRAFT); PATCH /api/campaigns/{id} (edit a DRAFT);
   POST /api/campaigns/{id}/preview (recipient count and split by person type);
   /submit, /approve, /reject (with a reason), /cancel and /test-send.
@@ -70,13 +71,11 @@ MN-01, MN-02, MN-05 to MN-08, MN-11, MN-12. Touches channel adapters (D-29).
 - In APP_ENV=pilot, refuse to send with an unreviewed translation (409, naming the language).
 - Sending queues deliveries exactly as playbook campaigns do (outbox, idempotency); there is no
   second sending path.
-- MN-11 (Should): fallback to the next channel once per person after FAILED. The simulated
-  adapter's failure rate is set by SIMULATED_FAILURE_RATE and is refused outside local/demo.
 - Every action is audited through app/core/audit.py.
 
 Tests: author approval → 403; a Viewer → 403; a second Duty Officer → deliveries queued; a
 staff-only campaign is sent by its author; cancel and test-send queue nothing; pilot mode
-blocks unreviewed translations; fallback queues exactly one retry per failed person.
+blocks unreviewed translations.
 ```
 
 ### Prompt 21 · Mass Notification screen
