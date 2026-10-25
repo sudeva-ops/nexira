@@ -58,6 +58,10 @@ FORWARDED = frozenset(
         "INCIDENT_UPDATED",
         "INCIDENT_NOTE_ADDED",
         "EXPOSURE_COMPUTED",
+        "PLAYBOOK_RUN_STARTED",
+        "PLAYBOOK_RUN_UPDATED",
+        "PLAYBOOK_STEP",
+        "PLAYBOOK_STEP_APPROVED",
     }
 )
 

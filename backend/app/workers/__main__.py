@@ -1,21 +1,46 @@
 import asyncio
 import logging
 import socket
+import uuid
 
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+from app.core.config import get_settings
 from app.core.db import get_engine, verify_connection_role
-from app.core.events import RedisPublisher, StreamConsumer, get_redis
+from app.core.events import Publisher, RedisPublisher, StreamConsumer, get_redis
 from app.modules.intel.consumer import exposure_handler, raw_signal_handler
+from app.modules.playbooks.consumer import resume_runs, run_handler
+
+RESUME_EVERY_S = 60
 
 log = logging.getLogger("app.workers")
 
 
+async def resume_loop(
+    engine: AsyncEngine, publisher: Publisher, tenant_ids: list[uuid.UUID], delay: float
+) -> None:
+    """Continue RUNNING playbook runs at start and then periodically, in case an
+    event was lost (plan G-01: tenants from WORKER_TENANT_IDS)."""
+    while True:
+        try:
+            resumed = await resume_runs(engine, publisher, tenant_ids, delay)
+            if resumed:
+                log.info("resumed %d playbook runs", resumed)
+        except Exception:
+            log.exception("resuming playbook runs failed")
+        await asyncio.sleep(RESUME_EVERY_S)
+
+
 async def main() -> None:
+    settings = get_settings()
     engine = get_engine()
     await verify_connection_role(engine)  # D-01: same guard as the API
     client = get_redis()
     publisher = RedisPublisher(client)
     name = socket.gethostname()
     on_incident = exposure_handler(engine, publisher)
+    on_run = run_handler(engine, publisher, settings.playbook_step_delay_s)
+    tenant_ids = [uuid.UUID(t) for t in settings.worker_tenant_ids]
     # One consumer group per concern, so each keeps its own position in the stream.
     consumers = [
         StreamConsumer(
@@ -30,12 +55,21 @@ async def main() -> None:
             consumer=name,
             handlers={"INCIDENT_CREATED": on_incident, "INCIDENT_UPDATED": on_incident},
         ),
+        StreamConsumer(
+            client,
+            group="playbooks",
+            consumer=name,
+            handlers={"PLAYBOOK_RUN_STARTED": on_run, "PLAYBOOK_STEP_APPROVED": on_run},
+        ),
     ]
-    log.info("consumers started: intel, exposure")
+    log.info("consumers started: intel, exposure, playbooks")
     try:
         async with asyncio.TaskGroup() as tasks:
             for consumer in consumers:
                 tasks.create_task(consumer.run())
+            tasks.create_task(
+                resume_loop(engine, publisher, tenant_ids, settings.playbook_step_delay_s)
+            )
     finally:
         await client.aclose()
         await engine.dispose()
