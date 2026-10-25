@@ -8,7 +8,9 @@ from app.core.db import get_engine, verify_connection_role
 from app.core.realtime import hub
 from app.core.realtime import router as realtime_router
 from app.modules.audit.router import router as audit_router
+from app.modules.checkin.router import router as checkin_router
 from app.modules.intel.router import router as intel_router
+from app.modules.notifications.router import router as notifications_router
 from app.modules.people.router import router as people_router
 from app.modules.playbooks.router import router as playbooks_router
 from app.modules.scenarios.router import router as scenarios_router
@@ -42,6 +44,8 @@ app.include_router(scenarios_router)
 app.include_router(intel_router)
 app.include_router(people_router)
 app.include_router(playbooks_router)
+app.include_router(notifications_router)
+app.include_router(checkin_router)
 app.include_router(realtime_router)
 
 

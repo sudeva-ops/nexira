@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     worker_tenant_ids: list[str] = Field(default_factory=list)  # plan G-01
     undo_window_s: int = 300  # plan G-17
     playbook_step_delay_s: float = 0.0  # demo pacing between playbook steps
+    # CHK-04: channel adapters are pluggable, but Phase 1 has only the simulated one
+    # (no real SMS, email or WhatsApp). Any other value fails at startup.
+    channel_adapter: Literal["simulated"] = "simulated"
 
 
 @lru_cache

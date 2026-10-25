@@ -1,19 +1,36 @@
-"""Notification campaigns. Prompt 9: playbook steps create campaigns; delivery
-through the simulated channel adapters arrives in Prompt 10."""
+"""Notification campaigns and deliveries (Prompts 9 and 10).
+
+Outbox: create_campaign() writes the campaign and one QUEUED notification_delivery
+row per recipient and channel, in the caller's transaction (for a playbook step,
+the step's own transaction). dispatch() later sends QUEUED rows through the
+channel adapter (channels.py) and marks them SENT. A crash between the adapter
+call and the update can only repeat a send with the same idempotency key (the
+delivery id); it can never create a second delivery.
+
+Audit (plan G-20): CAMPAIGN.CREATE, CAMPAIGN.SEND (counts per channel) and
+CAMPAIGN.DISPATCHED once per campaign. Per-delivery receipts are telemetry.
+"""
 
 import uuid
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import text
+from sqlalchemy import insert, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import audit
-from app.modules.notifications.models import NotificationCampaign
+from app.core.events import Event
+from app.modules.notifications.channels import CHANNELS, Recipient, adapter_for
+from app.modules.notifications.models import NotificationCampaign, NotificationDelivery
+from app.modules.people.models import Person
 from app.modules.tenancy.service import Actor
 
+DISPATCHER = Actor(type="SYSTEM", id="notifications.dispatcher")
+DISPATCH_BATCH = 500
+
 CAMPAIGN_TYPES = ("ALERT", "CHECKIN", "ADVISORY", "TEST")
-CHANNELS = ("APP", "SMS", "WHATSAPP", "VOICE", "EMAIL")
 DEFAULT_ESCALATE_AFTER_S = 600  # D-07
 
 
@@ -70,6 +87,27 @@ class CampaignIn:
     escalate_after_s: int = DEFAULT_ESCALATE_AFTER_S
 
 
+async def scenario_escalate_after_s(session: AsyncSession) -> int | None:
+    """The check-in escalation time of an active demo scenario run, if any
+    (SCENARIO_SETTINGS, Prompt 5: 20 s for NBO-CIVIL-UNREST). Pilot tenants have no
+    scenario runs, so they always use the campaign's own value."""
+    value = await session.scalar(
+        text(
+            """
+            SELECT (e.payload ->> 'checkin_escalate_after_s')::int
+              FROM scenario_run r
+              JOIN scenario_event e ON e.scenario_id = r.scenario_id
+             WHERE r.mode = 'DEMO' AND r.status IN ('IDLE', 'PLAYING', 'PAUSED')
+               AND e.event_type = 'SCENARIO_SETTINGS'
+               AND e.payload ? 'checkin_escalate_after_s'
+             ORDER BY r.started_at DESC NULLS LAST
+             LIMIT 1
+            """
+        )
+    )
+    return int(value) if value is not None else None
+
+
 async def create_campaign(
     session: AsyncSession,
     *,
@@ -79,13 +117,16 @@ async def create_campaign(
     created_by: str,
     actor: Actor,
 ) -> tuple[NotificationCampaign, int]:
-    """Create a DRAFT campaign with an NTF reference (D-18); return it and the
-    number of recipients its audience resolves to now."""
+    """Create a campaign with an NTF reference (D-18) and queue one delivery per
+    recipient and channel (status SENDING). Returns it and the recipient count."""
     if campaign.campaign_type not in CAMPAIGN_TYPES:
         raise ValueError(f"unknown campaign type {campaign.campaign_type}")
     if not campaign.channels or not set(campaign.channels) <= set(CHANNELS):
         raise ValueError(f"unknown channels {campaign.channels}")
     recipients = await resolve_audience(session, incident_id, campaign.audience)
+    escalate_after_s = campaign.escalate_after_s
+    if campaign.campaign_type == "CHECKIN":
+        escalate_after_s = await scenario_escalate_after_s(session) or escalate_after_s
     reference = await session.scalar(text("SELECT next_reference('NTF', false)"))
     row = NotificationCampaign(
         tenant_id=session.info["tenant_id"],
@@ -98,10 +139,25 @@ async def create_campaign(
         audience_filter={**campaign.audience, "incident_id": str(incident_id)},
         created_by_type=created_by_type,
         created_by=created_by,
-        escalate_after_s=campaign.escalate_after_s,
+        escalate_after_s=escalate_after_s,
+        status="SENDING" if recipients else "SENT",
     )
     session.add(row)
     await session.flush()
+    if recipients:
+        await session.execute(
+            insert(NotificationDelivery),
+            [
+                {
+                    "tenant_id": row.tenant_id,
+                    "campaign_id": row.id,
+                    "person_id": person_id,
+                    "channel": channel,
+                }
+                for person_id in recipients
+                for channel in row.channels
+            ],
+        )
     await audit.write(
         session,
         actor_type=actor.type,
@@ -117,4 +173,134 @@ async def create_campaign(
             "created_by": f"{created_by_type}:{created_by}",
         },
     )
+    await audit.write(
+        session,
+        actor_type=actor.type,
+        actor_id=actor.id,
+        action="CAMPAIGN.SEND",
+        entity_type="notification_campaign",
+        entity_id=row.reference,
+        details={
+            "recipients": len(recipients),
+            "per_channel": {c: len(recipients) for c in row.channels},
+            "escalate_after_s": row.escalate_after_s,
+        },
+    )
     return row, len(recipients)
+
+
+def campaign_queued_event(campaign: NotificationCampaign) -> Event:
+    return Event(
+        type="CAMPAIGN_QUEUED",
+        tenant_id=campaign.tenant_id,
+        payload={
+            "campaign_id": str(campaign.id),
+            "reference": campaign.reference,
+            "incident_id": str(campaign.incident_id) if campaign.incident_id else None,
+        },
+        source="notifications",
+    )
+
+
+@dataclass
+class Dispatched:
+    sent: Counter[str] = field(default_factory=Counter)  # per channel
+    completed: list[NotificationCampaign] = field(default_factory=list)  # now SENT
+
+
+async def dispatch(
+    session: AsyncSession,
+    now: datetime,
+    campaign_id: uuid.UUID | None = None,
+    configured_adapter: str = "simulated",
+) -> Dispatched:
+    """Send QUEUED deliveries (all campaigns, or one) through the channel adapter.
+
+    Rows are claimed FOR UPDATE SKIP LOCKED, so two dispatchers never send the same
+    delivery; the caller commits once per batch."""
+    result = Dispatched()
+    query = (
+        select(NotificationDelivery, NotificationCampaign, Person.preferred_lang)
+        .join(NotificationCampaign, NotificationCampaign.id == NotificationDelivery.campaign_id)
+        .join(Person, Person.id == NotificationDelivery.person_id)
+        .where(NotificationDelivery.status == "QUEUED")
+        .order_by(NotificationDelivery.id)
+        .limit(DISPATCH_BATCH)
+        .with_for_update(of=NotificationDelivery, skip_locked=True)
+    )
+    if campaign_id is not None:
+        query = query.where(NotificationDelivery.campaign_id == campaign_id)
+    touched: dict[uuid.UUID, NotificationCampaign] = {}
+    for delivery, campaign, lang in (await session.execute(query)).all():
+        adapter = adapter_for(delivery.channel, configured_adapter)
+        message = campaign.translations.get(lang or "", campaign.message)
+        sent = await adapter.send(
+            Recipient(delivery.person_id, lang),
+            delivery.channel,
+            message,
+            idempotency_key=str(delivery.id),
+            now=now,
+        )
+        delivery.status = "SENT"
+        delivery.provider_ref = sent.provider_ref
+        delivery.updated_at = now
+        result.sent[delivery.channel] += 1
+        touched[campaign.id] = campaign
+    await session.flush()
+    for campaign in touched.values():
+        left = await session.scalar(
+            select(NotificationDelivery.id)
+            .where(
+                NotificationDelivery.campaign_id == campaign.id,
+                NotificationDelivery.status == "QUEUED",
+            )
+            .limit(1)
+        )
+        if left is None and campaign.status == "SENDING":
+            campaign.status = "SENT"
+            campaign.sent_at = now
+            await audit.write(
+                session,
+                actor_type=DISPATCHER.type,
+                actor_id=DISPATCHER.id,
+                action="CAMPAIGN.DISPATCHED",
+                entity_type="notification_campaign",
+                entity_id=campaign.reference,
+                details={"adapter": configured_adapter},
+            )
+            result.completed.append(campaign)
+    await session.flush()
+    return result
+
+
+async def refresh_receipts(
+    session: AsyncSession, now: datetime, configured_adapter: str = "simulated"
+) -> int:
+    """Move SENT/DELIVERED deliveries on as the adapter reports (telemetry, not
+    audited, plan G-20). Returns how many changed."""
+    rows = (
+        await session.execute(
+            select(NotificationDelivery, NotificationCampaign.sent_at)
+            .join(NotificationCampaign, NotificationCampaign.id == NotificationDelivery.campaign_id)
+            .where(
+                NotificationDelivery.status.in_(("SENT", "DELIVERED")),
+                NotificationCampaign.sent_at.is_not(None),
+            )
+            .with_for_update(of=NotificationDelivery, skip_locked=True)
+        )
+    ).all()
+    changed: dict[str, list[int]] = {}
+    for delivery, sent_at in rows:
+        if sent_at is None:
+            continue
+        adapter = adapter_for(delivery.channel, configured_adapter)
+        reported: str = adapter.receipt(delivery.provider_ref or "", sent_at, now)
+        if reported != delivery.status:
+            changed.setdefault(reported, []).append(delivery.id)
+    for new_status, ids in changed.items():
+        await session.execute(
+            update(NotificationDelivery)
+            .where(NotificationDelivery.id.in_(ids))
+            .values(status=new_status, updated_at=now)
+        )
+    return sum(len(ids) for ids in changed.values())

@@ -62,6 +62,10 @@ FORWARDED = frozenset(
         "PLAYBOOK_RUN_UPDATED",
         "PLAYBOOK_STEP",
         "PLAYBOOK_STEP_APPROVED",
+        "CAMPAIGN_QUEUED",
+        "CAMPAIGN_UPDATED",
+        "CHECKIN_UPDATED",
+        "CHECKIN_ESCALATED",
     }
 )
 
