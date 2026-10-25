@@ -102,4 +102,5 @@ helm-check:
 	    -f nexira/ci/$$values-values.yaml > infra/helm/.rendered.yaml || exit 1; \
 	  docker run --rm -v "$(CURDIR)/infra/helm:/charts" $(KUBECONFORM_IMAGE) -strict -summary \
 	    -kubernetes-version 1.30.0 -skip Route /charts/.rendered.yaml || exit 1; \
+	  sh infra/helm/check-render.sh infra/helm/.rendered.yaml $$values || exit 1; \
 	done

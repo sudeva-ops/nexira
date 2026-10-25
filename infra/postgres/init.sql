@@ -4,7 +4,8 @@
 --   nexira_owner  LOGIN, owns all objects, runs Alembic. Not a superuser.
 --   nexira_app    NOLOGIN group role holding the runtime grants.
 --   nexira_api    LOGIN, member of nexira_app; the only user the backend uses.
---   nexira_backup LOGIN, read-only, BYPASSRLS; only pg_dump uses it (backup-role.sql).
+--   nexira_backup LOGIN, BYPASSRLS, SELECT on schema public only; only pg_dump uses it
+--                 (backup-role.sql, backup-grants.sql).
 
 CREATE ROLE nexira_owner LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS PASSWORD :'owner_password';
 CREATE ROLE nexira_app NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
@@ -22,3 +23,6 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- Schema public belongs to pg_database_owner (= nexira_owner) and PUBLIC cannot
 -- create in it (PostgreSQL 15+), so nexira_api can never create objects.
+
+-- Read-only grants for the backup role in this database (D-29).
+\ir backup-grants.sql

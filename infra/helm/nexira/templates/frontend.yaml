@@ -15,7 +15,7 @@ spec:
       annotations:
         checksum/nginx: {{ include (print $.Template.BasePath "/frontend-configmap.yaml") . | sha256sum }}
     spec:
-      {{- include "nexira.podCommon" . | nindent 6 }}
+      {{- include "nexira.podCommon" (dict "root" . "hook" false) | nindent 6 }}
       containers:
         - name: frontend
           image: {{ include "nexira.image" (list . .Values.images.frontend) }}

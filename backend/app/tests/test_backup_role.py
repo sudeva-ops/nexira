@@ -1,13 +1,15 @@
-"""The backup role (infra/postgres/backup-role.sql, Prompt 16): it can read every
-tenant's rows for pg_dump and can change nothing. Checked from the catalogue, as
-the superuser, because the role is created by the cluster bootstrap."""
+"""The backup role (infra/postgres/backup-role.sql and backup-grants.sql, Prompt 16):
+it reads every tenant's NEXIRA rows for pg_dump and can change nothing. The role is
+created by the cluster bootstrap; the test databases get the same grants as init.sql.
+Checked from the catalogue as the superuser, and by acting as the role."""
 
+import uuid
 from collections.abc import AsyncIterator
 
 import asyncpg
 import pytest
 
-from app.tests.conftest import DbUrls
+from app.tests.conftest import DbUrls, create_tenant
 
 
 @pytest.fixture
@@ -17,9 +19,7 @@ async def admin(db: DbUrls) -> AsyncIterator[asyncpg.Connection]:
     await conn.close()
 
 
-async def test_the_backup_role_reads_everything_and_nothing_more(
-    admin: asyncpg.Connection,
-) -> None:
+async def test_the_backup_role_has_no_more_than_it_needs(admin: asyncpg.Connection) -> None:
     role = await admin.fetchrow(
         "SELECT rolsuper, rolbypassrls, rolcreaterole, rolcreatedb, rolcanlogin "
         "FROM pg_roles WHERE rolname = 'nexira_backup'"
@@ -32,13 +32,19 @@ async def test_the_backup_role_reads_everything_and_nothing_more(
         "rolcreatedb": False,
         "rolcanlogin": True,
     }
-    assert await admin.fetchval("SELECT pg_has_role('nexira_backup', 'pg_read_all_data', 'MEMBER')")
-    assert not await admin.fetchval("SELECT pg_has_role('nexira_backup', 'nexira_app', 'MEMBER')")
-    assert not await admin.fetchval("SELECT pg_has_role('nexira_backup', 'nexira_owner', 'MEMBER')")
+    member_of = await admin.fetch(
+        "SELECT r.rolname FROM pg_auth_members m JOIN pg_roles r ON r.oid = m.roleid "
+        "WHERE m.member = 'nexira_backup'::regrole"
+    )
+    assert member_of == []  # not pg_read_all_data, nexira_app or nexira_owner
+    # pg_read_all_data would expose every role's password hash (pg_authid).
+    assert not await admin.fetchval(
+        "SELECT has_table_privilege('nexira_backup', 'pg_authid', 'SELECT')"
+    )
     writable = await admin.fetch(
         """
         SELECT c.relname FROM pg_class c
-         WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p')
+         WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p', 'S')
            AND (has_table_privilege('nexira_backup', c.oid, 'INSERT')
              OR has_table_privilege('nexira_backup', c.oid, 'UPDATE')
              OR has_table_privilege('nexira_backup', c.oid, 'DELETE')
@@ -46,11 +52,44 @@ async def test_the_backup_role_reads_everything_and_nothing_more(
         """
     )
     assert writable == []
-    readable = await admin.fetchval(
-        "SELECT bool_and(has_table_privilege('nexira_backup', c.oid, 'SELECT')) FROM pg_class c "
-        "WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'p')"
+    unreadable = await admin.fetch(
+        "SELECT c.relname FROM pg_class c WHERE c.relnamespace = 'public'::regnamespace "
+        "AND c.relkind IN ('r', 'p', 'S') "
+        "AND NOT has_table_privilege('nexira_backup', c.oid, 'SELECT')"
     )
-    assert readable
-    assert not await admin.fetchval(
-        "SELECT has_schema_privilege('nexira_backup', 'public', 'CREATE')"
-    )
+    assert unreadable == []  # every table and sequence, including alembic_version
+    create = "SELECT has_schema_privilege('nexira_backup', 'public', 'CREATE')"
+    assert not await admin.fetchval(create)
+
+
+async def test_acting_as_the_backup_role_reads_all_tenants_and_writes_nothing(
+    db: DbUrls, admin: asyncpg.Connection
+) -> None:
+    a = await create_tenant(db, "Backup A")
+    b = await create_tenant(db, "Backup B")
+    async with admin.transaction():
+        await admin.execute("SET LOCAL ROLE nexira_backup")
+        seen = {r["id"] for r in await admin.fetch("SELECT id FROM tenant")}
+        assert {a, b} <= seen  # BYPASSRLS: no tenant setting needed
+        with pytest.raises(asyncpg.InsufficientPrivilegeError):
+            await admin.execute(
+                "INSERT INTO tenant (id, name, oidc_issuer) VALUES ($1, 'x', 'https://x')",
+                uuid.uuid4(),
+            )
+
+
+async def test_tables_created_later_by_the_owner_are_readable_too(
+    db: DbUrls, admin: asyncpg.Connection
+) -> None:
+    owner = await asyncpg.connect(db.owner_plain)
+    try:
+        await owner.execute("CREATE TABLE backup_grant_probe (id int)")
+        assert await admin.fetchval(
+            "SELECT has_table_privilege('nexira_backup', 'backup_grant_probe', 'SELECT')"
+        )
+        assert not await admin.fetchval(
+            "SELECT has_table_privilege('nexira_backup', 'backup_grant_probe', 'INSERT')"
+        )
+    finally:
+        await owner.execute("DROP TABLE IF EXISTS backup_grant_probe")
+        await owner.close()

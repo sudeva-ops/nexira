@@ -47,7 +47,7 @@ spec:
         metadata:
           labels: {{- include "nexira.selector" (list . "backup") | nindent 12 }}
         spec:
-          {{- include "nexira.podCommon" . | nindent 10 }}
+          {{- include "nexira.podCommon" (dict "root" . "hook" false) | nindent 10 }}
           restartPolicy: Never
           containers:
             - name: backup
@@ -60,7 +60,7 @@ spec:
                 - { name: PGPORT, value: {{ .Values.database.port | quote }} }
                 - { name: PGDATABASE, value: {{ .Values.database.name | quote }} }
                 - { name: PGUSER, value: nexira_backup }
-                - { name: PGSSLMODE, value: prefer }
+                - { name: PGSSLMODE, value: {{ .Values.database.backupSslMode | quote }} }
                 - { name: BACKUP_DIR, value: /backups }
                 - { name: BACKUP_KEEP_DAYS, value: {{ .Values.backup.keepDays | quote }} }
               envFrom:

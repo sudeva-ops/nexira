@@ -42,7 +42,7 @@ NEXIRA delegates login, MFA, passwords and sessions to Keycloak (D-04). The API 
 |---|---|---|
 | 2.1 Passwords, 2.2 authenticator lifecycle, 2.5 recovery, 2.8 OTP | IdP | The pilot realm must require OTP MFA, a password policy and brute-force detection (`docs/runbooks/pilot-deployment.md` §4). **No pilot realm export is delivered** (G-02). The demo realm has brute-force detection but no MFA and no password policy. That is acceptable for local use only. |
 | 2.10 Service authentication | Met | Each service has its own database user; no shared superuser; passwords come from Secrets or a vault. The API refuses to start as a superuser or BYPASSRLS role (`verify_connection_role`). |
-| 3.2 Session binding, 3.3 logout and timeout | Partial | Tokens are kept in memory by keycloak-js (no localStorage). The access token lives 5 min and the SSO idle timeout is 30 min (demo realm). Logout goes through Keycloak. An open WebSocket is closed when its token expires (close 4401, `backend/app/core/realtime.py`). Every request checks that the `app_user` is active (`current_user`), so deactivating a user in NEXIRA takes effect at once. **Gap:** a user disabled only in Keycloak keeps access until their access token expires, up to 5 min (G-03). |
+| 3.2 Session binding, 3.3 logout and timeout | Partial | Tokens are kept in memory by keycloak-js, not in localStorage. keycloak-js does put short-lived login state there (`kc-callback-*`: the nonce and the PKCE verifier) during the redirect. The access token lives 5 min and the SSO idle timeout is 30 min (demo realm). Logout goes through Keycloak. An open WebSocket is closed when its token expires (close 4401, `backend/app/core/realtime.py`). Every request checks that the `app_user` is active (`current_user`), so deactivating a user in NEXIRA takes effect at once. **Gap:** a user disabled only in Keycloak keeps access until their access token expires, up to 5 min (G-03). |
 | 3.4 Cookie-based sessions | N/A | The app uses no cookies; the API takes bearer tokens only. |
 | 3.5 Token-based sessions | Met | RS256 only; issuer, audience, `exp`, `iat` and `sub` required; 30 s clock leeway; `kid` must be in the JWKS (`decode_token`). Tests: `backend/app/tests/test_security.py`. |
 
@@ -86,7 +86,7 @@ NEXIRA delegates login, MFA, passwords and sessions to Keycloak (D-04). The API 
 | Area | Status | Evidence / notes |
 |---|---|---|
 | 8.1 Server-side protection | Partial | Personal data stays in PostgreSQL behind RLS. **No field-level encryption** (G-08). Welfare and medical data do not exist in Phase 1 (NFR 3). |
-| 8.2 Client-side | Met | API responses carry `Cache-Control: no-store` (nginx). Tokens are kept in memory only. Nothing is written to localStorage. |
+| 8.2 Client-side | Met | API responses carry `Cache-Control: no-store` (nginx). Tokens are kept in memory only. The only thing in localStorage is keycloak-js's short-lived login state during the redirect (`kc-callback-*`). |
 | 8.3 Sensitive private data | Partial | Only simulated data in the repository. **No data retention or deletion process for personal data yet** (G-11). The audit retention default of 7 years (NFR 4) is not enforced by a job. |
 
 ### V9 Communications
@@ -133,7 +133,7 @@ NEXIRA delegates login, MFA, passwords and sessions to Keycloak (D-04). The API 
 | 14.3 Unintended disclosure | Met | The nginx version is hidden. The API docs are off in a pilot. No debug mode. The demo-only presenter bar is a build-time flag (`VITE_DEMO_MODE=false` for pilots). |
 | 14.4 HTTP security headers | Met | CSP (`script-src 'self'`; no inline scripts; `frame-ancestors 'none'`), X-Content-Type-Options, X-Frame-Options, Referrer-Policy and Permissions-Policy, plus HSTS in the chart. Source: `frontend/security-headers.conf.template` and `infra/helm/nexira/templates/frontend-configmap.yaml`. The Phase 1 acceptance e2e suite fails on any CSP violation. Styles allow `'unsafe-inline'` for React and Blueprint style attributes. |
 | 14.5 Request header validation | Partial | Only GET, POST and PATCH routes exist (plus the `/ws` WebSocket); FastAPI rejects other methods. No host-header allow-list in nginx (`server_name _`); the ingress host rule restricts it in a pilot. |
-| Containers (beyond ASVS) | Met | Non-root, read-only root filesystem, no capabilities, RuntimeDefault seccomp, no service-account token. Meets the restricted PSS and OpenShift `restricted-v2`. |
+| Containers (beyond ASVS) | Met | Non-root, read-only root filesystem, no capabilities, RuntimeDefault seccomp, no service-account token; a numeric UID of 10001 on Kubernetes. Meant to meet the restricted PSS and OpenShift `restricted-v2`. All four images were run in Docker under these settings; they have not been run on a cluster (G-16). |
 
 ## Gaps
 
@@ -161,9 +161,10 @@ Ordered by suggested priority for the pilot. None is fixed in this change unless
 
 ## Hardening done in Prompt 16
 
-- `APP_ENV=pilot` removes the scenario API and the API docs (`backend/app/main.py`). Tested in `backend/app/tests/test_health.py`.
+- `APP_ENV=pilot` removes the scenario API and the API docs (`backend/app/main.py`). Tested in `backend/app/tests/test_health.py`. It fails closed: an unset `APP_ENV` means pilot (`backend/app/core/config.py`, `test_an_unset_app_env_means_pilot`), and the chart sets it as an explicit `env` entry.
 - The demo seed refuses to run outside local or demo (`simulator/nexira_sim/seed/__main__.py`).
 - Security headers and `Cache-Control: no-store` on the API in nginx. The frontend now runs on unprivileged nginx (port 8080).
 - A test that every API operation requires authentication.
-- The read-only `nexira_backup` role for backups, so neither application role needs to bypass RLS (`infra/postgres/backup-role.sql`, `backend/app/tests/test_backup_role.py`).
+- The `nexira_backup` role for backups, so neither application role needs to bypass RLS. It has BYPASSRLS and SELECT on the NEXIRA tables only, not `pg_read_all_data` (`infra/postgres/backup-role.sql`, `backup-grants.sql`, `backend/app/tests/test_backup_role.py`).
+- Backup verification after a restore: every tenant's audit chain, the backup manifest (which catches a lost end of the log), and RLS enabled, forced and with a policy on every tenant table (`infra/helm/nexira/files/backup/verify.sh`).
 - The migrate Job gets only the owner DSN (`backend/migrations/env.py` reads `MIGRATIONS_DATABASE_URL` directly).

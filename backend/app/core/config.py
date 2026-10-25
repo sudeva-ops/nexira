@@ -13,7 +13,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=(".env", "../.env"), extra="ignore")
 
-    app_env: Literal["local", "demo", "test", "pilot"] = "local"
+    # Fails closed: unset means pilot (no scenario API, no API docs; D-21). Local runs
+    # set APP_ENV=local in .env, CI sets test.
+    app_env: Literal["local", "demo", "test", "pilot"] = "pilot"
 
     # D-01: the API connects as nexira_api only; migrations run as nexira_owner.
     # The owner DSN is only given to the migrate job, never to the API container.

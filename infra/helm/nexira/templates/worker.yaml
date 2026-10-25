@@ -17,13 +17,17 @@ spec:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
-      {{- include "nexira.podCommon" . | nindent 6 }}
+      {{- include "nexira.podCommon" (dict "root" . "hook" false) | nindent 6 }}
       containers:
         - name: worker
           image: {{ include "nexira.image" (list . .Values.images.backend) }}
           imagePullPolicy: {{ .Values.pullPolicy }}
           command: ["python", "-m", "app.workers"]
           securityContext: {{- include "nexira.containerSecurityContext" . | nindent 12 }}
+          env:
+            # Explicit env wins over envFrom, so no ConfigMap or Secret key can turn a
+            # pilot back into a demo (D-21).
+            - { name: APP_ENV, value: pilot }
           envFrom:
             - configMapRef: { name: {{ $fullname }}-config }
             - secretRef: { name: {{ include "nexira.secret" (list . "api") }} }

@@ -21,6 +21,7 @@ jobs:
       NEXIRA_OWNER_PASSWORD: ci-owner
       NEXIRA_API_PASSWORD: ci-api
       NEXIRA_BACKUP_PASSWORD: ci-backup
+      APP_ENV: test
       DATABASE_URL: postgresql+asyncpg://nexira_api:ci-api@localhost:5432/nexira
       MIGRATIONS_DATABASE_URL: postgresql+asyncpg://nexira_owner:ci-owner@localhost:5432/nexira
       # Superuser for creating throwaway test databases only; assertions run as nexira_api.

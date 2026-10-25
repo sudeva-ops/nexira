@@ -24,6 +24,7 @@ spec:
     matchLabels: {{- include "nexira.selector" (list . "frontend") | nindent 6 }}
   policyTypes: [Ingress, Egress]
   ingress:
+    {{- if not $np.ingressFrom.namespaceSelector }}{{ fail "networkPolicy.ingressFrom.namespaceSelector is required (the ingress controller's namespace)" }}{{ end }}
     - from:
         - namespaceSelector: {{ toYaml $np.ingressFrom.namespaceSelector | nindent 12 }}
       ports:
@@ -79,6 +80,25 @@ spec:
     {{- include "nexira.egress.db" . | nindent 4 }}
     {{- include "nexira.egress.redis" . | nindent 4 }}
     {{- include "nexira.egress.llm" . | nindent 4 }}
+    {{- include "nexira.egress.dns" . | nindent 4 }}
+---
+# migrate, before anything else exists: the pre-install hook would otherwise run
+# with open egress on the first install. Created as a hook, before the Job.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}-migrate-hook
+  labels: {{- include "nexira.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-20"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  podSelector:
+    matchLabels: {{- include "nexira.selector" (list . "migrate") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  egress:
+    {{- include "nexira.egress.db" . | nindent 4 }}
     {{- include "nexira.egress.dns" . | nindent 4 }}
 ---
 # migrate and backup: to PostgreSQL only.

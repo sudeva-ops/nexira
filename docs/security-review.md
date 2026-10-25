@@ -31,7 +31,10 @@ make helm-check              # chart lint, render, Kubernetes schema validation
 
 ## 2. New in Prompt 16: the backup role (grants change, D-29)
 
-- [ ] `infra/postgres/backup-role.sql` creates `nexira_backup` with **BYPASSRLS** and `pg_read_all_data`. It is not a superuser, cannot create roles or databases, is not a member of `nexira_app` or `nexira_owner`, and has no write privilege.
+- [ ] `infra/postgres/backup-role.sql` creates `nexira_backup` with **BYPASSRLS**. `backup-grants.sql` gives it SELECT on the tables and sequences of schema `public`, including tables created later (default privileges for `nexira_owner`).
+  - It is not a member of any role. In particular it is not in `pg_read_all_data`, which would expose `pg_authid` password hashes and every database.
+  - It is not a superuser, cannot create roles, databases or objects, and cannot insert, update, delete or truncate.
+  - It can create large objects, as every role can. This is accepted; NEXIRA uses none.
   - It is needed because FORCE RLS stops the owner from running `pg_dump`.
   - Decide whether a BYPASSRLS read-all role is acceptable, and how its password is held: the backup Secret, mounted only by the CronJob.
 - [ ] The test `backend/app/tests/test_backup_role.py` checks these properties.
@@ -96,7 +99,7 @@ make helm-check              # chart lint, render, Kubernetes schema validation
 
 ## 9. New in Prompt 16: deployment and hardening
 
-- [ ] **Pilot mode.** `APP_ENV=pilot` removes the scenario API and the API docs (`backend/app/main.py`, `create_app`; test `test_a_pilot_has_no_scenario_api_and_no_api_docs`). The chart always sets `APP_ENV=pilot` (`infra/helm/nexira/templates/configmap.yaml`).
+- [ ] **Pilot mode.** `APP_ENV=pilot` removes the scenario API and the API docs (`backend/app/main.py`, `create_app`; test `test_a_pilot_has_no_scenario_api_and_no_api_docs`). The chart sets `APP_ENV=pilot` as an explicit `env` entry in `templates/backend.yaml` and `worker.yaml`, which no Secret or ConfigMap key can override. An unset `APP_ENV` means pilot (`backend/app/core/config.py`).
 - [ ] **Secrets.** There are separate Secrets for the API, owner, backup and Redis users, and each workload mounts only its own:
   - backend and worker: `api`;
   - migrate: `owner` only (`backend/migrations/env.py` reads `MIGRATIONS_DATABASE_URL` directly);
@@ -106,7 +109,8 @@ make helm-check              # chart lint, render, Kubernetes schema validation
 - [ ] **Network policies** (`infra/helm/nexira/templates/networkpolicies.yaml`, `_netpol.tpl`):
   - default-deny for the release;
   - no egress except PostgreSQL, Redis, DNS, the configured IdP and (when enabled) the LLM gateway;
-  - on the first install the migrate hook runs before the policies exist.
+  - the pre-install migrate Job is covered by its own hook policy, `<release>-migrate-hook` (hook weight -20, before the Job). Check that it exists before the Job runs on a first install;
+  - the DNS and ingress selectors are required, with no defaults that Helm could merge into yours (`values.yaml`, `infra/helm/check-render.sh`).
 - [ ] **Pod security:** non-root, read-only root filesystem, all capabilities dropped, RuntimeDefault seccomp, no service-account token (`_helpers.tpl`).
 - [ ] **Headers:** the CSP and other headers (`frontend/security-headers.conf.template`, `templates/frontend-configmap.yaml`) and `Cache-Control: no-store` on `/api/`. The acceptance e2e suite fails on CSP violations (`frontend/e2e/support.ts`).
 - [ ] **The demo seed** refuses to run outside local or demo (`simulator/nexira_sim/seed/__main__.py`). The fixtures already did.

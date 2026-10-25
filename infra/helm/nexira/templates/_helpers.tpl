@@ -39,12 +39,16 @@ app.kubernetes.io/component: {{ index . 1 }}
 {{- end -}}
 {{- end -}}
 
-{{/* Restricted Pod Security Standard; OpenShift picks the UID/fsGroup itself. */}}
+{{/* Restricted Pod Security Standard. A numeric UID, because the Redis and
+PostgreSQL images run as root by default and the kubelet cannot check a user
+name against runAsNonRoot. OpenShift assigns the UID and fsGroup itself. */}}
 {{- define "nexira.podSecurityContext" -}}
 runAsNonRoot: true
 seccompProfile:
   type: RuntimeDefault
 {{- if not .Values.openshift }}
+runAsUser: 10001
+runAsGroup: 10001
 fsGroup: 10001
 {{- end }}
 {{- end -}}
@@ -56,14 +60,17 @@ capabilities:
   drop: ["ALL"]
 {{- end -}}
 
-{{/* Pod spec fields shared by every workload. */}}
+{{/* Pod spec fields shared by every workload. The migrate hook runs before the
+release's ServiceAccount exists, so it uses the namespace default (no token). */}}
 {{- define "nexira.podCommon" -}}
-serviceAccountName: {{ include "nexira.fullname" . }}
+{{- if not .hook }}
+serviceAccountName: {{ include "nexira.fullname" .root }}
+{{- end }}
 automountServiceAccountToken: false
-{{- with .Values.imagePullSecrets }}
+{{- with .root.Values.imagePullSecrets }}
 imagePullSecrets: {{ toYaml . | nindent 2 }}
 {{- end }}
-securityContext: {{ include "nexira.podSecurityContext" . | nindent 2 }}
+securityContext: {{ include "nexira.podSecurityContext" .root | nindent 2 }}
 {{- end -}}
 
 {{/* A NetworkPolicy egress peer list from {ipBlocks, namespaceSelector, podSelector}. */}}

@@ -34,4 +34,6 @@ SQL
 # extensions are created by the dump, as the superuser (plan G-27).
 pg_restore --exit-on-error --no-password --dbname="$target" "$dump"
 
-"$(dirname "$0")/verify.sh" "$target"
+manifest="$dump.manifest"
+[ -f "$manifest" ] || manifest=""  # dumps from before the manifest existed
+"$(dirname "$0")/verify.sh" "$target" $manifest

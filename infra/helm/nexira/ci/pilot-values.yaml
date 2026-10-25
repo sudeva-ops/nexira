@@ -16,6 +16,12 @@ app:
 frontend:
   tiles:
     existingClaim: nexira-tiles
+networkPolicy:
+  ingressFrom:
+    namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } }
+  dns:
+    namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
+    podSelector: { matchLabels: { k8s-app: kube-dns } }
 ingress:
   enabled: true
   className: nginx

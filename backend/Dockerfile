@@ -16,7 +16,8 @@ COPY . .
 RUN uv sync --frozen --no-dev
 
 RUN useradd --system --uid 10001 nexira
-USER nexira
+# Numeric, so Kubernetes can verify runAsNonRoot.
+USER 10001
 
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --retries=5 \

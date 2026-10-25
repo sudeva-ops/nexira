@@ -1,5 +1,6 @@
 {{/* Egress rules shared by the network policies (networkpolicies.yaml). */}}
 {{- define "nexira.egress.dns" -}}
+{{- if not .Values.networkPolicy.dns.namespaceSelector }}{{ fail "networkPolicy.dns.namespaceSelector is required (the cluster DNS namespace)" }}{{ end -}}
 - to:
     - namespaceSelector: {{ toYaml .Values.networkPolicy.dns.namespaceSelector | nindent 8 }}
       podSelector: {{ toYaml .Values.networkPolicy.dns.podSelector | nindent 8 }}

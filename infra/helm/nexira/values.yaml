@@ -47,6 +47,9 @@ database:
   host: ""
   port: 5432
   name: nexira
+  # libpq sslmode for the backup CronJob (verify-full needs the CA in the image or
+  # PGSSLROOTCERT). The API's mode is in its DSN (?ssl=require).
+  backupSslMode: require
   # Where the database is, for the egress policy: CIDRs and/or in-cluster selectors.
   egress:
     ipBlocks: []          # e.g. ["10.20.30.0/28"]
@@ -151,13 +154,15 @@ route:
 
 networkPolicy:
   enabled: true
-  # Who may reach the frontend: the ingress controller's or router's namespace.
+  # Required, with no defaults: Helm merges maps, so a default selector would be
+  # ANDed with yours and match nothing (see ci/*-values.yaml for both platforms).
+  # Who may reach the frontend: the ingress controller's or router's namespace,
+  #   e.g. { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } }
+  #   OpenShift: { matchLabels: { network.openshift.io/policy-group: ingress } }
   ingressFrom:
-    namespaceSelector:
-      matchLabels: { kubernetes.io/metadata.name: ingress-nginx }
-  # Cluster DNS (OpenShift: openshift-dns / dns-default).
+    namespaceSelector: {}
+  # Cluster DNS, e.g. kube-system + { k8s-app: kube-dns };
+  #   OpenShift: openshift-dns + { dns.operator.openshift.io/daemonset-dns: default }
   dns:
-    namespaceSelector:
-      matchLabels: { kubernetes.io/metadata.name: kube-system }
-    podSelector:
-      matchLabels: { k8s-app: kube-dns }
+    namespaceSelector: {}
+    podSelector: {}

@@ -5,7 +5,6 @@ metadata:
   name: {{ include "nexira.fullname" . }}-config
   labels: {{- include "nexira.labels" . | nindent 4 }}
 data:
-  APP_ENV: pilot  # no scenario API, no API docs (D-21)
   OIDC_ISSUER: {{ required "oidc.issuer is required" .Values.oidc.issuer | quote }}
   OIDC_JWKS_URL: {{ required "oidc.jwksUrl is required" .Values.oidc.jwksUrl | quote }}
   OIDC_AUDIENCE: {{ .Values.oidc.audience | quote }}
