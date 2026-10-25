@@ -70,6 +70,6 @@ describe("Presenter bar", () => {
       ),
     ).toBe(true);
     // Scene 1 is watched on Global Operations.
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Global Operations");
+    expect(await screen.findByRole("heading", { level: 1, name: "Global Operations" })).toBeInTheDocument();
   });
 });
