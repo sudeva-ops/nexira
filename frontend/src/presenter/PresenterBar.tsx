@@ -1,20 +1,29 @@
-import { Icon } from "@blueprintjs/core";
+import { HTMLSelect, Icon } from "@blueprintjs/core";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { hasRole, useMe } from "../api/me";
-import { DEMO_SCENARIO, useScenario, useScenarioCommand } from "../api/scenario";
+import {
+  DEMO_SCENARIO,
+  DEMO_SCENARIOS,
+  type DemoScenario,
+  useScenario,
+  useScenarioCommand,
+} from "../api/scenario";
 import { demoMode } from "../app/demo";
 import { SCENE_SCREEN } from "./scenes";
 
-/** Demo mode only: drives the scenario through the scenario API (PLT-06). The
- *  scenes with data (1, 4) play events; the others are moments for the people
- *  in the room to act (approve PB-07, decide the evacuation, close the incident). */
+/** Demo mode only: drives a demo scenario through the scenario API (PLT-06). In
+ *  NBO-CIVIL-UNREST the scenes with data (1, 4) play events; the others are moments
+ *  for the people in the room to act (approve PB-07, decide the evacuation, close
+ *  the incident). The picker switches between the demo scenarios. */
 export function PresenterBar() {
   const me = useMe().data;
   const operator = hasRole(me, "ADMIN") || hasRole(me, "DUTY_OFFICER");
   const enabled = demoMode() && operator;
-  const { data: state } = useScenario(DEMO_SCENARIO, enabled);
-  const command = useScenarioCommand(DEMO_SCENARIO);
+  const [code, setCode] = useState<DemoScenario>(DEMO_SCENARIO);
+  const { data: state } = useScenario(code, enabled);
+  const command = useScenarioCommand(code);
   const navigate = useNavigate();
   if (!enabled || !state) return null;
 
@@ -24,7 +33,7 @@ export function PresenterBar() {
   const run = (c: "play" | "pause" | "next" | "reset") =>
     command.mutate(c, {
       onSuccess: (next) => {
-        if (c === "next" || c === "reset") void navigate(SCENE_SCREEN[next.current_scene] ?? "/");
+        if (c === "next" || c === "reset") void navigate(SCENE_SCREEN[code][next.current_scene] ?? "/");
       },
     });
 
@@ -32,7 +41,13 @@ export function PresenterBar() {
     <div className="nx-presenter" role="toolbar" aria-label="Presenter">
       <div className="lbl">
         DEMO SCENARIO
-        <b>{state.name}</b>
+        <HTMLSelect
+          minimal
+          aria-label="Scenario"
+          value={code}
+          onChange={(e) => setCode(e.currentTarget.value as DemoScenario)}
+          options={DEMO_SCENARIOS.map((s) => ({ value: s.code, label: s.label }))}
+        />
       </div>
       <button type="button" className="pbtn" title="Reset to scene 0" aria-label="Reset" onClick={() => run("reset")}>
         <Icon icon="reset" size={12} />

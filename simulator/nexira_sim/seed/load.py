@@ -20,6 +20,7 @@ from app.modules.tenancy.service import ensure_reference_counter
 from app.modules.travel.service import ensure_trip
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from nexira_sim.scenarios import fra_national_protests as fra
 from nexira_sim.scenarios import nbo_civil_unrest as nbo
 from nexira_sim.seed import data, world
 from nexira_sim.seed.identities import bootstrap_tenant, seed_identities
@@ -129,6 +130,14 @@ async def seed_all(
             name=nbo.NAME,
             description=nbo.DESCRIPTION,
             events=nbo.build_events(w, tenant_id),
+        )
+        report["scenario_fra"] = await ensure_scenario(
+            session,
+            scenario_id=seed_id(tenant_id, "scenario", fra.CODE),
+            code=fra.CODE,
+            name=fra.NAME,
+            description=fra.DESCRIPTION,
+            events=fra.build_events(w, tenant_id),
         )
         await session.commit()
     return report

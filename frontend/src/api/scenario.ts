@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiGet, apiSend } from "./client";
 
@@ -22,13 +22,21 @@ export interface ScenarioState {
 
 export type ScenarioCommand = "play" | "pause" | "next" | "reset";
 
-export const DEMO_SCENARIO = "NBO-CIVIL-UNREST";
+/** The demo scenarios the presenter bar offers; the first is the default. */
+export const DEMO_SCENARIOS = [
+  { code: "NBO-CIVIL-UNREST", label: "Nairobi civil unrest" },
+  { code: "FRA-NATIONAL-PROTESTS", label: "France protests" },
+] as const;
+export type DemoScenario = (typeof DEMO_SCENARIOS)[number]["code"];
+export const DEMO_SCENARIO: DemoScenario = DEMO_SCENARIOS[0].code;
 
 export function useScenario(code: string, enabled: boolean) {
   return useQuery({
     queryKey: ["scenario", code],
     queryFn: () => apiGet<ScenarioState>(`/api/scenarios/${code}`),
     enabled,
+    // Switching scenarios keeps the bar on screen until the new state arrives.
+    placeholderData: keepPreviousData,
     // While a scene plays, follow its progress.
     refetchInterval: (query) => (query.state.data?.status === "PLAYING" ? 1_000 : false),
   });
