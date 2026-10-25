@@ -20,7 +20,8 @@ import {
 } from "../../api/playbooks";
 import { formatStamp } from "../../app/time";
 import { Card } from "../../ui/primitives";
-import { ACTION_ICON, roleText, STEP_CLASS, stepDetail } from "./steps";
+import { roleLabel } from "../../ui/format";
+import { ACTION_ICON, STEP_CLASS, stepDetail } from "./steps";
 
 const LIVE = ["RUNNING", "AWAITING_APPROVAL"];
 
@@ -83,7 +84,7 @@ function Step({ step, run, approvable }: { step: RunStep; run: PlaybookRun; appr
               intent="primary"
               size="small"
               icon="tick"
-              text={`Approve as ${roleText(step.requires_approval_role)}`}
+              text={`Approve as ${roleLabel(step.requires_approval_role)}`}
               loading={approve.isPending}
               onClick={() => approve.mutate(step.id)}
             />

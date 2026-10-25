@@ -42,7 +42,11 @@ class ProposalOut(BaseModel):
     decided_at: datetime | None
     executed_at: datetime | None
     approvals: list[ApprovalStepOut]
-    can_decide: bool  # the caller may decide the next step now (approvals.can_decide)
+    # What the caller may do now, from the same checks the actions enforce (plan G-07):
+    can_decide: bool  # approve, edit-and-approve, reject, use an alternative
+    can_edit: bool  # edit-and-approve: editable type, and the caller decides step 1
+    can_dismiss: bool  # reject level-4 advice
+    can_undo: bool  # undo a level-1 action inside its window
 
 
 class EditApproveIn(BaseModel):
@@ -62,11 +66,24 @@ class AgentOut(BaseModel):
     code: str
     name: str
     description: str | None
+    watches: list[str]  # the event types the agent observes
     autonomy_level: int  # 0 AUTO .. 4 ADVISE_ONLY
     is_enabled: bool
     model_ref: str | None
     proposals_pending: int
     proposals_total: int
+    accepted_pct: float | None  # approved / (approved + rejected) by people
+
+
+class ActivityOut(BaseModel):
+    """DQ-06 agent activity log: agents and people acting on proposals. People
+    are shown as "Human"; no names."""
+
+    occurred_at: datetime
+    actor: str  # an agent's name, "Human" or "System"
+    action: str
+    proposal_id: uuid.UUID | None
+    text: str
 
 
 class AgentPatch(BaseModel):

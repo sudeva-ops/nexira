@@ -67,3 +67,22 @@ export function drillAge(lastDrill: string | null, now: Date = new Date()): stri
   const weeks = Math.floor(days / 7);
   return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
 }
+
+const ROLE_LABEL: Record<string, string> = {
+  ADMIN: "Administrator",
+  DUTY_OFFICER: "Duty Officer",
+  SECURITY_OFFICER: "Security Officer",
+  HEAD_OF_MISSION: "Head of Mission",
+  HQ_CRISIS_DIRECTOR: "HQ Crisis Director",
+  TRAVEL_DESK: "Travel Desk",
+  CONSULAR_OFFICER: "Consular Officer",
+  VIEWER: "Viewer",
+};
+
+/** "DUTY_OFFICER|SECURITY_OFFICER" -> "Duty Officer or Security Officer" (D-16). */
+export function roleLabel(roles: string): string {
+  return roles
+    .split("|")
+    .map((r) => ROLE_LABEL[r.trim()] ?? r.trim())
+    .join(" or ");
+}

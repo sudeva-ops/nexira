@@ -3,17 +3,21 @@ import { Route, Routes } from "react-router-dom";
 
 import type { ReactElement } from "react";
 
+import { AgentsScreen } from "../screens/agents/AgentsScreen";
 import { AuditScreen } from "../screens/audit/AuditScreen";
 import { CheckinScreen } from "../screens/checkin/CheckinScreen";
 import { IncidentsScreen } from "../screens/incidents/IncidentsScreen";
 import { OperationsScreen } from "../screens/operations/OperationsScreen";
 import { PeopleScreen } from "../screens/people/PeopleScreen";
 import { PlaybooksScreen } from "../screens/playbooks/PlaybooksScreen";
+import { DecisionQueueScreen } from "../screens/queue/DecisionQueueScreen";
 import { AppShell } from "./AppShell";
 import { SCREENS } from "./screens";
 
 // Screens that exist so far; the rest show a placeholder naming their prompt.
 const BUILT: Record<string, ReactElement> = {
+  "/": <DecisionQueueScreen />,
+  "/agents": <AgentsScreen />,
   "/operations": <OperationsScreen />,
   "/incidents": <IncidentsScreen />,
   "/people": <PeopleScreen />,

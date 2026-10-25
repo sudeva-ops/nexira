@@ -1,6 +1,7 @@
 import type { IconName } from "@blueprintjs/core";
 
 import type { RunStep } from "../../api/playbooks";
+import { roleLabel } from "../../ui/format";
 
 export const ACTION_ICON: Record<string, IconName> = {
   TASK: "tick",
@@ -20,19 +21,12 @@ export const STEP_CLASS: Record<string, string> = {
   PENDING: "pend",
 };
 
-export function roleText(roles: string): string {
-  return roles
-    .split("|")
-    .map((r) => r.trim().toLowerCase().replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()))
-    .join(" or ");
-}
-
 /** What a step did, from its result (or what it will do). */
 export function stepDetail(step: RunStep): string {
   const r = step.result;
   if (typeof r.error === "string") return `Failed: ${r.error}`;
   if (step.status === "AWAITING_APPROVAL" && step.requires_approval_role) {
-    return `Requires ${roleText(step.requires_approval_role)} approval`;
+    return `Requires ${roleLabel(step.requires_approval_role)} approval`;
   }
   const parts: string[] = [];
   if (typeof r.reference === "string") {
@@ -45,7 +39,7 @@ export function stepDetail(step: RunStep): string {
   } else if (typeof r.summary === "string") {
     parts.push(r.summary);
   } else if (step.status === "PENDING" && step.requires_approval_role) {
-    parts.push(`Requires ${roleText(step.requires_approval_role)} approval`);
+    parts.push(`Requires ${roleLabel(step.requires_approval_role)} approval`);
   }
   if (step.approved_by_name) parts.push(`Approved by ${step.approved_by_name}`);
   return parts.join(" · ");

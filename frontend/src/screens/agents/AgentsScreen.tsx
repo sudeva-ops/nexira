@@ -1,0 +1,182 @@
+import { Button, HTMLSelect, Icon, Spinner } from "@blueprintjs/core";
+import { useState } from "react";
+
+import { ApiError } from "../../api/client";
+import { useMe } from "../../api/me";
+import {
+  LEVEL_COLOUR,
+  LEVELS,
+  useAgents,
+  useKillSwitch,
+  useProposals,
+  useSetAutonomy,
+} from "../../api/proposals";
+import { Card, Kpi } from "../../ui/primitives";
+
+const WATCHES: Record<string, string> = {
+  INCIDENT_CREATED: "New incidents",
+  EXPOSURE_COMPUTED: "Exposure of people and sites",
+  PLAYBOOK_STEP: "Playbook steps",
+};
+
+const GUARDRAILS = [
+  "No external message, playbook or movement of people without a named person's approval",
+  "Evacuation and mission closure need two different approvers",
+  "Every proposal cites its evidence, sources and confidence",
+  "Agents act only through the services people use; every step is in the audit log",
+  "No external AI calls; models run on the platform's own infrastructure",
+];
+
+function KillSwitch({ paused }: { paused: boolean }) {
+  const [confirming, setConfirming] = useState(false);
+  const toggle = useKillSwitch();
+  if (!confirming) {
+    return (
+      <Button
+        size="small"
+        intent={paused ? "primary" : "danger"}
+        text={paused ? "Resume all agents" : "Kill switch · pause all"}
+        onClick={() => setConfirming(true)}
+      />
+    );
+  }
+  return (
+    <div className="nx-row" role="group" aria-label="Confirm kill switch">
+      <span>{paused ? "Resume all agents?" : "Pause all agents now?"}</span>
+      <Button
+        size="small"
+        intent={paused ? "primary" : "danger"}
+        text={paused ? "Yes, resume" : "Yes, pause all"}
+        loading={toggle.isPending}
+        onClick={() => toggle.mutate(!paused, { onSuccess: () => setConfirming(false) })}
+      />
+      <Button size="small" text="Cancel" onClick={() => setConfirming(false)} />
+      {toggle.isError && (
+        <span className="nx-error">
+          {toggle.error instanceof ApiError ? toggle.error.message : "Not changed"}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** AI Agents (AGT-07, AGT-08): roster, autonomy (ADMIN), kill switch (ADMIN). */
+export function AgentsScreen() {
+  const { data } = useAgents();
+  const proposals = useProposals().data ?? [];
+  const me = useMe().data;
+  const setAutonomy = useSetAutonomy();
+  // Unscoped ADMIN only (the backend requires it too).
+  const admin = me?.roles.some((r) => r.code === "ADMIN" && r.mission_id === null) ?? false;
+  if (!data) return <Spinner />;
+
+  const decided = proposals.filter((p) => ["APPROVED", "EDITED_APPROVED", "REJECTED"].includes(p.status));
+  const overridden = decided.filter((p) => p.status !== "APPROVED").length;
+  // Executed without the approvals its level requires: computed, expected to be 0.
+  const outside = proposals.filter(
+    (p) =>
+      ["APPROVED", "EDITED_APPROVED"].includes(p.status) &&
+      p.approvals.filter((a) => a.decision === "APPROVE").length < (p.effective_level === 3 ? 2 : 1),
+  ).length;
+
+  return (
+    <div className="nx-pad">
+      <div className={`nx-banner ${data.paused ? "red" : "green"}`} role="status">
+        <Icon icon={data.paused ? "pause" : "predictive-analysis"} />
+        <div className="nx-grow">
+          <b>{data.paused ? "Agents paused." : "Agents active."}</b> Agents act only through the
+          platform's services, with the approvals their level requires; every output is logged.
+        </div>
+        {admin && <KillSwitch paused={data.paused} />}
+      </div>
+      <div className="nx-g4">
+        <Kpi
+          icon="predictive-analysis"
+          label="Agents"
+          value={data.agents.length}
+          detail={data.paused ? "Paused" : `${data.agents.filter((a) => a.is_enabled).length} enabled`}
+        />
+        <Kpi icon="inbox" label="Proposals" value={proposals.length} detail={`${proposals.filter((p) => p.status === "PENDING").length} pending`} />
+        <Kpi
+          icon="people"
+          label="Human override rate"
+          value={decided.length ? `${Math.round((overridden / decided.length) * 100)}%` : "—"}
+          detail="Edited or rejected"
+        />
+        <Kpi
+          icon="shield"
+          label="Executed without approval"
+          value={<span className={outside ? "nx-help" : "nx-safe"}>{outside}</span>}
+          detail="Checked against each proposal's approvals"
+        />
+      </div>
+      <Card
+        icon="predictive-analysis"
+        title="Agent roster"
+        sub="Autonomy per agent; policy floors still apply (evacuation always needs two approvers)"
+      >
+        <table className="nx-table-plain" aria-label="Agent roster">
+          <thead>
+            <tr>
+              <th>Agent</th>
+              <th>Watches</th>
+              <th>Autonomy level</th>
+              <th>Proposals</th>
+              <th>Accepted</th>
+              <th>Pending</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.agents.map((a) => (
+              <tr key={a.code}>
+                <td>
+                  <b>{a.name}</b>
+                  {a.description && <div className="nx-dim">{a.description}</div>}
+                </td>
+                <td>{a.watches.map((w) => WATCHES[w] ?? w).join(", ")}</td>
+                <td>
+                  {admin ? (
+                    <HTMLSelect
+                      aria-label={`Autonomy for ${a.name}`}
+                      value={a.autonomy_level}
+                      onChange={(e) =>
+                        setAutonomy.mutate({ code: a.code, autonomy_level: Number(e.currentTarget.value) })
+                      }
+                      options={LEVELS.map((label, i) => ({ value: i, label }))}
+                    />
+                  ) : (
+                    <span style={{ color: LEVEL_COLOUR[a.autonomy_level] }}>{LEVELS[a.autonomy_level]}</span>
+                  )}
+                </td>
+                <td className="nx-mono">{a.proposals_total}</td>
+                <td className="nx-mono">{a.accepted_pct === null ? "—" : `${a.accepted_pct}%`}</td>
+                <td className="nx-mono">{a.proposals_pending}</td>
+                <td>
+                  {data.paused ? (
+                    <span className="nx-sev crit">PAUSED</span>
+                  ) : a.is_enabled ? (
+                    <span className="nx-sev ok">ACTIVE</span>
+                  ) : (
+                    <span className="nx-sev nt">DISABLED</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+      <Card icon="shield" title="Guardrails">
+        <div className="nx-bd nx-guardrails">
+          {GUARDRAILS.map((g) => (
+            <div key={g} className="nx-row">
+              <Icon icon="tick" size={12} className="nx-safe" />
+              {g}
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+

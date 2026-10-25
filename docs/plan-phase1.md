@@ -127,6 +127,7 @@ Each item gives a proposed resolution. Items marked **(schema)** would need an e
 
 **G-06 · The audit trail panel conflicts with ADMIN-only audit access.** *(Implemented in Prompt 3.)* PB-04 and Prompt 11 show an audit trail panel on the playbook run screen for Duty Officers. Prompt 3 makes `GET /api/audit` ADMIN-only.
 → *Proposed:* `GET /api/audit?entity_type=&entity_id=` is allowed for any role that can read that entity. The unfiltered Audit view and `GET /api/audit/verify` stay ADMIN-only.
+  *Exception (Prompt 14):* `GET /api/agents/activity` reads the agent and decision actions only and returns a fixed projection (agent name, "Human", a verb, the proposal title) to any role, for the Decision Queue activity log (DQ-06). It never returns audit details or user ids.
 
 **G-07 · `GET /api/me/permissions` is used but never specified.** Prompts 11 and 14 rely on it, and no prompt defines it.
 → *Proposed:* define it in Prompt 3 and extend it in Prompts 9 and 12. Shape: `GET /api/me/permissions?entity_type=&entity_id=` returns the allowed actions, for example `{"approve_step": [...step_ids], "decide_proposal": [...]}`. It is computed by calling `approvals.can_decide(...)`, the same code as `decide()`, so the UI and the backend cannot drift apart.

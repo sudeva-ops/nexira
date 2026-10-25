@@ -59,3 +59,6 @@ class PermissionsOut(BaseModel):
     entity_id: str
     approve_step: list[uuid.UUID] = []  # playbook_run: steps the caller may approve
     decide_proposal: bool = False  # agent_proposal: may decide its next step
+    edit_proposal: bool = False  # agent_proposal: may edit-and-approve
+    dismiss_proposal: bool = False  # agent_proposal: may dismiss level-4 advice
+    undo_proposal: bool = False  # agent_proposal: may undo a level-1 action

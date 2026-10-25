@@ -78,7 +78,7 @@ test("PB-07 step 7 is approved by the Nairobi HoM only, and check-in updates liv
   await expect(duty.getByRole("button", { name: /Approve as/ })).toHaveCount(0);
 
   const hom = await signedIn(browser, "hom.nairobi", url);
-  await hom.getByRole("button", { name: "Approve as Head of mission" }).click();
+  await hom.getByRole("button", { name: "Approve as Head of Mission" }).click();
   await expect(hom.getByTestId("step-7")).toContainText("Approved by");
   // The Duty Officer's open page follows without a reload.
   await expect(duty.getByTestId("step-8")).toContainText("Situation report", { timeout: 15_000 });

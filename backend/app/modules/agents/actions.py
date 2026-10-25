@@ -192,10 +192,26 @@ def validate(action_type: str, payload: dict[str, Any]) -> _Payload | None:
         raise ActionError(f"invalid {action_type} payload: {e.error_count()} errors") from None
 
 
+# Action types an approver may edit, and the payload field the edit changes. Others
+# (START_PLAYBOOK, START_EVACUATION, unknown types) cannot be edited: use an
+# alternative instead, so what the approvers read is always what runs.
+EDITABLE_FIELD = {
+    "LOG_INFO": "text",
+    "POST_INTERNAL_NOTE": "text",
+    "SEND_EXTERNAL_MESSAGE": "message",
+}
+
+
+def editable(action_type: str) -> bool:
+    return action_type in EDITABLE_FIELD
+
+
 def check_edit(action_type: str, original: dict[str, Any], edited: dict[str, Any]) -> None:
     """Plan G-21: an edit must pass the same schema and cannot widen what the
     action reaches. For messages: the same audience, and only channels that were
     already proposed."""
+    if not editable(action_type):
+        raise ActionError(f"a {action_type} proposal cannot be edited; use an alternative")
     validate(action_type, edited)
     if action_type == "SEND_EXTERNAL_MESSAGE":
         if edited.get("audience") != original.get("audience"):
@@ -224,6 +240,11 @@ async def execute(
         raise ActionError(f"{action_type} is advise-only")
     model = action.payload.model_validate(payload)
     return await action.execute(session, model, ctx)
+
+
+def can_undo(action_type: str) -> bool:
+    action = ACTIONS.get(action_type)
+    return action is not None and action.undo is not None
 
 
 async def undo(

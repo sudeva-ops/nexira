@@ -4,6 +4,7 @@ import { checkinKeys } from "./checkin";
 import { keys } from "./intel";
 import { peopleKeys } from "./people";
 import { playbookKeys } from "./playbooks";
+import { proposalKeys } from "./proposals";
 
 // PLT-05: one WebSocket per tab (backend: app/core/realtime.py). Events carry ids
 // only; screens refetch through the REST API, so the cache stays the single
@@ -47,6 +48,10 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
       const runId = typeof event.data.run_id === "string" ? [playbookKeys.run(event.data.run_id)] : [];
       return [playbookKeys.runs, playbookKeys.permissions, ["audit"], ...runId, ...incident];
     }
+    case "PROPOSAL_CREATED":
+    case "PROPOSAL_UPDATED":
+    case "PROPOSAL_EXPIRED":
+      return [proposalKeys.proposals, proposalKeys.agents, ...incident];
     case "CAMPAIGN_QUEUED":
     case "CAMPAIGN_UPDATED":
     case "CHECKIN_UPDATED":

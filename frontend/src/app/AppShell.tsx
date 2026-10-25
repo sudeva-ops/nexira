@@ -1,6 +1,7 @@
 import { Icon, Tag } from "@blueprintjs/core";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
+import { useAgents, usePendingCount } from "../api/proposals";
 import { RealtimeProvider } from "../api/realtime";
 import { useRealtimeStatus } from "../api/realtimeContext";
 
@@ -33,6 +34,26 @@ function NavList() {
     );
   }
   return <nav aria-label="Main">{items}</nav>;
+}
+
+/** DQ-07: decisions waiting, or that agents are paused. */
+function DecisionsPill() {
+  const pending = usePendingCount();
+  const paused = useAgents().data?.paused ?? false;
+  return (
+    <Link to="/" className="nx-pill" aria-label="Decisions pending">
+      <Icon icon="predictive-analysis" size={12} />
+      {paused ? (
+        "Agents paused"
+      ) : pending ? (
+        <>
+          <b>{pending}</b>&nbsp;decision{pending === 1 ? "" : "s"} pending
+        </>
+      ) : (
+        "Agents active"
+      )}
+    </Link>
+  );
 }
 
 function LiveIndicator() {
@@ -74,6 +95,7 @@ export function AppShell({ onLogout }: Props) {
             <div className="nx-crumb">{current?.subtitle}</div>
           </div>
           <span className="nx-grow" />
+          <DecisionsPill />
           <Tag intent="warning" minimal>
             SIMULATED DATA
           </Tag>
