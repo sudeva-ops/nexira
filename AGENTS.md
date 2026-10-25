@@ -8,14 +8,16 @@ NEXIRA is a sovereign resilience platform for organisations with people and site
 
 Sources of truth, in this order:
 1. `docs/decisions.md` – settles conflicts; cite decision IDs (D-xx) in code comments and PRs.
-2. `docs/requirements.md` – Phase 1 requirements (PRD v0.1).
+2. `docs/requirements.md` – Phase 1 requirements (PRD v0.1); `docs/requirements-pilot.md` – pilot modules (D-30).
 3. `docs/schema/nexira_schema.sql` – Phase 1 database (v0.2).
 4. `docs/design/NEXIRA_Demo_Full.html` – visual reference only (D-25). Match layout and
    Blueprint dark styling. Do not copy its code, state handling or patching pattern.
 
-Phase 1 screens (build only these): Decision Queue (home), AI Agents, Global Operations,
-Incidents, People & Sites, Response Playbooks, Safety Check-in, Audit view, Presenter bar
-(demo mode only). Every other screen in the demo is out of scope (D-25).
+Phase 1 screens: Decision Queue (home), AI Agents, Global Operations, Incidents,
+People & Sites, Response Playbooks, Safety Check-in, Audit view, Presenter bar (demo mode
+only). Pilot additions (D-30), only once their requirements in docs/requirements-pilot.md
+are approved: Mass Notification, then Journey Management, Air Travel Tracking, the Travel &
+Air agent, and Assistance Partners. Every other screen in the demo is out of scope.
 
 ## Stack (do not substitute)
 - Backend: Python 3.12, FastAPI, SQLAlchemy 2.x (async, asyncpg), Alembic, Pydantic v2, pytest.
