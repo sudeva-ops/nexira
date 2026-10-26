@@ -199,6 +199,7 @@ async def _snapshot(conn: asyncpg.Connection) -> dict[str, Any]:
         "mission", "site", "person", "location_observation", "person_location_current", "trip",
         "trip_traveller", "intel_source", "playbook", "playbook_step", "agent", "action_policy",
         "app_user", "role", "user_role", "reference_counter", "scenario", "scenario_event",
+        "message_template",
     ]  # fmt: skip
     snap: dict[str, Any] = {}
     for t in tables:
@@ -231,3 +232,25 @@ async def test_bulk_loads_are_audited_once_per_batch(seeded: Seeded) -> None:
     assert actions["LOCATION.RECOMPUTE"] == 1
     assert actions["MISSION.CREATE"] == 36
     assert sum(actions.values()) < 150  # not one row per person
+
+
+async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> None:
+    """D-31: one generic template and one per mission; nothing reviewed yet (D-15), and
+    Nairobi keeps the exact PB-07 advisory the acceptance scenario sends."""
+    rows = await seeded.conn.fetch(
+        "SELECT t.code, m.code AS mission, t.texts, t.reviewed FROM message_template t "
+        "LEFT JOIN mission m ON m.id = t.mission_id ORDER BY m.code NULLS FIRST"
+    )
+    assert [(r["code"], r["mission"]) for r in rows] == [
+        ("CIVIL_UNREST_SHELTER", None),
+        ("CIVIL_UNREST_SHELTER", "NBO"),
+        ("CIVIL_UNREST_SHELTER", "PAR"),
+    ]
+    texts = [json.loads(r["texts"]) for r in rows]
+    assert "{city}" in texts[0]["en"]
+    assert texts[1] == data.CITIZEN_ADVISORY
+    assert "Paris" in texts[2]["en"]
+    assert "Nairobi" not in texts[2]["en"]
+    reviewed = [json.loads(r["reviewed"]) for r in rows]
+    assert all(set(r) == {"ar", "fr", "sw"} for r in reviewed)  # not English (D-15)
+    assert not any(any(r.values()) for r in reviewed)

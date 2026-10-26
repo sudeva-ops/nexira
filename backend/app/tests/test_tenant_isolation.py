@@ -92,6 +92,8 @@ ROWS: dict[str, str] = {
     "notification_campaign": "INSERT INTO notification_campaign (id, tenant_id, reference, "
     "campaign_type, message, channels, created_by_type) VALUES ('{campaign}', '{t}', 'NTF-T', "
     "'CHECKIN', 'm', '{{APP}}', 'USER')",
+    "message_template": "INSERT INTO message_template (tenant_id, code, kind, name, texts) "
+    "VALUES ('{t}', 'T', 'ADVISORY', 'T', '{{\"en\": \"m\"}}')",
     "notification_delivery": "INSERT INTO notification_delivery (tenant_id, campaign_id, "
     "person_id, channel) VALUES ('{t}', '{campaign}', '{person}', 'APP')",
     "checkin_response": "INSERT INTO checkin_response (tenant_id, campaign_id, person_id, status) "
@@ -110,7 +112,12 @@ ROWS: dict[str, str] = {
 
 # nexira_app has no UPDATE/DELETE on audit_log at all (D-20), so those fail with
 # a privilege error rather than touching zero rows.
-NO_UPDATE_DELETE = {"audit_log"}
+NO_UPDATE_DELETE = {"audit_log", "checkin_response"}  # append-only (D-20, D-07)
+NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELETE)
+    "message_template",
+    "notification_campaign",
+    "notification_delivery",
+}
 
 
 def sql_for(table: str, ids: Ids) -> str:
@@ -223,7 +230,11 @@ async def test_tenant_b_cannot_update_or_delete_tenant_a_rows(
                 await api.execute(stmt)
     else:
         assert await api.execute(f"UPDATE {table} SET tenant_id = tenant_id") == "UPDATE 0"
-        assert await api.execute(f"DELETE FROM {table}") == "DELETE 0"
+        if table in NO_DELETE:
+            with pytest.raises(asyncpg.InsufficientPrivilegeError):
+                await api.execute(f"DELETE FROM {table}")
+        else:
+            assert await api.execute(f"DELETE FROM {table}") == "DELETE 0"
     await set_tenant(api, world.a.t)
     assert await api.fetchval(f"SELECT count(*) FROM {table}") >= 1
 

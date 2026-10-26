@@ -29,6 +29,8 @@ REFUSAL_PREFIXES = (
     "agent ",  # agent is disabled
     "agent_proposal:",  # frozen proposal fields (D-12)
     "proposal_approval:",  # approval order and decided-once (D-16)
+    "notification_campaign:",  # approval, frozen content, forward-only status (D-31)
+    "notification_delivery:",  # a delivery keeps its campaign, person and channel
 )
 
 

@@ -225,6 +225,53 @@ CITIZEN_ADVISORY = {
     "na Upper Hill, na jibuni SAFE au HELP. Taarifa mpya kila saa 2.",
 }
 
+# --- message templates (D-31, PC-07): per mission, with a generic fallback ---------------
+# (code, kind, mission code or None for generic, name, texts). Every AR/FR/SW text keeps the
+# REVIEW REQUIRED marker and is stored as not reviewed until a native speaker checks it (D-15).
+# Nairobi reuses CITIZEN_ADVISORY unchanged, so the acceptance scenario sends the same words.
+SHELTER = "CIVIL_UNREST_SHELTER"
+MESSAGE_TEMPLATES: list[tuple[str, str, str | None, str, dict[str, str]]] = [
+    (
+        SHELTER,
+        "ADVISORY",
+        None,
+        "Civil unrest: shelter in place",
+        {
+            "en": "Civil unrest in central {city}. Stay indoors, avoid demonstrations and "
+            "large crowds, and reply SAFE or HELP. Updates every 2 hours.",
+            "ar": REVIEW_REQUIRED + "اضطرابات مدنية في وسط {city}. ابقوا في الداخل، وتجنبوا "
+            "المظاهرات والتجمعات الكبيرة، وردّوا بكلمة SAFE أو HELP. تحديثات كل ساعتين.",
+            "fr": REVIEW_REQUIRED + "Troubles civils dans le centre de {city}. Restez à "
+            "l'intérieur, évitez les manifestations et les rassemblements, et répondez SAFE ou "
+            "HELP. Mises à jour toutes les 2 heures.",
+            "sw": REVIEW_REQUIRED + "Kuna ghasia katikati ya {city}. Kaeni ndani, epukeni "
+            "maandamano na mikusanyiko mikubwa, na jibuni SAFE au HELP. Taarifa mpya kila saa 2.",
+        },
+    ),
+    (SHELTER, "ADVISORY", "NBO", "Civil unrest: shelter in place (Nairobi)", CITIZEN_ADVISORY),
+    (
+        SHELTER,
+        "ADVISORY",
+        "PAR",
+        "Civil unrest: shelter in place (Paris)",
+        {
+            "en": "Protests and clashes in central Paris, around République, Bastille and "
+            "Nation. Stay indoors, avoid the marches, expect transport disruption, and reply "
+            "SAFE or HELP. Updates every 2 hours.",
+            "ar": REVIEW_REQUIRED + "احتجاجات واشتباكات في وسط باريس، حول ساحات الجمهورية "
+            "والباستيل والأمة. ابقوا في الداخل، وتجنبوا المسيرات، وتوقعوا اضطراب وسائل النقل، "
+            "وردّوا بكلمة SAFE أو HELP. تحديثات كل ساعتين.",
+            "fr": REVIEW_REQUIRED + "Manifestations et heurts dans le centre de Paris, autour "
+            "de République, Bastille et Nation. Restez à l'intérieur, évitez les cortèges, "
+            "prévoyez des perturbations dans les transports, et répondez SAFE ou HELP. Mises "
+            "à jour toutes les 2 heures.",
+            "sw": REVIEW_REQUIRED + "Maandamano na makabiliano katikati ya Paris, karibu na "
+            "République, Bastille na Nation. Kaeni ndani, epukeni maandamano, tarajieni "
+            "usumbufu wa usafiri, na jibuni SAFE au HELP. Taarifa mpya kila saa 2.",
+        },
+    ),
+]
+
 PERSONNEL_TYPES = ["DIPLOMAT", "LOCAL_STAFF", "DELEGATE"]
 
 # (seq, name, action_type, action_config, requires_approval_role)

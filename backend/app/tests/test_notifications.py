@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from pydantic import ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.config import Settings
@@ -301,3 +301,45 @@ async def test_receipts_are_telemetry(api_engine: AsyncEngine, world: World) -> 
         after = await session.scalar(select(func.count()).select_from(AuditLog))
     assert {d.status for d in await deliveries(api_engine, world)} == {"READ"}
     assert after == before  # plan G-20: not audited
+
+
+async def test_only_campaigns_being_sent_are_dispatched(
+    api_engine: AsyncEngine, world: World
+) -> None:
+    """D-31 (review of Prompt 18, finding J): a delivery queued for a campaign that is
+    pending approval, or already sent, is never sent by the dispatcher."""
+    async with tenant_session(world.tenant, api_engine) as session:
+        author = await session.scalar(
+            text(
+                "INSERT INTO app_user (tenant_id, external_id, email, display_name) "
+                "VALUES (current_tenant_id(), 'sub-author', 'author@users.invalid', 'A') "
+                "RETURNING id"
+            )
+        )
+        for reference, status in (("NTF-PENDING", "PENDING_APPROVAL"), ("NTF-DONE", "SENT")):
+            await session.execute(
+                text(
+                    "INSERT INTO notification_campaign (tenant_id, reference, campaign_type, "
+                    "message, channels, created_by_type, created_by, submitted_by, status) "
+                    "VALUES (current_tenant_id(), :reference, 'ADVISORY', 'm', '{SMS}', 'USER', "
+                    ":author, :submitter, :status)"
+                ),
+                {
+                    "reference": reference,
+                    "author": str(author),
+                    "submitter": author,
+                    "status": status,
+                },
+            )
+            await session.execute(
+                text(
+                    "INSERT INTO notification_delivery (tenant_id, campaign_id, person_id, "
+                    "channel) SELECT current_tenant_id(), id, :person, 'SMS' "
+                    "FROM notification_campaign "
+                    "WHERE reference = :reference"
+                ),
+                {"person": world.people[0], "reference": reference},
+            )
+        await session.commit()
+    assert (await run_dispatch(api_engine, world)).sent == {}
+    assert {d.status for d in await deliveries(api_engine, world)} == {"QUEUED"}

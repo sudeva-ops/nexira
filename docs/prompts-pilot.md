@@ -72,6 +72,13 @@ second-person approval for external messages. The channel adapters are not chang
 - Sending queues deliveries exactly as playbook campaigns do (outbox, idempotency); there is no
   second sending path.
 - Every action is audited through app/core/audit.py.
+- No endpoint may write created_by, created_by_type or submitted_by from the request
+  (review of Prompt 18): set them in the service only, and test that a PATCH with those
+  fields changes nothing. Approve only from PENDING_APPROVAL, with the row locked, and
+  set status SENDING in the same UPDATE as approved_by. PATCH only DRAFT campaigns: the
+  content is frozen once submitted. The status only moves forward, and a pending campaign
+  reaches SENDING only together with its approval. The database refuses anything else
+  (PC-10, PC-11, PC-12).
 
 Tests: author approval → 403; a Viewer → 403; a second Duty Officer → deliveries queued; a
 staff-only campaign is sent by its author; cancel and test-send queue nothing; pilot mode

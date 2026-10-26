@@ -12,6 +12,7 @@ from typing import Any
 from app.core.db import tenant_session
 from app.modules.agents.service import AgentIn, PolicyIn, ensure_agents, ensure_policies
 from app.modules.intel.service import SourceIn, ensure_sources
+from app.modules.notifications.templates import TemplateIn, ensure_templates
 from app.modules.people import location
 from app.modules.people.service import add_observations, ensure_mission, load_persons, load_sites
 from app.modules.playbooks.service import StepIn, ensure_playbook
@@ -104,6 +105,22 @@ async def seed_all(
             ],
             step_ids=[
                 seed_id(tenant_id, "playbook_step", f"PB-07:{seq}") for seq, *_ in data.PB07_STEPS
+            ],
+        )
+
+        report["templates"] = await ensure_templates(
+            session,
+            [
+                # English is the source text, not a translation: only AR/FR/SW are reviewed.
+                TemplateIn(
+                    code,
+                    kind,
+                    mission,
+                    name,
+                    texts,
+                    {lang: False for lang in texts if lang != "en"},
+                )
+                for code, kind, mission, name, texts in data.MESSAGE_TEMPLATES
             ],
         )
 
