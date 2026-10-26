@@ -192,7 +192,7 @@ Rules:
 - **Translations.** D-15 still applies: pre-written translations only, no machine translation. A translation not yet reviewed keeps its `REVIEW REQUIRED` marker. With `APP_ENV=pilot`, a campaign cannot be sent with an unreviewed translation.
 - **Test send.** "Send to self" renders the message for each channel in the preview panel and writes an audit row. It creates no deliveries.
 
-**D-32 · Journey Management rules.** *(Proposed with `docs/requirements-pilot.md` §9–13; becomes settled when the product owner approves that PR.)* Requirements JR-01 to JR-09.
+**D-32 · Journey Management rules.** Approved by the product owner on 2026-10-26 (PR #24), with the defaults in `docs/requirements-pilot.md` §13. Requirements JR-01 to JR-09.
 - **Created on the traveller's behalf** by TRAVEL_DESK or DUTY_OFFICER, as a DRAFT. No traveller self-service in the pilot.
 - **Risk decides the approver.** At submission the trip takes the destination risk (D-08 scale): the country's simulated base level (PC-16) raised to the worst ACTIVE incident in that country.
   - LOW: approved on submission (audited).

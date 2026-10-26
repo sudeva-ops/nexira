@@ -113,7 +113,7 @@ Report the real output.
 
 ---
 
-## Pilot module 2 · Journey Management (draft for approval)
+## Pilot module 2 · Journey Management (approved 2026-10-26, PR #24)
 
 Sources: D-32, `docs/requirements-pilot.md` §9–13 (JR-01..09), PC-14..16.
 
@@ -128,7 +128,7 @@ No code changes.
 
 ### Prompt 24 · Trip itinerary, approval and country risk (migration) 🔒
 ```
-Only after PC-14, PC-15 and PC-16 are approved. A new migration (never edit 0001/0002):
+PC-14, PC-15 and PC-16 were approved on 2026-10-26 (PR #24). A new migration (never edit 0001/0002):
 trip_segment and country_risk with FORCE RLS and tenant_isolation; the trip columns and
 statuses; the guard triggers on trip, trip_traveller and trip_segment; REVOKE DELETE as
 PC-15 says. Seed country_risk (simulated) and a handful of trips: TRP-8812 unchanged

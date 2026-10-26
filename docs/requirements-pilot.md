@@ -96,7 +96,7 @@ The Nairobi acceptance scenario and the France scenario still pass. The France s
 
 ---
 
-# Pilot module 2 · Journey Management (draft for approval)
+# Pilot module 2 · Journey Management (approved 2026-10-26, PR #24)
 
 For the product owner, who approves this part; then for the coding agent (Prompts 23–27 in `docs/prompts-pilot.md`). Rules: D-30, and **D-32** (proposed with this draft).
 
