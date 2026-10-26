@@ -192,6 +192,17 @@ Rules:
 - **Translations.** D-15 still applies: pre-written translations only, no machine translation. A translation not yet reviewed keeps its `REVIEW REQUIRED` marker. With `APP_ENV=pilot`, a campaign cannot be sent with an unreviewed translation.
 - **Test send.** "Send to self" renders the message for each channel in the preview panel and writes an audit row. It creates no deliveries.
 
+**D-32 · Journey Management rules.** *(Proposed with `docs/requirements-pilot.md` §9–13; becomes settled when the product owner approves that PR.)* Requirements JR-01 to JR-09.
+- **Created on the traveller's behalf** by TRAVEL_DESK or DUTY_OFFICER, as a DRAFT. No traveller self-service in the pilot.
+- **Risk decides the approver.** At submission the trip takes the destination risk (D-08 scale): the country's simulated base level (PC-16) raised to the worst ACTIVE incident in that country.
+  - LOW: approved on submission (audited).
+  - MODERATE: TRAVEL_DESK or SECURITY_OFFICER.
+  - HIGH and CRITICAL: SECURITY_OFFICER.
+  - Never the requester (submitting is the first step, as in D-31 plan G-2), always through `app/core/approvals.py`. Mission scope: the mission in the destination country, else HQ only (D-06).
+- **Checklist before risky travel.** Four items are ticked by users (security briefing, insurance and medical cover, emergency contacts, check-in schedule); a HIGH or CRITICAL trip cannot be approved while any is open. The fifth, security approval, is set by the approval.
+- **Flag, don't revoke.** An approved trip whose destination risk rises is flagged with the new level; it is not paused or cancelled automatically. The Travel & Air agent (pilot module 4) will propose what to do.
+- **What is approved is what travels.** Travellers, destination, dates and itinerary are frozen once submitted; changes mean cancel and re-plan. The database backs this, as PC-10..12 do for campaigns.
+
 ---
 
 ## 7. Phase 1 acceptance scenario: NBO-CIVIL-UNREST

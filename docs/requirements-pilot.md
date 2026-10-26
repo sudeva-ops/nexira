@@ -83,7 +83,7 @@ The Nairobi acceptance scenario and the France scenario still pass. The France s
 
 | Module | Starting point | Needs to be decided |
 |---|---|---|
-| Journey Management (JRN-01..05) | `trip`, `trip_traveller` and trip exposure already exist | trip approval thresholds; the Travel Desk role in the pilot; checklist content |
+| Journey Management (JRN-01..05) | **Written: §9 (draft for approval)** | — |
 | Air Travel Tracking (AIR-01..07) | nothing | a simulated flight model; AIR-06 (never show VIP movements) before any real feed |
 | Travel & Air agent | the agent framework | action policies for diversion and rebooking (level 2, Travel Desk) |
 | Assistance Partners (AST-01..04) | nothing | only if the pilot customer wants it |
@@ -93,3 +93,55 @@ The Nairobi acceptance scenario and the France scenario still pass. The France s
 1. **Second person:** for campaigns that reach citizens only (MN-05 as written). Size alone does not trigger it.
 2. **Templates:** maintained by `ADMIN` and `CONSULAR_OFFICER` (§4 as written).
 3. **Channel fallback (MN-11):** first answered "wanted". It was then **deferred** on 2026-10-25 (PR #17, plan G-1), because it needs a delivery-mode column (PC-09) that is not worth adding before real gateways exist.
+
+---
+
+# Pilot module 2 · Journey Management (draft for approval)
+
+For the product owner, who approves this part; then for the coding agent (Prompts 23–27 in `docs/prompts-pilot.md`). Rules: D-30, and **D-32** (proposed with this draft).
+
+## 9. Purpose and starting point
+
+Travel risk and approvals (master spec §5.10, JRN-01..05): know who is travelling where, approve risky trips before they start, prepare the traveller, and see at once which trips an incident hits.
+
+| Exists today | Where |
+|---|---|
+| `trip` (reference, purpose, origin, destination, `destination_country`, dates, `risk_level`, `approval_status` PENDING/APPROVED/REJECTED) and `trip_traveller` | schema v0.2 |
+| Trips in incident exposure: active today and a traveller exposed (D-22); the Nairobi scenario's TRP-8812 | `intel/exposure.py`, seed |
+| `TRAVEL_DESK` role and the `travel.desk` demo user | roles seed, Keycloak realm |
+| Nothing else: no trip API, no screen, no itinerary, no checklist, no approver columns | — |
+
+## 10. Requirements: Journey Management (JR)
+
+| ID | Requirement | Master | Pri. | Acceptance |
+|---|---|---|---|---|
+| JR-01 | **Create and edit a trip** as a draft: purpose, travellers (people from People & Sites), origin, destination city and country, dates. Created by TRAVEL_DESK or DUTY_OFFICER on the traveller's behalf (no self-service in the pilot). | JRN-01 | M | A Travel Desk user creates TRP-…; a Viewer gets 403. |
+| JR-02 | **Itinerary** of ordered segments: flight, stay, meeting, ground transport; each with a place, start and end time. Shown as a timeline. | JRN-01 | M | Segments outside the trip's dates are refused. |
+| JR-03 | **Destination risk** at submission: the country's base level (simulated, PC-16) raised to the worst ACTIVE incident severity in that country. Stored on the trip at submission; shown with a four-part breakdown (security, civil unrest, health, transport). | JRN-04 | M | A trip to France during the France scenario rates HIGH or above. |
+| JR-04 | **Approval by risk** (D-32): LOW is approved on submission; MODERATE needs TRAVEL_DESK or SECURITY_OFFICER; HIGH and CRITICAL need SECURITY_OFFICER. Never the requester; through `approvals.decide()`. Reject needs a reason. | JRN-02 | M | The requester's approval → 403; a Travel Desk approval of a HIGH trip → 403; a Security Officer → APPROVED. |
+| JR-05 | **Pre-travel checklist**: security briefing, insurance and medical cover, emergency contacts, check-in schedule (each ticked by a user, audited) and security approval (set by the approval). A HIGH or CRITICAL trip cannot be approved until the first four are ticked. | JRN-03 | M | Approving a HIGH trip with an open item → 409 naming it. |
+| JR-06 | **Impacted trips**: a trip active today with a traveller in an incident's exposure shows "Impacted by INC-…" in the list and detail, and the incident lists the trip (exists, D-22). | JRN-05 | M | In the Nairobi scenario, TRP-8812 shows "Impacted by INC-…-1042". |
+| JR-07 | **Risk changed since approval**: if the destination risk rises above the approved level, the trip is flagged (not revoked); the Travel & Air agent will propose actions later. | JRN-04 | S | After the France scenario starts, an approved LOW Paris trip shows "risk now HIGH". |
+| JR-08 | **Trips screen**: list with filters (status, risk, mission, impacted), detail with itinerary, checklist, risk breakdown, travellers, and actions shown from `GET /api/me/permissions`. KPIs from data (D-27). | JRN-01 | M | — |
+| JR-09 | **Everything audited**: create, edit, submit, approve, reject, cancel, checklist ticks. | PLT | M | `GET /api/audit/verify` intact after the e2e. |
+
+### Not in this module
+Live flights (Air Travel Tracking, next), booking integration (GDS), traveller self-service or a mobile app, and automatic actions on risk changes (the Travel & Air agent).
+
+## 11. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-14 · `trip_segment`**: the itinerary.
+- **PC-15 · trip approval and checklist**: `DRAFT` and `CANCELLED` statuses, `requested_by`, `submitted_at`, `approved_by`, `approved_at`, `rejection_reason`, `approved_risk_level`, `mission_id` (scope), a `checklist` jsonb, and a guard trigger in the style of PC-10/11/12 (no self-approval, approval frozen, content frozen once submitted, forward-only status).
+- **PC-16 · `country_risk`**: simulated base levels and the four-part breakdown per country (D-19 label "simulated").
+
+## 12. Acceptance for the module
+
+Playwright on the real stack: a Travel Desk user plans a Paris trip for two staff during the France scenario; it rates HIGH; the Travel Desk cannot approve it and the requester cannot either; the checklist blocks approval until ticked; the Security Officer approves; the Nairobi scenario shows TRP-8812 as impacted; the audit chain verifies; `make acceptance` (Nairobi and Mass Notification) still passes.
+
+## 13. Questions for the product owner (defaults in D-32)
+
+1. Approval thresholds: LOW automatic, MODERATE Travel Desk or Security, HIGH and CRITICAL Security only. Should CRITICAL also need the HQ Crisis Director as a second step?
+2. Who creates trips: Travel Desk and Duty Officers only (no traveller self-service in the pilot)?
+3. The checklist's five items, and whether they should block HIGH and CRITICAL approvals.
+4. Should an approved trip whose risk rises be paused automatically, or only flagged (default: flagged; the Travel & Air agent proposes actions later)?
+

@@ -113,5 +113,64 @@ Report the real output.
 
 ---
 
+## Pilot module 2 · Journey Management (draft for approval)
+
+Sources: D-32, `docs/requirements-pilot.md` §9–13 (JR-01..09), PC-14..16.
+
+### Prompt 23 · Read and plan (no code)
+```
+Read D-08, D-22, D-29, D-30, D-32, requirements-pilot.md §9-13, the travel and intel
+modules and the Mass Notification composer (the pattern to follow). Write
+docs/plan-pilot-jrn.md: requirement-to-code mapping, the API (paths, roles), gaps with
+proposed answers, and the migration for PC-14..16 (only after they are approved).
+No code changes.
+```
+
+### Prompt 24 · Trip itinerary, approval and country risk (migration) 🔒
+```
+Only after PC-14, PC-15 and PC-16 are approved. A new migration (never edit 0001/0002):
+trip_segment and country_risk with FORCE RLS and tenant_isolation; the trip columns and
+statuses; the guard triggers on trip, trip_traveller and trip_segment; REVOKE DELETE as
+PC-15 says. Seed country_risk (simulated) and a handful of trips: TRP-8812 unchanged
+(the Nairobi acceptance depends on it), plus draft, pending and approved trips elsewhere.
+Tests (as nexira_api): isolation on the new tables; every guard refusal (self-approval,
+approval from DRAFT, edits after submission, backward status); backup role can read the
+new tables; the 0003 downgrade restores 0002 exactly.
+```
+
+### Prompt 25 · Trips backend 🔒
+```
+JR-01..07, JR-09. 🔒 because it adds an approval path (D-29: approvals).
+- /api/trips: create and edit a DRAFT (TRAVEL_DESK, DUTY_OFFICER), travellers and segments,
+  checklist ticks, submit, approve, reject (reason), cancel; GET with filters and an
+  "impacted by" field from incident_exposure; GET /api/me/permissions for trips.
+- Destination risk at submission (D-32, PC-16 + ACTIVE incidents in the country); the
+  approver follows the risk; the gate goes through approvals.decide with the requester as
+  a decider of the first step. LOW is approved on submission. HIGH/CRITICAL need the four
+  checklist items. "Risk now X" when the live risk exceeds approved_risk_level.
+- Author fields never from a request (extra="forbid"); everything audited.
+Tests: every role and scope refusal; the checklist block; LOW auto-approval; risk from an
+incident; impacted flag in the Nairobi scenario; the database backstop for each rule.
+```
+
+### Prompt 26 · Journey Management screen
+```
+JR-08 (visual reference: the demo's Journey Management screen). Trips table with filters
+and an "Impacted" status; detail with itinerary timeline, travellers, checklist (tick
+boxes for those allowed), destination risk breakdown (labelled simulated), approve /
+reject / cancel from permissions; KPIs from data. Navigation under MONITOR.
+Tests: Vitest for the table, the checklist, the permission-driven buttons.
+```
+
+### Prompt 27 · Journey Management acceptance
+```
+Playwright, real stack (requirements-pilot.md §12): plan a Paris trip during the France
+scenario (HIGH), refusals for the requester and the Travel Desk, the checklist block,
+approval by the Security Officer, TRP-8812 impacted in the Nairobi scenario, audit verifies;
+make acceptance still passes. Report the real output.
+```
+
+---
+
 ## Later pilot modules
-The prompts for Journey Management, Air Travel Tracking, the Travel & Air agent and (if the customer wants it) Assistance Partners are written after their requirements are approved (requirements-pilot.md §7).
+The prompts for Air Travel Tracking, the Travel & Air agent and (if the customer wants it) Assistance Partners are written after their requirements are approved (requirements-pilot.md §7).
