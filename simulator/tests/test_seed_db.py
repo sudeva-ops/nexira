@@ -199,7 +199,7 @@ async def _snapshot(conn: asyncpg.Connection) -> dict[str, Any]:
         "mission", "site", "person", "location_observation", "person_location_current", "trip",
         "trip_traveller", "intel_source", "playbook", "playbook_step", "agent", "action_policy",
         "app_user", "role", "user_role", "reference_counter", "scenario", "scenario_event",
-        "message_template",
+        "message_template", "country_risk",
     ]  # fmt: skip
     snap: dict[str, Any] = {}
     for t in tables:
@@ -260,3 +260,25 @@ async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> No
     assert all(set(r) == {"ar", "fr", "sw"} for r in reviewed[:3])  # not English (D-15)
     assert reviewed[3:] == [{}, {}, {}]  # English only: nothing to review
     assert not any(any(r.values()) for r in reviewed)
+
+
+async def test_journey_seed_country_risk_trips_and_counter(seeded: Seeded) -> None:
+    """D-32, PC-16: simulated country risk, a few future trips, and TRP-8821 next."""
+    levels = {
+        r["country_code"]: r["level"]
+        for r in await seeded.conn.fetch("SELECT country_code, level FROM country_risk")
+    }
+    assert (levels["KE"], levels["IQ"], levels["FR"]) == ("MODERATE", "HIGH", "LOW")
+    trips = {
+        r["reference"]: (r["approval_status"], r["risk_level"], r["approved_at"] is not None)
+        for r in await seeded.conn.fetch(
+            "SELECT reference, approval_status, risk_level, approved_at FROM trip"
+        )
+    }
+    assert trips == {
+        "TRP-8812": ("APPROVED", "MODERATE", True),
+        "TRP-8814": ("PENDING", "HIGH", False),
+        "TRP-8815": ("APPROVED", "LOW", True),
+        "TRP-8817": ("APPROVED", "LOW", True),
+    }
+    assert await seeded.conn.fetchval("SELECT next_reference('TRP', false)") == "TRP-8821"

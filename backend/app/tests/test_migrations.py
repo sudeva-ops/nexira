@@ -54,8 +54,9 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
 
     command.upgrade(cfg, "head")
     upgraded = asyncio.run(_snapshot(admin))
-    # The schema's 33 tables, message_template (0002) and alembic_version.
-    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 1
+    # The schema's 33 tables, message_template (0002), trip_segment and country_risk
+    # (0003), and alembic_version.
+    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 1
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
 
@@ -134,4 +135,64 @@ def test_downgrading_0002_restores_0001_exactly(fresh: DbUrls) -> None:
     assert at_0001["api_can_delete"] is True
     assert at_head["api_can_delete"] is False
     assert "notification_campaign_approval_guard" in str(at_head["triggers"])
+    command.upgrade(cfg, "head")
+
+
+async def _trip_shape(admin_url: str) -> dict[str, object]:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        columns = await conn.fetch(
+            "SELECT column_name, column_default FROM information_schema.columns "
+            "WHERE table_name = 'trip' ORDER BY column_name"
+        )
+        checks = await conn.fetch(
+            "SELECT conname, pg_get_constraintdef(oid) AS def FROM pg_constraint "
+            "WHERE conrelid = 'trip'::regclass AND contype = 'c' ORDER BY conname"
+        )
+        triggers = await conn.fetch(
+            "SELECT tgrelid::regclass::text AS t, tgname FROM pg_trigger WHERE NOT tgisinternal "
+            "AND tgrelid IN ('trip'::regclass, 'trip_traveller'::regclass) ORDER BY 1, 2"
+        )
+        tables = await conn.fetchval(
+            "SELECT count(*) FROM pg_class WHERE relname IN ('trip_segment', 'country_risk')"
+        )
+        can_delete = await conn.fetchval(
+            "SELECT has_table_privilege('nexira_app', 'trip', 'DELETE')"
+        )
+        security = await conn.fetch(
+            "SELECT relname, relrowsecurity, relforcerowsecurity, relacl::text AS acl "
+            "FROM pg_class "
+            "WHERE relname IN ('trip', 'trip_traveller') ORDER BY relname"
+        )
+        policies = await conn.fetch(
+            "SELECT tablename, policyname, qual, with_check FROM pg_policies "
+            "WHERE tablename IN ('trip', 'trip_traveller') ORDER BY 1, 2"
+        )
+    finally:
+        await conn.close()
+    return {
+        "columns": [(r["column_name"], r["column_default"]) for r in columns],
+        "checks": [(r["conname"], r["def"]) for r in checks],
+        "triggers": [(r["t"], r["tgname"]) for r in triggers],
+        "new_tables": tables,
+        "api_can_delete": can_delete,
+        "security": [tuple(r) for r in security],
+        "policies": [tuple(r) for r in policies],
+    }
+
+
+def test_downgrading_0003_restores_0002_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0002")
+    at_0002 = asyncio.run(_trip_shape(admin))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_trip_shape(admin))
+    command.downgrade(cfg, "0002")
+    assert asyncio.run(_trip_shape(admin)) == at_0002
+    assert (at_head["new_tables"], at_head["api_can_delete"]) == (2, False)
+    triggers = at_head["triggers"]
+    assert isinstance(triggers, list)
+    assert ("trip", "trip_guard") in triggers
     command.upgrade(cfg, "head")

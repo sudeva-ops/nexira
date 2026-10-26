@@ -112,6 +112,48 @@ OTHER_CITIZENS = 1000  # D-27: about 1,000 citizens across the other missions
 # --- trip TRP-8812 (demo TRIPS) ------------------------------------------------------------------
 TRIP_REFERENCE = "TRP-8812"
 TRIP_PURPOSE = "Trade delegation (3)"
+TRP_START = 8820  # next user trip: TRP-8821 (D-18)
+
+# --- Journey Management (D-32, PC-16) ------------------------------------------------------------
+# Simulated base risk per country: (security, unrest, health, transport), 0-100. Kenya and
+# Iraq follow the demo's CRISK figures; France starts LOW, so the France scenario's
+# incident is what raises it. Countries not listed get DEFAULT_COUNTRY_RISK.
+COUNTRY_RISK_SOURCE = "Riskline (simulated)"
+COUNTRY_RISK: dict[str, tuple[int, int, int, int]] = {
+    "KE": (58, 46, 30, 40),
+    "IQ": (78, 60, 35, 62),
+    "ET": (55, 52, 38, 45),
+    "BD": (44, 50, 52, 48),
+    "PK": (62, 55, 40, 45),
+    "NG": (60, 50, 45, 42),
+    "ID": (35, 30, 40, 48),
+    "FR": (25, 38, 8, 30),
+    "BE": (22, 25, 12, 15),
+    "BR": (40, 28, 22, 30),
+    "SG": (8, 6, 10, 8),
+    "KR": (12, 15, 10, 10),
+}
+DEFAULT_COUNTRY_RISK = (20, 15, 10, 15)
+
+# Trips for the Journey screen, all in the future so none is in today's exposure:
+# (reference, purpose, traveller mission, travellers, destination, country, days from the
+#  scenario date, length in days, status, risk). Seeded trips have no requester (plan G-4).
+EXTRA_TRIPS: list[tuple[str, str, str, int, str, str, int, int, str, str]] = [
+    ("TRP-8814", "Security assessment", "AMM", 2, "Baghdad", "IQ", 5, 3, "PENDING", "HIGH"),
+    ("TRP-8815", "EU coordination meeting", "LON", 1, "Brussels", "BE", 2, 1, "APPROVED", "LOW"),
+    (
+        "TRP-8817",
+        "Regional consular conference",
+        "JKT",
+        1,
+        "Singapore",
+        "SG",
+        9,
+        2,
+        "APPROVED",
+        "LOW",
+    ),
+]
 
 # --- intel sources (D-09, D-10, D-11) -----------------------------------------------------------
 # (code, name, reliability, severity_map, category_map, enabled, fusion)
