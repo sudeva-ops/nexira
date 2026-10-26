@@ -249,7 +249,12 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
     api: asyncpg.Connection, world: World, table: str
 ) -> None:
     await set_tenant(api, world.b)
-    with pytest.raises(asyncpg.InsufficientPrivilegeError, match="row-level security"):
+    # A trip's travellers and segments are refused one step earlier, by trip_child_guard:
+    # tenant B cannot see tenant A's trip (migration 0003).
+    with pytest.raises(
+        (asyncpg.InsufficientPrivilegeError, asyncpg.RaiseError),
+        match=r"row-level security|trip: no such trip",
+    ):
         await api.execute(sql_for(table, world.a))
 
 

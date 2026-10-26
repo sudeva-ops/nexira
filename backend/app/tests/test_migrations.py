@@ -159,6 +159,15 @@ async def _trip_shape(admin_url: str) -> dict[str, object]:
         can_delete = await conn.fetchval(
             "SELECT has_table_privilege('nexira_app', 'trip', 'DELETE')"
         )
+        security = await conn.fetch(
+            "SELECT relname, relrowsecurity, relforcerowsecurity, relacl::text AS acl "
+            "FROM pg_class "
+            "WHERE relname IN ('trip', 'trip_traveller') ORDER BY relname"
+        )
+        policies = await conn.fetch(
+            "SELECT tablename, policyname, qual, with_check FROM pg_policies "
+            "WHERE tablename IN ('trip', 'trip_traveller') ORDER BY 1, 2"
+        )
     finally:
         await conn.close()
     return {
@@ -167,6 +176,8 @@ async def _trip_shape(admin_url: str) -> dict[str, object]:
         "triggers": [(r["t"], r["tgname"]) for r in triggers],
         "new_tables": tables,
         "api_can_delete": can_delete,
+        "security": [tuple(r) for r in security],
+        "policies": [tuple(r) for r in policies],
     }
 
 

@@ -46,6 +46,8 @@ def downgrade() -> None:
         DROP FUNCTION trip_child_guard();
         DROP TRIGGER trip_guard ON trip;
         DROP FUNCTION trip_guard();
+        ALTER TABLE trip DROP CONSTRAINT trip_submitted_check;
+        ALTER TABLE trip DROP CONSTRAINT trip_approval_only_check;
         ALTER TABLE trip DROP CONSTRAINT trip_approver_check;
         ALTER TABLE trip DROP CONSTRAINT trip_approved_check;
         ALTER TABLE trip
