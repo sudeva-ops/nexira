@@ -401,11 +401,18 @@ async def complete_campaigns(
     return completed
 
 
+@dataclass
+class Receipts:
+    changed: int  # deliveries moved on
+    campaigns: list[NotificationCampaign]  # whose funnel changed, for one event each (MN-09)
+
+
 async def refresh_receipts(
     session: AsyncSession, now: datetime, configured_adapter: str = "simulated"
-) -> int:
+) -> Receipts:
     """Move SENT/DELIVERED deliveries on as the adapter reports (telemetry, not
-    audited, plan G-20). Returns how many changed."""
+    audited, plan G-20). Returns how many changed, and the campaigns they belong to,
+    so the screen's delivery funnel can follow live (one event per campaign)."""
     rows = (
         await session.execute(
             select(NotificationDelivery, NotificationCampaign.sent_at)
@@ -418,6 +425,7 @@ async def refresh_receipts(
         )
     ).all()
     changed: dict[str, list[int]] = {}
+    campaign_ids: set[uuid.UUID] = set()
     for delivery, sent_at in rows:
         if sent_at is None:
             continue
@@ -425,10 +433,20 @@ async def refresh_receipts(
         reported: str = adapter.receipt(delivery.provider_ref or "", sent_at, now)
         if reported != delivery.status:
             changed.setdefault(reported, []).append(delivery.id)
+            campaign_ids.add(delivery.campaign_id)
     for new_status, ids in changed.items():
         await session.execute(
             update(NotificationDelivery)
             .where(NotificationDelivery.id.in_(ids))
             .values(status=new_status, updated_at=now)
         )
-    return sum(len(ids) for ids in changed.values())
+    campaigns = (
+        list(
+            await session.scalars(
+                select(NotificationCampaign).where(NotificationCampaign.id.in_(campaign_ids))
+            )
+        )
+        if campaign_ids
+        else []
+    )
+    return Receipts(sum(len(ids) for ids in changed.values()), campaigns)

@@ -1531,3 +1531,139 @@ body {
   color: var(--nx-tx3);
   font-size: 11px;
 }
+
+/* --- Mass Notification (Prompt 21) ------------------------------------------ */
+.nx-ntf-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: start;
+}
+
+.nx-ntf-grid .nx-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nx-ntf-grid tbody tr {
+  cursor: pointer;
+}
+
+.nx-ntf-scroll {
+  max-height: 440px;
+  overflow: auto;
+}
+
+.nx-ntf-grid td.nx-nowrap {
+  white-space: nowrap;
+}
+
+.nx-ntf-grid tbody tr.on {
+  background: rgba(45, 114, 210, 0.15);
+}
+
+.nx-composer {
+  display: grid;
+  gap: 8px;
+}
+
+.nx-composer-actions,
+.nx-detail-actions {
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.nx-tg {
+  padding: 3px 9px;
+  border: 1px solid var(--nx-line);
+  background: transparent;
+  color: var(--nx-tx2);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.nx-tg.on,
+.nx-tg[aria-pressed="true"] {
+  border-color: #2d72d2;
+  background: rgba(45, 114, 210, 0.2);
+  color: var(--nx-tx);
+}
+
+.nx-translations summary {
+  color: var(--nx-tx3);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.nx-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--nx-line);
+  background: var(--nx-panel2);
+}
+
+.nx-ntf-message {
+  margin: 0 0 6px;
+  font-weight: 600;
+}
+
+.nx-funnel-legend {
+  display: flex;
+  gap: 12px;
+  margin: 8px 0;
+  font-size: 11px;
+  color: var(--nx-tx3);
+}
+
+.nx-funnel-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+}
+
+.nx-funnel {
+  display: grid;
+  grid-template-columns: 90px 1fr 90px;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.nx-stack {
+  display: flex;
+  height: 14px;
+  background: #2f343c;
+}
+
+.nx-stack i {
+  display: block;
+  height: 100%;
+}
+
+.nx-linkbtn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--nx-tx);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nx-testphone {
+  margin-top: 8px;
+}
+
+
+.nx-chips .nx-dim {
+  white-space: nowrap;
+}

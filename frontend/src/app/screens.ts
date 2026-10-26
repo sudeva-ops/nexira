@@ -9,7 +9,7 @@ export interface Screen {
   builtIn: string; // prompt that builds the real screen
 }
 
-// D-25: the Phase 1 screens, and only these. Groups and subtitles follow the demo,
+// D-25: the Phase 1 screens, plus the pilot modules approved under D-30. Groups and subtitles follow the demo,
 // without "Object explorer" / "AIP" wording (D-19); Audit is not in the demo nav.
 // The Presenter bar is not a screen; it renders only in demo mode (Prompt 15).
 export const SCREENS: readonly Screen[] = [
@@ -19,6 +19,7 @@ export const SCREENS: readonly Screen[] = [
   { path: "/incidents", title: "Incidents", subtitle: "Fused threat intelligence", icon: "warning-sign", group: "MONITOR", builtIn: "Prompt 8" },
   { path: "/people", title: "People & Sites", subtitle: "Location confidence", icon: "people", group: "MONITOR", builtIn: "Prompt 8" },
   { path: "/playbooks", title: "Response Playbooks", subtitle: "Workflows · Automated response", icon: "flash", group: "RESPOND", builtIn: "Prompt 11" },
+  { path: "/notifications", title: "Mass Notification", subtitle: "Comms · Multi-channel delivery", icon: "send-message", group: "RESPOND", builtIn: "Prompt 21" },
   { path: "/checkin", title: "Safety Check-in", subtitle: "Workflows · Personnel accountability", icon: "tick-circle", group: "RESPOND", builtIn: "Prompt 11" },
   { path: "/audit", title: "Audit", subtitle: "Admin · Hash-chained audit log", icon: "history", group: "ADMIN", builtIn: "Prompt 3" },
 ];
