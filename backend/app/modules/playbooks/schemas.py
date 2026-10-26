@@ -66,3 +66,8 @@ class PermissionsOut(BaseModel):
     submit_campaign: bool = False  # notification_campaign: may submit or send it
     approve_campaign: bool = False  # notification_campaign: may approve or reject (D-31)
     cancel_campaign: bool = False  # notification_campaign: may cancel it
+    edit_trip: bool = False  # trip: the requester may edit the draft
+    submit_trip: bool = False  # trip: the requester may submit it
+    approve_trip: bool = False  # trip: may approve or reject (D-32)
+    check_trip: bool = False  # trip: may tick checklist items
+    cancel_trip: bool = False  # trip: may cancel it

@@ -84,10 +84,13 @@ class World:
             await session.execute(
                 update(Person).where(Person.id == self.id("inactive")).values(is_active=False)
             )
-            for ref, starts, ends, traveller in [
-                ("TRP-IN", date(2026, 10, 19), date(2026, 10, 23), "delegate"),
-                ("TRP-PAST", date(2026, 10, 1), date(2026, 10, 5), "diplomat"),
-                ("TRP-AWAY", date(2026, 10, 19), date(2026, 10, 23), "citizen_out"),
+            for ref, starts, ends, traveller, trip_status in [
+                ("TRP-IN", date(2026, 10, 19), date(2026, 10, 23), "delegate", "PENDING"),
+                ("TRP-PAST", date(2026, 10, 1), date(2026, 10, 5), "diplomat", "APPROVED"),
+                ("TRP-AWAY", date(2026, 10, 19), date(2026, 10, 23), "citizen_out", "APPROVED"),
+                # Journey plan G-3: only trips that will happen count.
+                ("TRP-DRAFT", date(2026, 10, 19), date(2026, 10, 23), "delegate", "DRAFT"),
+                ("TRP-OFF", date(2026, 10, 19), date(2026, 10, 23), "delegate", "CANCELLED"),
             ]:
                 await ensure_trip(
                     session,
@@ -100,6 +103,7 @@ class World:
                     starts_on=starts,
                     ends_on=ends,
                     traveller_ids=[self.id(traveller)],
+                    approval_status=trip_status,
                 )
             await session.commit()
 
@@ -180,7 +184,8 @@ async def test_exposure_counts_mission_and_escalation(
         sites=3,  # embassy, hotel, residence; the office at 6 km is outside
         mission_sites=2,  # not the hotel (D-23)
         protected_sites=2,
-        trips=1,  # TRP-IN only: TRP-PAST is not active, TRP-AWAY's traveller is outside
+        trips=1,  # TRP-IN only: TRP-PAST is not active, TRP-AWAY's traveller is outside,
+        # TRP-DRAFT and TRP-OFF will not happen (Journey plan G-3)
     )
     assert (computed.mission_id, computed.severity, computed.escalated) == (
         world.ids["NBO"],

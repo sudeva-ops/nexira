@@ -12,6 +12,8 @@ from pathlib import Path
 
 import asyncpg
 from app.modules.tenancy import service as tenancy
+from app.modules.tenancy.models import AppUser
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nexira_sim.seed.ids import DEMO_TENANT_ID
@@ -108,3 +110,14 @@ async def seed_identities(
             ):
                 grants += 1
     return {"users": len(users), "new_grants": grants}
+
+
+async def demo_user_id(session: AsyncSession, username: str) -> uuid.UUID:
+    """The app_user of a demo realm user (seeded by seed_identities)."""
+    user = next(u for u in realm_users() if u.username == username)
+    user_id = await session.scalar(
+        select(AppUser.id).where(AppUser.external_id == user.keycloak_id)
+    )
+    if user_id is None:
+        raise LookupError(f"demo user {username} is not seeded")
+    return user_id

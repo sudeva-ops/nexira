@@ -65,6 +65,7 @@ FORWARDED = frozenset(
         "CAMPAIGN_QUEUED",
         "CAMPAIGN_UPDATED",
         "CHECKIN_UPDATED",
+        "TRIP_UPDATED",
         "CHECKIN_ESCALATED",
         "PROPOSAL_CREATED",
         "PROPOSAL_UPDATED",

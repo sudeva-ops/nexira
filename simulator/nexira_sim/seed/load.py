@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from nexira_sim.scenarios import fra_national_protests as fra
 from nexira_sim.scenarios import nbo_civil_unrest as nbo
 from nexira_sim.seed import data, world
-from nexira_sim.seed.identities import bootstrap_tenant, seed_identities
+from nexira_sim.seed.identities import bootstrap_tenant, demo_user_id, seed_identities
 from nexira_sim.seed.ids import seed_id
 
 
@@ -107,6 +107,10 @@ async def seed_all(
                 traveller_ids=travellers,
                 risk_level=risk,
                 approval_status=status,
+                mission_id=mission_ids[data.TRIP_SCOPE[ref]] if ref in data.TRIP_SCOPE else None,
+                requested_by=await demo_user_id(session, data.TRIP_REQUESTER[ref])
+                if ref in data.TRIP_REQUESTER
+                else None,
             )
 
         report["sources"] = await ensure_sources(

@@ -279,6 +279,13 @@ async def test_journey_seed_country_risk_trips_and_counter(seeded: Seeded) -> No
         "TRP-8812": ("APPROVED", "MODERATE", True),
         "TRP-8814": ("PENDING", "HIGH", False),
         "TRP-8815": ("APPROVED", "LOW", True),
+        "TRP-8816": ("DRAFT", "LOW", False),
         "TRP-8817": ("APPROVED", "LOW", True),
     }
+    scoped = await seeded.conn.fetchrow(
+        "SELECT m.code, (SELECT count(*) FROM trip WHERE requested_by IS NOT NULL) AS requested "
+        "FROM trip t JOIN mission m ON m.id = t.mission_id WHERE t.reference = 'TRP-8814'"
+    )
+    assert scoped is not None
+    assert (scoped["code"], scoped["requested"]) == ("BGW", 1)  # plan G-2; the draft
     assert await seeded.conn.fetchval("SELECT next_reference('TRP', false)") == "TRP-8821"

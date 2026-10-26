@@ -7,8 +7,8 @@ readers see either the previous set or the new one (READ COMMITTED):
 |---------|-------------------------------------------------------------------------|
 | PERSON  | active, with person_location_current within incident.impact_radius_m    |
 | SITE    | any site type within the radius                                         |
-| TRIP    | active on incident.opened_at::date (UTC, plan G-11), and at least one   |
-|         | traveller exposed                                                       |
+| TRIP    | PENDING or APPROVED (Journey plan G-3), active on incident.opened_at    |
+|         | ::date (UTC, plan G-11), and at least one traveller exposed             |
 
 Distances use ST_DWithin / ST_Distance on geography, backed by the gist indexes
 on person_location_current, site and incident.
@@ -66,6 +66,7 @@ _REPLACE = [
     SELECT i.tenant_id, i.id, 'TRIP', t.id, min(e.distance_m), max(e.confidence)
       FROM incident i
       JOIN trip t ON (i.opened_at AT TIME ZONE 'UTC')::date BETWEEN t.starts_on AND t.ends_on
+                 AND t.approval_status IN ('PENDING', 'APPROVED')  -- trips that will happen (G-3)
       JOIN trip_traveller tt ON tt.trip_id = t.id
       JOIN incident_exposure e ON e.incident_id = i.id AND e.subject_type = 'PERSON'
                               AND e.subject_id = tt.person_id
