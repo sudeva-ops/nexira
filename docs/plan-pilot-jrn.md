@@ -57,9 +57,8 @@ For the product owner and the coding agent. It maps JR-01..09 (`docs/requirement
 - `nexira_backup` reads the new tables through the default privileges; the downgrade restores 0002 exactly (as in Prompt 18).
 - Seed (simulator): `country_risk` for the seeded missions' countries (simulated levels), the `TRP` counter (G-5), and a few trips in other states for the screen. TRP-8812 is unchanged.
 
-## 5. Decisions needed from the product owner
-
-1. **G-1:** incidents count for their mission's country only (no country lookup in the pilot).
-2. **G-3:** only PENDING and APPROVED trips count in exposure and as impacted.
+## 5. Decisions from the product owner (2026-10-26, PR #25)
+1. **G-1:** approved. Incidents count for their mission's country only; no country lookup in the pilot.
+2. **G-3:** approved. Only PENDING and APPROVED trips count in exposure and as impacted.
 
 The other gaps follow from D-32 and the approved PCs.
