@@ -37,6 +37,7 @@ from app.modules.travel.schemas import (
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["travel"])
 
+LIST_MAX = 200
 Reader = Annotated[CurrentUser, Depends(require_roles(*ROLES))]
 Db = Annotated[AsyncSession, Depends(get_db)]
 Pub = Annotated[Publisher, Depends(get_publisher)]
@@ -92,7 +93,9 @@ async def trips_out(session: AsyncSession, rows: list[Trip]) -> list[TripOut]:
         out.append(
             TripOut(
                 **fields,
-                risk_level=live if t.approval_status == "DRAFT" else t.risk_level,
+                # Never submitted (a draft, or a draft cancelled): what submitting would
+                # give now (review of Prompt 25, L3).
+                risk_level=live if t.submitted_at is None else t.risk_level,
                 live_risk=live,
                 risk_changed=t.approval_status == "APPROVED"
                 and trips.rank(live) > trips.rank(t.approved_risk_level),
@@ -129,7 +132,8 @@ async def trip_detail(session: AsyncSession, trip: Trip) -> TripDetailOut:
         country_risk = CountryRiskOut(
             country_code=risk.country,
             level=risk.level,
-            base_level=base.level if base else "LOW",
+            base_level=base.level if base else trips.UNRATED_LEVEL,
+            rated=base is not None,
             security=base.security if base else None,
             unrest=base.unrest if base else None,
             health=base.health if base else None,
@@ -167,7 +171,7 @@ async def list_trips(
     impacted: bool | None = None,
 ) -> list[TripOut]:
     """Soonest first. risk filters the risk shown (submitted, or live for a draft)."""
-    query = select(Trip).order_by(Trip.starts_on, Trip.reference).limit(200)
+    query = select(Trip).order_by(Trip.starts_on, Trip.reference)
     if status_ is not None:
         query = query.where(Trip.approval_status == status_)
     if mission_id is not None:
@@ -177,7 +181,7 @@ async def list_trips(
         out = [t for t in out if t.risk_level == risk]
     if impacted is not None:
         out = [t for t in out if bool(t.impacted_by) == impacted]
-    return out
+    return out[:LIST_MAX]  # after the filters computed here (review of Prompt 25, L6)
 
 
 @router.get("/trips/{trip_id}")
@@ -223,24 +227,28 @@ async def _publish(publisher: Publisher, events: list[Event]) -> None:
 
 
 @router.post("/trips", status_code=201)
-async def create_trip(body: TripIn, user: Reader, session: Db, settings: Config) -> TripDetailOut:
+async def create_trip(
+    body: TripIn, user: Reader, session: Db, settings: Config, publisher: Pub
+) -> TripDetailOut:
     try:
         trip = await trips.create_draft(session, user, _plan(body), settings.home_tz)
     except trips.TripError as e:
         raise _http(e) from None
     await session.commit()
+    await _publish(publisher, [trips.trip_event(trip)])
     return await trip_detail(session, trip)
 
 
 @router.patch("/trips/{trip_id}")
 async def edit_trip(
-    trip_id: uuid.UUID, body: TripIn, user: Reader, session: Db, settings: Config
+    trip_id: uuid.UUID, body: TripIn, user: Reader, session: Db, settings: Config, publisher: Pub
 ) -> TripDetailOut:
     try:
         trip = await trips.update_draft(session, user, trip_id, _plan(body), settings.home_tz)
     except trips.TripError as e:
         raise _http(e) from None
     await session.commit()
+    await _publish(publisher, [trips.trip_event(trip)])
     return await trip_detail(session, trip)
 
 

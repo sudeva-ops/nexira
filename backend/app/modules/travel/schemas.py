@@ -63,7 +63,8 @@ class CountryRiskOut(BaseModel):
 
     country_code: str
     level: str  # the base level raised to the worst ACTIVE incident in the country
-    base_level: str
+    base_level: str  # MODERATE when the country has no simulated level (not rated)
+    rated: bool
     security: int | None
     unrest: int | None
     health: int | None

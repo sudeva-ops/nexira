@@ -41,6 +41,10 @@ CHECK_ITEMS = ("security_briefing", "insurance_medical", "emergency_contacts", "
 TRAVELLERS_MAX = 50
 SEGMENTS_MAX = 30
 REASON_MAX = 500
+# Review of Prompt 25, M1: a country with no simulated level is never LOW, so a second
+# person always decides a trip there (fail closed). The city and the country are not
+# cross-checked: the approver sees both.
+UNRATED_LEVEL = "MODERATE"
 
 CREATORS = "TRAVEL_DESK|DUTY_OFFICER"
 CHECKERS = "TRAVEL_DESK|DUTY_OFFICER|SECURITY_OFFICER"
@@ -176,7 +180,7 @@ async def destination_risks(
         row = base.get(country)
         out[country] = DestinationRisk(
             country=country,
-            level=worst(row.level if row else "LOW", incident_level),
+            level=worst(row.level if row else UNRATED_LEVEL, incident_level),
             base=row,
             incident_level=incident_level,
             incidents=[ref for _, ref in found],
@@ -186,7 +190,7 @@ async def destination_risks(
 
 async def live_risk(session: AsyncSession, trip: Trip) -> str:
     if not trip.destination_country:
-        return "LOW"
+        return UNRATED_LEVEL
     risks = await destination_risks(session, {trip.destination_country})
     return risks[trip.destination_country].level
 
@@ -229,6 +233,8 @@ def _text(value: str | None, name: str, limit: int, required: bool = True) -> No
         return
     if len(value) > limit:
         raise TripError(422, f"{name} is at most {limit} characters")
+    if "\x00" in value:  # PostgreSQL text cannot hold it (review of Prompt 25, L1)
+        raise TripError(422, f"{name} contains a NUL character")
 
 
 async def _validate(session: AsyncSession, plan: Plan, home_tz: str) -> None:
@@ -236,11 +242,8 @@ async def _validate(session: AsyncSession, plan: Plan, home_tz: str) -> None:
     _text(plan.purpose, "purpose", 200, required=False)
     _text(plan.origin, "origin", 120)
     _text(plan.destination, "destination", 120)
-    if (
-        len(plan.destination_country) != 2
-        or not plan.destination_country.isalpha()
-        or (not plan.destination_country.isupper())
-    ):
+    country = plan.destination_country
+    if len(country) != 2 or not all("A" <= c <= "Z" for c in country):
         raise TripError(422, "destination_country is a two-letter ISO code, e.g. FR")
     if plan.ends_on < plan.starts_on:
         raise TripError(422, "the trip ends before it starts")
@@ -331,6 +334,13 @@ async def _requester_planning(
         raise TripError(403, "Planning trips needs TRAVEL_DESK or DUTY_OFFICER")
 
 
+def _scope_of(trip: Trip) -> approvals.MissionScope:
+    """The mission scope of checklist ticks and cancelling (review of Prompt 25, L4): a
+    submitted trip's scope (None: HQ only, D-06); a draft has none yet, so any mission.
+    Planning itself is not scoped: the Travel Desk plans for every mission."""
+    return trip.mission_id if trip.submitted_at is not None else approvals.ANY_MISSION
+
+
 # --- drafts (JR-01, JR-02) ---------------------------------------------------------------
 
 
@@ -386,7 +396,7 @@ async def check(
     if item not in CHECK_ITEMS:
         raise TripError(422, f"item is one of {', '.join(CHECK_ITEMS)}")
     trip = await _locked(session, trip_id)
-    if not await approvals.user_has_role(session, user, CHECKERS):
+    if not await approvals.user_has_role(session, user, CHECKERS, _scope_of(trip)):
         raise TripError(403, "The checklist needs TRAVEL_DESK, DUTY_OFFICER or SECURITY_OFFICER")
     if trip.approval_status not in ("DRAFT", "PENDING"):
         raise TripError(409, f"{trip.reference} is {trip.approval_status}: the checklist is closed")
@@ -476,7 +486,7 @@ async def approve(session: AsyncSession, user: CurrentUser, trip_id: uuid.UUID) 
 async def reject(
     session: AsyncSession, user: CurrentUser, trip_id: uuid.UUID, reason: str
 ) -> Outcome:
-    if not reason.strip() or len(reason) > REASON_MAX:
+    if not reason.strip() or len(reason) > REASON_MAX or "\x00" in reason:
         raise TripError(422, f"a reason of 1 to {REASON_MAX} characters is needed")
     trip = await _locked(session, trip_id)
     await approvals.decide(session, user, await gate(session, trip))
@@ -488,7 +498,11 @@ async def reject(
 
 
 async def _may_cancel(session: AsyncSession, user: CurrentUser, trip: Trip) -> bool:
-    return trip.requested_by == user.id or await approvals.user_has_role(session, user, CANCELLERS)
+    """The requester may always withdraw their own trip, even without a planning role
+    any more; otherwise TRAVEL_DESK or ADMIN within the trip's scope."""
+    return trip.requested_by == user.id or await approvals.user_has_role(
+        session, user, CANCELLERS, _scope_of(trip)
+    )
 
 
 async def cancel(session: AsyncSession, user: CurrentUser, trip_id: uuid.UUID) -> Outcome:
@@ -511,7 +525,8 @@ async def cancel(session: AsyncSession, user: CurrentUser, trip_id: uuid.UUID) -
 class Permissions:
     edit: bool
     submit: bool
-    approve: bool
+    approve: bool  # also needs the checklist for HIGH and CRITICAL (review, L2)
+    reject: bool
     check: bool
     cancel: bool
 
@@ -522,15 +537,23 @@ async def permissions(session: AsyncSession, user: CurrentUser, trip: Trip) -> P
         and trip.approval_status == "DRAFT"
         and await approvals.user_has_role(session, user, CREATORS)
     )
-    may_approve = False
+    may_decide = may_approve = False
     if trip.approval_status == "PENDING":
-        may_approve = (await approvals.can_decide(session, user, await gate(session, trip))).allowed
+        level = await approval_level(session, trip)
+        verdict = await approvals.can_decide(session, user, await gate(session, trip, level))
+        may_decide = verdict.allowed
+        may_approve = may_decide and not (rank(level) >= rank("HIGH") and open_items(trip))
     may_check = trip.approval_status in ("DRAFT", "PENDING") and await approvals.user_has_role(
-        session, user, CHECKERS
+        session, user, CHECKERS, _scope_of(trip)
     )
     may_cancel = trip.approval_status in ("DRAFT", "PENDING", "APPROVED") and await _may_cancel(
         session, user, trip
     )
     return Permissions(
-        edit=planning, submit=planning, approve=may_approve, check=may_check, cancel=may_cancel
+        edit=planning,
+        submit=planning,
+        approve=may_approve,
+        reject=may_decide,
+        check=may_check,
+        cancel=may_cancel,
     )

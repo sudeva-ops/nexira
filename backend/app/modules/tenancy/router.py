@@ -70,6 +70,7 @@ async def my_permissions(
             edit_trip=may.edit,
             submit_trip=may.submit,
             approve_trip=may.approve,
+            reject_trip=may.reject,
             check_trip=may.check,
             cancel_trip=may.cancel,
         )

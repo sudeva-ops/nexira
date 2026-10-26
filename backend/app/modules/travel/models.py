@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from typing import Any
+from typing import Any, ClassVar
 
 from sqlalchemy import CHAR, Date, DateTime, ForeignKey, SmallInteger, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -11,6 +11,8 @@ from app.core.model_base import Base, GeoPoint, created_at, geo_point, tenant_fk
 
 class Trip(Base):
     __tablename__ = "trip"
+    # Recorded by the database (migration 0003): never written by the app.
+    __server_generated__: ClassVar[tuple[str, ...]] = ("created_at", "submitted_at", "approved_at")
 
     id: Mapped[uuid.UUID] = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = tenant_fk()
