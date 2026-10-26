@@ -235,22 +235,28 @@ async def test_bulk_loads_are_audited_once_per_batch(seeded: Seeded) -> None:
 
 
 async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> None:
-    """D-31: one generic template and one per mission; nothing reviewed yet (D-15), and
-    Nairobi keeps the exact PB-07 advisory the acceptance scenario sends."""
+    """D-31: per code, one generic template and one per mission; nothing reviewed yet
+    (D-15). Nairobi keeps PB-07 v1's exact words, so the acceptance scenario is unchanged."""
     rows = await seeded.conn.fetch(
-        "SELECT t.code, m.code AS mission, t.texts, t.reviewed FROM message_template t "
-        "LEFT JOIN mission m ON m.id = t.mission_id ORDER BY m.code NULLS FIRST"
+        "SELECT t.code, m.code AS mission, t.kind, t.texts, t.reviewed FROM message_template t "
+        "LEFT JOIN mission m ON m.id = t.mission_id ORDER BY t.code, m.code NULLS FIRST"
     )
-    assert [(r["code"], r["mission"]) for r in rows] == [
-        ("CIVIL_UNREST_SHELTER", None),
-        ("CIVIL_UNREST_SHELTER", "NBO"),
-        ("CIVIL_UNREST_SHELTER", "PAR"),
+    assert [(r["code"], r["mission"], r["kind"]) for r in rows] == [
+        ("CIVIL_UNREST_SHELTER", None, "ADVISORY"),
+        ("CIVIL_UNREST_SHELTER", "NBO", "ADVISORY"),
+        ("CIVIL_UNREST_SHELTER", "PAR", "ADVISORY"),
+        ("CIVIL_UNREST_STAFF_ALERT", None, "ALERT"),
+        ("CIVIL_UNREST_STAFF_ALERT", "NBO", "ALERT"),
+        ("CIVIL_UNREST_STAFF_ALERT", "PAR", "ALERT"),
     ]
     texts = [json.loads(r["texts"]) for r in rows]
     assert "{city}" in texts[0]["en"]
     assert texts[1] == data.CITIZEN_ADVISORY
     assert "Paris" in texts[2]["en"]
     assert "Nairobi" not in texts[2]["en"]
+    assert texts[4] == {"en": "Shelter in place. Avoid CBD and Upper Hill."}  # PB-07 v1
+    assert "CBD" not in texts[5]["en"]
     reviewed = [json.loads(r["reviewed"]) for r in rows]
-    assert all(set(r) == {"ar", "fr", "sw"} for r in reviewed)  # not English (D-15)
+    assert all(set(r) == {"ar", "fr", "sw"} for r in reviewed[:3])  # not English (D-15)
+    assert reviewed[3:] == [{}, {}, {}]  # English only: nothing to review
     assert not any(any(r.values()) for r in reviewed)

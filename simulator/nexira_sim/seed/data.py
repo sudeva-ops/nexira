@@ -230,6 +230,7 @@ CITIZEN_ADVISORY = {
 # REVIEW REQUIRED marker and is stored as not reviewed until a native speaker checks it (D-15).
 # Nairobi reuses CITIZEN_ADVISORY unchanged, so the acceptance scenario sends the same words.
 SHELTER = "CIVIL_UNREST_SHELTER"
+STAFF_ALERT = "CIVIL_UNREST_STAFF_ALERT"  # PB-07 step 4's alert to personnel
 MESSAGE_TEMPLATES: list[tuple[str, str, str | None, str, dict[str, str]]] = [
     (
         SHELTER,
@@ -249,6 +250,27 @@ MESSAGE_TEMPLATES: list[tuple[str, str, str | None, str, dict[str, str]]] = [
         },
     ),
     (SHELTER, "ADVISORY", "NBO", "Civil unrest: shelter in place (Nairobi)", CITIZEN_ADVISORY),
+    (
+        STAFF_ALERT,
+        "ALERT",
+        None,
+        "Civil unrest: staff alert",
+        {"en": "Shelter in place. Avoid demonstrations in central {city}."},
+    ),
+    (
+        STAFF_ALERT,
+        "ALERT",
+        "NBO",
+        "Civil unrest: staff alert (Nairobi)",
+        {"en": "Shelter in place. Avoid CBD and Upper Hill."},  # PB-07 v1's words
+    ),
+    (
+        STAFF_ALERT,
+        "ALERT",
+        "PAR",
+        "Civil unrest: staff alert (Paris)",
+        {"en": "Shelter in place. Avoid République, Bastille and Nation."},
+    ),
     (
         SHELTER,
         "ADVISORY",
@@ -361,6 +383,24 @@ PB07_STEPS: list[tuple[int, str, str, dict[str, object], str | None]] = [
         {"recipient": "Minister's office", "template": "situation_report"},
         None,
     ),
+]
+
+# PB-07 v2 (Prompt 19, D-31): step 4 names templates instead of carrying Nairobi text, so
+# each mission gets its own words (MN-04). Everything else is v1 unchanged; v1 is retired.
+PB07_VERSION = 2
+PB07_STEP4_V2: dict[str, object] = {
+    "campaign_type": "ALERT",
+    "audience": {"exposed": True, "person_types": PERSONNEL_TYPES},
+    "channels": ["APP", "SMS", "WHATSAPP"],
+    "message_template": STAFF_ALERT,
+    "continuity_plan": "BCP-NBO",
+    # Used by the Communications agent when this step is done (D-15, D-31).
+    "citizen_advisory_template": SHELTER,
+    "citizen_advisory_channels": ["SMS", "WHATSAPP", "APP"],
+}
+PB07_STEPS_V2 = [
+    (seq, name, kind, PB07_STEP4_V2 if seq == 4 else config, role)
+    for seq, name, kind, config, role in PB07_STEPS
 ]
 
 # --- agents and policies (D-17 seed table) --------------------------------------------------------

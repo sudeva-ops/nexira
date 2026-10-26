@@ -5,7 +5,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -89,6 +89,33 @@ async def ensure_playbook(
         details={"code": code, "version": version, "steps": len(steps)},
     )
     return True
+
+
+async def retire_older_versions(
+    session: AsyncSession, code: str, current: int, actor: Actor = SYSTEM
+) -> list[int]:
+    """Deactivate every version of a playbook below current, so only one version is
+    proposed and started (the Response Planner offers every active playbook). Runs
+    already started keep their own version's steps. Audited once per version retired."""
+    retired = list(
+        await session.scalars(
+            update(Playbook)
+            .where(Playbook.code == code, Playbook.version < current, Playbook.is_active)
+            .values(is_active=False)
+            .returning(Playbook.version)
+        )
+    )
+    for version in sorted(retired):
+        await audit.write(
+            session,
+            actor_type=actor.type,
+            actor_id=actor.id,
+            action="PLAYBOOK.RETIRE",
+            entity_type="playbook",
+            entity_id=f"{code} v{version}",
+            details={"code": code, "version": version, "replaced_by": current},
+        )
+    return sorted(retired)
 
 
 class RunNotAllowedError(Exception):

@@ -39,7 +39,7 @@ SCENES = [
         1,
         "Paris marches",
         "One Paris CIVIL_UNREST incident, confidence 92; embassy exposed, so CRITICAL; PB-07 "
-        "proposed (its citizen advisory is written for Nairobi: edit it before approving)",
+        "proposed, with the Paris staff alert and citizen advisory (D-31)",
     ),
     (
         2,

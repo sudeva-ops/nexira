@@ -31,6 +31,7 @@ from app.core.db import tenant_session
 from app.core.events import Event, Publisher
 from app.modules.intel import exposure
 from app.modules.intel.models import Incident, IncidentEvent
+from app.modules.notifications import templates
 from app.modules.notifications.service import AudienceError, CampaignIn, create_campaign
 from app.modules.playbooks.models import Playbook, PlaybookRun, PlaybookRunStep, PlaybookStep
 from app.modules.tenancy.service import Actor
@@ -123,6 +124,17 @@ async def _execute(
     if kind in ("NOTIFY", "CHECKIN"):
         if run.incident_id is None:
             raise StepError(f"{kind} needs an incident")
+        message = str(config.get("message") or step.name)
+        translations: dict[str, str] = {}
+        if config.get("message_template"):
+            # MN-04: the text comes from the incident mission's template (D-31).
+            incident = await session.get_one(Incident, run.incident_id)
+            resolved = await templates.resolve(
+                session, str(config["message_template"]), incident.mission_id
+            )
+            if resolved is not None:
+                message = resolved.texts["en"]
+                translations = {k: v for k, v in resolved.texts.items() if k != "en"}
         campaign, recipients = await create_campaign(
             session,
             incident_id=run.incident_id,
@@ -130,7 +142,8 @@ async def _execute(
                 campaign_type="CHECKIN"
                 if kind == "CHECKIN"
                 else config.get("campaign_type", "ALERT"),
-                message=str(config.get("message") or step.name),
+                message=message,
+                translations=translations,
                 channels=list(config.get("channels") or ["APP"]),
                 audience=dict(config.get("audience") or {}),
                 escalate_after_s=int(config.get("escalate_after_s", 600)),
