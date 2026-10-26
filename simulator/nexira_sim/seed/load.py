@@ -15,7 +15,7 @@ from app.modules.intel.service import SourceIn, ensure_sources
 from app.modules.notifications.templates import TemplateIn, ensure_templates
 from app.modules.people import location
 from app.modules.people.service import add_observations, ensure_mission, load_persons, load_sites
-from app.modules.playbooks.service import StepIn, ensure_playbook
+from app.modules.playbooks.service import StepIn, ensure_playbook, retire_older_versions
 from app.modules.scenarios.service import ensure_scenario
 from app.modules.tenancy.service import ensure_reference_counter
 from app.modules.travel.service import ensure_trip
@@ -92,21 +92,27 @@ async def seed_all(
             ],
         )
 
+        # PB-07 v2 (Prompt 19): step 4 uses message templates (D-31). A database seeded
+        # before it keeps its v1 rows for past runs; v1 is retired so only v2 is offered.
+        version = data.PB07_VERSION
         report["playbook"] = await ensure_playbook(
             session,
-            playbook_id=seed_id(tenant_id, "playbook", "PB-07"),
+            playbook_id=seed_id(tenant_id, "playbook", f"PB-07:v{version}"),
             code="PB-07",
             name="Civil unrest near mission",
             category="Security",
             trigger_rules=data.PB07_TRIGGER,
             steps=[
                 StepIn(seq, name, kind, config, role)
-                for seq, name, kind, config, role in data.PB07_STEPS
+                for seq, name, kind, config, role in data.PB07_STEPS_V2
             ],
             step_ids=[
-                seed_id(tenant_id, "playbook_step", f"PB-07:{seq}") for seq, *_ in data.PB07_STEPS
+                seed_id(tenant_id, "playbook_step", f"PB-07:v{version}:{seq}")
+                for seq, *_ in data.PB07_STEPS_V2
             ],
+            version=version,
         )
+        report["playbook_retired"] = await retire_older_versions(session, "PB-07", version)
 
         report["templates"] = await ensure_templates(
             session,

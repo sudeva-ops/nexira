@@ -2,9 +2,11 @@
 (PB-07 step 4, shelter-in-place), propose the advisory to registered citizens in
 the zone (PLAYBOOK_STEP -> SEND_EXTERNAL_MESSAGE).
 
-D-15: the texts are the pre-written EN/AR/FR/SW templates from the step's
-configuration. Until native speakers review them, AR/FR/SW keep their REVIEW
-REQUIRED marker; an alternative offers English only."""
+D-15: the texts are pre-written EN/AR/FR/SW templates. From PB-07 v2 the step names a
+template (citizen_advisory_template), resolved for the incident's mission (D-31,
+MN-04), so a Paris incident gets the Paris text. Runs of PB-07 v1 still carry the text
+in the step (citizen_advisory). Until native speakers review them, AR/FR/SW keep their
+REVIEW REQUIRED marker; an alternative offers English only."""
 
 import uuid
 
@@ -13,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.events import Event
 from app.modules.agents.agents import facts
 from app.modules.agents.proposals import ProposalIn
+from app.modules.notifications import templates
 from app.modules.playbooks.models import PlaybookStep
 
 
@@ -27,15 +30,25 @@ class Communications:
             step = await session.get(PlaybookStep, uuid.UUID(str(event.payload["step_id"])))
         except ValueError:
             return []
-        advisory = (step.action_config.get("citizen_advisory") if step else None) or None
         incident = await facts.incident(session, event.payload.get("incident_id"))
-        if step is None or not isinstance(advisory, dict) or incident is None:
+        if step is None or incident is None:
             return []
-        translations = dict(advisory.get("translations") or {})
+        config = step.action_config
+        translations: dict[str, str] = {}
+        channels = ["SMS"]
+        if config.get("citizen_advisory_template"):
+            resolved = await templates.resolve(
+                session, str(config["citizen_advisory_template"]), incident.mission_id
+            )
+            if resolved is not None:
+                translations = dict(resolved.texts)
+            channels = list(config.get("citizen_advisory_channels") or channels)
+        elif isinstance(config.get("citizen_advisory"), dict):  # a PB-07 v1 run
+            translations = dict(config["citizen_advisory"].get("translations") or {})
+            channels = list(config["citizen_advisory"].get("channels") or channels)
         english = translations.pop("en", None)
         if not english:
             return []
-        channels = list(advisory.get("channels") or ["SMS"])
         audience = {"exposed": True, "person_types": ["CITIZEN"]}
         payload = {
             "campaign_type": "ADVISORY",
