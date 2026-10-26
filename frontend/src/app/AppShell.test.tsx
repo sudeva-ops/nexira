@@ -14,7 +14,7 @@ afterEach(() => {
 });
 
 describe("app shell", () => {
-  it("lists exactly the Phase 1 screens in the navigation (D-25)", () => {
+  it("lists exactly the Phase 1 screens and the approved pilot modules (D-25, D-30)", () => {
     renderApp("/");
     const nav = screen.getByRole("navigation", { name: "Main" });
     const labels = within(nav)
@@ -27,6 +27,7 @@ describe("app shell", () => {
       "Incidents",
       "People & Sites",
       "Response Playbooks",
+      "Mass Notification", // pilot module 1 (D-30)
       "Safety Check-in",
       "Audit",
     ]);

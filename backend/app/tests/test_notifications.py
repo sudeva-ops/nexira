@@ -23,6 +23,7 @@ from app.modules.notifications.channels import (
     UnsupportedAdapterError,
     adapter_for,
 )
+from app.modules.notifications.consumer import tick
 from app.modules.notifications.models import NotificationCampaign, NotificationDelivery
 from app.modules.notifications.service import (
     CampaignIn,
@@ -33,6 +34,7 @@ from app.modules.notifications.service import (
 from app.modules.people.service import PersonIn, ensure_mission, load_persons
 from app.modules.tenancy.service import SYSTEM
 from app.tests.conftest import DbUrls
+from app.tests.fakes import ListPublisher
 from app.tests.intel_helpers import ingest, intel_tenant, signal
 
 T0 = datetime(2026, 10, 20, 6, 0, tzinfo=UTC)
@@ -294,9 +296,9 @@ async def test_receipts_are_telemetry(api_engine: AsyncEngine, world: World) -> 
     await run_dispatch(api_engine, world)
     async with tenant_session(world.tenant, api_engine) as session:
         before = await session.scalar(select(func.count()).select_from(AuditLog))
-        assert await refresh_receipts(session, T0 + timedelta(seconds=3)) == 4
-        assert await refresh_receipts(session, T0 + timedelta(seconds=7)) == 4
-        assert await refresh_receipts(session, T0 + timedelta(seconds=8)) == 0
+        assert (await refresh_receipts(session, T0 + timedelta(seconds=3))).changed == 4
+        assert (await refresh_receipts(session, T0 + timedelta(seconds=7))).changed == 4
+        assert (await refresh_receipts(session, T0 + timedelta(seconds=8))).changed == 0
         await session.commit()
         after = await session.scalar(select(func.count()).select_from(AuditLog))
     assert {d.status for d in await deliveries(api_engine, world)} == {"READ"}
@@ -343,3 +345,17 @@ async def test_only_campaigns_being_sent_are_dispatched(
         await session.commit()
     assert (await run_dispatch(api_engine, world)).sent == {}
     assert {d.status for d in await deliveries(api_engine, world)} == {"QUEUED"}
+
+
+async def test_receipts_refresh_the_funnel_live(api_engine: AsyncEngine, world: World) -> None:
+    """MN-09: when deliveries move on, the worker publishes one CAMPAIGN_UPDATED per
+    campaign, so the screen's delivery funnel follows without a reload."""
+    row = await campaign(api_engine, world)
+    await run_dispatch(api_engine, world)
+    publisher = ListPublisher()
+    await tick(api_engine, world.tenant, publisher, now=lambda: T0 + timedelta(seconds=3))
+    updates = [e for e in publisher.events if e.type == "CAMPAIGN_UPDATED"]
+    assert [e.payload["campaign_id"] for e in updates] == [str(row.id)]
+    quiet = ListPublisher()
+    await tick(api_engine, world.tenant, quiet, now=lambda: T0 + timedelta(seconds=3))
+    assert [e for e in quiet.events if e.type == "CAMPAIGN_UPDATED"] == []  # nothing moved
