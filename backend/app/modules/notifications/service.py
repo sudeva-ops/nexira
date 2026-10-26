@@ -38,8 +38,12 @@ class AudienceError(ValueError):
     pass
 
 
+class CitizensWithoutApprovalError(ValueError):
+    """A user campaign without a second person's approval would reach a citizen (D-31)."""
+
+
 async def resolve_audience(
-    session: AsyncSession, incident_id: uuid.UUID, audience: dict[str, Any]
+    session: AsyncSession, incident_id: uuid.UUID | None, audience: dict[str, Any]
 ) -> list[uuid.UUID]:
     """Active people an audience spec selects, ordered by id.
 
@@ -47,7 +51,27 @@ async def resolve_audience(
     - {"exposed": true, "person_types": [...]}: exposed to the incident (optional types)
     - {"mission": "incident", "role_titles": [...]}: people of the incident's mission
       with one of these role titles
+    Spec used by the composer (MN-02), with or without an incident:
+    - {"missions": [mission ids], "person_types": [...]}: people of those missions
     """
+    if audience.get("missions"):
+        rows = await session.scalars(
+            text(
+                """
+                SELECT p.id FROM person p
+                 WHERE p.is_active AND p.mission_id = ANY(CAST(:missions AS uuid[]))
+                   AND (CAST(:types AS text[]) IS NULL OR p.person_type = ANY(:types))
+                 ORDER BY p.id
+                """
+            ),
+            {
+                "missions": [str(m) for m in audience["missions"]],
+                "types": audience.get("person_types"),
+            },
+        )
+        return list(rows)
+    if incident_id is None:
+        raise AudienceError("this audience needs an incident")
     if audience.get("exposed"):
         rows = await session.scalars(
             text(
@@ -183,20 +207,7 @@ async def create_campaign(
     )
     session.add(row)
     await session.flush()
-    if recipients:
-        await session.execute(
-            insert(NotificationDelivery),
-            [
-                {
-                    "tenant_id": row.tenant_id,
-                    "campaign_id": row.id,
-                    "person_id": person_id,
-                    "channel": channel,
-                }
-                for person_id in recipients
-                for channel in row.channels
-            ],
-        )
+    await _insert_deliveries(session, row, recipients)
     await audit.write(
         session,
         actor_type=actor.type,
@@ -212,20 +223,81 @@ async def create_campaign(
             "created_by": f"{created_by_type}:{created_by}",
         },
     )
+    await _audit_send(session, row, recipients, actor)
+    return row, len(recipients)
+
+
+async def queue_deliveries(
+    session: AsyncSession,
+    campaign: NotificationCampaign,
+    actor: Actor,
+    recipients: list[uuid.UUID] | None = None,
+) -> int:
+    """Queue a composed campaign that is now SENDING (MN-01): one QUEUED delivery per
+    recipient and channel, through the same outbox as playbook and agent campaigns.
+    recipients: the people already resolved by the caller (who decided on them);
+    otherwise the audience is resolved now. A user campaign that was not approved by
+    a second person never reaches a citizen: that fails closed here (D-31).
+    Returns the recipient count."""
+    if campaign.status != "SENDING":
+        raise ValueError(f"campaign {campaign.reference} is {campaign.status}, not SENDING")
+    if recipients is None:
+        recipients = await resolve_audience(session, campaign.incident_id, campaign.audience_filter)
+    if campaign.created_by_type == "USER" and campaign.approved_by is None and recipients:
+        citizen = await session.scalar(
+            text(
+                "SELECT 1 FROM person WHERE id = ANY(CAST(:ids AS uuid[])) "
+                "AND person_type = 'CITIZEN' LIMIT 1"
+            ),
+            {"ids": [str(p) for p in recipients]},
+        )
+        if citizen is not None:
+            raise CitizensWithoutApprovalError(
+                f"campaign {campaign.reference} reaches citizens without approval"
+            )
+    await _insert_deliveries(session, campaign, recipients)
+    await _audit_send(session, campaign, recipients, actor)
+    return len(recipients)
+
+
+async def _insert_deliveries(
+    session: AsyncSession, campaign: NotificationCampaign, recipients: list[uuid.UUID]
+) -> None:
+    if recipients:
+        await session.execute(
+            insert(NotificationDelivery),
+            [
+                {
+                    "tenant_id": campaign.tenant_id,
+                    "campaign_id": campaign.id,
+                    "person_id": person_id,
+                    "channel": channel,
+                }
+                for person_id in recipients
+                for channel in campaign.channels
+            ],
+        )
+
+
+async def _audit_send(
+    session: AsyncSession,
+    campaign: NotificationCampaign,
+    recipients: list[uuid.UUID],
+    actor: Actor,
+) -> None:
     await audit.write(
         session,
         actor_type=actor.type,
         actor_id=actor.id,
         action="CAMPAIGN.SEND",
         entity_type="notification_campaign",
-        entity_id=row.reference,
+        entity_id=campaign.reference,
         details={
             "recipients": len(recipients),
-            "per_channel": {c: len(recipients) for c in row.channels},
-            "escalate_after_s": row.escalate_after_s,
+            "per_channel": {c: len(recipients) for c in campaign.channels},
+            "escalate_after_s": campaign.escalate_after_s,
         },
     )
-    return row, len(recipients)
 
 
 def campaign_queued_event(campaign: NotificationCampaign) -> Event:

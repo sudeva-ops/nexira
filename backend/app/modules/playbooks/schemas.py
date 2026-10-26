@@ -62,3 +62,7 @@ class PermissionsOut(BaseModel):
     edit_proposal: bool = False  # agent_proposal: may edit-and-approve
     dismiss_proposal: bool = False  # agent_proposal: may dismiss level-4 advice
     undo_proposal: bool = False  # agent_proposal: may undo a level-1 action
+    edit_campaign: bool = False  # notification_campaign: may edit the draft (the author)
+    submit_campaign: bool = False  # notification_campaign: may submit or send it
+    approve_campaign: bool = False  # notification_campaign: may approve or reject (D-31)
+    cancel_campaign: bool = False  # notification_campaign: may cancel it
