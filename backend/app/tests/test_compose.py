@@ -18,9 +18,11 @@ from app.core.db import tenant_session
 from app.core.events import get_publisher
 from app.main import app
 from app.modules.audit.models import AuditLog
-from app.modules.notifications.models import NotificationDelivery
+from app.modules.notifications import compose, service
+from app.modules.notifications.models import NotificationCampaign, NotificationDelivery
 from app.modules.notifications.templates import TemplateIn, ensure_templates
 from app.modules.people.service import PersonIn, load_persons
+from app.modules.tenancy.service import Actor
 from app.tests.auth_helpers import Idp
 from app.tests.fakes import ListPublisher
 
@@ -40,6 +42,7 @@ async def world(client: AsyncClient, idp: Idp) -> World:
         "duty": [("DUTY_OFFICER", None)],
         "duty2": [("DUTY_OFFICER", None)],
         "security": [("SECURITY_OFFICER", None)],
+        "security.nbo": [("SECURITY_OFFICER", nbo)],
         "consular.par": [("CONSULAR_OFFICER", par)],
         "consular.nbo": [("CONSULAR_OFFICER", nbo)],
         "admin": [("ADMIN", None)],
@@ -54,6 +57,7 @@ async def world(client: AsyncClient, idp: Idp) -> World:
                 PersonIn(uuid.uuid4(), nbo, "LOCAL_STAFF", "Staff Two"),
                 PersonIn(uuid.uuid4(), par, "CITIZEN", "Citizen One"),
                 PersonIn(uuid.uuid4(), par, "CITIZEN", "Citizen Two"),
+                PersonIn(uuid.uuid4(), par, "DIPLOMAT", "Paris Staff"),
             ],
         )
         await ensure_templates(
@@ -81,6 +85,7 @@ def body(w: World, *, citizens: bool, **extra: Any) -> dict[str, Any]:
         "message": "Stay indoors." if citizens else "Shelter in place.",
         "channels": ["SMS", "APP"],
         "missions": [str(w.par if citizens else w.nbo)],
+        **({"person_types": ["CITIZEN"]} if citizens else {}),
         **extra,
     }
 
@@ -426,3 +431,196 @@ async def test_templates_editing_clears_review_and_viewers_cannot_edit(
     )
     assert marked.json()["reviewed"] == {"fr": True}
     assert await audited(idp, "MESSAGE_TEMPLATE.UPDATE") == 2
+
+
+# --- review of Prompt 20 ----------------------------------------------------------------
+
+
+async def nbo_incident(idp: Idp, w: World) -> str:
+    incident_id = uuid.uuid4()
+    async with tenant_session(idp.tenant_id, idp.engine) as session:
+        await session.execute(
+            text(
+                "INSERT INTO incident (id, tenant_id, reference, title, category, severity, "
+                "signal_severity, location, mission_id) VALUES (:id, current_tenant_id(), "
+                "'INC-T', 'Unrest', 'CIVIL_UNREST', 'HIGH', 'HIGH', 'SRID=4326;POINT(0 0)', :m)"
+            ),
+            {"id": incident_id, "m": w.nbo},
+        )
+        await session.commit()
+    return str(incident_id)
+
+
+async def test_the_scope_follows_the_recipients_not_the_incident(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    """Finding 1: an NBO incident attached to a PAR audience gives no NBO authority."""
+    incident = await nbo_incident(idp, world)
+    to_par = await draft(client, idp, world, citizens=True, incident_id=incident)
+    await act(client, idp, to_par, "submit", "duty")
+    assert (await act(client, idp, to_par, "approve", "consular.nbo")).status_code == 403
+    assert await queued(idp, to_par) == 0
+    assert (await act(client, idp, to_par, "approve", "consular.par")).status_code == 200
+    staff = await draft(
+        client,
+        idp,
+        world,
+        "security.nbo",
+        citizens=False,
+        missions=[str(world.par)],
+        person_types=["DIPLOMAT"],  # staff only, so this is a send without a second person
+        incident_id=incident,
+    )
+    assert (await act(client, idp, staff, "submit", "security.nbo")).status_code == 403
+    assert await queued(idp, staff) == 0
+
+
+async def test_a_scoped_officer_cannot_send_to_several_missions(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    both = await draft(
+        client,
+        idp,
+        world,
+        "security.nbo",
+        citizens=False,
+        missions=[str(world.nbo), str(world.par)],
+        person_types=["DIPLOMAT", "LOCAL_STAFF"],
+    )
+    assert (await act(client, idp, both, "submit", "security.nbo")).status_code == 403  # HQ only
+
+
+async def test_who_is_checked_is_who_is_sent_to(
+    client: AsyncClient, idp: Idp, world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Finding 2: a citizen added between the check and the queueing is not sent to."""
+    campaign_id = await draft(client, idp, world, citizens=False)
+    original = compose._check_translations
+
+    async def add_a_citizen(*args: Any) -> None:
+        async with tenant_session(idp.tenant_id, idp.engine) as other:
+            await load_persons(other, [PersonIn(uuid.uuid4(), world.nbo, "CITIZEN", "Late")])
+            await other.commit()
+        await original(*args)
+
+    monkeypatch.setattr(compose, "_check_translations", add_a_citizen)
+    assert (await act(client, idp, campaign_id, "submit", "duty")).json()["status"] == "SENDING"
+    assert await queued(idp, campaign_id) == 2 * 2  # the two staff only
+
+
+async def test_queueing_fails_closed_for_an_unapproved_citizen(
+    idp: Idp, world: World, client: AsyncClient
+) -> None:
+    campaign_id = await draft(client, idp, world, citizens=False)
+    async with tenant_session(idp.tenant_id, idp.engine) as session:
+        campaign = await session.get_one(NotificationCampaign, uuid.UUID(campaign_id))
+        campaign.status = "SENDING"
+        await session.flush()
+        citizens = list(
+            await session.scalars(text("SELECT id FROM person WHERE person_type = 'CITIZEN'"))
+        )
+        with pytest.raises(ValueError, match="reaches citizens without approval"):
+            await service.queue_deliveries(
+                session, campaign, Actor(type="USER", id="t"), recipients=citizens
+            )
+
+
+async def test_templates_follow_mission_scope(client: AsyncClient, idp: Idp, world: World) -> None:
+    """Finding 3: a Consular Officer of NBO edits NBO templates only."""
+    generic = await client.post(
+        "/api/templates",
+        json={"code": "X", "kind": "ADVISORY", "name": "Generic", "texts": {"en": "Hello"}},
+        headers=idp.headers("consular.nbo"),
+    )
+    assert generic.status_code == 403  # a generic template applies to every mission
+    paris = await client.post(
+        "/api/templates",
+        json={
+            "code": "Y",
+            "kind": "ADVISORY",
+            "name": "Paris",
+            "texts": {"en": "Hello"},
+            "mission_id": str(world.par),
+        },
+        headers=idp.headers("consular.nbo"),
+    )
+    assert paris.status_code == 403
+    marked = await client.patch(
+        f"/api/templates/{await template_id(idp)}",  # the PAR template
+        json={"reviewed": {"fr": True}},
+        headers=idp.headers("consular.nbo"),
+    )
+    assert marked.status_code == 403
+    own = await client.post(
+        "/api/templates",
+        json={
+            "code": "Z",
+            "kind": "ALERT",
+            "name": "Nairobi",
+            "texts": {"en": "Hello"},
+            "mission_id": str(world.nbo),
+        },
+        headers=idp.headers("consular.nbo"),
+    )
+    assert own.status_code == 201
+
+
+async def test_an_author_who_lost_the_role_cannot_continue(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    """Finding 4."""
+    campaign_id = await draft(client, idp, world, citizens=True)
+    async with tenant_session(idp.tenant_id, idp.engine) as session:
+        await session.execute(
+            text("DELETE FROM user_role WHERE user_id = :u"), {"u": world.users["duty"]}
+        )
+        await session.commit()
+    await idp.user("duty", [("VIEWER", None)])
+    edited = await client.patch(
+        f"/api/campaigns/{campaign_id}",
+        json=body(world, citizens=True, message="x"),
+        headers=idp.headers("duty"),
+    )
+    assert edited.status_code == 403
+    assert (await act(client, idp, campaign_id, "submit", "duty")).status_code == 403
+
+
+async def test_duplicate_channels_and_a_viewer_preview_are_refused(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    """Findings 5 and 6."""
+    twice = await client.post(
+        "/api/campaigns",
+        json={**body(world, citizens=False), "channels": ["SMS", "SMS"]},
+        headers=idp.headers("duty"),
+    )
+    assert twice.status_code == 422
+    campaign_id = await draft(client, idp, world, citizens=True)
+    assert (await act(client, idp, campaign_id, "preview", "viewer")).status_code == 403
+
+
+async def test_decisions_need_a_pending_campaign_and_a_reason(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    campaign_id = await draft(client, idp, world, citizens=True)
+    assert (await act(client, idp, campaign_id, "approve", "duty2")).status_code == 409  # DRAFT
+    await act(client, idp, campaign_id, "submit", "duty")
+    for reason, expected in (("", 422), ("x" * 501, 422)):
+        response = await client.post(
+            f"/api/campaigns/{campaign_id}/reject",
+            json={"reason": reason},
+            headers=idp.headers("duty2"),
+        )
+        assert response.status_code == expected
+    by_author = await client.post(
+        f"/api/campaigns/{campaign_id}/reject", json={"reason": "no"}, headers=idp.headers("duty")
+    )
+    assert by_author.status_code == 403
+
+
+async def test_a_pilot_checks_translations_on_a_staff_send_too(
+    client: AsyncClient, idp: Idp, world: World, pilot: None
+) -> None:
+    campaign_id = await draft(client, idp, world, citizens=False, translations={"fr": "Abritez."})
+    assert (await act(client, idp, campaign_id, "submit", "duty")).status_code == 409
+    assert await queued(idp, campaign_id) == 0

@@ -127,6 +127,8 @@ async def _validate(session: AsyncSession, content: Content) -> dict[str, Any]:
         raise CampaignError(422, f"the message must be 1 to {TEXT_MAX} characters")
     if not content.channels or not set(content.channels) <= set(CHANNELS):
         raise CampaignError(422, f"channels must be among {', '.join(CHANNELS)}")
+    if len(set(content.channels)) != len(content.channels):
+        raise CampaignError(422, "each channel once")
     for lang, translated in content.translations.items():
         if lang not in TRANSLATIONS:
             raise CampaignError(422, f"translations are {', '.join(TRANSLATIONS)} only")
@@ -161,8 +163,11 @@ async def _validate(session: AsyncSession, content: Content) -> dict[str, Any]:
 
 
 async def _mission(session: AsyncSession, campaign: NotificationCampaign) -> uuid.UUID | None:
-    """The approval and sending scope (plan G-3)."""
-    if campaign.incident_id is not None:
+    """The approval and sending scope (plan G-3), from who receives the message: the
+    incident's mission for the people exposed to it; the single mission of a missions
+    audience; otherwise none (HQ only, D-06). An incident attached to a missions
+    audience does not change the scope (review of Prompt 20, finding 1)."""
+    if campaign.audience_filter.get("exposed"):
         mission: uuid.UUID | None = await session.scalar(
             select(Incident.mission_id)
             .where(Incident.id == campaign.incident_id)
@@ -184,6 +189,18 @@ async def _locked(session: AsyncSession, campaign_id: uuid.UUID) -> Notification
 
 def _is_author(user: CurrentUser, campaign: NotificationCampaign) -> bool:
     return campaign.created_by_type == "USER" and campaign.created_by == str(user.id)
+
+
+async def _author_composing(
+    session: AsyncSession, user: CurrentUser, campaign: NotificationCampaign, doing: str
+) -> None:
+    """The author, still holding a composer role (review of Prompt 20, finding 4)."""
+    if not _is_author(user, campaign):
+        raise CampaignError(403, f"Only the author {doing}")
+    if not await approvals.user_has_role(session, user, COMPOSERS):
+        raise CampaignError(
+            403, "Composing needs DUTY_OFFICER, SECURITY_OFFICER, CONSULAR_OFFICER or ADMIN"
+        )
 
 
 # --- drafts ---------------------------------------------------------------------------
@@ -222,8 +239,7 @@ async def update_draft(
     session: AsyncSession, user: CurrentUser, campaign_id: uuid.UUID, content: Content
 ) -> NotificationCampaign:
     campaign = await _locked(session, campaign_id)
-    if not _is_author(user, campaign):
-        raise CampaignError(403, "Only the author edits a draft")
+    await _author_composing(session, user, campaign, "edits a draft")
     if campaign.status != "DRAFT":
         raise CampaignError(
             409, f"{campaign.reference} is {campaign.status}: only a draft can be edited"
@@ -296,8 +312,7 @@ async def test_send(
 ) -> dict[str, dict[str, Any]]:
     """Send to self: a preview per channel, audited, with no deliveries (plan G-7)."""
     campaign = await _locked(session, campaign_id)
-    if not _is_author(user, campaign):
-        raise CampaignError(403, "Only the author sends a test to themselves")
+    await _author_composing(session, user, campaign, "sends a test to themselves")
     shown = render(campaign)
     await _audit(session, user, "TEST_SEND", campaign, {"channels": list(shown)})
     return shown
@@ -306,9 +321,8 @@ async def test_send(
 # --- submit, approve, reject, cancel ------------------------------------------------------
 
 
-async def _has_citizens(session: AsyncSession, campaign: NotificationCampaign) -> bool:
-    """From the people the audience selects now, not from the requested types."""
-    people = await service.resolve_audience(session, campaign.incident_id, campaign.audience_filter)
+async def _has_citizens(session: AsyncSession, people: list[uuid.UUID]) -> bool:
+    """From the people actually selected, not from the requested types."""
     found = await session.scalar(
         text(
             "SELECT 1 FROM person WHERE id = ANY(CAST(:ids AS uuid[])) "
@@ -364,11 +378,15 @@ async def submit(
     session: AsyncSession, user: CurrentUser, campaign_id: uuid.UUID, app_env: str
 ) -> Outcome:
     campaign = await _locked(session, campaign_id)
-    if not _is_author(user, campaign):
-        raise CampaignError(403, "Only the author submits a campaign")
+    await _author_composing(session, user, campaign, "submits a campaign")
     if campaign.status != "DRAFT":
         raise CampaignError(409, f"{campaign.reference} is {campaign.status}")
-    if await _has_citizens(session, campaign):
+    # Resolved once: the same list decides whether a second person is needed and is
+    # what gets queued, so nobody added in between is sent to (review, finding 2).
+    recipients = await service.resolve_audience(
+        session, campaign.incident_id, campaign.audience_filter
+    )
+    if await _has_citizens(session, recipients):
         campaign.status = "PENDING_APPROVAL"
         campaign.submitted_by = user.id
         await session.flush()
@@ -386,7 +404,7 @@ async def submit(
     campaign.submitted_by = user.id
     await session.flush()
     await _audit(session, user, "SUBMIT", campaign, {"needs_approval": False})
-    await service.queue_deliveries(session, campaign, _actor(user))
+    await service.queue_deliveries(session, campaign, _actor(user), recipients=recipients)
     return Outcome(campaign, [_event(campaign, "CAMPAIGN_QUEUED")])
 
 

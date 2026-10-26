@@ -224,14 +224,31 @@ async def create_campaign(
 
 
 async def queue_deliveries(
-    session: AsyncSession, campaign: NotificationCampaign, actor: Actor
+    session: AsyncSession,
+    campaign: NotificationCampaign,
+    actor: Actor,
+    recipients: list[uuid.UUID] | None = None,
 ) -> int:
     """Queue a composed campaign that is now SENDING (MN-01): one QUEUED delivery per
     recipient and channel, through the same outbox as playbook and agent campaigns.
-    The audience is resolved now, at sending time. Returns the recipient count."""
+    recipients: the people already resolved by the caller (who decided on them);
+    otherwise the audience is resolved now. A user campaign that was not approved by
+    a second person never reaches a citizen: that fails closed here (D-31).
+    Returns the recipient count."""
     if campaign.status != "SENDING":
         raise ValueError(f"campaign {campaign.reference} is {campaign.status}, not SENDING")
-    recipients = await resolve_audience(session, campaign.incident_id, campaign.audience_filter)
+    if recipients is None:
+        recipients = await resolve_audience(session, campaign.incident_id, campaign.audience_filter)
+    if campaign.created_by_type == "USER" and campaign.approved_by is None and recipients:
+        citizen = await session.scalar(
+            text(
+                "SELECT 1 FROM person WHERE id = ANY(CAST(:ids AS uuid[])) "
+                "AND person_type = 'CITIZEN' LIMIT 1"
+            ),
+            {"ids": [str(p) for p in recipients]},
+        )
+        if citizen is not None:
+            raise ValueError(f"campaign {campaign.reference} reaches citizens without approval")
     await _insert_deliveries(session, campaign, recipients)
     await _audit_send(session, campaign, recipients, actor)
     return len(recipients)

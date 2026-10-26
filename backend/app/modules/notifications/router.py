@@ -35,13 +35,17 @@ from app.modules.notifications.schemas import (
     TemplatePatch,
 )
 from app.modules.tenancy.models import AppUser
-from app.modules.tenancy.service import ROLES, Actor
+from app.modules.tenancy.service import ROLES
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["notifications"])
 
 Reader = Annotated[CurrentUser, Depends(require_roles(*ROLES))]
 TemplateEditor = Annotated[CurrentUser, Depends(require_roles("ADMIN", "CONSULAR_OFFICER"))]
+Composer = Annotated[
+    CurrentUser,
+    Depends(require_roles("DUTY_OFFICER", "SECURITY_OFFICER", "CONSULAR_OFFICER", "ADMIN")),
+]
 Db = Annotated[AsyncSession, Depends(get_db)]
 Pub = Annotated[Publisher, Depends(get_publisher)]
 Config = Annotated[Settings, Depends(get_settings)]
@@ -215,7 +219,7 @@ async def edit_campaign(
 
 
 @router.post("/campaigns/{campaign_id}/preview")
-async def preview_campaign(campaign_id: uuid.UUID, _user: Reader, session: Db) -> PreviewOut:
+async def preview_campaign(campaign_id: uuid.UUID, _user: Composer, session: Db) -> PreviewOut:
     campaign = await session.get(NotificationCampaign, campaign_id)
     if campaign is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Campaign not found")
@@ -320,13 +324,15 @@ async def create_template(body: TemplateIn, user: TemplateEditor, session: Db) -
     try:
         template = await templates.create_template(
             session,
-            Actor(type="USER", id=str(user.id)),
+            user,
             code=body.code,
             kind=body.kind,
             mission_id=body.mission_id,
             name=body.name,
             texts=body.texts,
         )
+    except templates.TemplateScopeError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from None
     except templates.TemplateError as e:
         raise HTTPException(422, str(e)) from None
     await session.commit()
@@ -340,7 +346,7 @@ async def update_template(
     try:
         template = await templates.update_template(
             session,
-            Actor(type="USER", id=str(user.id)),
+            user,
             template_id,
             name=body.name,
             texts=body.texts,
@@ -349,6 +355,8 @@ async def update_template(
         )
     except LookupError:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Template not found") from None
+    except templates.TemplateScopeError as e:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from None
     except templates.TemplateError as e:
         raise HTTPException(422, str(e)) from None
     await session.commit()

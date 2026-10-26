@@ -11,7 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core import audit
+from app.core import approvals, audit
+from app.core.security import CurrentUser
 from app.modules.notifications.models import MessageTemplate
 from app.modules.people.models import Mission
 from app.modules.tenancy.service import SYSTEM, Actor
@@ -118,8 +119,24 @@ LANGUAGES = ("en", "ar", "fr", "sw")  # D-15
 TEXT_MAX = 2000
 
 
+TEMPLATE_EDITORS = "ADMIN|CONSULAR_OFFICER"
+
+
 class TemplateError(ValueError):
     pass
+
+
+class TemplateScopeError(TemplateError):
+    """The editor's role does not cover the template's mission (D-05)."""
+
+
+async def _may_edit(session: AsyncSession, user: CurrentUser, mission_id: uuid.UUID | None) -> None:
+    """Within the template's mission; a generic template (no mission) applies to every
+    mission, so only HQ-level holders edit it or mark it reviewed (review of Prompt 20,
+    finding 3)."""
+    if not await approvals.user_has_role(session, user, TEMPLATE_EDITORS, mission_id):
+        scope = "this mission" if mission_id else "HQ (a generic template)"
+        raise TemplateScopeError(f"Editing templates needs ADMIN or CONSULAR_OFFICER for {scope}")
 
 
 def _check_texts(texts: dict[str, str]) -> None:
@@ -132,7 +149,7 @@ def _check_texts(texts: dict[str, str]) -> None:
 
 async def create_template(
     session: AsyncSession,
-    actor: Actor,
+    user: CurrentUser,
     *,
     code: str,
     kind: str,
@@ -148,6 +165,8 @@ async def create_template(
     _check_texts(texts)
     if mission_id is not None and await session.get(Mission, mission_id) is None:
         raise TemplateError("unknown mission")  # RLS: another tenant's mission is unknown
+    await _may_edit(session, user, mission_id)
+    actor = Actor(type="USER", id=str(user.id))
     template = MessageTemplate(
         tenant_id=session.info["tenant_id"],
         code=code,
@@ -173,7 +192,7 @@ async def create_template(
 
 async def update_template(
     session: AsyncSession,
-    actor: Actor,
+    user: CurrentUser,
     template_id: uuid.UUID,
     *,
     name: str | None = None,
@@ -188,6 +207,8 @@ async def update_template(
     )
     if template is None:
         raise LookupError("Template not found")
+    await _may_edit(session, user, template.mission_id)
+    actor = Actor(type="USER", id=str(user.id))
     changes: dict[str, object] = {}
     flags = dict(template.reviewed)
     if texts is not None:
