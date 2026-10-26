@@ -36,14 +36,16 @@ test-frontend:
 # Playwright against the running stack (`make up`, then `make seed` or `make reset-demo`).
 e2e: env
 	cd frontend && npx playwright install chromium
-	set -a && . ./.env && set +a && cd frontend && npx playwright test --grep-invert "Phase 1 acceptance"
+	set -a && . ./.env && set +a && cd frontend && npx playwright test --grep-invert "acceptance"
 
 # Prompt 15: the whole Phase 1 acceptance scenario (decisions.md §7) from a fresh
 # demo database; prints the performance numbers (frontend/test-results/performance.json).
+# Prompt 22: then the Mass Notification acceptance (requirements-pilot.md §6).
 acceptance: env reset-demo up
 	$(COMPOSE) restart backend worker
 	cd frontend && npx playwright install chromium
-	set -a && . ./.env && set +a && cd frontend && npx playwright test e2e/acceptance.spec.ts
+	set -a && . ./.env && set +a && cd frontend && npx playwright test e2e/acceptance.spec.ts \
+	  e2e/ntf-acceptance.spec.ts
 
 lint: lint-backend lint-simulator lint-frontend
 
