@@ -8,6 +8,8 @@ from app.core.approvals import roles_of
 from app.core.security import CurrentUser, current_user, get_db
 from app.modules.agents import proposals
 from app.modules.agents.models import AgentProposal
+from app.modules.notifications import compose
+from app.modules.notifications.models import NotificationCampaign
 from app.modules.playbooks import service as playbooks
 from app.modules.playbooks.schemas import PermissionsOut
 from app.modules.tenancy.schemas import MeOut, RoleOut
@@ -35,13 +37,26 @@ async def me(
 
 @router.get("/me/permissions")
 async def my_permissions(
-    entity_type: Literal["playbook_run", "agent_proposal"],
+    entity_type: Literal["playbook_run", "agent_proposal", "notification_campaign"],
     entity_id: uuid.UUID,
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> PermissionsOut:
     """Plan G-07: the actions the caller may take on an entity now, computed by
     approvals.can_decide(), the same code that enforces them."""
+    if entity_type == "notification_campaign":
+        campaign = await session.get(NotificationCampaign, entity_id)
+        if campaign is None:
+            return PermissionsOut(entity_type=entity_type, entity_id=str(entity_id))
+        allowed = await compose.permissions(session, user, campaign)
+        return PermissionsOut(
+            entity_type=entity_type,
+            entity_id=str(entity_id),
+            edit_campaign=allowed.edit,
+            submit_campaign=allowed.submit,
+            approve_campaign=allowed.approve,
+            cancel_campaign=allowed.cancel,
+        )
     if entity_type == "agent_proposal":
         proposal = await session.get(AgentProposal, entity_id)
         if proposal is None:

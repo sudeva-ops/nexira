@@ -112,3 +112,115 @@ async def ensure_templates(
         )
         made.append(f"{code}@{where}")
     return sorted(made)
+
+
+LANGUAGES = ("en", "ar", "fr", "sw")  # D-15
+TEXT_MAX = 2000
+
+
+class TemplateError(ValueError):
+    pass
+
+
+def _check_texts(texts: dict[str, str]) -> None:
+    for lang, value in texts.items():
+        if lang not in LANGUAGES:
+            raise TemplateError(f"languages are {', '.join(LANGUAGES)} only")
+        if not value.strip() or len(value) > TEXT_MAX:
+            raise TemplateError(f"the {lang} text must be 1 to {TEXT_MAX} characters")
+
+
+async def create_template(
+    session: AsyncSession,
+    actor: Actor,
+    *,
+    code: str,
+    kind: str,
+    mission_id: uuid.UUID | None,
+    name: str,
+    texts: dict[str, str],
+) -> MessageTemplate:
+    """A new template; nothing is reviewed yet (D-15)."""
+    if kind not in KINDS:
+        raise TemplateError(f"unknown kind {kind}")
+    if "en" not in texts:
+        raise TemplateError("a template needs English text")
+    _check_texts(texts)
+    if mission_id is not None and await session.get(Mission, mission_id) is None:
+        raise TemplateError("unknown mission")  # RLS: another tenant's mission is unknown
+    template = MessageTemplate(
+        tenant_id=session.info["tenant_id"],
+        code=code,
+        kind=kind,
+        mission_id=mission_id,
+        name=name,
+        texts=texts,
+        reviewed={lang: False for lang in texts if lang != "en"},
+    )
+    session.add(template)
+    await session.flush()
+    await audit.write(
+        session,
+        actor_type=actor.type,
+        actor_id=actor.id,
+        action="MESSAGE_TEMPLATE.CREATE",
+        entity_type="message_template",
+        entity_id=str(template.id),
+        details={"code": code, "kind": kind, "languages": sorted(texts)},
+    )
+    return template
+
+
+async def update_template(
+    session: AsyncSession,
+    actor: Actor,
+    template_id: uuid.UUID,
+    *,
+    name: str | None = None,
+    texts: dict[str, str] | None = None,
+    reviewed: dict[str, bool] | None = None,
+    is_active: bool | None = None,
+) -> MessageTemplate:
+    """Edit a template. A changed text loses its reviewed flag, so an edit can never
+    pass as reviewed; marking a language reviewed is a separate, audited act (D-15)."""
+    template = await session.scalar(
+        select(MessageTemplate).where(MessageTemplate.id == template_id).with_for_update()
+    )
+    if template is None:
+        raise LookupError("Template not found")
+    changes: dict[str, object] = {}
+    flags = dict(template.reviewed)
+    if texts is not None:
+        _check_texts(texts)
+        merged = {**template.texts, **texts}
+        for lang, value in texts.items():
+            if template.texts.get(lang) != value and lang != "en":
+                flags[lang] = False
+        template.texts = merged
+        changes["texts"] = sorted(texts)
+    if reviewed is not None:
+        for lang, flag in reviewed.items():
+            if lang == "en" or lang not in template.texts:
+                raise TemplateError(f"{lang} is not a translation of this template")
+            if texts is not None and lang in texts and flag:
+                raise TemplateError(f"review the {lang} text after saving it, not with it")
+            flags[lang] = flag
+        changes["reviewed"] = reviewed
+    template.reviewed = flags
+    if name is not None:
+        template.name = name
+        changes["name"] = name
+    if is_active is not None:
+        template.is_active = is_active
+        changes["is_active"] = is_active
+    await session.flush()
+    await audit.write(
+        session,
+        actor_type=actor.type,
+        actor_id=actor.id,
+        action="MESSAGE_TEMPLATE.UPDATE",
+        entity_type="message_template",
+        entity_id=str(template.id),
+        details=changes,
+    )
+    return template
