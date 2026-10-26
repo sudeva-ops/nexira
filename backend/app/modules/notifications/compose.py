@@ -18,6 +18,9 @@ there is no second sending path, and the dispatcher only sends SENDING campaigns
 - In a pilot (APP_ENV=pilot), a campaign cannot be sent with a translation that is not
   the template's reviewed text, unchanged (MN-06, plan G-11).
 - Every action is audited (MN-12).
+- The approver approves the audience as defined (missions, person types, or the people
+  exposed to an incident), not a fixed list: recipients are resolved again when the
+  approval sends it, so someone who joins the audience before then is included.
 """
 
 import math
@@ -387,6 +390,8 @@ async def submit(
         session, campaign.incident_id, campaign.audience_filter
     )
     if await _has_citizens(session, recipients):
+        # Said now rather than by the approver's refusal later (MN-06).
+        await _check_translations(session, campaign, app_env)
         campaign.status = "PENDING_APPROVAL"
         campaign.submitted_by = user.id
         await session.flush()
@@ -404,7 +409,13 @@ async def submit(
     campaign.submitted_by = user.id
     await session.flush()
     await _audit(session, user, "SUBMIT", campaign, {"needs_approval": False})
-    await service.queue_deliveries(session, campaign, _actor(user), recipients=recipients)
+    try:
+        await service.queue_deliveries(session, campaign, _actor(user), recipients=recipients)
+    except service.CitizensWithoutApprovalError:
+        # Someone in the list became a citizen since the check: nothing is sent.
+        raise CampaignError(
+            409, "The audience now includes citizens: submit again for a second person"
+        ) from None
     return Outcome(campaign, [_event(campaign, "CAMPAIGN_QUEUED")])
 
 
@@ -475,6 +486,6 @@ async def permissions(
     may_cancel = campaign.status in ("DRAFT", "PENDING_APPROVAL") and (
         author or await approvals.user_has_role(session, user, "ADMIN")
     )
-    return Permissions(
-        edit=author and draft, submit=author and draft, approve=may_approve, cancel=may_cancel
-    )
+    # As enforced by _author_composing: the author, still holding a composer role.
+    composing = author and draft and await approvals.user_has_role(session, user, COMPOSERS)
+    return Permissions(edit=composing, submit=composing, approve=may_approve, cancel=may_cancel)

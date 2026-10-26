@@ -38,6 +38,10 @@ class AudienceError(ValueError):
     pass
 
 
+class CitizensWithoutApprovalError(ValueError):
+    """A user campaign without a second person's approval would reach a citizen (D-31)."""
+
+
 async def resolve_audience(
     session: AsyncSession, incident_id: uuid.UUID | None, audience: dict[str, Any]
 ) -> list[uuid.UUID]:
@@ -248,7 +252,9 @@ async def queue_deliveries(
             {"ids": [str(p) for p in recipients]},
         )
         if citizen is not None:
-            raise ValueError(f"campaign {campaign.reference} reaches citizens without approval")
+            raise CitizensWithoutApprovalError(
+                f"campaign {campaign.reference} reaches citizens without approval"
+            )
     await _insert_deliveries(session, campaign, recipients)
     await _audit_send(session, campaign, recipients, actor)
     return len(recipients)

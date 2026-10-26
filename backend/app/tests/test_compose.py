@@ -343,16 +343,30 @@ async def template_id(idp: Idp) -> str:
     return str(value)
 
 
-async def test_a_pilot_refuses_an_unreviewed_translation(
+async def test_a_pilot_checks_again_at_approval(
     client: AsyncClient, idp: Idp, world: World, pilot: None
 ) -> None:
+    """A translation reviewed at submit whose review is withdrawn before approval is
+    still refused when the approver acts."""
     campaign_id = await draft(
-        client, idp, world, citizens=True, translations={"sw": "Kaeni ndani."}
+        client,
+        idp,
+        world,
+        citizens=True,
+        message="Stay indoors in Paris.",
+        translations={"fr": "Restez à l'intérieur à Paris."},
+        template_id=await template_id(idp),
     )
-    await act(client, idp, campaign_id, "submit", "duty")
+    assert (await act(client, idp, campaign_id, "submit", "duty")).status_code == 200
+    withdrawn = await client.patch(
+        f"/api/templates/{await template_id(idp)}",
+        json={"reviewed": {"fr": False}},
+        headers=idp.headers("admin"),
+    )
+    assert withdrawn.status_code == 200
     refused = await act(client, idp, campaign_id, "approve", "duty2")
     assert refused.status_code == 409
-    assert "sw" in refused.json()["detail"]
+    assert "fr" in refused.json()["detail"]
     assert await queued(idp, campaign_id) == 0
 
 
@@ -508,6 +522,29 @@ async def test_who_is_checked_is_who_is_sent_to(
     assert await queued(idp, campaign_id) == 2 * 2  # the two staff only
 
 
+async def test_someone_who_becomes_a_citizen_meanwhile_stops_the_send(
+    client: AsyncClient, idp: Idp, world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review finding A: the fail-closed check is a 409, and nothing is queued."""
+    campaign_id = await draft(client, idp, world, citizens=False)
+    original = compose._check_translations
+
+    async def reclassify(*args: Any) -> None:
+        async with tenant_session(idp.tenant_id, idp.engine) as other:
+            await other.execute(
+                text("UPDATE person SET person_type = 'CITIZEN' WHERE mission_id = :m"),
+                {"m": world.nbo},
+            )
+            await other.commit()
+        await original(*args)
+
+    monkeypatch.setattr(compose, "_check_translations", reclassify)
+    response = await act(client, idp, campaign_id, "submit", "duty")
+    assert response.status_code == 409
+    assert "submit again" in response.json()["detail"]
+    assert await queued(idp, campaign_id) == 0
+
+
 async def test_queueing_fails_closed_for_an_unapproved_citizen(
     idp: Idp, world: World, client: AsyncClient
 ) -> None:
@@ -519,7 +556,9 @@ async def test_queueing_fails_closed_for_an_unapproved_citizen(
         citizens = list(
             await session.scalars(text("SELECT id FROM person WHERE person_type = 'CITIZEN'"))
         )
-        with pytest.raises(ValueError, match="reaches citizens without approval"):
+        with pytest.raises(
+            service.CitizensWithoutApprovalError, match="reaches citizens without approval"
+        ):
             await service.queue_deliveries(
                 session, campaign, Actor(type="USER", id="t"), recipients=citizens
             )
@@ -583,6 +622,8 @@ async def test_an_author_who_lost_the_role_cannot_continue(
     )
     assert edited.status_code == 403
     assert (await act(client, idp, campaign_id, "submit", "duty")).status_code == 403
+    shown = await permissions(client, idp, campaign_id, "duty")  # the same rule (plan G-07)
+    assert (shown["edit_campaign"], shown["submit_campaign"]) == (False, False)
 
 
 async def test_duplicate_channels_and_a_viewer_preview_are_refused(
@@ -624,3 +665,13 @@ async def test_a_pilot_checks_translations_on_a_staff_send_too(
     campaign_id = await draft(client, idp, world, citizens=False, translations={"fr": "Abritez."})
     assert (await act(client, idp, campaign_id, "submit", "duty")).status_code == 409
     assert await queued(idp, campaign_id) == 0
+
+
+async def test_a_pilot_tells_the_author_at_submit(
+    client: AsyncClient, idp: Idp, world: World, pilot: None
+) -> None:
+    """The citizen path checks translations at submit, before any approver sees it."""
+    campaign_id = await draft(client, idp, world, citizens=True, translations={"sw": "Kaeni."})
+    response = await act(client, idp, campaign_id, "submit", "duty")
+    assert response.status_code == 409
+    assert "sw" in response.json()["detail"]
