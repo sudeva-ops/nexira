@@ -138,10 +138,10 @@ Live flights (Air Travel Tracking, next), booking integration (GDS), traveller s
 
 Playwright on the real stack: a Travel Desk user plans a Paris trip for two staff during the France scenario; it rates HIGH; the Travel Desk cannot approve it and the requester cannot either; the checklist blocks approval until ticked; the Security Officer approves; the Nairobi scenario shows TRP-8812 as impacted; the audit chain verifies; `make acceptance` (Nairobi and Mass Notification) still passes.
 
-## 13. Questions for the product owner (defaults in D-32)
+## 13. Questions answered by the product owner (2026-10-26: "use the defaults")
 
-1. Approval thresholds: LOW automatic, MODERATE Travel Desk or Security, HIGH and CRITICAL Security only. Should CRITICAL also need the HQ Crisis Director as a second step?
-2. Who creates trips: Travel Desk and Duty Officers only (no traveller self-service in the pilot)?
-3. The checklist's five items, and whether they should block HIGH and CRITICAL approvals.
-4. Should an approved trip whose risk rises be paused automatically, or only flagged (default: flagged; the Travel & Air agent proposes actions later)?
+1. **Approval thresholds:** LOW automatic; MODERATE Travel Desk or Security Officer; HIGH and CRITICAL Security Officer only. CRITICAL does **not** also need the HQ Crisis Director.
+2. **Who creates trips:** Travel Desk and Duty Officers; no traveller self-service in the pilot.
+3. **Checklist:** security briefing, insurance and medical cover, emergency contacts, check-in schedule (plus security approval, set by the approval). All four must be ticked before a HIGH or CRITICAL trip is approved.
+4. **Risk rises after approval:** flagged, not paused; the Travel & Air agent proposes actions later.
 
