@@ -31,6 +31,7 @@ REFUSAL_PREFIXES = (
     "proposal_approval:",  # approval order and decided-once (D-16)
     "notification_campaign:",  # approval, frozen content, forward-only status (D-31)
     "notification_delivery:",  # a delivery keeps its campaign, person and channel
+    "trip:",  # approval, frozen trip and itinerary, forward-only status (D-32)
 )
 
 

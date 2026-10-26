@@ -18,7 +18,7 @@ from app.modules.people.service import add_observations, ensure_mission, load_pe
 from app.modules.playbooks.service import StepIn, ensure_playbook, retire_older_versions
 from app.modules.scenarios.service import ensure_scenario
 from app.modules.tenancy.service import ensure_reference_counter
-from app.modules.travel.service import ensure_trip
+from app.modules.travel.service import CountryRiskIn, ensure_country_risks, ensure_trip
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from nexira_sim.scenarios import fra_national_protests as fra
@@ -75,6 +75,39 @@ async def seed_all(
             risk_level="MODERATE",
             approval_status="APPROVED",
         )
+
+        report["country_risks"] = await ensure_country_risks(
+            session,
+            [
+                CountryRiskIn(
+                    cc,
+                    *data.COUNTRY_RISK.get(cc, data.DEFAULT_COUNTRY_RISK),
+                    data.COUNTRY_RISK_SOURCE,
+                )
+                for cc in sorted({m.country_code for m in w.missions})
+            ],
+        )
+        missions_by_code = {m.code: m for m in w.missions}
+        report["extra_trips"] = 0
+        for ref, purpose, home, count, dest, cc, offset, days, status, risk in data.EXTRA_TRIPS:
+            home_id = missions_by_code[home].id
+            travellers = [
+                p.id for p in w.persons if p.mission_id == home_id and p.person_type == "DIPLOMAT"
+            ][:count]
+            report["extra_trips"] += await ensure_trip(
+                session,
+                trip_id=seed_id(tenant_id, "trip", ref),
+                reference=ref,
+                purpose=purpose,
+                origin=missions_by_code[home].city,
+                destination=dest,
+                destination_country=cc,
+                starts_on=scenario_date + timedelta(days=offset),
+                ends_on=scenario_date + timedelta(days=offset + days),
+                traveller_ids=travellers,
+                risk_level=risk,
+                approval_status=status,
+            )
 
         report["sources"] = await ensure_sources(
             session,
@@ -144,6 +177,9 @@ async def seed_all(
             ),
             await ensure_reference_counter(
                 session, prefix="NTF", with_year=False, last_value=data.NTF_START
+            ),
+            await ensure_reference_counter(
+                session, prefix="TRP", with_year=False, last_value=data.TRP_START
             ),
         ]
         report["scenario"] = await ensure_scenario(

@@ -92,6 +92,10 @@ ROWS: dict[str, str] = {
     "notification_campaign": "INSERT INTO notification_campaign (id, tenant_id, reference, "
     "campaign_type, message, channels, created_by_type) VALUES ('{campaign}', '{t}', 'NTF-T', "
     "'CHECKIN', 'm', '{{APP}}', 'USER')",
+    "trip_segment": "INSERT INTO trip_segment (tenant_id, trip_id, seq, kind, title, starts_at, "
+    "ends_at) VALUES ('{t}', '{trip}', 1, 'STAY', 'Hotel', now(), now())",
+    "country_risk": "INSERT INTO country_risk (tenant_id, country_code, level, security, unrest, "
+    "health, transport, source) VALUES ('{t}', 'KE', 'LOW', 1, 1, 1, 1, 'x')",
     "message_template": "INSERT INTO message_template (tenant_id, code, kind, name, texts) "
     "VALUES ('{t}', 'T', 'ADVISORY', 'T', '{{\"en\": \"m\"}}')",
     "notification_delivery": "INSERT INTO notification_delivery (tenant_id, campaign_id, "
@@ -112,11 +116,12 @@ ROWS: dict[str, str] = {
 
 # nexira_app has no UPDATE/DELETE on audit_log at all (D-20), so those fail with
 # a privilege error rather than touching zero rows.
-NO_UPDATE_DELETE = {"audit_log", "checkin_response"}  # append-only (D-20, D-07)
+NO_UPDATE_DELETE = {"audit_log", "checkin_response", "country_risk"}  # append-only / seeded
 NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELETE)
     "message_template",
     "notification_campaign",
     "notification_delivery",
+    "trip",  # cancelled, never deleted (PC-15)
 }
 
 

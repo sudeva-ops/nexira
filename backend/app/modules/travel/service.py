@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from datetime import date
 
 from sqlalchemy.dialects.postgresql import insert
@@ -6,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import audit
 from app.modules.tenancy.service import SYSTEM, Actor
-from app.modules.travel.models import Trip, TripTraveller
+from app.modules.travel.models import CountryRisk, Trip, TripTraveller
 
 
 async def ensure_trip(
@@ -66,3 +67,65 @@ async def ensure_trip(
         details={"reference": reference, "travellers": len(traveller_ids)},
     )
     return True
+
+
+@dataclass(frozen=True)
+class CountryRiskIn:
+    country_code: str
+    security: int
+    unrest: int
+    health: int
+    transport: int
+    source: str
+
+    @property
+    def level(self) -> str:
+        """D-08 level from the worst of the four scores (0-100)."""
+        worst = max(self.security, self.unrest, self.health, self.transport)
+        return (
+            "CRITICAL"
+            if worst >= 90
+            else "HIGH"
+            if worst >= 70
+            else ("MODERATE" if worst >= 45 else "LOW")
+        )
+
+
+async def ensure_country_risks(
+    session: AsyncSession, risks: list[CountryRiskIn], actor: Actor = SYSTEM
+) -> int:
+    """Simulated base risk per country (PC-16, D-19), for the countries that are new.
+    One audit row for the load, as for people and sites (plan G-20)."""
+    if not risks:
+        return 0
+    created = await session.execute(
+        insert(CountryRisk)
+        .values(
+            [
+                {
+                    "tenant_id": session.info["tenant_id"],
+                    "country_code": r.country_code,
+                    "level": r.level,
+                    "security": r.security,
+                    "unrest": r.unrest,
+                    "health": r.health,
+                    "transport": r.transport,
+                    "source": r.source,
+                }
+                for r in risks
+            ]
+        )
+        .on_conflict_do_nothing(index_elements=["tenant_id", "country_code"])
+        .returning(CountryRisk.country_code)
+    )
+    count = len(created.all())
+    if count:
+        await audit.write(
+            session,
+            actor_type=actor.type,
+            actor_id=actor.id,
+            action="COUNTRY_RISK.BULK_LOAD",
+            entity_type="country_risk",
+            details={"count": count},
+        )
+    return count
