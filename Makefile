@@ -42,11 +42,12 @@ e2e: env
 # demo database; prints the performance numbers (frontend/test-results/performance.json).
 # Prompt 22: then the Mass Notification acceptance (requirements-pilot.md §6).
 # Prompt 27: then the Journey Management acceptance (requirements-pilot.md §12).
+# Prompt 32: then the Air Travel Tracking acceptance (requirements-pilot.md §17).
 acceptance: env reset-demo up
 	$(COMPOSE) restart backend worker
 	cd frontend && npx playwright install chromium
 	set -a && . ./.env && set +a && cd frontend && npx playwright test e2e/acceptance.spec.ts \
-	  e2e/ntf-acceptance.spec.ts e2e/jrn-acceptance.spec.ts
+	  e2e/ntf-acceptance.spec.ts e2e/jrn-acceptance.spec.ts e2e/air-acceptance.spec.ts
 
 lint: lint-backend lint-simulator lint-frontend
 

@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 import asyncpg
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.db import tenant_session
@@ -114,3 +115,42 @@ async def test_repeated_observations_are_not_duplicated(
     await _person(api_engine, tenant, obs)
     async with tenant_session(tenant, api_engine) as session:
         assert await add_observations(session, obs) == 0
+
+
+async def test_a_landing_supersedes_what_was_seen_before_it(
+    api_engine: AsyncEngine, tenant: uuid.UUID
+) -> None:
+    """D-33 AT-04 (Prompt 32): a badge at the embassy they flew from scores higher than a
+    landing an hour later (91 > 90), but the person has moved. Later sightings still count."""
+    flew, stayed = uuid.uuid4(), uuid.uuid4()
+    await _person(
+        api_engine,
+        tenant,
+        [
+            _obs(flew, "ACCESS_CONTROL", timedelta(minutes=75), "Embassy"),  # 91 now
+            _obs(flew, "FLIGHT", timedelta(0), "Mombasa · Mombasa Moi"),  # 90
+        ],
+    )
+    await _person(
+        api_engine,
+        tenant,
+        [
+            _obs(stayed, "FLIGHT", timedelta(hours=2), "Mombasa · Mombasa Moi"),  # 78
+            _obs(stayed, "MOBILE_GPS", timedelta(minutes=5), "Hotel", accuracy_m=20),  # 97
+        ],
+    )
+    async with tenant_session(tenant, api_engine) as session:
+        await location.recompute(session, AS_OF)
+        rows = {
+            r.person_id: (r.primary_source, r.place_label)
+            for r in await session.scalars(
+                select(PersonLocationCurrent).where(
+                    PersonLocationCurrent.person_id.in_([flew, stayed])
+                )
+            )
+        }
+        await session.commit()
+    assert rows == {
+        flew: ("FLIGHT", "Mombasa · Mombasa Moi"),
+        stayed: ("MOBILE_GPS", "Hotel"),  # seen after landing: competes as usual
+    }

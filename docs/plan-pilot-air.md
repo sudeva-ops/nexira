@@ -114,3 +114,7 @@ The plan is approved. **G-7 approved** (2026-10-27, during Prompt 29): for a res
 - **Positions** are published per tenant at most every 15 s (`FLIGHT_POSITIONS`), not per flight.
 - **Replaying the demo:** once XW 451 has LANDED it is final; `NBO-AIR-DIVERSION` can be played again only after `make reset-demo`.
 - **Home zone:** the tracker reads `HOME_TZ` from the settings; the simulator seed still assumes GST (UTC+4) for its anchors, which is the pilot's zone (plan Q2).
+
+## 11. Found by the acceptance (Prompt 32)
+
+**G-10 · A landing did not always move the travellers (AT-04).** The location engine (PPL-02, plan Phase 1 G-13) picks the observation with the highest confidence. A badge at the embassy the traveller flew from, 75 minutes before landing, still scores 91 (99 − 6/h), above a fresh landing (FLIGHT, 90), so the travellers stayed "at the embassy". **Fix (in Prompt 32):** a FLIGHT observation supersedes the person's earlier observations: anything observed before their latest landing no longer counts; later sightings compete as usual. Only the flight tracker records FLIGHT observations, so no Phase 1 behaviour changes.
