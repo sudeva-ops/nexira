@@ -131,6 +131,9 @@ Messages to people outside the platform are never undoable.
 | Response Planner | 2 | `START_PLAYBOOK` | 2 | `DUTY_OFFICER\|SECURITY_OFFICER` | no |
 | Communications | 2 | `SEND_EXTERNAL_MESSAGE` | 2 | `DUTY_OFFICER\|CONSULAR_OFFICER` | no |
 | (test only) | — | `START_EVACUATION` | 3 | `HEAD_OF_MISSION`, `HQ_CRISIS_DIRECTOR` | no |
+| Travel & Air (pilot, D-34) | 2 | `NOTIFY_TRAVELLERS` | 2 | `TRAVEL_DESK\|SECURITY_OFFICER` | no |
+| Travel & Air (pilot, D-34) | 2 | `CANCEL_TRIP` | 2 | `SECURITY_OFFICER` | no |
+| Travel & Air (pilot, D-34) | 2 | `ADVISE_REBOOKING` | 4 (no policy, D-12) | — | — |
 
 ## 4. Other data rules
 

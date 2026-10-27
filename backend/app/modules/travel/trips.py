@@ -34,6 +34,7 @@ from app.core import approvals, audit
 from app.core.events import Event
 from app.core.security import CurrentUser
 from app.modules.people.models import Mission, Person
+from app.modules.tenancy.service import Actor
 from app.modules.travel.models import Airport, CountryRisk, Trip, TripSegment, TripTraveller
 
 LEVELS = ("LOW", "MODERATE", "HIGH", "CRITICAL")  # D-08, as severity_rank()
@@ -567,6 +568,39 @@ async def cancel(session: AsyncSession, user: CurrentUser, trip_id: uuid.UUID) -
     trip.approval_status = "CANCELLED"
     await session.flush()
     await _audit(session, user, "CANCEL", trip, {"was": was})
+    return Outcome(trip, [trip_event(trip)])
+
+
+async def cancel_by_agent(
+    session: AsyncSession,
+    trip_id: uuid.UUID,
+    *,
+    actor: Actor,
+    approved_by: uuid.UUID | None,
+    home_tz: str,
+) -> Outcome:
+    """CANCEL_TRIP, once a person approved the Travel & Air agent's proposal (D-34,
+    plan-pilot-ta §3). Only an APPROVED trip that has not started, never a restricted
+    one; the same row update (and trigger) as a user's cancel, audited with the agent as
+    actor and the approver recorded."""
+    trip = await _locked(session, trip_id)
+    if trip.restricted:
+        raise TripError(409, f"{trip.reference} is restricted: agents do not handle it (D-33)")
+    if trip.approval_status != "APPROVED":
+        raise TripError(409, f"{trip.reference} is {trip.approval_status}, not APPROVED")
+    if trip.starts_on <= datetime.now(ZoneInfo(home_tz)).date():
+        raise TripError(409, f"{trip.reference} has started: notify its travellers instead")
+    trip.approval_status = "CANCELLED"
+    await session.flush()
+    await audit.write(
+        session,
+        actor_type=actor.type,
+        actor_id=actor.id,
+        action="TRIP.CANCEL",
+        entity_type="trip",
+        entity_id=trip.reference,
+        details={"was": "APPROVED", "approved_by": str(approved_by) if approved_by else None},
+    )
     return Outcome(trip, [trip_event(trip)])
 
 

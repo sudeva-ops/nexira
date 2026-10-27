@@ -559,6 +559,13 @@ AGENTS: list[tuple[str, str, str, int]] = [
     ("EXPOSURE", "Exposure", "Watches people, trips and sites exposed to incidents.", 0),
     ("RESPONSE_PLANNER", "Response Planner", "Matches incidents to response playbooks.", 2),
     ("COMMUNICATIONS", "Communications", "Drafts multilingual advisories for audiences.", 2),
+    # Pilot module 4 (D-34): proposes only; a Travel Desk or Security Officer decides.
+    (
+        "TRAVEL_AIR",
+        "Travel & Air",
+        "Watches trips and flights; proposes messages and cancellations.",
+        2,
+    ),
 ]
 # (action_type, floor, approver_roles, undoable)
 POLICIES: list[tuple[str, int, list[str], bool]] = [
@@ -568,6 +575,12 @@ POLICIES: list[tuple[str, int, list[str], bool]] = [
     ("SEND_EXTERNAL_MESSAGE", 2, ["DUTY_OFFICER|CONSULAR_OFFICER"], False),
     # Test only (scene 5): injected by a test, never proposed by a Phase 1 agent.
     ("START_EVACUATION", 3, ["HEAD_OF_MISSION", "HQ_CRISIS_DIRECTOR"], False),
+]
+# Travel & Air agent (D-34, plan-pilot-ta §6): decided within 60 minutes or they expire.
+# ADVISE_REBOOKING has no policy: advice only (level 4, D-12).
+TRAVEL_POLICIES: list[tuple[str, int, list[str], bool, int]] = [
+    ("NOTIFY_TRAVELLERS", 2, ["TRAVEL_DESK|SECURITY_OFFICER"], False, 3600),
+    ("CANCEL_TRIP", 2, ["SECURITY_OFFICER"], False, 3600),
 ]
 
 # --- reference counters (D-18) -------------------------------------------------------------------

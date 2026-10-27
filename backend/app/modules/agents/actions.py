@@ -2,8 +2,9 @@
 
 Each Phase 1 action type has a payload schema and an executor. Executors only
 call the service functions a logged-in user's request calls: incident notes,
-playbooks.start_run, notifications.create_campaign. Agents never reach channels,
-external systems or tables directly (AGENTS.md).
+playbooks.start_run, notifications.create_campaign, and for the Travel & Air agent
+(D-34) the trip audience of create_campaign and trips.cancel_by_agent. Agents never
+reach channels, external systems or tables directly (AGENTS.md).
 
 An action type with no entry here can still be proposed: the database makes it
 level 4 (advise only) when it has no action_policy row (D-12), and it is never
@@ -18,6 +19,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.events import Event
 from app.modules.intel import service as intel
 from app.modules.intel.models import Incident
@@ -25,6 +27,7 @@ from app.modules.notifications.channels import CHANNELS
 from app.modules.notifications.service import CampaignIn, campaign_queued_event, create_campaign
 from app.modules.playbooks import service as playbooks
 from app.modules.tenancy.service import Actor
+from app.modules.travel import trips
 
 
 class ActionError(Exception):
@@ -56,6 +59,20 @@ class MessagePayload(_Payload):
 class EvacuationPayload(_Payload):
     route: str = Field(min_length=1)
     note: str | None = None
+
+
+class NotifyTravellersPayload(_Payload):
+    """NOTIFY_TRAVELLERS (D-34): a staff alert to one trip's travellers."""
+
+    trip_id: uuid.UUID
+    message: str = Field(min_length=1, max_length=2000)
+    channels: list[str] = Field(default_factory=lambda: ["APP", "SMS"], min_length=1)
+
+
+class CancelTripPayload(_Payload):
+    """CANCEL_TRIP (D-34): an approved trip that has not started."""
+
+    trip_id: uuid.UUID
 
 
 @dataclass
@@ -171,6 +188,52 @@ class Action:
     undo: Undo | None = None
 
 
+async def _notify_travellers(
+    session: AsyncSession, payload: NotifyTravellersPayload, ctx: Context
+) -> dict[str, Any]:
+    try:
+        # The same service as every agent and playbook message; simulated channels only.
+        # The trip audience refuses a restricted trip and citizens (plan-pilot-ta G-2).
+        campaign, recipients = await create_campaign(
+            session,
+            incident_id=ctx.incident_id,
+            campaign=CampaignIn(
+                campaign_type="ALERT",
+                message=payload.message,
+                channels=payload.channels,
+                audience={"trip_id": str(payload.trip_id)},
+            ),
+            created_by_type="AGENT",
+            created_by=str(ctx.proposal_id),
+            actor=ctx.agent_actor,
+        )
+    except ValueError as e:
+        raise ActionError(str(e)) from None
+    ctx.events.append(campaign_queued_event(campaign))
+    return {
+        "campaign_id": str(campaign.id),
+        "reference": campaign.reference,
+        "recipients": recipients,
+    }
+
+
+async def _cancel_trip(
+    session: AsyncSession, payload: CancelTripPayload, ctx: Context
+) -> dict[str, Any]:
+    try:
+        outcome = await trips.cancel_by_agent(
+            session,
+            payload.trip_id,
+            actor=ctx.agent_actor,
+            approved_by=ctx.approved_by,
+            home_tz=get_settings().home_tz,
+        )
+    except trips.TripError as e:
+        raise ActionError(str(e)) from None
+    ctx.events.extend(outcome.events)
+    return {"trip_id": str(outcome.trip.id), "reference": outcome.trip.reference}
+
+
 ACTIONS: dict[str, Action] = {
     "LOG_INFO": Action(NotePayload, _note, _retract_note),
     "POST_INTERNAL_NOTE": Action(NotePayload, _note, _retract_note),
@@ -178,6 +241,9 @@ ACTIONS: dict[str, Action] = {
     "SEND_EXTERNAL_MESSAGE": Action(MessagePayload, _send_message),
     # Test only (scene 5, plan G-16): no Phase 1 agent proposes it.
     "START_EVACUATION": Action(EvacuationPayload, _start_evacuation),
+    # Travel & Air agent (D-34). ADVISE_REBOOKING has no entry: advice only (level 4).
+    "NOTIFY_TRAVELLERS": Action(NotifyTravellersPayload, _notify_travellers),
+    "CANCEL_TRIP": Action(CancelTripPayload, _cancel_trip),
 }
 
 
