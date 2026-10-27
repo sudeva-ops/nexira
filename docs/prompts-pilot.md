@@ -173,4 +173,73 @@ make acceptance still passes. Report the real output.
 ---
 
 ## Later pilot modules
-The prompts for Air Travel Tracking, the Travel & Air agent and (if the customer wants it) Assistance Partners are written after their requirements are approved (requirements-pilot.md §7).
+## Pilot module 3 · Air Travel Tracking (approved 2026-10-27, PR #30)
+
+Sources: D-33, `docs/requirements-pilot.md` §14–18 (AT-01..08), PC-17..19. Simulated flights only.
+
+### Prompt 28 · Read and plan (no code)
+```
+Read D-19, D-22, D-24, D-29, D-30, D-32, D-33, requirements-pilot.md §14-18, the travel,
+people/location, intel/exposure and scenarios modules and the worker. Write
+docs/plan-pilot-air.md: requirement-to-code mapping, the tracker's loop (how flights are
+created, moved, disrupted and landed; how scenario events reach it; time compression),
+the API (paths, roles), how AT-05 (restricted trips) is enforced at every layer, gaps with
+proposed answers, and the migration for PC-17..19 (only after they are approved).
+No code changes.
+```
+
+### Prompt 29 · Airports, flights and restricted trips (migration) 🔒
+```
+PC-17..19, once approved. A new migration (never edit 0001-0003): airport, flight and
+flight_event with FORCE RLS and tenant_isolation; grants as PC-19 (the tracker also runs
+as nexira_api, so guard triggers keep flight_event append-only and flight status forward-
+only); the trip_segment flight columns
+(frozen with the segment); trip.restricted (frozen once the trip leaves DRAFT, in the
+PC-15 guard); a database backstop that refuses a flight for a restricted or unapproved
+trip. Seed airports (simulated) and the Nairobi scenario's approved trip with XW 451 AUH
+-> NBO for 3 HQ staff, plus one restricted trip with a flight.
+Tests (as nexira_api): isolation; every guard refusal; backup role reads the new tables;
+the downgrade restores 0003 exactly.
+```
+
+### Prompt 30 · Flight tracker and flights API
+```
+AT-01, AT-03, AT-04, AT-06, AT-08. The tracker in the worker (simulated feed): ensures a
+flight for each FLIGHT segment of an APPROVED, not restricted trip from 24 h before
+departure; moves it along a great-circle route on the clock; applies scenario events
+(DELAYED >= 30 min, HOLDING, DIVERTED, CANCELLED) as flight events; on LANDED adds a
+FLIGHT location observation per traveller at the landing airport (people/location), then
+recompute and exposure as today; stops tracking when the trip is cancelled. Publishes
+FLIGHT_UPDATED. Audits creation and each status change (actor SYSTEM).
+GET /api/flights (filters: status, disrupted) and /api/flights/{id} with events, travellers
+and trip; the trip API gains each flight segment's live status. Nairobi scenario: XW 451
+holds when the airport roads are affected, then diverts to Mombasa and lands (the Phase 1
+acceptance must still pass unchanged).
+Tests: restricted and unapproved trips never produce a flight or appear anywhere; every
+transition; landing moves the travellers; time compression; isolation of the API.
+Ask for an independent review: AT-05 is a safety rule even though it is not a D-29 path.
+```
+
+### Prompt 31 · Air Travel screen, and flight fields in the planner
+```
+AT-02, AT-07 (visual reference: the demo's Air Travel Tracking screen). Under MONITOR:
+KPIs from data (officials airborne, disrupted flights, position source "simulated");
+air picture on the self-hosted map (D-24) with routes and positions; tracked-flight table;
+detail with travellers, trip link and the event timeline; banners for HOLDING and DIVERTED;
+live over FLIGHT_UPDATED; a "Safeguards" card stating AT-01 and AT-05. The Journey planner
+gains flight number and airports for FLIGHT segments and a "Restricted (VIP/ministerial)"
+switch; the trip detail shows each flight's live status.
+Tests: Vitest for the table, the banners, the planner fields and the restricted switch.
+```
+
+### Prompt 32 · Air Travel acceptance
+```
+Playwright, real stack (requirements-pilot.md §17): XW 451 on the air picture; HOLDING,
+then DIVERTED · Mombasa, then LANDED, live; the 3 travellers' location becomes Mombasa
+(source FLIGHT); the restricted trip's flight never appears (API and UI); audit verifies;
+make acceptance (Nairobi, Mass Notification, Journey) still passes. Report the real output.
+```
+
+---
+
+The prompts for the Travel & Air agent and (if the customer wants it) Assistance Partners are written after their requirements are approved (requirements-pilot.md §7).
