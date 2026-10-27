@@ -39,6 +39,14 @@ export function canStartPlaybook(me: Me | undefined, missionId: string | null): 
   return holds(me, START_ROLES, missionId);
 }
 
+// backend/app/modules/travel/trips.py CREATORS. Every other trip action comes from
+// GET /api/me/permissions (trips.permissions()).
+const TRIP_CREATORS = ["TRAVEL_DESK", "DUTY_OFFICER"];
+
+export function canPlanTrip(me: Me | undefined): boolean {
+  return me?.roles.some((r) => TRIP_CREATORS.includes(r.code)) ?? false;
+}
+
 export function canRecordCheckin(me: Me | undefined, missionId: string | null): boolean {
   return holds(me, RESPOND_ROLES, missionId);
 }

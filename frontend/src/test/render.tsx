@@ -39,6 +39,24 @@ export function mockApi(routes: Routes) {
   return fetchMock;
 }
 
+export type Reply = { status?: number; body: unknown };
+
+/** Like mockApi, but keyed by "METHOD path", for paths that differ by method. */
+export function mockServer(routes: Record<string, Reply>) {
+  const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
+    const path = String(input).split("?")[0] ?? "";
+    const reply = routes[`${init?.method ?? "GET"} ${path}`];
+    if (!reply) return new Response("not found", { status: 404 });
+    return new Response(JSON.stringify(reply.body), {
+      status: reply.status ?? 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  setTokenProvider(() => Promise.resolve("test-token"));
+  return fetchMock;
+}
+
 export function renderApp(path: string, onLogout = vi.fn()) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(

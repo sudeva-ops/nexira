@@ -26,6 +26,7 @@ describe("app shell", () => {
       "Global Operations",
       "Incidents",
       "People & Sites",
+      "Journey Management", // pilot module 2 (D-30)
       "Response Playbooks",
       "Mass Notification", // pilot module 1 (D-30)
       "Safety Check-in",

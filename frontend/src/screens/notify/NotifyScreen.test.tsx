@@ -2,10 +2,9 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
-import { setTokenProvider } from "../../api/client";
 import type { CampaignPermissions, NtfCampaign, Template } from "../../api/notifications";
 import { MISSIONS, NAIROBI } from "../../test/fixtures";
-import { DUTY_OFFICER, renderApp } from "../../test/render";
+import { DUTY_OFFICER, type Reply, mockServer, renderApp } from "../../test/render";
 
 const PENDING: NtfCampaign = {
   id: "c-1",
@@ -58,24 +57,6 @@ const NONE: CampaignPermissions = {
   approve_campaign: false,
   cancel_campaign: false,
 };
-
-type Reply = { status?: number; body: unknown };
-
-/** Like mockApi, but keyed by "METHOD path", for paths that differ by method. */
-function mockServer(routes: Record<string, Reply>) {
-  const fetchMock = vi.fn<typeof fetch>(async (input, init) => {
-    const path = String(input).split("?")[0] ?? "";
-    const reply = routes[`${init?.method ?? "GET"} ${path}`];
-    if (!reply) return new Response("not found", { status: 404 });
-    return new Response(JSON.stringify(reply.body), {
-      status: reply.status ?? 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  });
-  vi.stubGlobal("fetch", fetchMock);
-  setTokenProvider(() => Promise.resolve("test-token"));
-  return fetchMock;
-}
 
 function server(permissions: CampaignPermissions, extra: Record<string, Reply> = {}) {
   return mockServer({
