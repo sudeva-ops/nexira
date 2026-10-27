@@ -242,7 +242,7 @@ make acceptance (Nairobi, Mass Notification, Journey) still passes. Report the r
 
 ---
 
-## Pilot module 4 · Travel & Air agent (draft for approval)
+## Pilot module 4 · Travel & Air agent (approved 2026-10-27, PR #36)
 
 Sources: D-12 to D-17, D-34, `docs/requirements-pilot.md` §19–23 (TA-01..09).
 

@@ -210,7 +210,7 @@ Rules:
 - **Disruptions are shown, not acted on.** Delays (30 minutes or more), holding, diversions and cancellations are flight events, shown live. Proposals to rebook, book hotels or notify travellers come with the Travel & Air agent (pilot module 4).
 - **Landing moves the travellers.** On landing, each traveller gets a `FLIGHT` location observation at the landing airport, through the existing location service.
 
-**D-34 · Travel & Air agent rules.** *Proposed* with the draft in `docs/requirements-pilot.md` §19–23 (TA-01 to TA-09); not in force until the product owner approves it.
+**D-34 · Travel & Air agent rules.** Approved by the product owner on 2026-10-27 (PR #36), with the defaults in `docs/requirements-pilot.md` §23. Requirements TA-01 to TA-09.
 - **Level 2, always a person.** The agent proposes; a Travel Desk or Security Officer approves (D-16, through `app/core/approvals.py`). Nothing it proposes runs on its own.
 - **Only what the platform can do.** Notify a trip's travellers (a staff campaign, simulated channels) or cancel a trip that has not started. Rebooking and hotels are advice only: the pilot books nothing.
 - **Flag, then a person decides.** D-32 still holds: a risen risk never cancels a trip by itself; the agent's CANCEL_TRIP proposal is a suggestion with "notify instead" as the alternative.

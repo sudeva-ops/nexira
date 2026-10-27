@@ -85,7 +85,7 @@ The Nairobi acceptance scenario and the France scenario still pass. The France s
 |---|---|---|
 | Journey Management (JRN-01..05) | **Written: §9 (approved, built: Prompts 23–27)** | — |
 | Air Travel Tracking (AIR-01..07) | **Written: §14 (approved, built: Prompts 28–32)** | — |
-| Travel & Air agent | **Written: §19 (draft for approval)** | — |
+| Travel & Air agent | **Written: §19 (approved)** | — |
 | Assistance Partners (AST-01..04) | nothing | only if the pilot customer wants it |
 
 ## 8. Questions answered by the product owner (2026-10-25)
@@ -201,9 +201,9 @@ Playwright on the real stack: the Nairobi scenario's inbound XW 451 (Abu Dhabi �
 
 ---
 
-# Pilot module 4 · Travel & Air agent (draft for approval)
+# Pilot module 4 · Travel & Air agent (approved 2026-10-27, PR #36)
 
-For the product owner, who approves this part; then for the coding agent (Prompts 33–37 in `docs/prompts-pilot.md`). Rules: D-12 to D-17 (agents), D-29, D-30, D-31 to D-33, and **D-34** (proposed with this draft).
+For the product owner, who approves this part; then for the coding agent (Prompts 33–37 in `docs/prompts-pilot.md`). Rules: D-12 to D-17 (agents), D-29, D-30, D-31 to D-33, and **D-34**.
 
 ## 19. Purpose and starting point
 
@@ -241,12 +241,12 @@ Booking, rebooking or hotel reservations by the platform (no booking integration
 
 Playwright on the real stack: in NBO-AIR-DIVERSION, XW 451 holding gives a NOTIFY_TRAVELLERS proposal; the Travel Desk approves it and a campaign to the 3 travellers is sent (simulated); the diversion adds an ADVISE_REBOOKING card; during the France scenario a seeded approved Paris trip gets a CANCEL_TRIP proposal that the Security Officer approves and the trip is CANCELLED; nothing is proposed about the restricted trip; the kill switch stops new proposals; the audit chain verifies; `make acceptance` (all four existing specs) still passes.
 
-## 23. Questions for the product owner (each has a proposed default)
+## 23. Questions answered by the product owner (2026-10-27: "use the defaults")
 
-1. **Agent level:** *Default:* 2, so every action needs a person; nothing runs on its own.
-2. **Who approves notifying travellers:** *Default:* `TRAVEL_DESK|SECURITY_OFFICER`.
-3. **Who approves cancelling a trip:** *Default:* `SECURITY_OFFICER`, one step. (Alternative: Security Officer then HQ Crisis Director.)
-4. **Delay that triggers a proposal:** *Default:* 60 minutes (30 minutes is only flagged, AT-03).
-5. **Restricted trips:** *Default:* the agent never proposes anything about them.
-6. **Rebooking and hotels:** *Default:* advice only (level 4), since the pilot has no booking integration.
-7. **Decision deadline:** *Default:* 60 minutes, then the proposal expires (AGT-06).
+1. **Agent level:** 2, so every action needs a person; nothing runs on its own.
+2. **Who approves notifying travellers:** `TRAVEL_DESK|SECURITY_OFFICER`.
+3. **Who approves cancelling a trip:** `SECURITY_OFFICER`, one step.
+4. **Delay that triggers a proposal:** 60 minutes (30 minutes is only flagged, AT-03).
+5. **Restricted trips:** the agent never proposes anything about them.
+6. **Rebooking and hotels:** advice only (level 4), since the pilot has no booking integration.
+7. **Decision deadline:** 60 minutes, then the proposal expires (AGT-06).
