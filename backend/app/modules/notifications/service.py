@@ -53,7 +53,14 @@ async def resolve_audience(
       with one of these role titles
     Spec used by the composer (MN-02), with or without an incident:
     - {"missions": [mission ids], "person_types": [...]}: people of those missions
+    Spec used by the Travel & Air agent (D-34, plan-pilot-ta G-2), with or without an
+    incident:
+    - {"trip_id": id}: that trip's active travellers. Refused for a restricted trip (D-33)
+      and if any traveller is a citizen (only DUTY_OFFICER|CONSULAR_OFFICER approve
+      citizen messages, D-31; the agent's approvers are TRAVEL_DESK|SECURITY_OFFICER).
     """
+    if audience.get("trip_id"):
+        return await _trip_travellers(session, str(audience["trip_id"]))
     if audience.get("missions"):
         rows = await session.scalars(
             text(
@@ -99,6 +106,48 @@ async def resolve_audience(
         )
         return list(rows)
     raise AudienceError(f"unsupported audience {audience!r}")
+
+
+async def _trip_travellers(session: AsyncSession, trip_id: str) -> list[uuid.UUID]:
+    try:
+        trip_uuid = uuid.UUID(trip_id)
+    except ValueError:
+        raise AudienceError("unknown trip") from None
+    # FOR SHARE: a PENDING trip cannot go back to DRAFT (and change its travellers) while
+    # its list is read (review of Prompt 34, M1).
+    trip = (
+        await session.execute(
+            text("SELECT restricted, approval_status FROM trip WHERE id = :trip FOR SHARE"),
+            {"trip": trip_uuid},
+        )
+    ).first()
+    if trip is None:
+        raise AudienceError("unknown trip")
+    restricted, status = trip
+    if restricted:
+        raise AudienceError("a restricted trip's travellers are not messaged (D-33)")
+    if status not in ("PENDING", "APPROVED"):
+        # Travellers are frozen only once a trip leaves DRAFT (PC-15): what was proposed
+        # is what is sent. Cancelled trips have no one to tell.
+        raise AudienceError(f"the trip is {status}: only a pending or approved trip is messaged")
+    rows = (
+        await session.execute(
+            text(
+                """
+                SELECT p.id, p.person_type FROM trip_traveller tt
+                  JOIN person p ON p.id = tt.person_id
+                 WHERE tt.trip_id = :trip AND p.is_active
+                 ORDER BY p.id
+                """
+            ),
+            {"trip": trip_uuid},
+        )
+    ).all()
+    if any(person_type == "CITIZEN" for _, person_type in rows):
+        raise AudienceError("a trip with a citizen traveller needs a composed campaign (D-31)")
+    if not rows:
+        raise AudienceError("the trip has no active travellers")  # review, L4
+    return [person_id for person_id, _ in rows]
 
 
 @dataclass(frozen=True)
@@ -173,7 +222,7 @@ async def scenario_escalate_after_s(session: AsyncSession) -> int | None:
 async def create_campaign(
     session: AsyncSession,
     *,
-    incident_id: uuid.UUID,
+    incident_id: uuid.UUID | None,
     campaign: CampaignIn,
     created_by_type: str,
     created_by: str,
@@ -185,6 +234,8 @@ async def create_campaign(
         raise ValueError(f"unknown campaign type {campaign.campaign_type}")
     if not campaign.channels or not set(campaign.channels) <= set(CHANNELS):
         raise ValueError(f"unknown channels {campaign.channels}")
+    if len(set(campaign.channels)) != len(campaign.channels):
+        raise ValueError("each channel once")  # review of Prompt 34, L1
     recipients = await resolve_audience(session, incident_id, campaign.audience)
     escalate_after_s = campaign.escalate_after_s
     if campaign.campaign_type == "CHECKIN":
@@ -198,7 +249,10 @@ async def create_campaign(
         message=campaign.message,
         translations=campaign.translations or {},
         channels=campaign.channels,
-        audience_filter={**campaign.audience, "incident_id": str(incident_id)},
+        audience_filter={
+            **campaign.audience,
+            **({"incident_id": str(incident_id)} if incident_id else {}),
+        },
         created_by_type=created_by_type,
         created_by=created_by,
         escalate_after_s=escalate_after_s,
@@ -219,7 +273,7 @@ async def create_campaign(
             "campaign_type": row.campaign_type,
             "channels": row.channels,
             "recipients": len(recipients),
-            "incident_id": str(incident_id),
+            "incident_id": str(incident_id) if incident_id else None,
             "created_by": f"{created_by_type}:{created_by}",
         },
     )

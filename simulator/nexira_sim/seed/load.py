@@ -188,7 +188,8 @@ async def seed_all(
         )
         report["policies"] = await ensure_policies(
             session,
-            [PolicyIn(action, floor, roles, undo) for action, floor, roles, undo in data.POLICIES],
+            [PolicyIn(action, floor, roles, undo) for action, floor, roles, undo in data.POLICIES]
+            + [PolicyIn(*policy) for policy in data.TRAVEL_POLICIES],
         )
 
         report["counters"] = [

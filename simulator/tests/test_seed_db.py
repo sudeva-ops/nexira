@@ -168,11 +168,25 @@ async def test_sources_playbook_agents_and_counters(seeded: Seeded) -> None:
     assert steps[6]["requires_approval_role"] == "HEAD_OF_MISSION"
 
     agents = {r["code"]: r["autonomy_level"] for r in await c.fetch("SELECT * FROM agent")}
-    assert agents == {"WATCH_OFFICER": 0, "EXPOSURE": 0, "RESPONSE_PLANNER": 2, "COMMUNICATIONS": 2}
+    assert agents == {
+        "WATCH_OFFICER": 0,
+        "EXPOSURE": 0,
+        "RESPONSE_PLANNER": 2,
+        "COMMUNICATIONS": 2,
+        "TRAVEL_AIR": 2,  # D-34
+    }
     policies = {
         r["action_type"]: (r["min_autonomy_level"], r["approver_roles"], r["is_undoable"])
         for r in await c.fetch("SELECT * FROM action_policy")
     }
+    assert policies["NOTIFY_TRAVELLERS"] == (2, ["TRAVEL_DESK|SECURITY_OFFICER"], False)
+    assert policies["CANCEL_TRIP"] == (2, ["SECURITY_OFFICER"], False)
+    assert "ADVISE_REBOOKING" not in policies  # advice only (D-12)
+    deadlines = await c.fetch(
+        "SELECT decision_deadline_s FROM action_policy "
+        "WHERE action_type IN ('NOTIFY_TRAVELLERS', 'CANCEL_TRIP')"
+    )
+    assert {r["decision_deadline_s"] for r in deadlines} == {3600}
     assert policies["START_EVACUATION"] == (3, ["HEAD_OF_MISSION", "HQ_CRISIS_DIRECTOR"], False)
     assert policies["SEND_EXTERNAL_MESSAGE"] == (2, ["DUTY_OFFICER|CONSULAR_OFFICER"], False)
     assert policies["LOG_INFO"] == (0, [], True)
