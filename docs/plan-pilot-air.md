@@ -105,3 +105,12 @@ The plan is approved. **G-7 approved** (2026-10-27, during Prompt 29): for a res
 - **Travel KPIs on Global Operations change (accepted, D-27).** The seeded flight trips (G-1, G-4) are active today, so "travellers active" and "active trips" go from 3 travellers on 1 trip to about 12 on 5. Exposure (D-23) does not change: their travellers are away from any incident. G-1 means the incident and check-in figures, which stay the same.
 - **Prompt 30:** the status table refuses AIRBORNE → CANCELLED, so the tracker's "stop" step cancels only flights that have not departed; a flight already in the air with a cancelled trip is tracked until it lands.
 - **Until Prompt 30 masks it (G-7):** the restricted seeded trip TRP-8813's flight segment is titled "Flight" with no place label; its times remain visible in the trip API.
+
+## 10. Review of Prompt 30 (tracker and API)
+
+- **G-5 as built:** after a landing the tracker recomputes exposure directly (the same code as the exposure handler) for ACTIVE incidents within 100 km or the incident's own radius if larger, and publishes `EXPOSURE_COMPUTED`; it does not publish `INCIDENT_UPDATED`, so agents do not react to a landing as if the incident had changed.
+- **The feed** is validated (minutes 0–48 h, known changes only); a malformed message is dropped, not retried. It applies to every tracked flight with that number and date (several of our trips can share a physical flight). A refused transition changes nothing; a repeat records nothing. In the air, a delay moves only the arrival.
+- **An edit never un-restricts a trip:** `restricted` left out of a PATCH keeps its value; the planner sends it and the flight fields back unchanged.
+- **Positions** are published per tenant at most every 15 s (`FLIGHT_POSITIONS`), not per flight.
+- **Replaying the demo:** once XW 451 has LANDED it is final; `NBO-AIR-DIVERSION` can be played again only after `make reset-demo`.
+- **Home zone:** the tracker reads `HOME_TZ` from the settings; the simulator seed still assumes GST (UTC+4) for its anchors, which is the pilot's zone (plan Q2).

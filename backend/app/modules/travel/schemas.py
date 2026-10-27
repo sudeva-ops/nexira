@@ -32,7 +32,9 @@ class TripIn(BaseModel):
     ends_on: date
     travellers: list[uuid.UUID] = Field(min_length=1, max_length=50)
     segments: list[SegmentIn] = Field(default_factory=list, max_length=30)
-    restricted: bool = False  # VIP or ministerial: flights never tracked (D-33)
+    # VIP or ministerial: flights never tracked (D-33). Left out of an edit, it keeps its
+    # value: an edit never quietly un-restricts a trip (review of Prompt 30, M1).
+    restricted: bool | None = None
 
 
 class CheckIn(BaseModel):

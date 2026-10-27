@@ -274,8 +274,30 @@ describe("Journey Management", () => {
           place_label: null,
           starts_at: "2026-11-02T05:00:00.000Z", // 09:00 GST
           ends_at: "2026-11-02T08:00:00.000Z",
+          flight_number: null,
+          from_airport: null,
+          to_airport: null,
         },
       ],
+      restricted: false,
+    });
+  });
+});
+
+describe("editing a restricted draft (review of Prompt 30, M1)", () => {
+  it("sends the restricted flag and the flight fields back unchanged", async () => {
+    const draft: TripDetail = { ...PENDING, approval_status: "DRAFT", restricted: true };
+    const fetchMock = server(DUTY_OFFICER, { ...NONE, edit_trip: true }, {
+      "GET /api/trips/t-1": { body: draft },
+      "PATCH /api/trips/t-1": { body: draft },
+    });
+    renderApp("/journeys?trip=t-1");
+    await userEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save draft" }));
+    await waitFor(() => expect(posted(fetchMock, "/api/trips/t-1", "PATCH")).toHaveLength(1));
+    expect(posted(fetchMock, "/api/trips/t-1", "PATCH")[0]).toMatchObject({
+      restricted: true,
+      segments: [{ flight_number: "RJ 810", from_airport: "AMM", to_airport: "BGW" }],
     });
   });
 });

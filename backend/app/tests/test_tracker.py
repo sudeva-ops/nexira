@@ -469,3 +469,140 @@ async def test_a_restricted_trips_flight_segments_are_masked_for_most_roles(
         "flight_status": None,
     }
     assert viewer["destination"] == "Nairobi"  # the trip itself stays visible (JR-08)
+
+
+# --- review of Prompt 30 ---------------------------------------------------------------------
+
+
+async def test_an_edit_without_restricted_keeps_it(client: AsyncClient, world: World) -> None:
+    """M1: an edit never quietly un-restricts a trip."""
+    created = await client.post(
+        "/api/trips", json=plan(world, restricted=True), headers=world.idp.headers("desk")
+    )
+    trip_id = created.json()["id"]
+    edited = await client.patch(
+        f"/api/trips/{trip_id}", json=plan(world), headers=world.idp.headers("desk")
+    )
+    assert edited.status_code == 200
+    assert edited.json()["restricted"] is True
+    viewer = (await client.get(f"/api/trips/{trip_id}", headers=world.idp.headers("viewer"))).json()
+    assert viewer["segments"][0]["flight_number"] is None
+
+
+async def test_a_feed_updates_every_tracked_flight_with_that_number(world: World) -> None:
+    """M2: two of our trips on the same physical flight."""
+    first = await world.trip(departs=timedelta(hours=-10), scenario=True)
+    second = await world.trip(departs=timedelta(hours=-10), scenario=True)
+    await world.feed(T0, status="AIRBORNE", arrives_in_min=10)
+    await world.feed(T0, status="HOLDING", reason="Arrivals restricted")
+    assert {(await world.flight(t)).status for t in (first, second)} == {"HOLDING"}
+
+
+async def test_a_refused_feed_change_leaves_the_flight_as_it_was(world: World) -> None:
+    """L1: the transition is checked before anything is written."""
+    trip_id = await world.trip(departs=timedelta(hours=-10), scenario=True)
+    before = await world.flight(trip_id)
+    await world.feed(T0, status="LANDED")
+    await world.feed(T0, status="DIVERTED", to="MBA")
+    after = await world.flight(trip_id)
+    assert (after.status, after.diverted_to, after.position, after.estimated_arr) == (
+        "SCHEDULED",
+        None,
+        before.position,
+        before.estimated_arr,
+    )
+    assert await world.events(trip_id) == []
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"delay_min": -100000},
+        {"delay_min": "45"},
+        {"delay_min": 10**9},
+        {"status": "AIRBORNE", "arrives_in_min": -5},
+        {"status": "AIRBORNE", "arrives_in_min": float("nan")},
+        {"status": "TELEPORTED"},
+        {"status": "DIVERTED"},
+    ],
+)
+async def test_a_malformed_feed_is_dropped(world: World, payload: dict[str, Any]) -> None:
+    """L2: bounded, typed; dropped rather than retried."""
+    trip_id = await world.trip(departs=timedelta(hours=-10), scenario=True)
+    before = await world.flight(trip_id)
+    await world.feed(T0, **payload)
+    after = await world.flight(trip_id)
+    assert (after.status, after.estimated_dep, after.estimated_arr) == (
+        before.status,
+        before.estimated_dep,
+        before.estimated_arr,
+    )
+
+
+async def test_a_delay_in_the_air_moves_only_the_arrival(world: World) -> None:
+    """L3."""
+    trip_id = await world.trip(departs=timedelta(hours=-1), hours=4)  # left on schedule
+    await world.tick(T0)
+    departed = (await world.flight(trip_id)).estimated_dep
+    await world.feed(T0, delay_min=45, date=(T0 - timedelta(hours=1)).date().isoformat())
+    flight = await world.flight(trip_id)
+    assert flight.estimated_dep == departed
+    assert flight.estimated_arr - flight.scheduled_arr == timedelta(minutes=45)
+    assert flight.status == "AIRBORNE"
+
+
+async def test_a_repeated_feed_records_nothing_new(world: World) -> None:
+    """L4: the stream may redeliver."""
+    trip_id = await world.trip(departs=timedelta(hours=-10), scenario=True)
+    await world.feed(T0, status="AIRBORNE", arrives_in_min=10)
+    for _ in range(2):
+        await world.feed(T0, status="HOLDING", reason="Arrivals restricted")
+        await world.feed(T0, delay_min=45)
+    assert [e for e, _ in await world.events(trip_id)] == ["DEPARTED", "HOLDING", "DELAYED"]
+
+
+async def test_a_large_incident_beyond_100_km_is_recomputed_too(world: World) -> None:
+    """L7: the incident's own radius when it is larger than 100 km."""
+    await world.trip(departs=timedelta(hours=-10), scenario=True)
+    await world.sql(
+        "INSERT INTO incident (tenant_id, reference, title, category, severity, signal_severity, "
+        "location, impact_radius_m) VALUES (current_tenant_id(), 'INC-WIDE', 'Cyclone', "
+        "'NATURAL_HAZARD', 'HIGH', 'HIGH', 'SRID=4326;POINT(41.5 -4.03)', 250000)"
+    )
+    await world.feed(T0, status="AIRBORNE", arrives_in_min=10)
+    await world.feed(T0, status="DIVERTED", to="MBA", arrives_in_min=1)
+    await world.feed(T0, status="LANDED")
+    assert any(e.type == "EXPOSURE_COMPUTED" for e in world.publisher.events)
+
+
+async def test_flight_status_filter_is_validated(client: AsyncClient, world: World) -> None:
+    """L8."""
+    response = await client.get("/api/flights?status=FLYING", headers=world.idp.headers("viewer"))
+    assert response.status_code == 422
+
+
+async def test_a_flight_number_with_a_trailing_newline_is_refused(
+    client: AsyncClient, world: World
+) -> None:
+    """L9: the API check matches the database CHECK."""
+    response = await client.post(
+        "/api/trips",
+        json=plan(world, segment={"flight_number": "XW 451\n"}),
+        headers=world.idp.headers("desk"),
+    )
+    assert response.status_code == 422
+
+
+async def test_masking_applies_to_action_responses_too(client: AsyncClient, world: World) -> None:
+    """G-7 on a checklist tick by a Duty Officer who is not the requester."""
+    created = await client.post(
+        "/api/trips", json=plan(world, restricted=True), headers=world.idp.headers("desk")
+    )
+    trip_id = created.json()["id"]
+    ticked = await client.post(
+        f"/api/trips/{trip_id}/checklist",
+        json={"item": "security_briefing", "done": True},
+        headers=world.idp.headers("duty"),
+    )
+    assert ticked.status_code == 200
+    assert ticked.json()["segments"][0]["title"] == "Flight (restricted)"

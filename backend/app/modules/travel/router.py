@@ -364,6 +364,8 @@ async def list_flights(
     disrupted: bool | None = None,
 ) -> list[FlightOut]:
     """Tracked flights only: our travellers on approved, unrestricted trips (AT-01, AT-05)."""
+    if status_ is not None and status_ not in flights.STATUSES:
+        raise HTTPException(422, f"status is one of {', '.join(flights.STATUSES)}")
     return await flights.list_flights(session, datetime.now(UTC), status_, disrupted)
 
 

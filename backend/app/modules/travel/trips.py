@@ -91,7 +91,7 @@ class Plan:
     travellers: list[uuid.UUID]
     purpose: str | None = None
     segments: list[SegmentIn] = field(default_factory=list)
-    restricted: bool = False  # VIP or ministerial: flights never tracked (D-33)
+    restricted: bool | None = None  # VIP or ministerial (D-33); None on an edit: unchanged
 
 
 @dataclass
@@ -294,7 +294,7 @@ async def _validate_flight(session: AsyncSession, n: int, segment: SegmentIn) ->
         raise TripError(422, f"segment {n}: a flight number and airports are for FLIGHT segments")
     if not all(fields):
         raise TripError(422, f"segment {n}: a tracked flight needs its number and both airports")
-    if not FLIGHT_NUMBER.match(segment.flight_number or ""):
+    if not FLIGHT_NUMBER.fullmatch(segment.flight_number or ""):
         raise TripError(422, f"segment {n}: the flight number looks like XW 451")
     if segment.from_airport == segment.to_airport:
         raise TripError(422, f"segment {n}: the flight departs and arrives at the same airport")
@@ -345,7 +345,7 @@ async def _write_children(session: AsyncSession, trip: Trip, plan: Plan) -> None
 
 def _details(plan: Plan) -> dict[str, Any]:
     return {
-        "restricted": plan.restricted,
+        "restricted": bool(plan.restricted),
         "destination": plan.destination,
         "country": plan.destination_country,
         "starts_on": plan.starts_on.isoformat(),
@@ -408,7 +408,7 @@ async def create_draft(session: AsyncSession, user: CurrentUser, plan: Plan, hom
         ends_on=plan.ends_on,
         approval_status="DRAFT",
         requested_by=user.id,  # from the token's user, never from the request
-        restricted=plan.restricted,
+        restricted=bool(plan.restricted),
     )
     session.add(trip)
     await session.flush()
@@ -431,7 +431,8 @@ async def update_draft(
     trip.destination_country = plan.destination_country
     trip.starts_on = plan.starts_on
     trip.ends_on = plan.ends_on
-    trip.restricted = plan.restricted
+    if plan.restricted is not None:
+        trip.restricted = plan.restricted
     await session.flush()
     await _write_children(session, trip, plan)
     await _audit(session, user, "EDIT", trip, _details(plan))

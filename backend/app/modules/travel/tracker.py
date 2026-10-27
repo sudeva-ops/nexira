@@ -32,9 +32,11 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, text
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.core import audit
+from app.core.config import get_settings
 from app.core.db import tenant_session
 from app.core.events import Event, Handler, Publisher
 from app.modules.intel import exposure
@@ -56,7 +58,6 @@ CRUISE_FT, CRUISE_KT = 37_000, 460
 HOLD_FT, HOLD_KT = 12_000, 230
 POSITIONS_EVERY = timedelta(seconds=15)
 EARTH_KM = 6371.0
-HOME_TZ = ZoneInfo("Asia/Dubai")  # scenario feed dates are home-zone dates (plan Q2)
 
 IN_AIR = ("AIRBORNE", "HOLDING", "DIVERTED")
 FINAL = ("LANDED", "CANCELLED")
@@ -296,8 +297,15 @@ async def _ensure(session: AsyncSession, now: datetime, result: Result) -> None:
             estimated_arr=arrives,
             source="SIMULATED",
         )
-        session.add(flight)
-        await session.flush()
+        try:
+            # A savepoint each: another worker, or a trip cancelled since the select, must
+            # not roll back the rest of the tick (review, L6).
+            async with session.begin_nested():
+                session.add(flight)
+                await session.flush()
+        except DBAPIError:
+            log.info("flight %s not tracked now (taken or no longer approved)", number)
+            continue
         await audit.write(
             session,
             actor_type=SYSTEM.type,
@@ -345,7 +353,9 @@ async def _move(
             flight.position = _wkt(along(origin, destination, p))
             flight.altitude_ft, flight.speed_kt = profile(p)
         elif flight.status == "HOLDING":
-            flight.position = _wkt(holding_point(origin, destination, now))
+            # After a diversion it holds near the diversion airport (review, L10).
+            target = airports[flight.diverted_to][0] if flight.diverted_to else destination
+            flight.position = _wkt(holding_point(origin, target, now))
             flight.altitude_ft, flight.speed_kt = HOLD_FT, HOLD_KT
         elif flight.status == "DIVERTED" and flight.diverted_to:
             start, since = await _diversion_start(session, flight)
@@ -377,7 +387,9 @@ async def _diversion_start(
     return start, event.occurred_at
 
 
-def flight_event(flight: Flight, kind: str = "FLIGHT_UPDATED") -> Event:
+def flight_event(
+    flight: Flight, kind: str = "FLIGHT_UPDATED", trip_id: uuid.UUID | None = None
+) -> Event:
     return Event(
         type=kind,
         tenant_id=flight.tenant_id,
@@ -385,6 +397,7 @@ def flight_event(flight: Flight, kind: str = "FLIGHT_UPDATED") -> Event:
             "flight_id": str(flight.id),
             "flight_number": flight.flight_number,
             "status": flight.status,
+            "trip_id": str(trip_id) if trip_id else None,
         },
         source="travel.tracker",
     )
@@ -397,8 +410,20 @@ async def _after(
     engine: AsyncEngine, tenant_id: uuid.UUID, publisher: Publisher, result: Result, now: datetime
 ) -> None:
     """After commit: events, and exposure near each landing airport (plan G-5)."""
-    for flight in {f.id: f for f in result.changed}.values():
-        await publisher.publish(flight_event(flight))
+    changed = {f.id: f for f in result.changed}
+    trips: dict[uuid.UUID, uuid.UUID] = {}
+    if changed:
+        async with tenant_session(tenant_id, engine) as session:
+            rows = await session.execute(
+                text(
+                    "SELECT f.id, s.trip_id FROM flight f "
+                    "JOIN trip_segment s ON s.id = f.trip_segment_id WHERE f.id = ANY(:ids)"
+                ),
+                {"ids": list(changed)},
+            )
+            trips = {flight_id: trip_id for flight_id, trip_id in rows}
+    for flight in changed.values():
+        await publisher.publish(flight_event(flight, trip_id=trips.get(flight.id)))
     if (
         result.moving
         and now - _last_positions.get(tenant_id, datetime.min.replace(tzinfo=UTC))
@@ -414,7 +439,8 @@ async def _after(
                 await session.scalars(
                     text(
                         "SELECT i.id FROM incident i, airport a WHERE i.status = 'ACTIVE' "
-                        "AND a.iata = :at AND ST_DWithin(i.location, a.location, :metres)"
+                        "AND a.iata = :at AND ST_DWithin(i.location, a.location, "
+                        "greatest(i.impact_radius_m, :metres))"
                     ),
                     {"at": at, "metres": NEARBY_KM * 1000},
                 )
@@ -445,83 +471,170 @@ async def tick(
 # --- the feed (FLIGHT_FEED) -------------------------------------------------------------------
 
 
-async def _find(session: AsyncSession, number: str, day: str) -> Flight | None:
-    """The flight with this number departing on this home-zone date, not yet final."""
+MAX_MIN = 48 * 60  # feed times are relative minutes; anything outside 0..48 h is refused
+
+
+@dataclass(frozen=True)
+class Feed:
+    """A validated FLIGHT_FEED payload (review of Prompt 30, L2): one change."""
+
+    flight_number: str
+    day: str
+    status: str | None  # AIRBORNE, HOLDING, DIVERTED, LANDED, CANCELLED; None for a delay
+    delay_min: int | None = None
+    departed_min_ago: float = 0
+    arrives_in_min: float | None = None
+    to: str | None = None
+    reason: str = ""
+
+
+def _minutes(value: object, default: float | None) -> float | None:
+    if value is None:
+        return default
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError("minutes must be a number")
+    if not math.isfinite(value) or not 0 <= value <= MAX_MIN:
+        raise ValueError(f"minutes must be between 0 and {MAX_MIN}")
+    return float(value)
+
+
+def parse_feed(payload: dict[str, Any]) -> Feed | None:
+    """None (logged) for anything malformed: a bad feed is dropped, never retried."""
+    try:
+        number, day = payload.get("flight_number"), payload.get("date")
+        if not isinstance(number, str) or not isinstance(day, str):
+            raise ValueError("flight_number and date are required")
+        reason = payload.get("reason", "")
+        if not isinstance(reason, str):
+            raise ValueError("reason must be text")
+        if "delay_min" in payload:
+            delay = _minutes(payload["delay_min"], None)
+            return Feed(number, day, None, delay_min=round(delay or 0), reason=reason[:200])
+        status = payload.get("status")
+        if status not in ("AIRBORNE", "HOLDING", "DIVERTED", "LANDED", "CANCELLED"):
+            raise ValueError(f"unknown change {status!r}")
+        to = payload.get("to")
+        if status == "DIVERTED" and not isinstance(to, str):
+            raise ValueError("a diversion names the airport")
+        return Feed(
+            number,
+            day,
+            str(status),
+            departed_min_ago=_minutes(payload.get("departed_min_ago"), 0) or 0,
+            arrives_in_min=_minutes(payload.get("arrives_in_min"), None),
+            to=to if isinstance(to, str) else None,
+            reason=reason[:200],
+        )
+    except ValueError as e:
+        log.warning("FLIGHT_FEED ignored (%s): %s", e, payload)
+        return None
+
+
+async def _find(session: AsyncSession, number: str, day: str) -> list[Flight]:
+    """Every tracked flight with this number departing on this home-zone date, not yet
+    final: a provider's update is about the physical flight, which may carry several of
+    our trips (review of Prompt 30, M2). Locked in a fixed order."""
+    zone = ZoneInfo(get_settings().home_tz)
     flights = (
         await session.scalars(
             select(Flight)
             .where(Flight.flight_number == number, Flight.status.not_in(FINAL))
+            .order_by(Flight.id)
             .with_for_update()
         )
     ).all()
-    for flight in flights:
-        if flight.scheduled_dep.astimezone(HOME_TZ).date().isoformat() == day:
-            return flight
-    return None
+    return [f for f in flights if f.scheduled_dep.astimezone(zone).date().isoformat() == day]
 
 
-async def apply_feed(
-    session: AsyncSession, payload: dict[str, Any], now: datetime, result: Result
-) -> Flight | None:
-    flight = await _find(
-        session, str(payload.get("flight_number", "")), str(payload.get("date", ""))
-    )
-    if flight is None:
-        log.info("FLIGHT_FEED for an untracked flight ignored: %s", payload.get("flight_number"))
-        return None
-    airports = await _airports(session)
-    if "delay_min" in payload:
-        minutes = int(payload["delay_min"])
-        flight.estimated_dep = flight.scheduled_dep + timedelta(minutes=minutes)
-        flight.estimated_arr = flight.scheduled_arr + timedelta(minutes=minutes)
-        if minutes >= DELAY_MIN:
+def _allowed(flight: Flight, status: str) -> bool:
+    return status == flight.status or status in ALLOWED.get(flight.status, set())
+
+
+async def _apply(
+    session: AsyncSession,
+    flight: Flight,
+    feed: Feed,
+    airports: dict[str, tuple[Point, str, str]],
+    now: datetime,
+    result: Result,
+) -> None:
+    """One change to one flight. The transition is checked before anything is written,
+    so a refused change leaves the flight as it was (review, L1); a repeat of the
+    current state writes nothing (L4)."""
+    if feed.status is None:  # a delay
+        minutes = feed.delay_min or 0
+        if flight.status in IN_AIR:
+            # In the air only the arrival moves; the departure happened (review, L3). Never
+            # before the actual departure, whatever the schedule said.
+            flight.estimated_arr = max(
+                flight.scheduled_arr + timedelta(minutes=minutes), flight.estimated_dep
+            )
+        else:
+            flight.estimated_dep = flight.scheduled_dep + timedelta(minutes=minutes)
+            flight.estimated_arr = flight.scheduled_arr + timedelta(minutes=minutes)
+        recorded = await session.scalar(
+            select(FlightEvent.details)
+            .where(FlightEvent.flight_id == flight.id, FlightEvent.event_type == "DELAYED")
+            .order_by(FlightEvent.id.desc())
+            .limit(1)
+        )
+        if minutes >= DELAY_MIN and (recorded or {}).get("minutes") != minutes:
             status = "DELAYED" if flight.status == "SCHEDULED" else flight.status
             await _change(session, flight, status, "DELAYED", {"minutes": minutes}, result)
-        return flight
-    status = str(payload.get("status", ""))
+        else:
+            await session.flush()
+        return
+    status = feed.status
+    if not _allowed(flight, status):
+        log.warning("flight %s: %s -> %s ignored", flight.flight_number, flight.status, status)
+        return
+    if status == flight.status and status != "AIRBORNE":
+        return  # a repeated HOLDING, DIVERTED: nothing new
     if status == "AIRBORNE":
         departed = flight.status in ("SCHEDULED", "DELAYED")
         if departed:
-            flight.estimated_dep = now - timedelta(
-                minutes=float(payload.get("departed_min_ago", 0))
-            )
-        flight.estimated_arr = now + timedelta(minutes=float(payload.get("arrives_in_min", 60)))
+            flight.estimated_dep = now - timedelta(minutes=feed.departed_min_ago)
+        if feed.arrives_in_min is not None:
+            flight.estimated_arr = now + timedelta(minutes=feed.arrives_in_min)
         await _change(session, flight, "AIRBORNE", "DEPARTED" if departed else None, {}, result)
     elif status == "HOLDING":
-        await _change(
-            session, flight, "HOLDING", "HOLDING", {"reason": payload.get("reason", "")}, result
-        )
+        await _change(session, flight, "HOLDING", "HOLDING", {"reason": feed.reason}, result)
     elif status == "DIVERTED":
-        to = str(payload.get("to", ""))
+        to = feed.to or ""
         if to not in airports or to == flight.to_airport:
             log.warning("flight %s: diversion to %s ignored", flight.flight_number, to)
-            return None
+            return
         start = await _position(session, flight) or airports[flight.to_airport][0]
         flight.diverted_to = to
-        flight.estimated_arr = now + timedelta(minutes=float(payload.get("arrives_in_min", 30)))
+        flight.estimated_arr = now + timedelta(minutes=feed.arrives_in_min or 30)
         await _change(
             session,
             flight,
             "DIVERTED",
             "DIVERTED",
-            {
-                "to": to,
-                "reason": payload.get("reason", ""),
-                "from_lat": start[0],
-                "from_lon": start[1],
-            },
+            {"to": to, "reason": feed.reason, "from_lat": start[0], "from_lon": start[1]},
             result,
         )
     elif status == "LANDED":
         await _land(session, flight, airports, now, result)
-    elif status == "CANCELLED":
-        await _change(
-            session, flight, "CANCELLED", "CANCELLED", {"reason": payload.get("reason", "")}, result
-        )
-    else:
-        log.warning("FLIGHT_FEED with no known change ignored: %s", payload)
-        return None
-    return flight
+    else:  # CANCELLED
+        await _change(session, flight, "CANCELLED", "CANCELLED", {"reason": feed.reason}, result)
+
+
+async def apply_feed(
+    session: AsyncSession, payload: dict[str, Any], now: datetime, result: Result
+) -> list[Flight]:
+    feed = parse_feed(payload)
+    if feed is None:
+        return []
+    flights = await _find(session, feed.flight_number, feed.day)
+    if not flights:
+        log.info("FLIGHT_FEED for an untracked flight ignored: %s", feed.flight_number)
+        return []
+    airports = await _airports(session)
+    for flight in flights:
+        await _apply(session, flight, feed, airports, now, result)
+    return flights
 
 
 def feed_handler(engine: AsyncEngine, publisher: Publisher, now: Now = _utcnow) -> Handler:

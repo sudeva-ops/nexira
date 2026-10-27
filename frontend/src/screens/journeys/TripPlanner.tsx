@@ -20,6 +20,10 @@ interface SegmentRow {
   place_label: string;
   starts_at: string; // datetime-local, home zone (plan G-8)
   ends_at: string;
+  // Kept through an edit (review of Prompt 30, M1); the inputs come with Prompt 31.
+  flight_number: string | null;
+  from_airport: string | null;
+  to_airport: string | null;
 }
 
 interface Draft {
@@ -31,6 +35,7 @@ interface Draft {
   ends_on: string;
   travellers: { id: string; full_name: string }[];
   segments: SegmentRow[];
+  restricted: boolean; // VIP or ministerial (D-33)
 }
 
 function fromTrip(trip: TripDetail | null): Draft {
@@ -44,6 +49,7 @@ function fromTrip(trip: TripDetail | null): Draft {
       ends_on: "",
       travellers: [],
       segments: [],
+      restricted: false,
     };
   }
   return {
@@ -60,7 +66,11 @@ function fromTrip(trip: TripDetail | null): Draft {
       place_label: s.place_label ?? "",
       starts_at: s.starts_at ? isoToHomeInput(s.starts_at) : "",
       ends_at: s.ends_at ? isoToHomeInput(s.ends_at) : "",
+      flight_number: s.flight_number,
+      from_airport: s.from_airport,
+      to_airport: s.to_airport,
     })),
+    restricted: trip.restricted,
   };
 }
 
@@ -79,7 +89,11 @@ function toPlan(d: Draft): TripPlan {
       place_label: s.place_label.trim() || null,
       starts_at: homeInputToIso(s.starts_at),
       ends_at: homeInputToIso(s.ends_at),
+      flight_number: s.flight_number,
+      from_airport: s.from_airport,
+      to_airport: s.to_airport,
     })),
+    restricted: d.restricted,
   };
 }
 
@@ -291,6 +305,9 @@ export function TripPlanner({
                     place_label: "",
                     starts_at: draft.starts_on ? `${draft.starts_on}T09:00` : "",
                     ends_at: draft.starts_on ? `${draft.starts_on}T12:00` : "",
+                    flight_number: null,
+                    from_airport: null,
+                    to_airport: null,
                   },
                 ],
               })

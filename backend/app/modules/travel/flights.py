@@ -12,7 +12,7 @@ from app.modules.travel.models import FlightEvent
 from app.modules.travel.schemas import FlightDetailOut, FlightEventOut, FlightOut
 from app.modules.travel.tracker import DELAY_MIN, progress_of
 
-DISRUPTED = ("DELAYED", "HOLDING", "DIVERTED", "CANCELLED")
+DISRUPTED = ("HOLDING", "DIVERTED", "CANCELLED")  # and 30 min or more late
 
 _FLIGHTS = """
     SELECT f.id, f.flight_number, f.status, f.from_airport, fa.city AS from_city,
@@ -81,20 +81,21 @@ def _out(r: Any, now: datetime) -> FlightOut:
     )
 
 
+STATUSES = ("SCHEDULED", "DELAYED", "AIRBORNE", "HOLDING", "DIVERTED", "LANDED", "CANCELLED")
+LIST_MAX = 200
+
+
 async def list_flights(
     session: AsyncSession, now: datetime, status: str | None = None, disrupted: bool | None = None
 ) -> list[FlightOut]:
-    """In the air first, then by estimated arrival."""
+    """In the air first, then by estimated arrival; filtered before the limit."""
     query = _FLIGHTS + " WHERE (CAST(:status AS text) IS NULL OR f.status = :status)"
-    query += """
-     ORDER BY f.status IN ('LANDED', 'CANCELLED'), f.estimated_arr
-     LIMIT 200
-    """
+    query += " ORDER BY f.status IN ('LANDED', 'CANCELLED'), f.estimated_arr"
     rows = (await session.execute(text(query), {"status": status})).all()
     out = [_out(r, now) for r in rows]
     if disrupted is not None:
         out = [f for f in out if f.disrupted == disrupted]
-    return out
+    return out[:LIST_MAX]
 
 
 async def flight_detail(
