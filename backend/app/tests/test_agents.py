@@ -43,6 +43,7 @@ class WritingAgent:
 
     code = "WATCH_OFFICER"
     observes = frozenset({"TEST_EVENT"})
+    proposes = ("LOG_INFO",)
 
     async def observe(self, session: AsyncSession, event: Event) -> list[ProposalIn]:
         await session.execute(text("UPDATE agent SET autonomy_level = 0"))

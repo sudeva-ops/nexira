@@ -22,6 +22,7 @@ export interface NtfCampaign {
     missions?: string[];
     person_types?: string[];
     exposed?: boolean;
+    trip_id?: string; // a Travel & Air message (D-34)
   };
   status: CampaignStatus;
   created_by_type: "USER" | "AGENT" | "PLAYBOOK";

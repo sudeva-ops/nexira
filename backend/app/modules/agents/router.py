@@ -21,9 +21,10 @@ from app.core.events import Publisher, get_publisher
 from app.core.security import CurrentUser, current_user, get_db
 from app.modules.agents import proposals
 from app.modules.agents.agents import AGENTS
-from app.modules.agents.models import Agent, AgentProposal, ProposalApproval
+from app.modules.agents.models import ActionPolicy, Agent, AgentProposal, ProposalApproval
 from app.modules.agents.schemas import (
     ActivityOut,
+    AgentActionOut,
     AgentOut,
     AgentPatch,
     AgentsStateOut,
@@ -241,6 +242,23 @@ async def _agents_state(session: AsyncSession) -> AgentsStateOut:
         )
     }
     watches = {agent.code: sorted(agent.observes) for agent in AGENTS}
+    proposes = {agent.code: agent.proposes for agent in AGENTS}
+    policies = {p.action_type: p for p in await session.scalars(select(ActionPolicy))}
+
+    def actions(code: str) -> list[AgentActionOut]:
+        out = []
+        for action_type in proposes.get(code, ()):
+            policy = policies.get(action_type)
+            out.append(
+                AgentActionOut(
+                    action_type=action_type,
+                    level=policy.min_autonomy_level if policy else 4,
+                    approver_roles=list(policy.approver_roles) if policy else [],
+                    decision_deadline_s=policy.decision_deadline_s if policy else None,
+                )
+            )
+        return out
+
     agents = await session.scalars(select(Agent).order_by(Agent.code))
     return AgentsStateOut(
         paused=await proposals.agents_paused(session),
@@ -253,6 +271,7 @@ async def _agents_state(session: AsyncSession) -> AgentsStateOut:
                 is_enabled=a.is_enabled,
                 model_ref=a.model_ref,
                 watches=watches.get(a.code, []),
+                actions=actions(a.code),
                 proposals_pending=counts.get(a.id, (0, 0, 0, 0))[0],
                 proposals_total=counts.get(a.id, (0, 0, 0, 0))[1],
                 accepted_pct=_pct(*counts.get(a.id, (0, 0, 0, 0))[2:]),

@@ -22,6 +22,7 @@ from app.modules.playbooks.models import PlaybookStep
 class Communications:
     code = "COMMUNICATIONS"
     observes = frozenset({"PLAYBOOK_STEP"})
+    proposes = ("SEND_EXTERNAL_MESSAGE",)
 
     async def observe(self, session: AsyncSession, event: Event) -> list[ProposalIn]:
         if event.payload.get("step_status") != "DONE" or not event.payload.get("step_id"):

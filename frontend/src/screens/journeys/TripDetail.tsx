@@ -14,6 +14,7 @@ import {
 import { formatStamp } from "../../app/time";
 import { flightColour } from "../../map/geo";
 import { Card, Sev } from "../../ui/primitives";
+import { PendingProposals } from "../queue/PendingProposals";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Draft",
@@ -73,6 +74,7 @@ export function TripDetail({ trip, onEdit }: { trip: Detail; onEdit: (trip: Deta
             Risk now {trip.live_risk} (approved at {trip.approved_risk_level}): flagged, not revoked (D-32)
           </div>
         )}
+        <PendingProposals tripId={trip.id} />
         {trip.rejection_reason && trip.approval_status === "DRAFT" && (
           <div className="nx-pending">Returned: {trip.rejection_reason}</div>
         )}

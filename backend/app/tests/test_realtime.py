@@ -179,6 +179,9 @@ async def test_another_subjects_token_does_not_renew(
 ) -> None:
     url, _ = server
     await idp.user("viewer2", [("VIEWER", None)])
-    ws = await ready(url, idp.token("viewer", lifetime_s=1))
+    # 3 s, not 1: expiry is whole seconds, so a 1 s token could expire before "ready"
+    # under load (a flake seen in Prompts 25, 30 and 36). It still expires within the
+    # 5 s that closed_with() waits, so the refused renewal shows as 4401.
+    ws = await ready(url, idp.token("viewer", lifetime_s=3))
     await ws.send(json.dumps({"type": "auth", "token": idp.token("viewer2", lifetime_s=600)}))
     assert await closed_with(ws) == 4401

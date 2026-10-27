@@ -62,11 +62,21 @@ class AlternativeIn(BaseModel):
     index: int = Field(ge=0)
 
 
+class AgentActionOut(BaseModel):
+    """One action type an agent proposes, with its policy (D-12, D-16; TA-09)."""
+
+    action_type: str
+    level: int  # the policy floor; 4 (advise only) when there is no policy (D-12)
+    approver_roles: list[str]  # one entry per step; '|' separates alternatives
+    decision_deadline_s: int | None
+
+
 class AgentOut(BaseModel):
     code: str
     name: str
     description: str | None
     watches: list[str]  # the event types the agent observes
+    actions: list[AgentActionOut]  # what it proposes, and who decides
     autonomy_level: int  # 0 AUTO .. 4 ADVISE_ONLY
     is_enabled: bool
     model_ref: str | None

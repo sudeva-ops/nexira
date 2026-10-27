@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ApiError } from "../../api/client";
 import { useMe } from "../../api/me";
 import {
+  ACTION_LABEL,
   LEVEL_COLOUR,
   LEVELS,
   useAgents,
@@ -11,12 +12,14 @@ import {
   useProposals,
   useSetAutonomy,
 } from "../../api/proposals";
+import { roleLabel } from "../../ui/format";
 import { Card, Kpi } from "../../ui/primitives";
 
 const WATCHES: Record<string, string> = {
   INCIDENT_CREATED: "New incidents",
   EXPOSURE_COMPUTED: "Exposure of people and sites",
   PLAYBOOK_STEP: "Playbook steps",
+  FLIGHT_UPDATED: "Tracked flights",
 };
 
 const GUARDRAILS = [
@@ -25,6 +28,7 @@ const GUARDRAILS = [
   "Every proposal cites its evidence, sources and confidence",
   "Agents act only through the services people use; every step is in the audit log",
   "No external AI calls; models run on the platform's own infrastructure",
+  "Travel & Air books nothing and never proposes anything about restricted (VIP) trips",
 ];
 
 function KillSwitch({ paused }: { paused: boolean }) {
@@ -120,6 +124,7 @@ export function AgentsScreen() {
             <tr>
               <th>Agent</th>
               <th>Watches</th>
+              <th>Proposes · who decides</th>
               <th>Autonomy level</th>
               <th>Proposals</th>
               <th>Accepted</th>
@@ -135,6 +140,17 @@ export function AgentsScreen() {
                   {a.description && <div className="nx-dim">{a.description}</div>}
                 </td>
                 <td>{a.watches.map((w) => WATCHES[w] ?? w).join(", ")}</td>
+                <td>
+                  {a.actions.map((x) => (
+                    <div key={x.action_type} className="nx-agent-action">
+                      {ACTION_LABEL[x.action_type] ?? x.action_type}{" "}
+                      <span style={{ color: LEVEL_COLOUR[x.level] }}>· {LEVELS[x.level]}</span>
+                      {x.approver_roles.length > 0 && (
+                        <span className="nx-dim"> · {x.approver_roles.map(roleLabel).join(", then ")}</span>
+                      )}
+                    </div>
+                  ))}
+                </td>
                 <td>
                   {admin ? (
                     <HTMLSelect

@@ -101,6 +101,7 @@ def _notify(trip_id: uuid.UUID, message: str) -> dict[str, Any]:
 class TravelAir:
     code = CODE
     observes = frozenset({"FLIGHT_UPDATED", "EXPOSURE_COMPUTED"})
+    proposes = ("NOTIFY_TRAVELLERS", "CANCEL_TRIP", "ADVISE_REBOOKING")
 
     async def observe(self, session: AsyncSession, event: Event) -> list[ProposalIn]:
         if event.type == "FLIGHT_UPDATED":

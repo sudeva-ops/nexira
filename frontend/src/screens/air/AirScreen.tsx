@@ -6,6 +6,7 @@ import { formatStamp } from "../../app/time";
 import { AirMap } from "../../map/AirMap";
 import { flightColour } from "../../map/geo";
 import { Card, Kpi } from "../../ui/primitives";
+import { PendingProposals } from "../queue/PendingProposals";
 
 const STATUS_LABEL: Record<string, string> = {
   SCHEDULED: "Scheduled",
@@ -120,6 +121,7 @@ function Detail({ flight }: { flight: FlightDetail }) {
             </tr>
           </tbody>
         </table>
+        <PendingProposals tripId={flight.trip_id} />
         <div className="nx-lbl">Flight events</div>
         {flight.events.length === 0 ? (
           <div className="nx-dim">Nothing yet</div>

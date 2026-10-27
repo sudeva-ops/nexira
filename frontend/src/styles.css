@@ -1782,3 +1782,18 @@ body {
   font-size: 11px;
   font-weight: 600;
 }
+
+/* Travel & Air agent (Prompt 36) */
+.nx-agent-action {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.nx-pending-proposals {
+  display: grid;
+  gap: 4px;
+  padding: 6px 8px;
+  border-left: 3px solid #ec9a3c;
+  background: rgba(236, 154, 60, 0.08);
+  font-size: 12px;
+}

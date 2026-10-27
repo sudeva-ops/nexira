@@ -230,4 +230,62 @@ describe("Decision Queue", () => {
     expect(within(card).getByTestId("approver-2")).toHaveTextContent("HQ Crisis Director");
     expect(card).toHaveTextContent("Senior approval");
   });
+
+  it("shows a travel card with links to the trip and the flight (TA-09)", async () => {
+    const advice = proposal({
+      id: "p9",
+      agent_code: "TRAVEL_AIR",
+      agent_name: "Travel & Air",
+      incident_id: null,
+      incident_reference: null,
+      action_type: "ADVISE_REBOOKING",
+      title: "Arrange onward travel · XW 451 diverted to Mombasa",
+      proposed_action: "Book onward travel and a hotel in Mombasa through the travel management company.",
+      action_payload: { trip_id: "t-8818", flight_id: "f-451", at: "Mombasa" },
+      alternatives: [],
+      effective_level: 4,
+      approvals: [],
+      can_decide: false,
+      can_dismiss: true,
+    });
+    setup(DUTY_OFFICER, [advice]);
+    renderApp("/");
+    const card = await screen.findByRole("article", { name: /Arrange onward travel/ });
+    expect(card).toHaveTextContent("Advice only: never executed");
+    const links = within(card).getByLabelText("Travel links");
+    expect(within(links).getByRole("link", { name: "Open trip →" })).toHaveAttribute("href", "/journeys?trip=t-8818");
+    expect(within(links).getByRole("link", { name: "Open flight →" })).toHaveAttribute("href", "/air?flight=f-451");
+    expect(within(card).queryByRole("button", { name: /^Approve/ })).toBeNull();
+    expect(within(card).getByRole("button", { name: "Dismiss" })).toBeInTheDocument();
+  });
+
+  it("offers the notify alternative on a cancel card", async () => {
+    const cancel = proposal({
+      id: "p1",
+      agent_code: "TRAVEL_AIR",
+      agent_name: "Travel & Air",
+      incident_id: null,
+      incident_reference: null,
+      action_type: "CANCEL_TRIP",
+      title: "Cancel TRP-8811 Paris · risk now CRITICAL",
+      action_payload: { trip_id: "t-8811" },
+      alternatives: [
+        {
+          label: "Notify the travellers instead",
+          action_type: "NOTIFY_TRAVELLERS",
+          action_payload: { trip_id: "t-8811", message: "x", channels: ["APP"] },
+          rationale: "The trip may still go ahead.",
+        },
+      ],
+      approvals: [
+        { step_no: 1, required_role: "SECURITY_OFFICER", decision: null, decided_by: null, decided_by_name: null, decided_at: null },
+      ],
+    });
+    const fetchMock = setup(DUTY_OFFICER, [cancel]);
+    renderApp("/");
+    const card = await screen.findByRole("article", { name: /Cancel TRP-8811/ });
+    expect(within(card).getByRole("link", { name: "Open trip →" })).toHaveAttribute("href", "/journeys?trip=t-8811");
+    await userEvent.click(within(card).getByRole("button", { name: "Use alternative: Notify the travellers instead" }));
+    expect(posts(fetchMock)).toEqual([["/api/proposals/p1/use-alternative", JSON.stringify({ index: 0 })]]);
+  });
 });

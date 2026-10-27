@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ApiError } from "../../api/client";
-import { LEVEL_COLOUR, LEVELS, type Proposal, useDecide } from "../../api/proposals";
+import { LEVEL_COLOUR, LEVELS, type Proposal, travelLinks, useDecide } from "../../api/proposals";
 import { ago, formatTime, HOME_TZ } from "../../app/time";
 import { roleLabel } from "../../ui/format";
 import { countdown, nextStep, REJECT_REASONS } from "./format";
@@ -72,6 +72,7 @@ export function ProposalCard({ p }: { p: Proposal }) {
   const badge = STATUS_BADGE[p.status];
   const step = nextStep(p);
   const canAct = p.can_decide || p.can_dismiss;
+  const links = travelLinks(p);
 
   const saveEdit = () =>
     field &&
@@ -138,6 +139,12 @@ export function ProposalCard({ p }: { p: Proposal }) {
                 </span>
               ))}
             </div>
+            {(links.trip || links.flight) && (
+              <div className="nx-row nx-mt-s" aria-label="Travel links">
+                {links.trip && <Link to={`/journeys?trip=${links.trip}`}>Open trip →</Link>}
+                {links.flight && <Link to={`/air?flight=${links.flight}`}>Open flight →</Link>}
+              </div>
+            )}
           </div>
           <div>
             <div className="nx-row nx-proposal-facts">

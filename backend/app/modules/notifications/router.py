@@ -36,6 +36,7 @@ from app.modules.notifications.schemas import (
 )
 from app.modules.tenancy.models import AppUser
 from app.modules.tenancy.service import ROLES
+from app.modules.travel.models import Trip
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["notifications"])
@@ -150,6 +151,10 @@ async def list_campaigns(
                     select(Incident.id).where(Incident.mission_id == mission_id)
                 ),
                 NotificationCampaign.audience_filter["missions"].contains([str(mission_id)]),
+                # A Travel & Air message to a trip's travellers (D-34): the trip's scope.
+                NotificationCampaign.audience_filter["trip_id"].astext.in_(
+                    select(cast(Trip.id, Text)).where(Trip.mission_id == mission_id)
+                ),
             )
         )
     return await campaigns_out(session, list(await session.scalars(query)))

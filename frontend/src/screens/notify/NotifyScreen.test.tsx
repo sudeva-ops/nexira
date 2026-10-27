@@ -93,6 +93,21 @@ describe("Mass Notification", () => {
     expect(within(funnel).getByLabelText("App push funnel")).toHaveTextContent("3/4 read");
   });
 
+  it("names a Travel & Air message's audience", async () => {
+    const trip: NtfCampaign = {
+      ...SENT,
+      id: "c-3",
+      reference: "NTF-3202",
+      campaign_type: "ALERT",
+      audience_filter: { trip_id: "t-8818" },
+      created_by_type: "AGENT",
+    };
+    server(NONE, { "GET /api/campaigns": { body: [trip] } });
+    renderApp("/notifications");
+    const table = await screen.findByRole("table", { name: "Campaigns" });
+    expect(within(table).getByText("A trip's travellers (Travel & Air)")).toBeInTheDocument();
+  });
+
   it("shows approve and reject only to someone who may decide", async () => {
     server(NONE);
     renderApp("/notifications?campaign=c-1");
