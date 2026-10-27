@@ -203,7 +203,7 @@ Rules:
 - **Flag, don't revoke.** An approved trip whose destination risk rises is flagged with the new level; it is not paused or cancelled automatically. The Travel & Air agent (pilot module 4) will propose what to do.
 - **What is approved is what travels.** Travellers, destination, dates and itinerary are frozen once submitted; changes mean cancel and re-plan. The database backs this, as PC-10..12 do for campaigns.
 
-**D-33 · Air Travel Tracking rules.** *Proposed* with the draft in `docs/requirements-pilot.md` §14–18 (AT-01 to AT-08); not in force until the product owner approves it.
+**D-33 · Air Travel Tracking rules.** Approved by the product owner on 2026-10-27 (PR #30), with the defaults in `docs/requirements-pilot.md` §18. Requirements AT-01 to AT-08.
 - **Simulated flights only.** A flight tracker in the worker plays the part of a flight-data provider; no external service is called (AGENTS.md). Positions and statuses are labelled simulated (D-19). A real provider later replaces only the tracker.
 - **Only our travellers' flights.** A flight is tracked only for a FLIGHT segment of an APPROVED trip that has a flight number and airports. There is no view of other flights.
 - **Never VIP or ministerial movements.** A trip marked *restricted* at planning has no tracked flights at all: nothing is stored, shown, published or audited about its flights. The database refuses such a flight (PC-19).

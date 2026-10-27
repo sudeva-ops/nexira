@@ -173,7 +173,7 @@ make acceptance still passes. Report the real output.
 ---
 
 ## Later pilot modules
-## Pilot module 3 · Air Travel Tracking (draft for approval)
+## Pilot module 3 · Air Travel Tracking (approved 2026-10-27, PR #30)
 
 Sources: D-33, `docs/requirements-pilot.md` §14–18 (AT-01..08), PC-17..19. Simulated flights only.
 

@@ -84,7 +84,7 @@ The Nairobi acceptance scenario and the France scenario still pass. The France s
 | Module | Starting point | Needs to be decided |
 |---|---|---|
 | Journey Management (JRN-01..05) | **Written: §9 (approved, built: Prompts 23–27)** | — |
-| Air Travel Tracking (AIR-01..07) | **Written: §14 (draft for approval)** | — |
+| Air Travel Tracking (AIR-01..07) | **Written: §14 (approved)** | — |
 | Travel & Air agent | the agent framework | action policies for diversion and rebooking (level 2, Travel Desk) |
 | Assistance Partners (AST-01..04) | nothing | only if the pilot customer wants it |
 
@@ -148,9 +148,9 @@ Playwright on the real stack: a Travel Desk user plans a Paris trip for two staf
 
 ---
 
-# Pilot module 3 · Air Travel Tracking (draft for approval)
+# Pilot module 3 · Air Travel Tracking (approved 2026-10-27, PR #30)
 
-For the product owner, who approves this part; then for the coding agent (Prompts 28–32 in `docs/prompts-pilot.md`). Rules: D-30, and **D-33** (proposed with this draft). Everything here runs on **simulated flights**: no flight-data provider is called (AGENTS.md: no external URLs at runtime).
+For the product owner, who approves this part; then for the coding agent (Prompts 28–32 in `docs/prompts-pilot.md`). Rules: D-30, and **D-33**. Everything here runs on **simulated flights**: no flight-data provider is called (AGENTS.md: no external URLs at runtime).
 
 ## 14. Purpose and starting point
 
