@@ -83,8 +83,8 @@ The Nairobi acceptance scenario and the France scenario still pass. The France s
 
 | Module | Starting point | Needs to be decided |
 |---|---|---|
-| Journey Management (JRN-01..05) | **Written: §9 (draft for approval)** | — |
-| Air Travel Tracking (AIR-01..07) | nothing | a simulated flight model; AIR-06 (never show VIP movements) before any real feed |
+| Journey Management (JRN-01..05) | **Written: §9 (approved, built: Prompts 23–27)** | — |
+| Air Travel Tracking (AIR-01..07) | **Written: §14 (draft for approval)** | — |
 | Travel & Air agent | the agent framework | action policies for diversion and rebooking (level 2, Travel Desk) |
 | Assistance Partners (AST-01..04) | nothing | only if the pilot customer wants it |
 
@@ -145,3 +145,56 @@ Playwright on the real stack: a Travel Desk user plans a Paris trip for two staf
 3. **Checklist:** security briefing, insurance and medical cover, emergency contacts, check-in schedule (plus security approval, set by the approval). All four must be ticked before a HIGH or CRITICAL trip is approved.
 4. **Risk rises after approval:** flagged, not paused; the Travel & Air agent proposes actions later.
 
+
+---
+
+# Pilot module 3 · Air Travel Tracking (draft for approval)
+
+For the product owner, who approves this part; then for the coding agent (Prompts 28–32 in `docs/prompts-pilot.md`). Rules: D-30, and **D-33** (proposed with this draft). Everything here runs on **simulated flights**: no flight-data provider is called (AGENTS.md: no external URLs at runtime).
+
+## 14. Purpose and starting point
+
+Officials in the air (master spec §5.11, AIR-01..07): see which of our travellers are flying, where they are, and when a flight is delayed, holding, diverted or cancelled, and know where the travellers are once they land.
+
+| Exists today | Where |
+|---|---|
+| Trips with FLIGHT segments (title, place, times) and approval | Journey Management (PC-14, PC-15) |
+| `location_observation.source` already allows `FLIGHT`; location recompute and exposure | schema v0.2, `people/location.py`, `intel/exposure.py` |
+| Self-hosted map (MapLibre, PMTiles), realtime events, the scenario player | D-24, PLT-05, Prompt 6 |
+| Nothing else: no airports, flights, flight events, flight number on a segment, or a way to mark a trip as VIP | — |
+
+## 15. Requirements: Air Travel Tracking (AT)
+
+| ID | Requirement | Master | Pri. | Acceptance |
+|---|---|---|---|---|
+| AT-01 | **Only our travellers' flights.** A flight is tracked only when it comes from a FLIGHT segment of an **approved** trip, with a flight number and departure and arrival airports. Nothing else is queried or shown; there is no "all flights" view. | AIR-01 | M | A flight segment of a DRAFT, PENDING or CANCELLED trip is not tracked. |
+| AT-02 | **Air picture and tracked-flight table**: map with each tracked flight's simulated position and route; table with flight, travellers, route, progress, altitude, ETA and status; detail with the flight's events. Positions labelled simulated (D-19). | AIR-02 | M | — |
+| AT-03 | **Disruptions detected**: DELAYED (departure or arrival estimate 30 min or more late), HOLDING, DIVERTED (with the new airport), CANCELLED. Each is a flight event, shown at once (realtime) in the table, a banner and the trip's detail. Proposals for what to do come with the Travel & Air agent (module 4), not here. | AIR-03 | M | In the Nairobi scenario, XW 451 shows HOLDING, then DIVERTED · Mombasa. |
+| AT-04 | **Landing updates where travellers are.** When a flight lands (at its destination or a diversion airport), each traveller gets a location observation with source `FLIGHT` at that airport, through the existing location service; current location and exposure follow. | AIR-04 | M | After XW 451 lands in Mombasa, its 3 travellers' current location is Mombasa (source FLIGHT). |
+| AT-05 | **Never show VIP or ministerial movements.** A trip can be marked **restricted** when planned (frozen once submitted). A restricted trip's flights are never tracked: no flight row, no position, nothing in any API, screen, event or export. | AIR-06 | M | A restricted trip's flight is absent from `GET /api/flights`, the map and the audit details. |
+| AT-06 | **Simulated feed with the same seams as a real one.** A flight tracker in the worker ensures flights for approved trips (from 24 h before departure), moves them along their route on the clock, and applies scenario events (delay, hold, divert, cancel). It is the only writer of flights; a real provider later replaces only this tracker. | AIR-01, 02 | M | — |
+| AT-07 | **Trip and flight together.** The Journey screen shows each flight segment's live status; the Air screen links each flight to its trip. Cancelling a trip stops tracking its flights. | AIR-01 | S | — |
+| AT-08 | **Audited.** Each flight's creation and every status change is written through `audit.write` (actor `SYSTEM`, the tracker). Positions are not audited. | PLT | M | `GET /api/audit/verify` intact after the e2e. |
+
+### Not in this module
+Evacuation charter flights (AIR-05: there is no Evacuation module in the pilot); rebooking, hotel booking and "notify travellers" actions (AIR-07: the Travel & Air agent, module 4); diversion or rebooking proposals in the Decision Queue (module 4); any real flight-data provider.
+
+## 16. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-17 · flight details on a segment, and restricted trips**: `trip_segment.flight_number`, `from_airport`, `to_airport` (IATA codes, for FLIGHT segments); `trip.restricted boolean`, frozen once the trip leaves DRAFT (the PC-15 guard).
+- **PC-18 · `airport`**: a simulated reference list (IATA code, name, city, country, location) for the seeded missions' cities and the scenario airports.
+- **PC-19 · `flight` and `flight_event`**: one flight per tracked segment (status, schedule and estimates, current simulated position, altitude, speed, diversion airport) and an append-only event log. Written only by the tracker; read-only for the API role.
+
+## 17. Acceptance for the module
+
+Playwright on the real stack: the Nairobi scenario's inbound XW 451 (Abu Dhabi → Nairobi, 3 HQ staff, an approved seeded trip) appears on the air picture; when the incident affects the airport roads it shows HOLDING, then DIVERTED · Mombasa, then LANDED; the banner and the trip's detail update live; the 3 travellers' current location becomes Mombasa (source FLIGHT); a seeded restricted trip's flight never appears; the audit chain verifies; `make acceptance` (Nairobi, Mass Notification, Journey) still passes.
+
+## 18. Questions for the product owner (each has a proposed default)
+
+1. **Which trips are tracked?** *Default:* APPROVED only. (Alternative: PENDING too.)
+2. **Restricted (VIP/ministerial) trips:** *Default:* a `restricted` flag set by the planner; their flights are never tracked or shown to anyone. (Alternative: tracked but shown only to SECURITY_OFFICER.)
+3. **Delay threshold:** *Default:* 30 minutes late against schedule.
+4. **Disruptions without the agent:** *Default:* banner, table and trip detail, live; no Decision Queue proposal until the Travel & Air agent (module 4).
+5. **Location on landing:** *Default:* yes, one `FLIGHT` observation per traveller at the landing airport.
+6. **Flight time in the demo:** *Default:* scenario flights run compressed (minutes), other seeded flights in real time.
+7. **Flight numbers:** *Default:* fictional (e.g. "XW 451"), as the demo; no real airline schedules.
