@@ -66,6 +66,8 @@ FORWARDED = frozenset(
         "CAMPAIGN_UPDATED",
         "CHECKIN_UPDATED",
         "TRIP_UPDATED",
+        "FLIGHT_UPDATED",
+        "FLIGHT_POSITIONS",  # at most every 15 s per tenant (D-33)
         "CHECKIN_ESCALATED",
         "PROPOSAL_CREATED",
         "PROPOSAL_UPDATED",

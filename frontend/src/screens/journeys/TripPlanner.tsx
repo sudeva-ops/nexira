@@ -58,8 +58,8 @@ function fromTrip(trip: TripDetail | null): Draft {
       kind: s.kind,
       title: s.title,
       place_label: s.place_label ?? "",
-      starts_at: isoToHomeInput(s.starts_at),
-      ends_at: isoToHomeInput(s.ends_at),
+      starts_at: s.starts_at ? isoToHomeInput(s.starts_at) : "",
+      ends_at: s.ends_at ? isoToHomeInput(s.ends_at) : "",
     })),
   };
 }

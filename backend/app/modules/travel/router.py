@@ -8,6 +8,7 @@
 
 import logging
 import uuid
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -21,11 +22,14 @@ from app.core.security import CurrentUser, get_db
 from app.modules.people.models import Person
 from app.modules.tenancy.models import AppUser
 from app.modules.tenancy.service import ROLES
-from app.modules.travel import trips
-from app.modules.travel.models import Trip, TripSegment, TripTraveller
+from app.modules.travel import flights, trips
+from app.modules.travel.models import Airport, Trip, TripSegment, TripTraveller
 from app.modules.travel.schemas import (
+    AirportOut,
     CheckIn,
     CountryRiskOut,
+    FlightDetailOut,
+    FlightOut,
     RejectIn,
     SegmentOut,
     TravellerOut,
@@ -80,6 +84,7 @@ async def trips_out(session: AsyncSession, rows: list[Trip]) -> list[TripOut]:
                 "starts_on",
                 "ends_on",
                 "approval_status",
+                "restricted",
                 "mission_id",
                 "requested_by",
                 "submitted_at",
@@ -112,7 +117,7 @@ async def trips_out(session: AsyncSession, rows: list[Trip]) -> list[TripOut]:
     return out
 
 
-async def trip_detail(session: AsyncSession, trip: Trip) -> TripDetailOut:
+async def trip_detail(session: AsyncSession, trip: Trip, user: CurrentUser) -> TripDetailOut:
     summary = (await trips_out(session, [trip]))[0]
     travellers = await session.execute(
         select(Person.id, Person.full_name, Person.person_type)
@@ -120,9 +125,13 @@ async def trip_detail(session: AsyncSession, trip: Trip) -> TripDetailOut:
         .where(TripTraveller.trip_id == trip.id)
         .order_by(Person.full_name)
     )
-    segments = await session.scalars(
-        select(TripSegment).where(TripSegment.trip_id == trip.id).order_by(TripSegment.seq)
+    segments = list(
+        await session.scalars(
+            select(TripSegment).where(TripSegment.trip_id == trip.id).order_by(TripSegment.seq)
+        )
     )
+    tracked = await flights.segment_flights(session, [s.id for s in segments])
+    masked = trip.restricted and not await trips.sees_restricted_flights(session, user, trip)
     country_risk = None
     if trip.destination_country:
         risk = (await trips.destination_risks(session, {trip.destination_country}))[
@@ -146,18 +155,41 @@ async def trip_detail(session: AsyncSession, trip: Trip) -> TripDetailOut:
     return TripDetailOut(
         **summary.model_dump(),
         travellers=[TravellerOut(id=i, full_name=n, person_type=p) for i, n, p in travellers],
-        segments=[
-            SegmentOut(
-                seq=s.seq,
-                kind=s.kind,
-                title=s.title,
-                place_label=s.place_label,
-                starts_at=s.starts_at,
-                ends_at=s.ends_at,
-            )
-            for s in segments
-        ],
+        segments=[_segment_out(s, tracked, masked) for s in segments],
         country_risk=country_risk,
+    )
+
+
+def _segment_out(
+    s: TripSegment, tracked: dict[uuid.UUID, tuple[uuid.UUID, str]], masked: bool
+) -> SegmentOut:
+    if masked and s.kind == "FLIGHT":  # plan G-7
+        return SegmentOut(
+            seq=s.seq,
+            kind=s.kind,
+            title="Flight (restricted)",
+            place_label=None,
+            starts_at=None,
+            ends_at=None,
+            flight_number=None,
+            from_airport=None,
+            to_airport=None,
+            flight_id=None,
+            flight_status=None,
+        )
+    flight = tracked.get(s.id)
+    return SegmentOut(
+        seq=s.seq,
+        kind=s.kind,
+        title=s.title,
+        place_label=s.place_label,
+        starts_at=s.starts_at,
+        ends_at=s.ends_at,
+        flight_number=s.flight_number,
+        from_airport=s.from_airport,
+        to_airport=s.to_airport,
+        flight_id=flight[0] if flight else None,
+        flight_status=flight[1] if flight else None,
     )
 
 
@@ -185,11 +217,11 @@ async def list_trips(
 
 
 @router.get("/trips/{trip_id}")
-async def get_trip(trip_id: uuid.UUID, _user: Reader, session: Db) -> TripDetailOut:
+async def get_trip(trip_id: uuid.UUID, user: Reader, session: Db) -> TripDetailOut:
     trip = await session.get(Trip, trip_id)
     if trip is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Trip not found")
-    return await trip_detail(session, trip)
+    return await trip_detail(session, trip, user)
 
 
 def _plan(body: TripIn) -> trips.Plan:
@@ -208,9 +240,13 @@ def _plan(body: TripIn) -> trips.Plan:
                 place_label=s.place_label,
                 starts_at=s.starts_at,
                 ends_at=s.ends_at,
+                flight_number=s.flight_number,
+                from_airport=s.from_airport,
+                to_airport=s.to_airport,
             )
             for s in body.segments
         ],
+        restricted=body.restricted,
     )
 
 
@@ -236,7 +272,7 @@ async def create_trip(
         raise _http(e) from None
     await session.commit()
     await _publish(publisher, [trips.trip_event(trip)])
-    return await trip_detail(session, trip)
+    return await trip_detail(session, trip, user)
 
 
 @router.patch("/trips/{trip_id}")
@@ -249,7 +285,7 @@ async def edit_trip(
         raise _http(e) from None
     await session.commit()
     await _publish(publisher, [trips.trip_event(trip)])
-    return await trip_detail(session, trip)
+    return await trip_detail(session, trip, user)
 
 
 @router.post("/trips/{trip_id}/checklist")
@@ -262,7 +298,7 @@ async def check_trip(
         raise _http(e) from None
     await session.commit()
     await _publish(publisher, [trips.trip_event(trip)])
-    return await trip_detail(session, trip)
+    return await trip_detail(session, trip, user)
 
 
 @router.post("/trips/{trip_id}/submit")
@@ -275,7 +311,7 @@ async def submit_trip(
         raise _http(e) from None
     await session.commit()
     await _publish(publisher, outcome.events)
-    return await trip_detail(session, outcome.trip)
+    return await trip_detail(session, outcome.trip, user)
 
 
 @router.post("/trips/{trip_id}/approve")
@@ -288,7 +324,7 @@ async def approve_trip(
         raise _http(e) from None
     await session.commit()
     await _publish(publisher, outcome.events)
-    return await trip_detail(session, outcome.trip)
+    return await trip_detail(session, outcome.trip, user)
 
 
 @router.post("/trips/{trip_id}/reject")
@@ -301,7 +337,7 @@ async def reject_trip(
         raise _http(e) from None
     await session.commit()
     await _publish(publisher, outcome.events)
-    return await trip_detail(session, outcome.trip)
+    return await trip_detail(session, outcome.trip, user)
 
 
 @router.post("/trips/{trip_id}/cancel")
@@ -314,4 +350,35 @@ async def cancel_trip(
         raise _http(e) from None
     await session.commit()
     await _publish(publisher, outcome.events)
-    return await trip_detail(session, outcome.trip)
+    return await trip_detail(session, outcome.trip, user)
+
+
+# --- flights (Prompt 30; AT-02, AT-03, AT-07; D-33) ----------------------------------------
+
+
+@router.get("/flights")
+async def list_flights(
+    _user: Reader,
+    session: Db,
+    status_: Annotated[str | None, Query(alias="status")] = None,
+    disrupted: bool | None = None,
+) -> list[FlightOut]:
+    """Tracked flights only: our travellers on approved, unrestricted trips (AT-01, AT-05)."""
+    return await flights.list_flights(session, datetime.now(UTC), status_, disrupted)
+
+
+@router.get("/flights/{flight_id}")
+async def get_flight(flight_id: uuid.UUID, _user: Reader, session: Db) -> FlightDetailOut:
+    flight = await flights.flight_detail(session, flight_id, datetime.now(UTC))
+    if flight is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Flight not found")
+    return flight
+
+
+@router.get("/airports")
+async def list_airports(_user: Reader, session: Db) -> list[AirportOut]:
+    """For the planner's flight segments (plan G-6). Simulated reference data (D-19)."""
+    rows = await session.scalars(select(Airport).order_by(Airport.iata))
+    return [
+        AirportOut(iata=a.iata, name=a.name, city=a.city, country_code=a.country_code) for a in rows
+    ]
