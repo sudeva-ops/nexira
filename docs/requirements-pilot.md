@@ -84,8 +84,8 @@ The Nairobi acceptance scenario and the France scenario still pass. The France s
 | Module | Starting point | Needs to be decided |
 |---|---|---|
 | Journey Management (JRN-01..05) | **Written: §9 (approved, built: Prompts 23–27)** | — |
-| Air Travel Tracking (AIR-01..07) | **Written: §14 (approved)** | — |
-| Travel & Air agent | the agent framework | action policies for diversion and rebooking (level 2, Travel Desk) |
+| Air Travel Tracking (AIR-01..07) | **Written: §14 (approved, built: Prompts 28–32)** | — |
+| Travel & Air agent | **Written: §19 (draft for approval)** | — |
 | Assistance Partners (AST-01..04) | nothing | only if the pilot customer wants it |
 
 ## 8. Questions answered by the product owner (2026-10-25)
@@ -198,3 +198,55 @@ Playwright on the real stack: the Nairobi scenario's inbound XW 451 (Abu Dhabi �
 5. **Location on landing:** yes, one `FLIGHT` observation per traveller at the landing airport.
 6. **Flight time in the demo:** scenario flights run compressed (minutes), other seeded flights in real time.
 7. **Flight numbers:** fictional (e.g. "XW 451"), as the demo; no real airline schedules.
+
+---
+
+# Pilot module 4 · Travel & Air agent (draft for approval)
+
+For the product owner, who approves this part; then for the coding agent (Prompts 33–37 in `docs/prompts-pilot.md`). Rules: D-12 to D-17 (agents), D-29, D-30, D-31 to D-33, and **D-34** (proposed with this draft).
+
+## 19. Purpose and starting point
+
+The master spec's fifth agent (§ agents, "Travel & Air": watches bookings and flight status; proposes diversions, rebooking and trip conditions; approved by the Travel Desk or Security; level 2). In the pilot there is no booking system and channels are simulated (D-19), so the agent proposes what the platform can actually do, through the same service functions a user calls, and only **advises** on what it cannot (rebooking, hotels).
+
+| Exists today | Where |
+|---|---|
+| The agent framework: proposals, policies, levels, approvals, alternatives, expiry, kill switch, executors | D-12 to D-17, `app/modules/agents` |
+| Flights with disruptions (`FLIGHT_UPDATED`), trips with "risk now X" (JR-07) and "impacted by" (JR-06) | Prompts 25, 30 |
+| Staff campaigns through the notification service, simulated channels | D-31, `notifications/service.py` |
+| Nothing yet: a travel agent, travel action types, a "trip travellers" audience, an agent path to cancel a trip | — |
+
+## 20. Requirements: Travel & Air agent (TA)
+
+| ID | Requirement | Master | Pri. | Acceptance |
+|---|---|---|---|---|
+| TA-01 | **Disrupted flight.** When a tracked flight goes HOLDING, DIVERTED or CANCELLED, or is 60 minutes or more late, the agent proposes **NOTIFY_TRAVELLERS**: a message to that trip's travellers saying what happened and that the Travel Desk will follow up. | AGT (Travel & Air), AIR-03 | M | In NBO-AIR-DIVERSION, XW 451 holding gives one pending proposal to notify its 3 travellers. |
+| TA-02 | **Onward travel advice.** For a DIVERTED or CANCELLED flight it also proposes **ADVISE_REBOOKING** (advice only, level 4): arrange onward travel and a hotel through the travel management company. Nothing is booked by the platform. | AIR-07 | M | XW 451 diverted to Mombasa gives an advice card naming Mombasa. |
+| TA-03 | **Trip in an incident.** When a trip is impacted by an ACTIVE incident (JR-06), the agent proposes NOTIFY_TRAVELLERS with safety instructions, linked to the incident. | JRN-05 | M | In the Nairobi scenario, TRP-8812 impacted by INC-…-1042 gives one proposal. |
+| TA-04 | **Risk rose since approval.** When an approved trip that has **not started** is flagged "risk now X" (JR-07) with X HIGH or CRITICAL, the agent proposes **CANCEL_TRIP**, with "notify the travellers instead" as an alternative (D-14). A trip in progress gets NOTIFY_TRAVELLERS only. Never automatic (D-32: flag, don't revoke). | JRN-04 | M | During the France scenario, an approved Paris trip next week gives a CANCEL_TRIP proposal. |
+| TA-05 | **Through the same services.** NOTIFY_TRAVELLERS creates a staff campaign to the trip's travellers through the notification service (new audience: the travellers of one trip; refused if any is a citizen, D-31). CANCEL_TRIP cancels through the trips service, audited with the agent as actor and the approver recorded. ADVISE_REBOOKING is never executed. | AGT-05 | M | Executing writes the same rows and audit as a user doing it. |
+| TA-06 | **Policies (D-12, D-16).** NOTIFY_TRAVELLERS: level 2, `TRAVEL_DESK|SECURITY_OFFICER`. CANCEL_TRIP: level 2, `SECURITY_OFFICER`. ADVISE_REBOOKING: no policy (level 4). None is undoable. Decisions expire after 60 minutes. | AGT-03 | M | The requester of a trip can approve a notification but the database and approvals still apply as for every proposal. |
+| TA-07 | **Never about restricted trips.** The agent makes no proposal about a restricted (VIP or ministerial) trip (D-33): its travellers are handled outside the platform. | AIR-06 | M | A restricted trip impacted by an incident gives no proposal. |
+| TA-08 | **One proposal per change.** Proposals are idempotent per trip or flight and cause (same status, same incident, same level → one proposal); evidence names the flight events, the incident or the risk breakdown. | AGT-02 | M | Replaying an event creates nothing new. |
+| TA-09 | **Shown where people look.** The Decision Queue card links to the trip (Journey) and the flight (Air); the AI Agents screen lists the agent and its policies; the kill switch stops it like the others (D-17). | AGT-07, AGT-09 | M | — |
+
+### Not in this module
+Booking, rebooking or hotel reservations by the platform (no booking integration); messages to people outside the trip's travellers; any action at level 0 or 1; proposals for restricted trips.
+
+## 21. Data changes
+
+**None expected.** The agent, its action policies and the "trip travellers" audience are data (seed and `audience_filter` JSON), not schema. If the plan (Prompt 33) finds one is needed, it is proposed in `docs/schema/proposed-changes.md` first.
+
+## 22. Acceptance for the module
+
+Playwright on the real stack: in NBO-AIR-DIVERSION, XW 451 holding gives a NOTIFY_TRAVELLERS proposal; the Travel Desk approves it and a campaign to the 3 travellers is sent (simulated); the diversion adds an ADVISE_REBOOKING card; during the France scenario a seeded approved Paris trip gets a CANCEL_TRIP proposal that the Security Officer approves and the trip is CANCELLED; nothing is proposed about the restricted trip; the kill switch stops new proposals; the audit chain verifies; `make acceptance` (all four existing specs) still passes.
+
+## 23. Questions for the product owner (each has a proposed default)
+
+1. **Agent level:** *Default:* 2, so every action needs a person; nothing runs on its own.
+2. **Who approves notifying travellers:** *Default:* `TRAVEL_DESK|SECURITY_OFFICER`.
+3. **Who approves cancelling a trip:** *Default:* `SECURITY_OFFICER`, one step. (Alternative: Security Officer then HQ Crisis Director.)
+4. **Delay that triggers a proposal:** *Default:* 60 minutes (30 minutes is only flagged, AT-03).
+5. **Restricted trips:** *Default:* the agent never proposes anything about them.
+6. **Rebooking and hotels:** *Default:* advice only (level 4), since the pilot has no booking integration.
+7. **Decision deadline:** *Default:* 60 minutes, then the proposal expires (AGT-06).
