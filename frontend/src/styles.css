@@ -1667,3 +1667,60 @@ body {
 .nx-chips .nx-dim {
   white-space: nowrap;
 }
+
+/* Journey Management (Prompt 26) */
+.nx-trip-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.nx-impacted {
+  color: #fa999c;
+  font-weight: 600;
+}
+
+.nx-travellers {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12px;
+}
+
+.nx-risk-parts {
+  display: grid;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.nx-risk-bar {
+  display: block;
+  height: 6px;
+}
+
+.nx-segment {
+  display: grid;
+  grid-template-columns: 130px 1fr 1fr 30px;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--nx-line);
+}
+
+.nx-segment > .nx-seg-start {
+  grid-column: 1 / 3;
+}
+
+.nx-segment > .nx-seg-end {
+  grid-column: 3 / 5;
+}
+
+.nx-segment > .nx-seg-remove {
+  grid-row: 1;
+  grid-column: 4;
+}
+
+.nx-trip-cols .nx-lbl + .nx-tl,
+.nx-trip-cols .nx-dim + .nx-lbl,
+.nx-trip-cols .nx-tl + .nx-lbl {
+  margin-top: 8px;
+}
