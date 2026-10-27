@@ -24,9 +24,13 @@ async def ensure_trip(
     traveller_ids: list[uuid.UUID],
     risk_level: str = "LOW",
     approval_status: str = "PENDING",
+    mission_id: uuid.UUID | None = None,
+    requested_by: uuid.UUID | None = None,
     actor: Actor = SYSTEM,
 ) -> bool:
-    """Create a trip with its travellers if the reference is new. Audited on create."""
+    """Create a trip with its travellers if the reference is new. Audited on create.
+    Seed only: a trip with a requester must be a DRAFT (migration 0003); users plan
+    trips through travel/trips.py."""
     tenant_id = session.info["tenant_id"]
     created = await session.scalar(
         insert(Trip)
@@ -42,6 +46,8 @@ async def ensure_trip(
             ends_on=ends_on,
             risk_level=risk_level,
             approval_status=approval_status,
+            mission_id=mission_id,
+            requested_by=requested_by,
         )
         .on_conflict_do_nothing(index_elements=["tenant_id", "reference"])
         .returning(Trip.id)

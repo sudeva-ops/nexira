@@ -13,6 +13,8 @@ from app.modules.notifications.models import NotificationCampaign
 from app.modules.playbooks import service as playbooks
 from app.modules.playbooks.schemas import PermissionsOut
 from app.modules.tenancy.schemas import MeOut, RoleOut
+from app.modules.travel import trips
+from app.modules.travel.models import Trip
 
 router = APIRouter(prefix="/api", tags=["tenancy"])
 
@@ -37,7 +39,7 @@ async def me(
 
 @router.get("/me/permissions")
 async def my_permissions(
-    entity_type: Literal["playbook_run", "agent_proposal", "notification_campaign"],
+    entity_type: Literal["playbook_run", "agent_proposal", "notification_campaign", "trip"],
     entity_id: uuid.UUID,
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -56,6 +58,21 @@ async def my_permissions(
             submit_campaign=allowed.submit,
             approve_campaign=allowed.approve,
             cancel_campaign=allowed.cancel,
+        )
+    if entity_type == "trip":
+        trip = await session.get(Trip, entity_id)
+        if trip is None:
+            return PermissionsOut(entity_type=entity_type, entity_id=str(entity_id))
+        may = await trips.permissions(session, user, trip)
+        return PermissionsOut(
+            entity_type=entity_type,
+            entity_id=str(entity_id),
+            edit_trip=may.edit,
+            submit_trip=may.submit,
+            approve_trip=may.approve,
+            reject_trip=may.reject,
+            check_trip=may.check,
+            cancel_trip=may.cancel,
         )
     if entity_type == "agent_proposal":
         proposal = await session.get(AgentProposal, entity_id)

@@ -137,10 +137,13 @@ DEFAULT_COUNTRY_RISK = (20, 15, 10, 15)
 
 # Trips for the Journey screen, all in the future so none is in today's exposure:
 # (reference, purpose, traveller mission, travellers, destination, country, days from the
-#  scenario date, length in days, status, risk). Seeded trips have no requester (plan G-4).
+#  scenario date, length in days, status, risk). Seeded trips have no requester (plan G-4),
+# except the draft, which belongs to the demo Travel Desk user so it can be edited and
+# submitted. TRIP_SCOPE: the approval scope, the single mission in the country (plan G-2).
 EXTRA_TRIPS: list[tuple[str, str, str, int, str, str, int, int, str, str]] = [
     ("TRP-8814", "Security assessment", "AMM", 2, "Baghdad", "IQ", 5, 3, "PENDING", "HIGH"),
     ("TRP-8815", "EU coordination meeting", "LON", 1, "Brussels", "BE", 2, 1, "APPROVED", "LOW"),
+    ("TRP-8816", "Donor roundtable", "NBO", 2, "Addis Ababa", "ET", 4, 2, "DRAFT", "LOW"),
     (
         "TRP-8817",
         "Regional consular conference",
@@ -154,6 +157,9 @@ EXTRA_TRIPS: list[tuple[str, str, str, int, str, str, int, int, str, str]] = [
         "LOW",
     ),
 ]
+
+TRIP_SCOPE = {"TRP-8814": "BGW"}
+TRIP_REQUESTER = {"TRP-8816": "travel.desk"}
 
 # --- intel sources (D-09, D-10, D-11) -----------------------------------------------------------
 # (code, name, reliability, severity_map, category_map, enabled, fusion)

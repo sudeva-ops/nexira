@@ -18,6 +18,7 @@ from app.modules.playbooks.router import router as playbooks_router
 from app.modules.scenarios.router import router as scenarios_router
 from app.modules.scenarios.service import registry
 from app.modules.tenancy.router import router as tenancy_router
+from app.modules.travel.router import router as travel_router
 
 
 @asynccontextmanager
@@ -55,6 +56,7 @@ def create_app(app_env: str) -> FastAPI:
         notifications_router,
         checkin_router,
         agents_router,
+        travel_router,
         realtime_router,
     ):
         api.include_router(router)

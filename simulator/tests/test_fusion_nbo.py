@@ -19,6 +19,8 @@ from app.modules.intel.models import Incident, IncidentEvent
 from app.modules.people.models import Mission
 from app.modules.scenarios.player import Player
 from app.modules.scenarios.service import get_scenario, load_events
+from app.modules.travel import trips
+from app.modules.travel.models import Trip
 from app.tests.conftest import DbUrls
 from app.tests.fakes import FakeClock, ListPublisher
 from sqlalchemy import select
@@ -37,6 +39,8 @@ class Result:
         self.nbo_mission: uuid.UUID | None = None
         self.paris_mission: uuid.UUID | None = None
         self.worst_signal_to_exposure_s = 0.0
+        self.impacted: dict[str, list[str]] = {}
+        self.risks: dict[str, str] = {}
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -98,6 +102,17 @@ async def played(db: DbUrls) -> Result:
             )
             missions = {m.code: m.id for m in await session.scalars(select(Mission))}
             result.nbo_mission, result.paris_mission = missions["NBO"], missions["PAR"]
+            references = {t.id: t.reference for t in await session.scalars(select(Trip))}
+            result.impacted = {
+                references[trip_id]: incidents
+                for trip_id, incidents in (
+                    await trips.impacted_by(session, list(references))
+                ).items()
+            }
+            result.risks = {
+                country: risk.level
+                for country, risk in (await trips.destination_risks(session, {"KE", "FR"})).items()
+            }
     finally:
         await engine.dispose()
     return result
@@ -156,3 +171,11 @@ async def test_paris_is_not_escalated(played: Result) -> None:
 async def test_signal_to_exposure_within_5_seconds(played: Result) -> None:
     """Requirements §5: signal to fused incident ≤ 5 s; incident to exposure ≤ 5 s."""
     assert played.worst_signal_to_exposure_s < 5
+
+
+async def test_trp_8812_is_impacted_and_the_risk_follows_the_incidents(played: Result) -> None:
+    """JR-06: only TRP-8812 shows "Impacted by INC-…-1042"; JR-03 and plan G-1: Kenya
+    rises from MODERATE to the Nairobi incident's CRITICAL, France from LOW to the
+    Paris strike's MODERATE."""
+    assert played.impacted == {"TRP-8812": [played.incidents[0].reference]}
+    assert played.risks == {"KE": "CRITICAL", "FR": "MODERATE"}
