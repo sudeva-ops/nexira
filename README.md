@@ -122,6 +122,10 @@ POST  /api/incidents/{id}/notes    {"text": "..."}
 
 `make logs` shows the worker's output.
 
+### Running a demo
+
+Step by step, with the four storylines and what to show: [docs/runbooks/demo.md](docs/runbooks/demo.md).
+
 ### Everyday commands
 
 ```sh
