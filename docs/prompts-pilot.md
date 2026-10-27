@@ -242,4 +242,62 @@ make acceptance (Nairobi, Mass Notification, Journey) still passes. Report the r
 
 ---
 
-The prompts for the Travel & Air agent and (if the customer wants it) Assistance Partners are written after their requirements are approved (requirements-pilot.md §7).
+## Pilot module 4 · Travel & Air agent (approved 2026-10-27, PR #36)
+
+Sources: D-12 to D-17, D-34, `docs/requirements-pilot.md` §19–23 (TA-01..09).
+
+### Prompt 33 · Read and plan (no code)
+```
+Read D-12..D-17, D-29, D-31..D-34, requirements-pilot.md §19-23, app/modules/agents (runner,
+proposals, actions, the Phase 1 agents), notifications/service.py (audiences), travel
+(trips, tracker). Write docs/plan-pilot-ta.md: triggers and the events they come from,
+proposal keys and evidence, the two executors and the service functions they call (an
+agent path for cancelling a trip), the "trip travellers" audience, approval scope (an
+incident's mission, else HQ only, D-06), the seed (agent, policies, a Paris trip for the
+acceptance), and gaps with proposed answers. Confirm no schema change is needed, or
+propose one. No code changes.
+```
+
+### Prompt 34 · Travel actions, policies and the trip audience 🔒
+```
+TA-05, TA-06 (D-29: executors and policies). NOTIFY_TRAVELLERS and CANCEL_TRIP payload
+schemas and executors in agents/actions.py, calling only the notification service (new
+audience {"trip_id"}: that trip's travellers; citizens refused, D-31) and the trips
+service (cancel by the agent, approver recorded, audited). ADVISE_REBOOKING has no
+executor and no policy (level 4). Seed the TRAVEL_AIR agent (level 2, no observe logic
+yet) and the policies (deadline 60 min).
+Tests: each executor through the approval flow as a user would; the audience refuses a
+citizen; level 4 never executes; policies fail closed; a restricted trip cannot be
+cancelled or notified through these actions.
+```
+
+### Prompt 35 · Travel & Air agent: what it watches
+```
+TA-01..04, TA-07, TA-08. The agent observes FLIGHT_UPDATED, EXPOSURE_COMPUTED and
+incident events; proposes NOTIFY_TRAVELLERS, ADVISE_REBOOKING and CANCEL_TRIP (with the
+notify alternative) as §20 says; never for restricted trips; one proposal per trip or
+flight and cause; evidence from flight events, the incident and the risk breakdown. The
+scenarios: NBO-AIR-DIVERSION (holding, diversion), NBO-CIVIL-UNREST (TRP-8812 impacted;
+the Phase 1 counts and proposals must not change — check), FRA-NATIONAL-PROTESTS (a
+seeded approved Paris trip).
+Tests: each trigger, idempotency, restricted trips, the kill switch.
+```
+
+### Prompt 36 · Decision Queue and AI Agents for travel
+```
+TA-09. Decision Queue cards for travel proposals: the trip and flight with links to
+Journey and Air, the advice card for ADVISE_REBOOKING (dismiss only), the alternative on
+CANCEL_TRIP. AI Agents lists Travel & Air with its policies. Journey and Air show a
+trip's or flight's pending proposals.
+Tests: Vitest for the cards and links.
+```
+
+### Prompt 37 · Travel & Air agent acceptance
+```
+Playwright, real stack (requirements-pilot.md §22). Report the real output; make
+acceptance (all specs) still passes.
+```
+
+---
+
+The prompts for Assistance Partners (if the customer wants it) are written after its requirements are approved (requirements-pilot.md §7).
