@@ -4,13 +4,15 @@ logged-in user, exactly as the Decision Queue does."""
 
 import uuid
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytest
 from httpx import AsyncClient, Response
 from sqlalchemy import select, text
 
+from app.core.config import get_settings
 from app.core.db import tenant_session
 from app.core.events import get_publisher
 from app.main import app
@@ -22,8 +24,15 @@ from app.modules.notifications.models import NotificationCampaign, NotificationD
 from app.modules.people.service import PersonIn, load_persons
 from app.modules.tenancy.service import ensure_reference_counter
 from app.modules.travel.models import Trip
-from app.modules.travel.service import ensure_trip
+from app.modules.travel.service import (
+    AirportIn,
+    SegmentSeed,
+    ensure_airports,
+    ensure_scenario_flight,
+    ensure_trip,
+)
 from app.tests.auth_helpers import Idp
+from app.tests.conftest import DbUrls, create_tenant
 from app.tests.fakes import ListPublisher
 
 POLICIES = [  # the seed (plan-pilot-ta §6)
@@ -48,7 +57,9 @@ class World:
         restricted: bool = False,
     ) -> uuid.UUID:
         trip_id = uuid.uuid4()
-        start = date.today() + timedelta(days=starts_in_days)
+        start = datetime.now(ZoneInfo(get_settings().home_tz)).date() + timedelta(  # L2
+            days=starts_in_days
+        )
         async with tenant_session(self.idp.tenant_id, self.idp.engine) as session:
             await ensure_trip(
                 session,
@@ -67,7 +78,14 @@ class World:
             await session.commit()
         return trip_id
 
-    async def propose(self, action_type: str, payload: dict[str, Any]) -> AgentProposal:
+    async def propose(
+        self,
+        action_type: str,
+        payload: dict[str, Any],
+        *,
+        incident_id: uuid.UUID | None = None,
+        alternatives: list[dict[str, Any]] | None = None,
+    ) -> AgentProposal:
         async with tenant_session(self.idp.tenant_id, self.idp.engine) as session:
             outcome = await proposals.create(
                 session,
@@ -78,7 +96,9 @@ class World:
                     title=f"{action_type} proposal",
                     proposed_action=action_type,
                     action_payload=payload,
+                    incident_id=incident_id,
                     evidence=[{"text": "test", "source": "test"}],
+                    alternatives=alternatives or [],
                 ),
                 undo_window_s=300,
             )
@@ -102,6 +122,7 @@ async def world(client: AsyncClient, idp: Idp) -> World:
         "security": [("SECURITY_OFFICER", None)],
         "duty": [("DUTY_OFFICER", None)],
         "viewer": [("VIEWER", None)],
+        "admin": [("ADMIN", None)],
     }
     for sub, roles in grants.items():
         await idp.user(sub, roles)
@@ -280,3 +301,208 @@ async def test_payloads_are_strict(world: World) -> None:
     ):
         with pytest.raises((proposals.ProposalError, ActionError)):
             await world.propose(action_type, payload)
+
+
+# --- review of Prompt 34 -------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("status", "sent"), [("DRAFT", False), ("CANCELLED", False), ("PENDING", True)]
+)
+async def test_notify_only_pending_or_approved_trips(
+    client: AsyncClient, world: World, status: str, sent: bool
+) -> None:
+    """M1: a DRAFT's travellers can still change; a cancelled trip has no one to tell."""
+    trip_id = await world.trip(status=status)
+    proposal = await world.propose("NOTIFY_TRAVELLERS", notify(trip_id))
+    await approve(client, world, proposal.id, "desk")
+    assert (await world.stored(proposal.id)).status == ("APPROVED" if sent else "FAILED")
+
+
+async def test_an_empty_trip_audience_fails(client: AsyncClient, world: World) -> None:
+    """L4: nothing silently 'done'."""
+    trip_id = await world.trip(travellers=[])
+    proposal = await world.propose("NOTIFY_TRAVELLERS", notify(trip_id))
+    await approve(client, world, proposal.id, "desk")
+    assert (await world.stored(proposal.id)).status == "FAILED"
+
+
+@pytest.mark.parametrize("channels", [["SMS", "SMS"], ["FAX"], []])
+async def test_channels_are_checked_when_proposed(world: World, channels: list[str]) -> None:
+    """L1."""
+    with pytest.raises((proposals.ProposalError, ActionError)):
+        await world.propose(
+            "NOTIFY_TRAVELLERS", {**notify(await world.trip()), "channels": channels}
+        )
+
+
+async def test_another_tenants_trip_is_unknown(
+    client: AsyncClient, world: World, db: DbUrls
+) -> None:
+    other = await create_tenant(db, "Other ministry")
+    trip_id = uuid.uuid4()
+    async with tenant_session(other, world.idp.engine) as session:
+        await ensure_trip(
+            session,
+            trip_id=trip_id,
+            reference="TRP-OTHER",
+            purpose="",
+            origin="A",
+            destination="B",
+            destination_country="FR",
+            starts_on=datetime.now(UTC).date() + timedelta(days=5),
+            ends_on=datetime.now(UTC).date() + timedelta(days=6),
+            traveller_ids=[],
+            approval_status="APPROVED",
+        )
+        await session.commit()
+    for action_type, payload, sub in (
+        ("NOTIFY_TRAVELLERS", notify(trip_id), "desk"),
+        ("CANCEL_TRIP", {"trip_id": str(trip_id)}, "security"),
+    ):
+        proposal = await world.propose(action_type, payload)
+        await approve(client, world, proposal.id, sub)
+        assert (await world.stored(proposal.id)).status == "FAILED", action_type
+
+
+async def test_a_trip_is_cancelled_once_and_the_audit_names_the_proposal(
+    client: AsyncClient, world: World
+) -> None:
+    trip_id = await world.trip()
+    first = await world.propose("CANCEL_TRIP", {"trip_id": str(trip_id)})
+    second = await world.propose("CANCEL_TRIP", {"trip_id": str(trip_id)})
+    await approve(client, world, first.id, "security")
+    await approve(client, world, second.id, "security")
+    assert [(await world.stored(p.id)).status for p in (first, second)] == ["APPROVED", "FAILED"]
+    details = await world.sql(
+        "SELECT details->>'was', details->>'proposal_id' FROM audit_log "
+        "WHERE action = 'TRIP.CANCEL'"
+    )
+    assert details == [("APPROVED", str(first.id))]
+
+
+async def test_a_trip_with_a_flight_in_the_air_is_not_cancelled(
+    client: AsyncClient, world: World
+) -> None:
+    """L3: a red-eye already flying, though the trip starts tomorrow in the home zone."""
+    trip_id = uuid.uuid4()
+    start = datetime.now(UTC) + timedelta(days=2)
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        await ensure_airports(
+            session,
+            [
+                AirportIn("AUH", "Abu Dhabi", "Abu Dhabi", "AE", 24.43, 54.65),
+                AirportIn("CDG", "Paris", "Paris", "FR", 49.01, 2.55),
+            ],
+        )
+        await ensure_trip(
+            session,
+            trip_id=trip_id,
+            reference="TRP-REDEYE",
+            purpose="",
+            origin="Abu Dhabi",
+            destination="Paris",
+            destination_country="FR",
+            starts_on=start.date(),
+            ends_on=start.date() + timedelta(days=2),
+            traveller_ids=world.staff,
+            approval_status="APPROVED",
+            segments=[
+                SegmentSeed(
+                    kind="FLIGHT",
+                    title="XW 9",
+                    starts_at=start,
+                    ends_at=start + timedelta(hours=7),
+                    flight_number="XW 9",
+                    from_airport="AUH",
+                    to_airport="CDG",
+                )
+            ],
+        )
+        await ensure_scenario_flight(session, trip_id)
+        await session.execute(text("UPDATE flight SET status = 'AIRBORNE'"))
+        await session.commit()
+    proposal = await world.propose("CANCEL_TRIP", {"trip_id": str(trip_id)})
+    await approve(client, world, proposal.id, "security")
+    assert (await world.stored(proposal.id)).status == "FAILED"
+
+
+async def test_neither_action_can_be_edited_and_the_alternative_keeps_its_level(
+    client: AsyncClient, world: World
+) -> None:
+    trip_id = await world.trip()
+    for action_type, payload in (
+        ("NOTIFY_TRAVELLERS", notify(trip_id)),
+        ("CANCEL_TRIP", {"trip_id": str(trip_id)}),
+    ):
+        proposal = await world.propose(action_type, payload)
+        edited = await client.post(
+            f"/api/proposals/{proposal.id}/edit-approve",
+            json={"edited_payload": {**payload, "trip_id": str(uuid.uuid4())}},
+            headers=world.idp.headers("security"),
+        )
+        assert edited.status_code in (403, 409, 422), action_type
+    cancel = await world.propose(
+        "CANCEL_TRIP",
+        {"trip_id": str(trip_id)},
+        alternatives=[
+            {
+                "label": "Notify instead",
+                "action_type": "NOTIFY_TRAVELLERS",
+                "action_payload": notify(trip_id),
+                "rationale": "The trip may still go ahead",
+            }
+        ],
+    )
+    headers = world.idp.headers
+    refused = await client.post(
+        f"/api/proposals/{cancel.id}/use-alternative", json={"index": 0}, headers=headers("desk")
+    )
+    assert refused.status_code == 403
+    chosen = await client.post(
+        f"/api/proposals/{cancel.id}/use-alternative",
+        json={"index": 0},
+        headers=headers("security"),
+    )
+    assert chosen.status_code == 200
+    replacement = await world.sql(
+        "SELECT action_type, effective_level, status FROM agent_proposal "
+        "WHERE action_type = 'NOTIFY_TRAVELLERS' ORDER BY created_at DESC LIMIT 1"
+    )
+    assert replacement == [("NOTIFY_TRAVELLERS", 2, "PENDING")]
+
+
+async def test_lowering_the_agents_level_keeps_the_policy_floor(
+    client: AsyncClient, world: World
+) -> None:
+    lowered = await client.patch(
+        "/api/agents/TRAVEL_AIR", json={"autonomy_level": 0}, headers=world.idp.headers("admin")
+    )
+    assert lowered.status_code == 200
+    proposal = await world.propose("NOTIFY_TRAVELLERS", notify(await world.trip()))
+    assert (proposal.effective_level, proposal.status) == (2, "PENDING")
+
+
+async def test_a_message_about_an_incident_keeps_the_incident(
+    client: AsyncClient, world: World
+) -> None:
+    """TA-03: the impacted-trip message is linked to its incident."""
+    incident = uuid.uuid4()
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        await session.execute(
+            text(
+                "INSERT INTO incident (id, tenant_id, reference, title, category, severity, "
+                "signal_severity, location) VALUES (:id, current_tenant_id(), 'INC-T', 'I', "
+                "'CIVIL_UNREST', 'HIGH', 'HIGH', 'SRID=4326;POINT(2.35 48.86)')"
+            ),
+            {"id": incident},
+        )
+        await session.commit()
+    proposal = await world.propose(
+        "NOTIFY_TRAVELLERS", notify(await world.trip()), incident_id=incident
+    )
+    assert (await approve(client, world, proposal.id, "desk")).status_code == 200
+    stored = await world.sql(
+        "SELECT incident_id, audience_filter->>'incident_id' FROM notification_campaign"
+    )
+    assert stored == [(incident, str(incident))]

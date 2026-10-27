@@ -16,7 +16,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -66,7 +66,15 @@ class NotifyTravellersPayload(_Payload):
 
     trip_id: uuid.UUID
     message: str = Field(min_length=1, max_length=2000)
-    channels: list[str] = Field(default_factory=lambda: ["APP", "SMS"], min_length=1)
+    channels: list[str] = Field(default_factory=lambda: ["APP", "SMS"], min_length=1, max_length=5)
+
+    @field_validator("channels")
+    @classmethod
+    def _known_once(cls, channels: list[str]) -> list[str]:
+        """Refused when proposed, not at execution (review of Prompt 34, L1)."""
+        if not set(channels) <= set(CHANNELS) or len(set(channels)) != len(channels):
+            raise ValueError(f"channels are each of {', '.join(CHANNELS)} at most once")
+        return channels
 
 
 class CancelTripPayload(_Payload):
@@ -226,6 +234,7 @@ async def _cancel_trip(
             payload.trip_id,
             actor=ctx.agent_actor,
             approved_by=ctx.approved_by,
+            proposal_id=ctx.proposal_id,
             home_tz=get_settings().home_tz,
         )
     except trips.TripError as e:

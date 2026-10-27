@@ -577,6 +577,7 @@ async def cancel_by_agent(
     *,
     actor: Actor,
     approved_by: uuid.UUID | None,
+    proposal_id: uuid.UUID | None = None,
     home_tz: str,
 ) -> Outcome:
     """CANCEL_TRIP, once a person approved the Travel & Air agent's proposal (D-34,
@@ -590,6 +591,16 @@ async def cancel_by_agent(
         raise TripError(409, f"{trip.reference} is {trip.approval_status}, not APPROVED")
     if trip.starts_on <= datetime.now(ZoneInfo(home_tz)).date():
         raise TripError(409, f"{trip.reference} has started: notify its travellers instead")
+    in_air = await session.scalar(
+        text(
+            "SELECT 1 FROM flight f JOIN trip_segment s ON s.id = f.trip_segment_id "
+            "WHERE s.trip_id = :trip AND f.status NOT IN ('SCHEDULED', 'DELAYED', 'CANCELLED') "
+            "LIMIT 1"
+        ),
+        {"trip": trip.id},
+    )
+    if in_air:  # a red-eye already flying (review of Prompt 34, L3)
+        raise TripError(409, f"{trip.reference} has a flight under way: notify instead")
     trip.approval_status = "CANCELLED"
     await session.flush()
     await audit.write(
@@ -599,7 +610,11 @@ async def cancel_by_agent(
         action="TRIP.CANCEL",
         entity_type="trip",
         entity_id=trip.reference,
-        details={"was": "APPROVED", "approved_by": str(approved_by) if approved_by else None},
+        details={
+            "was": "APPROVED",
+            "approved_by": str(approved_by) if approved_by else None,
+            "proposal_id": str(proposal_id) if proposal_id else None,
+        },
     )
     return Outcome(trip, [trip_event(trip)])
 

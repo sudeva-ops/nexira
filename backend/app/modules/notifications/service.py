@@ -113,13 +113,23 @@ async def _trip_travellers(session: AsyncSession, trip_id: str) -> list[uuid.UUI
         trip_uuid = uuid.UUID(trip_id)
     except ValueError:
         raise AudienceError("unknown trip") from None
-    restricted = await session.scalar(
-        text("SELECT restricted FROM trip WHERE id = :trip"), {"trip": trip_uuid}
-    )
-    if restricted is None:
+    # FOR SHARE: a PENDING trip cannot go back to DRAFT (and change its travellers) while
+    # its list is read (review of Prompt 34, M1).
+    trip = (
+        await session.execute(
+            text("SELECT restricted, approval_status FROM trip WHERE id = :trip FOR SHARE"),
+            {"trip": trip_uuid},
+        )
+    ).first()
+    if trip is None:
         raise AudienceError("unknown trip")
+    restricted, status = trip
     if restricted:
         raise AudienceError("a restricted trip's travellers are not messaged (D-33)")
+    if status not in ("PENDING", "APPROVED"):
+        # Travellers are frozen only once a trip leaves DRAFT (PC-15): what was proposed
+        # is what is sent. Cancelled trips have no one to tell.
+        raise AudienceError(f"the trip is {status}: only a pending or approved trip is messaged")
     rows = (
         await session.execute(
             text(
@@ -135,6 +145,8 @@ async def _trip_travellers(session: AsyncSession, trip_id: str) -> list[uuid.UUI
     ).all()
     if any(person_type == "CITIZEN" for _, person_type in rows):
         raise AudienceError("a trip with a citizen traveller needs a composed campaign (D-31)")
+    if not rows:
+        raise AudienceError("the trip has no active travellers")  # review, L4
     return [person_id for person_id, _ in rows]
 
 
@@ -222,6 +234,8 @@ async def create_campaign(
         raise ValueError(f"unknown campaign type {campaign.campaign_type}")
     if not campaign.channels or not set(campaign.channels) <= set(CHANNELS):
         raise ValueError(f"unknown channels {campaign.channels}")
+    if len(set(campaign.channels)) != len(campaign.channels):
+        raise ValueError("each channel once")  # review of Prompt 34, L1
     recipients = await resolve_audience(session, incident_id, campaign.audience)
     escalate_after_s = campaign.escalate_after_s
     if campaign.campaign_type == "CHECKIN":
