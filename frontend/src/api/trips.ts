@@ -26,6 +26,7 @@ export interface Trip {
   starts_on: string;
   ends_on: string;
   approval_status: TripStatus;
+  restricted: boolean; // VIP or ministerial: flights never tracked (D-33)
   risk_level: Severity; // submitted; for a trip never submitted, what submitting gives now
   live_risk: Severity;
   risk_changed: boolean; // JR-07
@@ -44,13 +45,31 @@ export interface Trip {
   created_at: string;
 }
 
+/** A restricted trip's FLIGHT segments come masked for most roles (plan G-7): title
+ *  "Flight (restricted)" and no place, times or flight fields. */
 export interface Segment {
   seq: number;
   kind: SegmentKind;
   title: string;
   place_label: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  flight_number: string | null;
+  from_airport: string | null;
+  to_airport: string | null;
+  flight_id: string | null; // set while tracked (D-33)
+  flight_status: string | null;
+}
+
+export interface SegmentPlan {
+  kind: SegmentKind;
+  title: string;
+  place_label: string | null;
   starts_at: string;
   ends_at: string;
+  flight_number?: string | null;
+  from_airport?: string | null;
+  to_airport?: string | null;
 }
 
 export interface CountryRisk {
@@ -82,7 +101,8 @@ export interface TripPlan {
   starts_on: string;
   ends_on: string;
   travellers: string[];
-  segments: Omit<Segment, "seq">[];
+  segments: SegmentPlan[];
+  restricted?: boolean;
 }
 
 export interface TripPermissions {

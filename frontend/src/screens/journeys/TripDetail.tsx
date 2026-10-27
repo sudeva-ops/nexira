@@ -90,7 +90,7 @@ export function TripDetail({ trip, onEdit }: { trip: Detail; onEdit: (trip: Deta
                     <br />
                     <span>
                       {s.place_label ? `${s.place_label} · ` : ""}
-                      {formatStamp(s.starts_at)}
+                      {s.starts_at ? formatStamp(s.starts_at) : "—"}
                     </span>
                   </div>
                 ))}

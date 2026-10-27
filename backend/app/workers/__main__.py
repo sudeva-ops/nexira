@@ -13,9 +13,11 @@ from app.modules.checkin.consumer import clock_handler, response_handler
 from app.modules.intel.consumer import exposure_handler, raw_signal_handler
 from app.modules.notifications.consumer import campaign_handler, tick
 from app.modules.playbooks.consumer import resume_runs, run_handler
+from app.modules.travel import tracker
 
 RESUME_EVERY_S = 60
 TICK_EVERY_S = 2  # dispatch leftovers, delivery receipts, check-in escalation
+FLIGHTS_EVERY_S = 5  # the simulated flight tracker (D-33)
 
 log = logging.getLogger("app.workers")
 
@@ -45,6 +47,18 @@ async def tick_loop(
             except Exception:
                 log.exception("notifications tick failed for %s", tenant_id)
         await asyncio.sleep(TICK_EVERY_S)
+
+
+async def flights_loop(
+    engine: AsyncEngine, publisher: Publisher, tenant_ids: list[uuid.UUID]
+) -> None:
+    while True:
+        for tenant_id in tenant_ids:
+            try:
+                await tracker.tick(engine, tenant_id, publisher)
+            except Exception:
+                log.exception("flight tracker tick failed for %s", tenant_id)
+        await asyncio.sleep(FLIGHTS_EVERY_S)
 
 
 async def main() -> None:
@@ -95,6 +109,12 @@ async def main() -> None:
         ),
         StreamConsumer(
             client,
+            group="flights",
+            consumer=name,
+            handlers={"FLIGHT_FEED": tracker.feed_handler(engine, publisher)},
+        ),
+        StreamConsumer(
+            client,
             group="checkin",
             consumer=name,
             handlers={
@@ -103,7 +123,9 @@ async def main() -> None:
             },
         ),
     ]
-    log.info("consumers started: intel, exposure, playbooks, notifications, agents, checkin")
+    log.info(
+        "consumers started: intel, exposure, playbooks, notifications, agents, flights, checkin"
+    )
     try:
         async with asyncio.TaskGroup() as tasks:
             for consumer in consumers:
@@ -112,6 +134,7 @@ async def main() -> None:
                 resume_loop(engine, publisher, tenant_ids, settings.playbook_step_delay_s)
             )
             tasks.create_task(tick_loop(engine, publisher, tenant_ids, settings.channel_adapter))
+            tasks.create_task(flights_loop(engine, publisher, tenant_ids))
     finally:
         await client.aclose()
         await engine.dispose()

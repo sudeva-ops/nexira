@@ -20,6 +20,7 @@
   content frozen once submitted, forward-only status, no self-approval.
 """
 
+import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -33,7 +34,7 @@ from app.core import approvals, audit
 from app.core.events import Event
 from app.core.security import CurrentUser
 from app.modules.people.models import Mission, Person
-from app.modules.travel.models import CountryRisk, Trip, TripSegment, TripTraveller
+from app.modules.travel.models import Airport, CountryRisk, Trip, TripSegment, TripTraveller
 
 LEVELS = ("LOW", "MODERATE", "HIGH", "CRITICAL")  # D-08, as severity_rank()
 SEGMENT_KINDS = ("FLIGHT", "STAY", "MEETING", "GROUND")
@@ -72,6 +73,10 @@ class SegmentIn:
     starts_at: datetime
     ends_at: datetime
     place_label: str | None = None
+    # PC-17: FLIGHT segments only; tracked once the trip is approved (D-33).
+    flight_number: str | None = None
+    from_airport: str | None = None
+    to_airport: str | None = None
 
 
 @dataclass(frozen=True)
@@ -86,6 +91,7 @@ class Plan:
     travellers: list[uuid.UUID]
     purpose: str | None = None
     segments: list[SegmentIn] = field(default_factory=list)
+    restricted: bool | None = None  # VIP or ministerial (D-33); None on an edit: unchanged
 
 
 @dataclass
@@ -272,6 +278,34 @@ async def _validate(session: AsyncSession, plan: Plan, home_tz: str) -> None:
         )
         if first < plan.starts_on or last > plan.ends_on:
             raise TripError(422, f"segment {n} is outside the trip's dates (JR-02)")
+        await _validate_flight(session, n, segment)
+
+
+FLIGHT_NUMBER = re.compile(r"^[A-Z0-9]{2} ?[0-9]{1,4}[A-Z]?$")  # as the PC-17 CHECK
+
+
+async def _validate_flight(session: AsyncSession, n: int, segment: SegmentIn) -> None:
+    """PC-17: flight fields on FLIGHT segments only; known airports (plan G-6). A flight
+    segment without them is allowed and is simply not tracked."""
+    fields = (segment.flight_number, segment.from_airport, segment.to_airport)
+    if not any(fields):
+        return
+    if segment.kind != "FLIGHT":
+        raise TripError(422, f"segment {n}: a flight number and airports are for FLIGHT segments")
+    if not all(fields):
+        raise TripError(422, f"segment {n}: a tracked flight needs its number and both airports")
+    if not FLIGHT_NUMBER.fullmatch(segment.flight_number or ""):
+        raise TripError(422, f"segment {n}: the flight number looks like XW 451")
+    if segment.from_airport == segment.to_airport:
+        raise TripError(422, f"segment {n}: the flight departs and arrives at the same airport")
+    known = set(
+        await session.scalars(
+            select(Airport.iata).where(Airport.iata.in_([segment.from_airport, segment.to_airport]))
+        )
+    )
+    for code in (segment.from_airport, segment.to_airport):
+        if code not in known:
+            raise TripError(422, f"segment {n}: unknown airport {code}")
 
 
 async def _write_children(session: AsyncSession, trip: Trip, plan: Plan) -> None:
@@ -299,6 +333,9 @@ async def _write_children(session: AsyncSession, trip: Trip, plan: Plan) -> None
                         "place_label": s.place_label,
                         "starts_at": s.starts_at,
                         "ends_at": s.ends_at,
+                        "flight_number": s.flight_number,
+                        "from_airport": s.from_airport,
+                        "to_airport": s.to_airport,
                     }
                     for n, s in enumerate(plan.segments, start=1)
                 ]
@@ -308,6 +345,7 @@ async def _write_children(session: AsyncSession, trip: Trip, plan: Plan) -> None
 
 def _details(plan: Plan) -> dict[str, Any]:
     return {
+        "restricted": bool(plan.restricted),
         "destination": plan.destination,
         "country": plan.destination_country,
         "starts_on": plan.starts_on.isoformat(),
@@ -341,6 +379,17 @@ def _scope_of(trip: Trip) -> approvals.MissionScope:
     return trip.mission_id if trip.submitted_at is not None else approvals.ANY_MISSION
 
 
+SEE_RESTRICTED = "TRAVEL_DESK|SECURITY_OFFICER|ADMIN"
+
+
+async def sees_restricted_flights(session: AsyncSession, user: CurrentUser, trip: Trip) -> bool:
+    """Plan G-7: a restricted trip's flight segments are shown only to its requester and to
+    TRAVEL_DESK, SECURITY_OFFICER and ADMIN; everyone else sees "Flight (restricted)"."""
+    return trip.requested_by == user.id or await approvals.user_has_role(
+        session, user, SEE_RESTRICTED
+    )
+
+
 # --- drafts (JR-01, JR-02) ---------------------------------------------------------------
 
 
@@ -359,6 +408,7 @@ async def create_draft(session: AsyncSession, user: CurrentUser, plan: Plan, hom
         ends_on=plan.ends_on,
         approval_status="DRAFT",
         requested_by=user.id,  # from the token's user, never from the request
+        restricted=bool(plan.restricted),
     )
     session.add(trip)
     await session.flush()
@@ -381,6 +431,8 @@ async def update_draft(
     trip.destination_country = plan.destination_country
     trip.starts_on = plan.starts_on
     trip.ends_on = plan.ends_on
+    if plan.restricted is not None:
+        trip.restricted = plan.restricted
     await session.flush()
     await _write_children(session, trip, plan)
     await _audit(session, user, "EDIT", trip, _details(plan))
