@@ -34,6 +34,9 @@ class Ids:
     agent: uuid.UUID
     proposal: uuid.UUID
     scenario: uuid.UUID
+    flight_trip: uuid.UUID
+    segment: uuid.UUID
+    flight: uuid.UUID
 
 
 PT = "'SRID=4326;POINT(36.8245 -1.2838)'"
@@ -96,6 +99,20 @@ ROWS: dict[str, str] = {
     "ends_at) VALUES ('{t}', '{trip}', 1, 'STAY', 'Hotel', now(), now())",
     "country_risk": "INSERT INTO country_risk (tenant_id, country_code, level, security, unrest, "
     "health, transport, source) VALUES ('{t}', 'KE', 'LOW', 1, 1, 1, 1, 'x')",
+    "airport": "INSERT INTO airport (tenant_id, iata, name, city, country_code, location) "
+    "VALUES ('{t}', 'AAA', 'A', 'A', 'KE', " + PT + ")",
+    # A flight needs an approved (seeded) trip with a matching FLIGHT segment, loaded in
+    # one transaction (migration 0004).
+    "flight": "INSERT INTO trip (id, tenant_id, reference, origin, destination, starts_on, "
+    "ends_on, approval_status) VALUES ('{flight_trip}', '{t}', 'TRP-F', 'A', 'B', current_date, "
+    "current_date, 'APPROVED'); INSERT INTO trip_segment (id, tenant_id, trip_id, seq, kind, "
+    "title, starts_at, ends_at, flight_number, from_airport, to_airport) VALUES ('{segment}', "
+    "'{t}', '{flight_trip}', 1, 'FLIGHT', 'XW 1', now(), now(), 'XW 1', 'AAA', 'AAA'); "
+    "INSERT INTO flight (id, tenant_id, trip_segment_id, flight_number, from_airport, to_airport, "
+    "scheduled_dep, scheduled_arr, estimated_dep, estimated_arr) VALUES ('{flight}', '{t}', "
+    "'{segment}', 'XW 1', 'AAA', 'AAA', now(), now(), now(), now())",
+    "flight_event": "INSERT INTO flight_event (tenant_id, flight_id, event_type) "
+    "VALUES ('{t}', '{flight}', 'DEPARTED')",
     "message_template": "INSERT INTO message_template (tenant_id, code, kind, name, texts) "
     "VALUES ('{t}', 'T', 'ADVISORY', 'T', '{{\"en\": \"m\"}}')",
     "notification_delivery": "INSERT INTO notification_delivery (tenant_id, campaign_id, "
@@ -116,12 +133,19 @@ ROWS: dict[str, str] = {
 
 # nexira_app has no UPDATE/DELETE on audit_log at all (D-20), so those fail with
 # a privilege error rather than touching zero rows.
-NO_UPDATE_DELETE = {"audit_log", "checkin_response", "country_risk"}  # append-only / seeded
+NO_UPDATE_DELETE = {  # append-only / seeded
+    "audit_log",
+    "checkin_response",
+    "country_risk",
+    "airport",
+    "flight_event",
+}
 NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELETE)
     "message_template",
     "notification_campaign",
     "notification_delivery",
     "trip",  # cancelled, never deleted (PC-15)
+    "flight",  # written only by the tracker; never deleted (PC-19)
 }
 
 
@@ -253,7 +277,7 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
     # tenant B cannot see tenant A's trip (migration 0003).
     with pytest.raises(
         (asyncpg.InsufficientPrivilegeError, asyncpg.RaiseError),
-        match=r"row-level security|trip: no such trip",
+        match=r"row-level security|trip: no such trip|flight: no such flight",
     ):
         await api.execute(sql_for(table, world.a))
 

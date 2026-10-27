@@ -55,8 +55,8 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     command.upgrade(cfg, "head")
     upgraded = asyncio.run(_snapshot(admin))
     # The schema's 33 tables, message_template (0002), trip_segment and country_risk
-    # (0003), and alembic_version.
-    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 1
+    # (0003), airport, flight and flight_event (0004), and alembic_version.
+    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
 
@@ -195,4 +195,61 @@ def test_downgrading_0003_restores_0002_exactly(fresh: DbUrls) -> None:
     triggers = at_head["triggers"]
     assert isinstance(triggers, list)
     assert ("trip", "trip_guard") in triggers
+    command.upgrade(cfg, "head")
+
+
+async def _air_shape(admin_url: str) -> dict[str, object]:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        columns = await conn.fetch(
+            "SELECT table_name, column_name, column_default FROM information_schema.columns "
+            "WHERE table_name IN ('trip', 'trip_segment') ORDER BY 1, 2"
+        )
+        constraints = await conn.fetch(
+            "SELECT conrelid::regclass::text AS t, conname, pg_get_constraintdef(oid) AS def "
+            "FROM pg_constraint WHERE conrelid IN ('trip'::regclass, 'trip_segment'::regclass) "
+            "ORDER BY 1, 2"
+        )
+        triggers = await conn.fetch(
+            "SELECT tgrelid::regclass::text AS t, tgname FROM pg_trigger WHERE NOT tgisinternal "
+            "AND tgrelid IN ('trip'::regclass, 'trip_segment'::regclass) ORDER BY 1, 2"
+        )
+        tables = await conn.fetch(
+            "SELECT relname, relforcerowsecurity, relacl::text AS acl FROM pg_class "
+            "WHERE relname IN ('airport', 'flight', 'flight_event') ORDER BY 1"
+        )
+        functions = await conn.fetch(
+            "SELECT proname FROM pg_proc WHERE proname IN "
+            "('flight_guard', 'flight_event_guard', 'trip_restricted_guard') ORDER BY 1"
+        )
+    finally:
+        await conn.close()
+    return {
+        "columns": [tuple(r) for r in columns],
+        "constraints": [tuple(r) for r in constraints],
+        "triggers": [tuple(r) for r in triggers],
+        "tables": [tuple(r) for r in tables],
+        "functions": [r["proname"] for r in functions],
+    }
+
+
+def test_downgrading_0004_restores_0003_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0003")
+    at_0003 = asyncio.run(_air_shape(admin))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_air_shape(admin))
+    command.downgrade(cfg, "0003")
+    assert asyncio.run(_air_shape(admin)) == at_0003
+    assert at_0003["tables"] == []
+    tables = at_head["tables"]
+    assert isinstance(tables, list)
+    assert [(t[0], t[1]) for t in tables] == [  # FORCE RLS on each
+        ("airport", True),
+        ("flight", True),
+        ("flight_event", True),
+    ]
+    assert at_head["functions"] == ["flight_event_guard", "flight_guard", "trip_restricted_guard"]
     command.upgrade(cfg, "head")

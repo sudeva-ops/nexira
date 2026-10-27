@@ -6,7 +6,7 @@ idempotent: seeding twice changes nothing and writes no new audit rows.
 """
 
 import uuid
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, time, timedelta, timezone
 from typing import Any
 
 from app.core.db import tenant_session
@@ -18,8 +18,16 @@ from app.modules.people.service import add_observations, ensure_mission, load_pe
 from app.modules.playbooks.service import StepIn, ensure_playbook, retire_older_versions
 from app.modules.scenarios.service import ensure_scenario
 from app.modules.tenancy.service import ensure_reference_counter
-from app.modules.travel.service import CountryRiskIn, ensure_country_risks, ensure_trip
-from sqlalchemy.ext.asyncio import AsyncEngine
+from app.modules.travel.service import (
+    AirportIn,
+    CountryRiskIn,
+    SegmentSeed,
+    ensure_airports,
+    ensure_country_risks,
+    ensure_scenario_flight,
+    ensure_trip,
+)
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from nexira_sim.scenarios import fra_national_protests as fra
 from nexira_sim.scenarios import nbo_civil_unrest as nbo
@@ -113,6 +121,11 @@ async def seed_all(
                 else None,
             )
 
+        report["airports"] = await ensure_airports(session, [AirportIn(*a) for a in data.AIRPORTS])
+        report["air_trips"] = await _air_trips(
+            session, tenant_id, w, scenario_date, missions_by_code
+        )
+
         report["sources"] = await ensure_sources(
             session,
             [
@@ -204,3 +217,74 @@ async def seed_all(
         )
         await session.commit()
     return report
+
+
+GST = timezone(timedelta(hours=4))  # the home zone (plan Q2)
+
+
+async def _air_trips(
+    session: AsyncSession,
+    tenant_id: uuid.UUID,
+    w: world.World,
+    scenario_date: date,
+    missions: dict[str, world.MissionIn],
+) -> int:
+    """Approved trips with one tracked FLIGHT segment (D-33, plan G-1, G-3, G-4)."""
+    created = 0
+    now = datetime.now(UTC)
+    today = now.astimezone(GST).date()
+    for (
+        ref,
+        purpose,
+        home,
+        skip,
+        count,
+        destination,
+        country,
+        flight_number,
+        from_airport,
+        to_airport,
+        departs_h,
+        hours,
+        restricted,
+        scenario,
+    ) in data.AIR_TRIPS:
+        home_id = missions[home].id
+        travellers = [
+            p.id for p in w.persons if p.mission_id == home_id and p.person_type == "DIPLOMAT"
+        ][skip : skip + count]
+        anchor = datetime.combine(scenario_date, time(0), tzinfo=GST) if scenario else now
+        departs = anchor + timedelta(hours=departs_h)
+        first = (scenario_date if scenario else today) - timedelta(days=1)
+        risk = data.COUNTRY_RISK.get(country)
+        trip_id = seed_id(tenant_id, "trip", ref)
+        created += await ensure_trip(
+            session,
+            trip_id=trip_id,
+            reference=ref,
+            purpose=purpose,
+            origin=missions[home].city,
+            destination=destination,
+            destination_country=country,
+            starts_on=first,
+            ends_on=first + timedelta(days=4),
+            traveller_ids=travellers,
+            risk_level=CountryRiskIn(country, *risk, "").level if risk else "LOW",
+            approval_status="APPROVED",
+            restricted=restricted,
+            segments=[
+                SegmentSeed(
+                    kind="FLIGHT",
+                    title=flight_number,
+                    place_label=f"{from_airport} → {to_airport}",
+                    starts_at=departs,
+                    ends_at=departs + timedelta(hours=hours),
+                    flight_number=flight_number,
+                    from_airport=from_airport,
+                    to_airport=to_airport,
+                )
+            ],
+        )
+        if scenario:
+            await ensure_scenario_flight(session, trip_id)
+    return created
