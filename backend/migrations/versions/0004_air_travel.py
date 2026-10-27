@@ -40,6 +40,8 @@ def downgrade() -> None:
     # Drops every flight, airport and segment flight field: simulated data only (D-33).
     _execute_script(
         """
+        DROP TRIGGER trip_segment_flight_guard ON trip_segment;
+        DROP FUNCTION trip_segment_flight_guard();
         DROP TABLE flight_event;
         DROP TABLE flight;
         DROP FUNCTION flight_event_guard();

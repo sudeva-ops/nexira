@@ -307,6 +307,17 @@ async def test_air_seed_airports_and_the_scenario_flight_only(seeded: Seeded) ->
     assert [tuple(f) for f in flights] == [("XW 451", "SCHEDULED", "SCENARIO", "TRP-8818")]
     restricted = await seeded.conn.fetch("SELECT reference FROM trip WHERE restricted")
     assert [r["reference"] for r in restricted] == ["TRP-8813"]
+    # A real AT-05 fixture: a trackable FLIGHT segment that names nothing on screen.
+    segment = await seeded.conn.fetchrow(
+        "SELECT s.title, s.place_label, s.flight_number, s.from_airport, s.to_airport "
+        "FROM trip_segment s JOIN trip t ON t.id = s.trip_id WHERE t.reference = 'TRP-8813'"
+    )
+    assert segment is not None
+    assert tuple(segment) == ("Flight", None, "XW 777", "AMM", "AUH")
+    tracked = await seeded.conn.fetchval(
+        "SELECT count(*) FROM audit_log WHERE action = 'FLIGHT.TRACK'"
+    )
+    assert tracked == 1  # once, however often the seed runs
     travellers = await seeded.conn.fetchval(
         "SELECT count(*) FROM trip_traveller tt JOIN trip t ON t.id = tt.trip_id "
         "WHERE t.reference = 'TRP-8818'"

@@ -275,8 +275,10 @@ async def _air_trips(
             segments=[
                 SegmentSeed(
                     kind="FLIGHT",
-                    title=flight_number,
-                    place_label=f"{from_airport} → {to_airport}",
+                    # A restricted trip's segment names nothing (D-33; plan G-7 masks the
+                    # rest in the trip API).
+                    title="Flight" if restricted else flight_number,
+                    place_label=None if restricted else f"{from_airport} → {to_airport}",
                     starts_at=departs,
                     ends_at=departs + timedelta(hours=hours),
                     flight_number=flight_number,

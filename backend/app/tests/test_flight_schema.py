@@ -3,6 +3,7 @@ for a FLIGHT segment of an approved trip that is not restricted, matches its seg
 starts SCHEDULED, keeps its identity and schedule, follows the status table (plan G-8),
 and its events are append-only; restricted is fixed once a trip leaves DRAFT."""
 
+import asyncio
 import uuid
 
 import asyncpg
@@ -65,18 +66,22 @@ async def add_flight(
     number: str = "XW 451",
     to: str = "NBO",
     status: str = "SCHEDULED",
+    late_min: int = 0,
 ) -> uuid.UUID:
+    """A flight with its segment's schedule (late_min shifts it, to test the match)."""
     flight_id = uuid.uuid4()
     await conn.execute(
         "INSERT INTO flight (id, tenant_id, trip_segment_id, flight_number, from_airport, "
         "to_airport, scheduled_dep, scheduled_arr, estimated_dep, estimated_arr, status) "
-        "VALUES ($1, current_tenant_id(), $2, $3, 'AUH', $4, now(), now() + interval '4 hours', "
-        "now(), now() + interval '4 hours', $5)",
+        "SELECT $1, current_tenant_id(), s.id, $3, 'AUH', $4, "
+        "s.starts_at + make_interval(mins => $6), s.ends_at, s.starts_at, s.ends_at, $5 "
+        "FROM trip_segment s WHERE s.id = $2",
         flight_id,
         segment_id,
         number,
         to,
         status,
+        late_min,
     )
     return flight_id
 
@@ -117,6 +122,8 @@ async def test_a_flight_matches_its_segment_and_starts_scheduled(
         await add_flight(tenant, segment, number="XW 999")
     with pytest.raises(REFUSED, match="must match its segment"):
         await add_flight(tenant, segment, to="MBA")
+    with pytest.raises(REFUSED, match="must match its segment"):
+        await add_flight(tenant, segment, late_min=30)  # the schedule is the segment's
     with pytest.raises(REFUSED, match="starts SCHEDULED"):
         await add_flight(tenant, segment, status="AIRBORNE")
     _, stay = await trip_with_flight(tenant, kind="STAY")
@@ -133,7 +140,12 @@ async def test_a_flight_needs_a_segment_in_its_own_tenant(
     _, segment = await trip_with_flight(tenant)
     await set_tenant(tenant, await create_tenant(db, "Other"))
     with pytest.raises(REFUSED, match="no such segment"):
-        await add_flight(tenant, segment)
+        await tenant.execute(
+            "INSERT INTO flight (tenant_id, trip_segment_id, flight_number, from_airport, "
+            "to_airport, scheduled_dep, scheduled_arr, estimated_dep, estimated_arr) VALUES "
+            "(current_tenant_id(), $1, 'XW 451', 'AUH', 'NBO', now(), now(), now(), now())",
+            segment,
+        )
 
 
 # --- identity, status and events (plan G-8) --------------------------------------------
@@ -142,6 +154,7 @@ async def test_a_flight_needs_a_segment_in_its_own_tenant(
 async def test_identity_and_schedule_never_change(tenant: asyncpg.Connection) -> None:
     flight = await add_flight(tenant, (await trip_with_flight(tenant))[1])
     for change in (
+        "id = gen_random_uuid()",
         "flight_number = 'XW 1'",
         "to_airport = 'MBA'",
         "scheduled_arr = scheduled_arr + interval '1 hour'",
@@ -255,3 +268,110 @@ async def test_restricted_is_fixed_once_the_trip_leaves_draft(tenant: asyncpg.Co
     approved, _ = await trip_with_flight(tenant, restricted=True)
     with pytest.raises(REFUSED, match="frozen once it leaves DRAFT"):
         await tenant.execute("UPDATE trip SET restricted = false WHERE id = $1", approved)
+
+
+# --- review of Prompt 29 ------------------------------------------------------------------
+
+
+async def seed_and_track(conn: asyncpg.Connection, *, restricted: bool, then_delete: bool) -> None:
+    """In one transaction, as the seed does: an APPROVED trip, its FLIGHT segment, its
+    flight, and optionally deleting the segment again."""
+    trip_id, segment_id = uuid.uuid4(), uuid.uuid4()
+    async with conn.transaction():
+        await conn.execute(
+            "INSERT INTO trip (id, tenant_id, reference, origin, destination, starts_on, "
+            "ends_on, approval_status, restricted) VALUES ($1, current_tenant_id(), $2, 'A', "
+            "'B', current_date, current_date + 1, 'APPROVED', $3)",
+            trip_id,
+            f"TRP-{trip_id.hex[:6]}",
+            restricted,
+        )
+        await conn.execute(
+            "INSERT INTO trip_segment (id, tenant_id, trip_id, seq, kind, title, starts_at, "
+            "ends_at, flight_number, from_airport, to_airport) VALUES ($1, current_tenant_id(), "
+            "$2, 1, 'FLIGHT', 'Flight', now(), now(), 'XW 1', 'AUH', 'NBO')",
+            segment_id,
+            trip_id,
+        )
+        await add_flight(conn, segment_id, number="XW 1")
+        if then_delete:
+            await conn.execute("DELETE FROM trip_segment WHERE id = $1", segment_id)
+
+
+async def test_a_tracked_flights_segment_never_changes(tenant: asyncpg.Connection) -> None:
+    """L2: not later, and not in the transaction that seeded the trip either."""
+    _, segment = await trip_with_flight(tenant)
+    await add_flight(tenant, segment)
+    for statement in (
+        "UPDATE trip_segment SET to_airport = 'MBA' WHERE id = $1",
+        "DELETE FROM trip_segment WHERE id = $1",
+    ):
+        with pytest.raises(REFUSED):
+            await tenant.execute(statement, segment)
+    with pytest.raises(REFUSED, match="segment of a tracked flight cannot change"):
+        await seed_and_track(tenant, restricted=False, then_delete=True)
+
+
+async def test_a_restricted_trip_is_refused_in_the_seed_transaction(
+    tenant: asyncpg.Connection,
+) -> None:
+    with pytest.raises(REFUSED, match="restricted trip is never tracked"):
+        await seed_and_track(tenant, restricted=True, then_delete=False)
+
+
+async def test_a_flight_waits_for_and_is_refused_after_a_cancellation(
+    db: DbUrls, tenant: asyncpg.Connection
+) -> None:
+    """The FOR SHARE in flight_guard: a cancellation committed first wins."""
+    trip_id, segment = await trip_with_flight(tenant)
+    other = await asyncpg.connect(db.api_plain)
+    try:
+        await set_tenant(other, await tenant.fetchval("SELECT current_tenant_id()"))
+        cancel = other.transaction()
+        await cancel.start()
+        await other.execute("UPDATE trip SET approval_status = 'CANCELLED' WHERE id = $1", trip_id)
+        insert = asyncio.ensure_future(add_flight(tenant, segment))
+        await asyncio.sleep(0.3)
+        assert not insert.done()  # waiting on the trip row
+        await cancel.commit()
+        with pytest.raises(REFUSED, match="only an approved trip is tracked"):
+            await insert
+    finally:
+        await other.close()
+
+
+async def test_diversion_airports_are_known_and_not_the_destination(
+    db: DbUrls, tenant: asyncpg.Connection
+) -> None:
+    flight = await add_flight(tenant, (await trip_with_flight(tenant))[1])
+    await set_status(tenant, flight, "AIRBORNE")
+    with pytest.raises(asyncpg.ForeignKeyViolationError):
+        await set_status(tenant, flight, "DIVERTED", "ZZZ")
+    with pytest.raises(asyncpg.CheckViolationError):
+        await set_status(tenant, flight, "DIVERTED", "NBO")  # its own destination
+    tenant_id = await tenant.fetchval("SELECT current_tenant_id()")
+    await set_tenant(tenant, await create_tenant(db, "Elsewhere"))
+    await tenant.execute(
+        "INSERT INTO airport (tenant_id, iata, name, city, country_code, location) "
+        f"VALUES (current_tenant_id(), 'ELS', 'E', 'E', 'XX', {PT})"
+    )
+    await set_tenant(tenant, tenant_id)
+    with pytest.raises(asyncpg.ForeignKeyViolationError):
+        await set_status(tenant, flight, "DIVERTED", "ELS")  # another tenant's airport
+    await set_status(tenant, flight, "DIVERTED", "AUH")  # back to its origin is a diversion
+
+
+async def test_a_final_flight_takes_only_its_own_final_event_once(
+    tenant: asyncpg.Connection,
+) -> None:
+    flight = await add_flight(tenant, (await trip_with_flight(tenant))[1])
+    event = (
+        "INSERT INTO flight_event (tenant_id, flight_id, event_type) "
+        "VALUES (current_tenant_id(), $1, $2)"
+    )
+    await set_status(tenant, flight, "CANCELLED")
+    with pytest.raises(REFUSED, match="a CANCELLED flight takes no more events"):
+        await tenant.execute(event, flight, "DEPARTED")
+    await tenant.execute(event, flight, "CANCELLED")
+    with pytest.raises(REFUSED, match="a CANCELLED flight takes no more events"):
+        await tenant.execute(event, flight, "CANCELLED")

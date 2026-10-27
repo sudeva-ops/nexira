@@ -140,7 +140,7 @@ class Flight(Base):
     id: Mapped[uuid.UUID] = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = tenant_fk()
     trip_segment_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("trip_segment.id", ondelete="CASCADE"), nullable=False
+        UUID(as_uuid=True), ForeignKey("trip_segment.id", ondelete="RESTRICT"), nullable=False
     )
     flight_number: Mapped[str] = mapped_column(Text, nullable=False)
     from_airport: Mapped[str] = mapped_column(CHAR(3), nullable=False)

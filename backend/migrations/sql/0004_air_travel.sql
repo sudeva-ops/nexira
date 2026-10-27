@@ -50,7 +50,7 @@ CREATE TRIGGER trip_restricted_guard BEFORE UPDATE ON trip
 CREATE TABLE flight (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id       uuid NOT NULL REFERENCES tenant(id),
-  trip_segment_id uuid NOT NULL UNIQUE REFERENCES trip_segment(id) ON DELETE CASCADE,
+  trip_segment_id uuid NOT NULL UNIQUE REFERENCES trip_segment(id) ON DELETE RESTRICT,
   flight_number   text NOT NULL,
   from_airport    char(3) NOT NULL,
   to_airport      char(3) NOT NULL,
@@ -72,7 +72,8 @@ CREATE TABLE flight (
   FOREIGN KEY (tenant_id, diverted_to) REFERENCES airport (tenant_id, iata),
   CHECK (scheduled_arr >= scheduled_dep),
   CHECK (estimated_arr >= estimated_dep),
-  CHECK (status <> 'DIVERTED' OR diverted_to IS NOT NULL)
+  CHECK (status <> 'DIVERTED' OR diverted_to IS NOT NULL),
+  CHECK (diverted_to IS DISTINCT FROM to_airport)
 );
 CREATE INDEX flight_status_idx ON flight (tenant_id, status);
 ALTER TABLE flight ENABLE ROW LEVEL SECURITY;
@@ -108,7 +109,7 @@ DECLARE
 BEGIN
   IF TG_OP = 'INSERT' THEN
     SELECT seg.tenant_id, seg.kind, seg.flight_number, seg.from_airport, seg.to_airport,
-           t.approval_status, t.restricted
+           seg.starts_at, seg.ends_at, t.approval_status, t.restricted
       INTO s
       FROM trip_segment seg JOIN trip t ON t.id = seg.trip_id
      WHERE seg.id = NEW.trip_segment_id
@@ -124,7 +125,9 @@ BEGIN
     END IF;
     IF s.kind <> 'FLIGHT' OR s.flight_number IS DISTINCT FROM NEW.flight_number
        OR s.from_airport IS DISTINCT FROM NEW.from_airport
-       OR s.to_airport IS DISTINCT FROM NEW.to_airport THEN
+       OR s.to_airport IS DISTINCT FROM NEW.to_airport
+       OR s.starts_at IS DISTINCT FROM NEW.scheduled_dep
+       OR s.ends_at IS DISTINCT FROM NEW.scheduled_arr THEN
       RAISE EXCEPTION 'flight: the flight must match its segment';
     END IF;
     IF NEW.status <> 'SCHEDULED' OR NEW.diverted_to IS NOT NULL THEN
@@ -135,7 +138,8 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  IF NEW.tenant_id IS DISTINCT FROM OLD.tenant_id
+  IF NEW.id IS DISTINCT FROM OLD.id
+     OR NEW.tenant_id IS DISTINCT FROM OLD.tenant_id
      OR NEW.trip_segment_id IS DISTINCT FROM OLD.trip_segment_id
      OR NEW.flight_number IS DISTINCT FROM OLD.flight_number
      OR NEW.from_airport IS DISTINCT FROM OLD.from_airport
@@ -157,6 +161,8 @@ BEGIN
        OR (OLD.status = 'DIVERTED' AND NEW.status IN ('HOLDING','LANDED'))) THEN
     RAISE EXCEPTION 'flight: status cannot go from % to %', OLD.status, NEW.status;
   END IF;
+  -- Once set, diverted_to is where the flight is going for the rest of its journey; a
+  -- second diversion (DIVERTED -> HOLDING -> DIVERTED) may name another airport.
   IF NEW.diverted_to IS DISTINCT FROM OLD.diverted_to
      AND NOT (NEW.status = 'DIVERTED' AND OLD.status <> 'DIVERTED') THEN
     RAISE EXCEPTION 'flight: the diversion airport is set only by diverting';
@@ -168,11 +174,23 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER flight_guard BEFORE INSERT OR UPDATE ON flight
   FOR EACH ROW EXECUTE FUNCTION flight_guard();
 
--- An event belongs to a flight in its own tenant (FKs ignore RLS).
+-- An event belongs to a flight in its own tenant (FKs ignore RLS). A LANDED or
+-- CANCELLED flight takes only its own final event, once.
 CREATE FUNCTION flight_event_guard() RETURNS trigger AS $$
+DECLARE
+  final_status text;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM flight WHERE id = NEW.flight_id AND tenant_id = NEW.tenant_id) THEN
+  SELECT status INTO final_status FROM flight
+   WHERE id = NEW.flight_id AND tenant_id = NEW.tenant_id
+     FOR SHARE;
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'flight: no such flight';
+  END IF;
+  IF final_status IN ('LANDED','CANCELLED') AND (
+       NEW.event_type <> final_status
+       OR EXISTS (SELECT 1 FROM flight_event WHERE flight_id = NEW.flight_id
+                   AND event_type = final_status)) THEN
+    RAISE EXCEPTION 'flight: a % flight takes no more events', final_status;
   END IF;
   NEW.occurred_at := now();
   RETURN NEW;
@@ -180,3 +198,16 @@ END;
 $$ LANGUAGE plpgsql;
 CREATE TRIGGER flight_event_guard BEFORE INSERT ON flight_event
   FOR EACH ROW EXECUTE FUNCTION flight_event_guard();
+
+-- A tracked flight's segment never changes or goes away, even in the transaction that
+-- seeded its trip (review of Prompt 29, L2; trip_child_guard allows that transaction).
+CREATE FUNCTION trip_segment_flight_guard() RETURNS trigger AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM flight WHERE trip_segment_id = OLD.id) THEN
+    RAISE EXCEPTION 'flight: the segment of a tracked flight cannot change';
+  END IF;
+  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER trip_segment_flight_guard BEFORE UPDATE OR DELETE ON trip_segment
+  FOR EACH ROW EXECUTE FUNCTION trip_segment_flight_guard();

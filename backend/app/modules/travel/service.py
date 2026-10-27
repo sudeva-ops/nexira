@@ -247,6 +247,10 @@ async def ensure_scenario_flight(
         return False
     if segment.from_airport is None or segment.to_airport is None:
         return False
+    if await session.scalar(select(Flight.id).where(Flight.trip_segment_id == segment.id)):
+        # Already seeded: re-seeding must not hit the guard, e.g. after the trip was
+        # cancelled (review of Prompt 29, L3).
+        return False
     created = await session.scalar(
         insert(Flight)
         .values(
