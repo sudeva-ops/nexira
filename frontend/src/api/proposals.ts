@@ -63,11 +63,40 @@ export interface Proposal {
   can_undo: boolean;
 }
 
+/** One action type an agent proposes, with its policy (D-12, D-16; TA-09). */
+export interface AgentAction {
+  action_type: string;
+  level: number; // the policy floor; 4 (advise only) with no policy
+  approver_roles: string[]; // one entry per step
+  decision_deadline_s: number | null;
+}
+
+export const ACTION_LABEL: Record<string, string> = {
+  LOG_INFO: "Log information",
+  POST_INTERNAL_NOTE: "Internal note",
+  START_PLAYBOOK: "Start a playbook",
+  SEND_EXTERNAL_MESSAGE: "Citizen advisory",
+  START_EVACUATION: "Evacuation",
+  NOTIFY_TRAVELLERS: "Notify a trip's travellers",
+  CANCEL_TRIP: "Cancel a trip",
+  ADVISE_REBOOKING: "Onward travel advice",
+};
+
+/** The trip and flight a travel proposal is about (D-34), read from its payload. */
+export function travelLinks(p: Pick<Proposal, "action_payload">): { trip?: string; flight?: string } {
+  const { trip_id: trip, flight_id: flight } = p.action_payload;
+  return {
+    ...(typeof trip === "string" ? { trip } : {}),
+    ...(typeof flight === "string" ? { flight } : {}),
+  };
+}
+
 export interface AgentRow {
   code: string;
   name: string;
   description: string | null;
   watches: string[];
+  actions: AgentAction[];
   autonomy_level: number;
   is_enabled: boolean;
   model_ref: string | null;

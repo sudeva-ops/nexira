@@ -25,6 +25,7 @@ const STATUS: Record<string, [string, string]> = {
 
 function audienceText(c: NtfCampaign, missionCode: (id: string) => string): string {
   const types = c.audience_filter.person_types?.map((t) => t.toLowerCase().replace("_", " ")).join(", ");
+  if (c.audience_filter.trip_id) return "A trip's travellers (Travel & Air)";
   if (c.audience_filter.exposed) return `Exposed to the incident${types ? ` · ${types}` : ""}`;
   if (c.audience_filter.missions) {
     return `${c.audience_filter.missions.map(missionCode).join(", ")}${types ? ` · ${types}` : ""}`;

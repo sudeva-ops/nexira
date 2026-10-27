@@ -47,7 +47,7 @@ Scenario **Nairobi civil unrest** (NBO-CIVIL-UNREST, decisions.md §7). In windo
 |---|---|---|
 | 0 Calm | — | Decision Queue: "No decisions waiting". Global Operations: all missions normal. |
 | 1 Signals fused | → | Global Operations: three reports fuse into one incident, INC-…-1042, confidence 92, in about a second. A Paris transport strike stays separate. |
-| 2 Impact | → | Click the incident marker: 229 people (14 staff, 3 delegates, 212 citizens), 3 sites, 1 trip; severity CRITICAL because the embassy is in the zone. Journey Management: TRP-8812 shows "Impacted · INC-…-1042". |
+| 2 Impact | → | Click the incident marker: 229 people (14 staff, 3 delegates, 212 citizens), 3 sites, 1 trip; severity CRITICAL because the embassy is in the zone. Journey Management: TRP-8812 shows "Impacted · INC-…-1042". Decision Queue: the **Travel & Air** agent proposes a safety message to TRP-8812's travellers and a notice for TRP-8818 ("risk now CRITICAL"); window E (Travel Desk) can approve them. |
 | 3 Playbook | → | Decision Queue: the Response Planner proposes PB-07. Approve as Duty Officer. The playbook runs to step 7 and waits. In **window B** (Head of Mission) open Response Playbooks and approve step 7. Back in A: the Communications agent proposes the citizen advisory; approve it. |
 | 4 Check-in | → | Safety Check-in: answers arrive live: personnel 15 safe, 1 needs help, 1 pending; citizens 168 / 4 / 40. Hana Takeda, who did not answer, is escalated after 20 seconds. |
 | 5 Decisions | → | Two-person rule. In a terminal: `cd simulator && APP_ENV=local uv run python -m nexira_sim.fixtures.evacuation` (adds an evacuation proposal). Window B approves step 1 of 2; she cannot approve step 2. **Window C** (HQ Crisis Director) approves step 2. |
@@ -68,6 +68,7 @@ Best right after storyline 2, while the Paris incident is active.
 2. The destination risk shows France raised to CRITICAL by the Paris incident. **Submit for approval**: it rates HIGH or above and waits. The Travel Desk sees no Approve button: it is the requester, and HIGH needs a Security Officer.
 3. **Window F** (Security Officer): open the trip. Approve is missing until the four checklist boxes are ticked (the screen says why). Tick them, then **Approve trip**. Window E updates live to Approved.
 4. Mention the restricted switch: a VIP or ministerial trip planned "restricted" is never tracked, and others see its flights only as "Flight (restricted)".
+5. **Travel & Air agent.** The France scenario also raised the risk of TRP-8811 (Berlin staff to Paris next week, approved at LOW). Decision Queue: "Cancel TRP-8811 Paris · risk now CRITICAL", with "Notify the travellers instead" as an alternative. Only the Security Officer (window F) can approve it; the trip then shows Cancelled in Journey Management. The agent never proposes anything about restricted trips.
 
 ## 6. Storyline 4 · Air Travel Tracking (about 4 minutes)
 
@@ -75,6 +76,7 @@ Best right after storyline 2, while the Paris incident is active.
 2. Presenter bar: pick **Inbound flight diversion** and press →: XW 451 (Abu Dhabi → Nairobi, three London staff) is airborne.
 3. → : **Holding** near Nairobi, amber banner.
 4. → : **Diverted** to Mombasa, red banner, a new leg on the map; about a minute later it **lands**. Click XW 451: the event timeline. In People & Sites, its three travellers are now in Mombasa (source: flight).
+5. **Travel & Air agent.** XW 451's detail lists the agent's proposals: notify its travellers (holding, then diverted) and "Arrange onward travel" in Mombasa, which is advice only (the platform books nothing). In the Decision Queue, window E (Travel Desk) approves a notification: a staff alert goes to the three travellers (simulated); Mass Notification shows it as "A trip's travellers (Travel & Air)". AI Agents lists Travel & Air with what it proposes and who decides.
 
 XW 451 can land only once. To show it again, run `make reset-demo`.
 

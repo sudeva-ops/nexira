@@ -79,9 +79,19 @@ const DETAIL: FlightDetail = {
 function server(flights: Flight[]) {
   return mockServer({
     "GET /api/me": { body: DUTY_OFFICER },
-    "GET /api/proposals": { body: [] },
     "GET /api/flights": { body: flights },
     "GET /api/flights/f-451": { body: DETAIL },
+    "GET /api/proposals": {
+      body: [
+        {
+          id: "p1",
+          status: "PENDING",
+          title: "Notify XW 451 travellers · holding near Nairobi",
+          effective_level: 2,
+          action_payload: { trip_id: "t-8818", message: "x" },
+        },
+      ],
+    },
   });
 }
 
@@ -126,6 +136,7 @@ describe("Air Travel Tracking", () => {
     expect(events).toHaveTextContent("Holding · Arrivals restricted");
     expect(screen.getByRole("link", { name: "TRP-8818" })).toHaveAttribute("href", "/journeys?trip=t-8818");
     expect(screen.getByText("Fictional Officer A, Fictional Officer B, Fictional Officer C")).toBeInTheDocument();
+    expect(screen.getByLabelText("Agent proposals")).toHaveTextContent("Notify XW 451 travellers · holding near Nairobi");
   });
 
   it("states the safeguards", async () => {

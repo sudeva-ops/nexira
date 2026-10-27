@@ -10,6 +10,7 @@ from app.modules.agents.proposals import ProposalIn
 class WatchOfficer:
     code = "WATCH_OFFICER"
     observes = frozenset({"INCIDENT_CREATED"})
+    proposes = ("LOG_INFO",)
 
     async def observe(self, session: AsyncSession, event: Event) -> list[ProposalIn]:
         incident = await facts.incident(session, event.payload.get("incident_id"))

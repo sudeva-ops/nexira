@@ -353,6 +353,25 @@ describe("editing a restricted draft (review of Prompt 30, M1)", () => {
   });
 });
 
+describe("agent proposals on a trip (Prompt 36; TA-09)", () => {
+  it("lists the trip's pending Travel & Air proposals and points to the Decision Queue", async () => {
+    const pending = {
+      id: "p1",
+      status: "PENDING",
+      title: "Notify TRP-8814 travellers · risk now CRITICAL",
+      effective_level: 2,
+      action_payload: { trip_id: "t-1", message: "x" },
+    };
+    const other = { ...pending, id: "p2", title: "Something else", action_payload: { trip_id: "t-9" } };
+    server(SECURITY, NONE, { "GET /api/proposals": { body: [pending, other] } });
+    renderApp("/journeys?trip=t-1");
+    const box = await screen.findByLabelText("Agent proposals");
+    expect(box).toHaveTextContent("Notify TRP-8814 travellers · risk now CRITICAL · Approve");
+    expect(box).not.toHaveTextContent("Something else");
+    expect(within(box).getByRole("link", { name: "Decide in the Decision Queue →" })).toHaveAttribute("href", "/");
+  });
+});
+
 describe("home-zone dates (plan G-8)", () => {
   it("converts datetime-local input in GST both ways", () => {
     expect(homeInputToIso("2026-10-31T09:30", "Asia/Dubai")).toBe("2026-10-31T05:30:00.000Z");

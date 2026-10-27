@@ -14,12 +14,32 @@ const STATE: AgentsState = {
       name: "Response Planner",
       description: "Matches incidents to response playbooks.",
       watches: ["EXPOSURE_COMPUTED"],
+      actions: [
+        { action_type: "START_PLAYBOOK", level: 2, approver_roles: ["DUTY_OFFICER|SECURITY_OFFICER"], decision_deadline_s: 900 },
+      ],
       autonomy_level: 2,
       is_enabled: true,
       model_ref: null,
       proposals_pending: 1,
       proposals_total: 4,
       accepted_pct: 75,
+    },
+    {
+      code: "TRAVEL_AIR",
+      name: "Travel & Air",
+      description: "Watches trips and flights; proposes messages and cancellations.",
+      watches: ["EXPOSURE_COMPUTED", "FLIGHT_UPDATED"],
+      actions: [
+        { action_type: "NOTIFY_TRAVELLERS", level: 2, approver_roles: ["TRAVEL_DESK|SECURITY_OFFICER"], decision_deadline_s: 3600 },
+        { action_type: "CANCEL_TRIP", level: 2, approver_roles: ["SECURITY_OFFICER"], decision_deadline_s: 3600 },
+        { action_type: "ADVISE_REBOOKING", level: 4, approver_roles: [], decision_deadline_s: null },
+      ],
+      autonomy_level: 2,
+      is_enabled: true,
+      model_ref: null,
+      proposals_pending: 0,
+      proposals_total: 0,
+      accepted_pct: null,
     },
   ],
 };
@@ -48,6 +68,17 @@ describe("AI Agents", () => {
     expect(row).toHaveTextContent("75%");
     expect(screen.queryByLabelText("Autonomy for Response Planner")).toBeNull();
     expect(screen.queryByRole("button", { name: /Kill switch/ })).toBeNull();
+  });
+
+  it("lists what Travel & Air proposes and who decides (TA-09)", async () => {
+    setup(DUTY_OFFICER);
+    renderApp("/agents");
+    const row = (await screen.findByText("Travel & Air")).closest("tr");
+    expect(row).toHaveTextContent("Tracked flights");
+    expect(row).toHaveTextContent("Notify a trip's travellers · Approve · Travel Desk or Security Officer");
+    expect(row).toHaveTextContent("Cancel a trip · Approve · Security Officer");
+    expect(row).toHaveTextContent("Onward travel advice · Advise only");
+    expect(screen.getByText(/books nothing and never proposes anything about restricted/)).toBeInTheDocument();
   });
 
   it("lets an admin set autonomy and pause all agents after confirming", async () => {

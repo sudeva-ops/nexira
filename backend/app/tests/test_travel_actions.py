@@ -47,6 +47,7 @@ class World:
     staff: list[uuid.UUID]
     citizen: uuid.UUID
     publisher: ListPublisher
+    mission: uuid.UUID
 
     async def trip(
         self,
@@ -55,6 +56,7 @@ class World:
         starts_in_days: int = 5,
         status: str = "APPROVED",
         restricted: bool = False,
+        mission_id: uuid.UUID | None = None,
     ) -> uuid.UUID:
         trip_id = uuid.uuid4()
         start = datetime.now(ZoneInfo(get_settings().home_tz)).date() + timedelta(  # L2
@@ -74,6 +76,7 @@ class World:
                 traveller_ids=travellers if travellers is not None else self.staff,
                 approval_status=status,
                 restricted=restricted,
+                mission_id=mission_id,
             )
             await session.commit()
         return trip_id
@@ -143,7 +146,7 @@ async def world(client: AsyncClient, idp: Idp) -> World:
         await session.commit()
     publisher = ListPublisher()
     app.dependency_overrides[get_publisher] = lambda: publisher
-    return World(idp, staff, citizen, publisher)
+    return World(idp, staff, citizen, publisher, mission)
 
 
 async def approve(client: AsyncClient, w: World, proposal_id: uuid.UUID, sub: str) -> Response:
@@ -506,3 +509,36 @@ async def test_a_message_about_an_incident_keeps_the_incident(
         "SELECT incident_id, audience_filter->>'incident_id' FROM notification_campaign"
     )
     assert stored == [(incident, str(incident))]
+
+
+# --- shown where people look (Prompt 36; TA-09) ----------------------------------------------
+
+
+async def test_the_agents_screen_lists_what_travel_and_air_proposes(
+    client: AsyncClient, world: World
+) -> None:
+    state = (await client.get("/api/agents", headers=world.idp.headers("viewer"))).json()
+    travel = next(a for a in state["agents"] if a["code"] == "TRAVEL_AIR")
+    assert travel["watches"] == ["EXPOSURE_COMPUTED", "FLIGHT_UPDATED"]
+    assert {a["action_type"]: (a["level"], a["approver_roles"]) for a in travel["actions"]} == {
+        "NOTIFY_TRAVELLERS": (2, ["TRAVEL_DESK|SECURITY_OFFICER"]),
+        "CANCEL_TRIP": (2, ["SECURITY_OFFICER"]),
+        "ADVISE_REBOOKING": (4, []),  # no policy: advice only (D-12)
+    }
+
+
+async def test_a_trip_message_is_listed_under_its_trips_mission(
+    client: AsyncClient, world: World
+) -> None:
+    """The gap accepted in Prompt 34: trip campaigns under the mission filter."""
+    trip_id = await world.trip(mission_id=world.mission)
+    proposal = await world.propose("NOTIFY_TRAVELLERS", notify(trip_id))
+    await approve(client, world, proposal.id, "desk")
+    listed = await client.get(
+        f"/api/campaigns?mission_id={world.mission}", headers=world.idp.headers("viewer")
+    )
+    assert [c["audience_filter"] for c in listed.json()] == [{"trip_id": str(trip_id)}]
+    other = await client.get(
+        f"/api/campaigns?mission_id={uuid.uuid4()}", headers=world.idp.headers("viewer")
+    )
+    assert other.json() == []

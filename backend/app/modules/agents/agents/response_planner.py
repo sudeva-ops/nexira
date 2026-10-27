@@ -49,6 +49,7 @@ def matches(rules: dict[str, Any], incident: Incident, nearest_site_m: int | Non
 class ResponsePlanner:
     code = "RESPONSE_PLANNER"
     observes = frozenset({"EXPOSURE_COMPUTED"})
+    proposes = ("START_PLAYBOOK",)
 
     async def observe(self, session: AsyncSession, event: Event) -> list[ProposalIn]:
         incident = await facts.incident(session, event.payload.get("incident_id"))

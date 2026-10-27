@@ -14,6 +14,7 @@ from app.modules.intel.exposure import exposure_counts
 class ExposureAgent:
     code = "EXPOSURE"
     observes = frozenset({"EXPOSURE_COMPUTED"})
+    proposes = ("POST_INTERNAL_NOTE",)
 
     async def observe(self, session: AsyncSession, event: Event) -> list[ProposalIn]:
         incident = await facts.incident(session, event.payload.get("incident_id"))

@@ -21,4 +21,9 @@ class PhaseOneAgent(Protocol):
     code: str  # matches agent.code in the seed
     observes: frozenset[str]  # event types
 
+    @property
+    def proposes(self) -> tuple[str, ...]:
+        """Action types it proposes, for the AI Agents screen (TA-09)."""
+        ...
+
     async def observe(self, session: AsyncSession, event: Event) -> list[ProposalIn]: ...
