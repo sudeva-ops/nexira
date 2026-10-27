@@ -18,4 +18,11 @@ export const SCENE_SCREEN: Record<DemoScenario, Record<number, string>> = {
     2: "/operations",
     3: "/operations",
   },
+  // D-33: XW 451 holds near Nairobi, diverts to Mombasa and lands.
+  "NBO-AIR-DIVERSION": {
+    0: "/air",
+    1: "/air",
+    2: "/air",
+    3: "/air",
+  },
 };

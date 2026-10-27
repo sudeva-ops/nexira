@@ -1,5 +1,6 @@
 import { Button, Checkbox, InputGroup } from "@blueprintjs/core";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { ApiError } from "../../api/client";
 import {
@@ -11,6 +12,7 @@ import {
   useTripPermissions,
 } from "../../api/trips";
 import { formatStamp } from "../../app/time";
+import { flightColour } from "../../map/geo";
 import { Card, Sev } from "../../ui/primitives";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -54,7 +56,7 @@ export function TripDetail({ trip, onEdit }: { trip: Detail; onEdit: (trip: Deta
     <Card
       icon="route"
       title={`${trip.reference} · ${STATUS_LABEL[trip.approval_status] ?? trip.approval_status}`}
-      sub={trip.purpose ?? undefined}
+      sub={`${trip.purpose ?? ""}${trip.restricted ? " · restricted (VIP)" : ""}` || undefined}
     >
       <div className="nx-bd">
         <div className="nx-dim">
@@ -87,6 +89,15 @@ export function TripDetail({ trip, onEdit }: { trip: Detail; onEdit: (trip: Deta
                     <b>
                       {KIND_LABEL[s.kind] ?? s.kind} · {s.title}
                     </b>
+                    {s.flight_id && s.flight_status && (
+                      <Link
+                        className="nx-flight-chip"
+                        to={`/air?flight=${s.flight_id}`}
+                        style={{ color: flightColour(s.flight_status) }}
+                      >
+                        {s.flight_status}
+                      </Link>
+                    )}
                     <br />
                     <span>
                       {s.place_label ? `${s.place_label} · ` : ""}

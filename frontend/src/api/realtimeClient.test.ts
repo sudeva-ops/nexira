@@ -125,6 +125,9 @@ describe("realtime client (PLT-05)", () => {
     expect(staleKeys(event("INCIDENT_NOTE_ADDED", { incident_id: "i1" }))).toEqual([
       ["incident", "i1"],
     ]);
+    // D-33: a flight's status also shows on its trip (AT-07); positions only on the air view.
+    expect(staleKeys(event("FLIGHT_UPDATED", { flight_id: "f1" }))).toEqual([["flights"], ["trips"]]);
+    expect(staleKeys(event("FLIGHT_POSITIONS"))).toEqual([["flights"]]);
     expect(staleKeys(event("SOMETHING_ELSE"))).toEqual([]);
   });
 });

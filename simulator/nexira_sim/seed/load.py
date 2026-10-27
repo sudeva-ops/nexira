@@ -93,7 +93,9 @@ async def seed_all(
                     *data.COUNTRY_RISK.get(cc, data.DEFAULT_COUNTRY_RISK),
                     data.COUNTRY_RISK_SOURCE,
                 )
-                for cc in sorted({m.country_code for m in w.missions})
+                for cc in sorted(
+                    {m.country_code for m in w.missions} | {t[6] for t in data.AIR_TRIPS}
+                )
             ],
         )
         missions_by_code = {m.code: m for m in w.missions}

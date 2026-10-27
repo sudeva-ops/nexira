@@ -121,6 +121,12 @@ function server(me: Me, permissions: TripPermissions, extra: Record<string, Repl
     "GET /api/me/permissions": { body: permissions },
     "GET /api/missions": { body: MISSIONS },
     "GET /api/people": { body: PEOPLE },
+    "GET /api/airports": {
+      body: [
+        { iata: "AUH", name: "Abu Dhabi", city: "Abu Dhabi", country_code: "AE" },
+        { iata: "NBO", name: "Nairobi", city: "Nairobi", country_code: "KE" },
+      ],
+    },
     ...extra,
   });
 }
@@ -281,6 +287,51 @@ describe("Journey Management", () => {
       ],
       restricted: false,
     });
+  });
+});
+
+describe("planning a tracked flight (Prompt 31; D-33)", () => {
+  it("needs the flight number and both airports together, and sends the restricted switch", async () => {
+    const created: TripDetail = { ...PENDING, id: "t-new", approval_status: "DRAFT" };
+    const fetchMock = server(DUTY_OFFICER, NONE, {
+      "POST /api/trips": { status: 201, body: created },
+      "GET /api/trips/t-new": { body: created },
+    });
+    renderApp("/journeys");
+    await userEvent.click(await screen.findByRole("button", { name: "Plan a trip" }));
+    await userEvent.type(screen.getByLabelText("To (city)"), "Nairobi");
+    await userEvent.type(screen.getByLabelText("Country (ISO, e.g. FR)"), "KE");
+    await userEvent.type(screen.getByLabelText("Starts"), "2026-11-02");
+    await userEvent.type(screen.getByLabelText("Ends"), "2026-11-04");
+    await userEvent.type(screen.getByLabelText("Travellers"), "Peter");
+    await userEvent.click(await screen.findByRole("button", { name: /\+ Peter Mwangi/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Add segment" }));
+    const segment = screen.getByRole("group", { name: "Segment 1" });
+    await userEvent.type(within(segment).getByLabelText("Title"), "XW 451");
+    await userEvent.type(within(segment).getByLabelText("Flight number"), "xw 451");
+    const save = screen.getByRole("button", { name: "Save draft" });
+    expect(save).toBeDisabled(); // a number without airports
+    await within(segment).findAllByRole("option", { name: "AUH · Abu Dhabi" });
+    await userEvent.selectOptions(within(segment).getByLabelText("From airport"), "AUH");
+    await userEvent.selectOptions(within(segment).getByLabelText("To airport"), "NBO");
+    await userEvent.click(screen.getByRole("checkbox", { name: /Restricted \(VIP or ministerial\)/ }));
+    expect(save).toBeEnabled();
+    await userEvent.click(save);
+    await waitFor(() => expect(posted(fetchMock, "/api/trips")).toHaveLength(1));
+    expect(posted(fetchMock, "/api/trips")[0]).toMatchObject({
+      restricted: true,
+      segments: [{ kind: "FLIGHT", flight_number: "XW 451", from_airport: "AUH", to_airport: "NBO" }],
+    });
+  });
+
+  it("links a tracked flight segment to the air view", async () => {
+    const tracked: TripDetail = {
+      ...IMPACTED,
+      segments: PENDING.segments.map((seg) => ({ ...seg, flight_id: "f-1", flight_status: "HOLDING" })),
+    };
+    server(SECURITY, NONE, { "GET /api/trips/t-2": { body: tracked } });
+    renderApp("/journeys?trip=t-2");
+    expect(await screen.findByRole("link", { name: "HOLDING" })).toHaveAttribute("href", "/air?flight=f-1");
   });
 });
 

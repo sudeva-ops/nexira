@@ -1724,3 +1724,61 @@ body {
 .nx-trip-cols .nx-tl + .nx-lbl {
   margin-top: 8px;
 }
+
+/* Air Travel Tracking (Prompt 31) */
+.nx-air-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: start;
+}
+
+.nx-air-grid .nx-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.nx-air-grid tbody tr {
+  cursor: pointer;
+}
+
+.nx-air-grid tbody tr.on {
+  background: rgba(45, 114, 210, 0.15);
+}
+
+.nx-air-map {
+  position: relative;
+  height: 360px;
+}
+
+.nx-banner.amber {
+  border-left-color: #ec9a3c;
+  background: rgba(236, 154, 60, 0.14);
+}
+
+.nx-flight-detail {
+  display: grid;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.nx-flight-detail table td {
+  padding: 2px 8px 2px 0;
+  vertical-align: top;
+}
+
+.nx-safeguards {
+  margin: 0;
+  padding-left: 26px;
+  color: var(--nx-tx2);
+  font-size: 12px;
+}
+
+.nx-flight-chip {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
