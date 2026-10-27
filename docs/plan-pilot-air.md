@@ -98,4 +98,10 @@ The other gaps follow from D-33, the approved PCs and the defaults in requiremen
 
 ## 8. Product owner (2026-10-27, PR #31)
 
-The plan is approved. **G-7 is still open:** no answer yet on hiding a restricted trip's flight segments; it does not affect Prompt 29 and must be settled before Prompt 30.
+The plan is approved. **G-7 approved** (2026-10-27, during Prompt 29): for a restricted trip, the trip API returns FLIGHT segments without title, flight number, airports or times to anyone except the requester, TRAVEL_DESK, SECURITY_OFFICER and ADMIN; others see "Flight (restricted)". Built in Prompt 30 (API) and 31 (screen).
+
+## 9. Review of Prompt 29 (migration 0004)
+
+- **Travel KPIs on Global Operations change (accepted, D-27).** The seeded flight trips (G-1, G-4) are active today, so "travellers active" and "active trips" go from 3 travellers on 1 trip to about 12 on 5. Exposure (D-23) does not change: their travellers are away from any incident. G-1 means the incident and check-in figures, which stay the same.
+- **Prompt 30:** the status table refuses AIRBORNE → CANCELLED, so the tracker's "stop" step cancels only flights that have not departed; a flight already in the air with a cancelled trip is tracked until it lands.
+- **Until Prompt 30 masks it (G-7):** the restricted seeded trip TRP-8813's flight segment is titled "Flight" with no place label; its times remain visible in the trip API.

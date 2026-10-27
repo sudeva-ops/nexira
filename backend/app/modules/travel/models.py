@@ -2,7 +2,18 @@ import uuid
 from datetime import date, datetime
 from typing import Any, ClassVar
 
-from sqlalchemy import CHAR, Date, DateTime, ForeignKey, SmallInteger, Text, text
+from sqlalchemy import (
+    CHAR,
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    SmallInteger,
+    Text,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -45,6 +56,8 @@ class Trip(Base):
     checklist: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'")
     )
+    # PC-17 (D-33): a VIP or ministerial trip; its flights are never tracked.
+    restricted: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
 
 
 class TripTraveller(Base):
@@ -76,6 +89,10 @@ class TripSegment(Base):
     location: Mapped[GeoPoint] = geo_point(nullable=True)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # PC-17: FLIGHT segments only; IATA codes of airports in the same tenant.
+    flight_number: Mapped[str | None] = mapped_column(Text)
+    from_airport: Mapped[str | None] = mapped_column(CHAR(3))
+    to_airport: Mapped[str | None] = mapped_column(CHAR(3))
 
 
 class CountryRisk(Base):
@@ -95,4 +112,68 @@ class CountryRisk(Base):
     source: Mapped[str] = mapped_column(Text, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class Airport(Base):
+    """Simulated reference airports (PC-18, D-19)."""
+
+    __tablename__ = "airport"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenant.id"), primary_key=True
+    )
+    iata: Mapped[str] = mapped_column(CHAR(3), primary_key=True)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    city: Mapped[str] = mapped_column(Text, nullable=False)
+    country_code: Mapped[str] = mapped_column(CHAR(2), nullable=False)
+    location: Mapped[GeoPoint] = geo_point()
+
+
+class Flight(Base):
+    """A tracked flight (PC-19, D-33): only for an approved, unrestricted trip's FLIGHT
+    segment. Written only by the tracker (and the seed for scenario flights, plan G-3)."""
+
+    __tablename__ = "flight"
+    __server_generated__: ClassVar[tuple[str, ...]] = ("created_at", "updated_at")
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    tenant_id: Mapped[uuid.UUID] = tenant_fk()
+    trip_segment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("trip_segment.id", ondelete="RESTRICT"), nullable=False
+    )
+    flight_number: Mapped[str] = mapped_column(Text, nullable=False)
+    from_airport: Mapped[str] = mapped_column(CHAR(3), nullable=False)
+    to_airport: Mapped[str] = mapped_column(CHAR(3), nullable=False)
+    scheduled_dep: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    scheduled_arr: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    estimated_dep: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    estimated_arr: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'SCHEDULED'"))
+    diverted_to: Mapped[str | None] = mapped_column(CHAR(3))
+    position: Mapped[GeoPoint | None] = geo_point(nullable=True)
+    altitude_ft: Mapped[int | None] = mapped_column(Integer)
+    speed_kt: Mapped[int | None] = mapped_column(Integer)
+    source: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'SIMULATED'"))
+    created_at: Mapped[datetime] = created_at()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class FlightEvent(Base):
+    """Append-only flight history (PC-19): DEPARTED, DELAYED, HOLDING, DIVERTED, LANDED,
+    CANCELLED."""
+
+    __tablename__ = "flight_event"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    tenant_id: Mapped[uuid.UUID] = tenant_fk()
+    flight_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("flight.id", ondelete="CASCADE"), nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    occurred_at: Mapped[datetime] = created_at()
+    details: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'")
     )

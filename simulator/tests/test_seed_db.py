@@ -281,6 +281,11 @@ async def test_journey_seed_country_risk_trips_and_counter(seeded: Seeded) -> No
         "TRP-8815": ("APPROVED", "LOW", True),
         "TRP-8816": ("DRAFT", "LOW", False),
         "TRP-8817": ("APPROVED", "LOW", True),
+        # Air Travel Tracking (D-33): one FLIGHT segment each.
+        "TRP-8813": ("APPROVED", "LOW", True),  # restricted
+        "TRP-8818": ("APPROVED", "MODERATE", True),  # XW 451, the scenario flight
+        "TRP-8819": ("APPROVED", "LOW", True),
+        "TRP-8820": ("APPROVED", "LOW", True),
     }
     scoped = await seeded.conn.fetchrow(
         "SELECT m.code, (SELECT count(*) FROM trip WHERE requested_by IS NOT NULL) AS requested "
@@ -289,3 +294,32 @@ async def test_journey_seed_country_risk_trips_and_counter(seeded: Seeded) -> No
     assert scoped is not None
     assert (scoped["code"], scoped["requested"]) == ("BGW", 1)  # plan G-2; the draft
     assert await seeded.conn.fetchval("SELECT next_reference('TRP', false)") == "TRP-8821"
+
+
+async def test_air_seed_airports_and_the_scenario_flight_only(seeded: Seeded) -> None:
+    """D-33, plan G-1, G-3: XW 451 is seeded as a SCENARIO flight; the tracker (not the
+    seed) creates the others; the restricted trip has none and never can."""
+    assert await seeded.conn.fetchval("SELECT count(*) FROM airport") == 14
+    flights = await seeded.conn.fetch(
+        "SELECT f.flight_number, f.status, f.source, t.reference FROM flight f "
+        "JOIN trip_segment s ON s.id = f.trip_segment_id JOIN trip t ON t.id = s.trip_id"
+    )
+    assert [tuple(f) for f in flights] == [("XW 451", "SCHEDULED", "SCENARIO", "TRP-8818")]
+    restricted = await seeded.conn.fetch("SELECT reference FROM trip WHERE restricted")
+    assert [r["reference"] for r in restricted] == ["TRP-8813"]
+    # A real AT-05 fixture: a trackable FLIGHT segment that names nothing on screen.
+    segment = await seeded.conn.fetchrow(
+        "SELECT s.title, s.place_label, s.flight_number, s.from_airport, s.to_airport "
+        "FROM trip_segment s JOIN trip t ON t.id = s.trip_id WHERE t.reference = 'TRP-8813'"
+    )
+    assert segment is not None
+    assert tuple(segment) == ("Flight", None, "XW 777", "AMM", "AUH")
+    tracked = await seeded.conn.fetchval(
+        "SELECT count(*) FROM audit_log WHERE action = 'FLIGHT.TRACK'"
+    )
+    assert tracked == 1  # once, however often the seed runs
+    travellers = await seeded.conn.fetchval(
+        "SELECT count(*) FROM trip_traveller tt JOIN trip t ON t.id = tt.trip_id "
+        "WHERE t.reference = 'TRP-8818'"
+    )
+    assert travellers == 3

@@ -161,6 +161,103 @@ EXTRA_TRIPS: list[tuple[str, str, str, int, str, str, int, int, str, str]] = [
 TRIP_SCOPE = {"TRP-8814": "BGW"}
 TRIP_REQUESTER = {"TRP-8816": "travel.desk"}
 
+# --- Air Travel Tracking (D-33, PC-17..19) -----------------------------------------------------
+# Simulated airports (D-19): (IATA, name, city, ISO country, lat, lon). Fictional flight
+# numbers ("XW"); no real schedules.
+AIRPORTS: list[tuple[str, str, str, str, float, float]] = [
+    ("LHR", "London Heathrow", "London", "GB", 51.47, -0.45),
+    ("CDG", "Paris Charles de Gaulle", "Paris", "FR", 49.01, 2.55),
+    ("BRU", "Brussels", "Brussels", "BE", 50.90, 4.48),
+    ("AMS", "Amsterdam Schiphol", "Amsterdam", "NL", 52.31, 4.76),
+    ("LIS", "Lisbon", "Lisbon", "PT", 38.77, -9.13),
+    ("AUH", "Abu Dhabi", "Abu Dhabi", "AE", 24.43, 54.65),
+    ("NBO", "Nairobi Jomo Kenyatta", "Nairobi", "KE", -1.32, 36.93),
+    ("MBA", "Mombasa Moi", "Mombasa", "KE", -4.03, 39.59),
+    ("ADD", "Addis Ababa Bole", "Addis Ababa", "ET", 8.98, 38.80),
+    ("AMM", "Amman Queen Alia", "Amman", "JO", 31.72, 35.99),
+    ("BGW", "Baghdad", "Baghdad", "IQ", 33.26, 44.23),
+    ("CGK", "Jakarta Soekarno-Hatta", "Jakarta", "ID", -6.13, 106.66),
+    ("SIN", "Singapore Changi", "Singapore", "SG", 1.36, 103.99),
+    ("BSB", "Brasília", "Brasília", "BR", -15.87, -47.92),
+]
+
+# Tracked-flight trips, APPROVED with one FLIGHT segment: (reference, purpose, traveller
+# mission, travellers to skip, travellers, destination, country, flight, from, to, hours
+# from the anchor to departure, flight hours, restricted, scenario flight).
+# - TRP-8818 carries XW 451 for the NBO-AIR-DIVERSION scenario (plan G-1, G-3): London
+#   staff not on any other trip, so no Phase 1 figure changes; it departs on the scenario
+#   date at 10:00 GST and moves only through the scenario's FLIGHT_FEED events.
+# - TRP-8819 and TRP-8820 fly in real time around the seed time (plan G-4).
+# - TRP-8813 is restricted (D-33): its flight must never be tracked or shown.
+AIR_TRIPS: list[
+    tuple[str, str, str, int, int, str, str, str, str, str, float, float, bool, bool]
+] = [
+    (
+        "TRP-8818",
+        "HQ consultations · Nairobi",
+        "LON",
+        1,
+        3,
+        "Nairobi",
+        "KE",
+        "XW 451",
+        "AUH",
+        "NBO",
+        10,
+        4.5,
+        False,
+        True,
+    ),
+    (
+        "TRP-8819",
+        "Trade fair · Amsterdam",
+        "JKT",
+        1,
+        2,
+        "Amsterdam",
+        "NL",
+        "XW 812",
+        "CGK",
+        "AMS",
+        -3,
+        14,
+        False,
+        False,
+    ),
+    (
+        "TRP-8820",
+        "Bilateral talks · Lisbon",
+        "BSB",
+        0,
+        2,
+        "Lisbon",
+        "PT",
+        "XW 260",
+        "BSB",
+        "LIS",
+        -1,
+        9.5,
+        False,
+        False,
+    ),
+    (
+        "TRP-8813",
+        "Ministerial visit",
+        "AMM",
+        2,
+        2,
+        "Abu Dhabi",
+        "AE",
+        "XW 777",
+        "AMM",
+        "AUH",
+        1,
+        3,
+        True,
+        False,
+    ),
+]
+
 # --- intel sources (D-09, D-10, D-11) -----------------------------------------------------------
 # (code, name, reliability, severity_map, category_map, enabled, fusion)
 GENERIC_SEVERITY = {"Minor": "LOW", "Moderate": "MODERATE", "Major": "HIGH", "Severe": "CRITICAL"}
