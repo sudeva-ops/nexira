@@ -98,4 +98,4 @@ The other gaps follow from D-33, the approved PCs and the defaults in requiremen
 
 ## 8. Product owner (2026-10-27, PR #31)
 
-The plan is approved. **G-7 is still open:** no answer yet on hiding a restricted trip's flight segments; it does not affect Prompt 29 and must be settled before Prompt 30.
+The plan is approved. **G-7 approved** (2026-10-27, during Prompt 29): for a restricted trip, the trip API returns FLIGHT segments without title, flight number, airports or times to anyone except the requester, TRAVEL_DESK, SECURITY_OFFICER and ADMIN; others see "Flight (restricted)". Built in Prompt 30 (API) and 31 (screen).
