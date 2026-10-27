@@ -7,6 +7,7 @@ the same scene events twice must give exactly one proposal per agent per trigger
 
 import uuid
 from collections import Counter, deque
+from datetime import UTC, date, datetime
 
 from app.core.db import create_engine, tenant_session
 from app.core.events import Event, Handler
@@ -65,11 +66,11 @@ class Bus:
             queue.extend(fresh)
 
 
-def scene_1(tenant_id: uuid.UUID) -> list[Event]:
+def scene_1(tenant_id: uuid.UUID, day: date = DAY) -> list[Event]:
     """The scenario's RAW_SIGNAL events (Nairobi and Paris), as the player sends them."""
     return [
         Event("RAW_SIGNAL", tenant_id, dict(e.payload), "scenario")
-        for e in nbo.build_events(world.build(DAY, tenant_id), tenant_id)
+        for e in nbo.build_events(world.build(day, tenant_id), tenant_id)
         if e.event_type == "RAW_SIGNAL"
     ]
 
@@ -104,21 +105,31 @@ async def test_scenes_1_to_3_give_one_proposal_per_agent_per_trigger(db: DbUrls)
     tenant_id = uuid.uuid4()
     engine = create_engine(db.api)
     try:
-        await seed(db, engine, tenant_id)
+        # Seeded for today (review of Prompt 35, H1): Travel & Air reads the real date.
+        today = datetime.now(UTC).date()
+        await seed(db, engine, tenant_id, today)
         bus = Bus(engine)
-        await bus.deliver(scene_1(tenant_id))
-        await bus.deliver(scene_1(tenant_id))  # the same events again: nothing new
+        await bus.deliver(scene_1(tenant_id, today))
+        await bus.deliver(scene_1(tenant_id, today))  # the same events again: nothing new
 
         found = await all_proposals(engine, tenant_id)
-        # Travel & Air (pilot module 4, D-34) also proposes here: a safety message for
-        # TRP-8812, whose delegates are in the zone (plan-pilot-ta G-5). Its "trip has
-        # started / ended" checks use the real date, so only what it proposes is checked,
-        # not how many: always level 2, pending, never executed.
-        travel = [row for row in found if row[0] == "TRAVEL_AIR"]
-        assert travel
-        assert {(action, status, level) for _, action, status, level in travel} == {
-            ("NOTIFY_TRAVELLERS", "PENDING", 2)
-        }
+        # Travel & Air (pilot module 4, D-34) adds exactly the two cards of plan-pilot-ta
+        # G-5: TRP-8812's delegates are in the zone; Kenya rose to CRITICAL while TRP-8818
+        # (approved at MODERATE) is under way. Nothing for the future Paris trip TRP-8811.
+        async with tenant_session(tenant_id, engine) as session:
+            travel = sorted(
+                (p.title, p.status, p.effective_level)
+                for p in await session.scalars(
+                    select(AgentProposal)
+                    .join(Agent, Agent.id == AgentProposal.agent_id)
+                    .where(Agent.code == "TRAVEL_AIR")
+                )
+            )
+        year = today.year
+        assert travel == [
+            ("Notify TRP-8818 travellers · risk now CRITICAL", "PENDING", 2),
+            (f"Safety message to TRP-8812 travellers · INC-{year}-1042", "PENDING", 2),
+        ]
         assert Counter(
             (agent, action, status, level)
             for agent, action, status, level in found

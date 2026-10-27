@@ -67,3 +67,12 @@ A trip that is impacted gets the "impacted" message only, not also the "risk ros
 ## 7. Decisions needed from the product owner
 
 None: G-1..G-8 follow from D-12..D-17, D-31..D-34 and the defaults in §23. G-3 (HQ-only approval for proposals without an incident) and G-5 (two new cards in the Nairobi scenario) are worth a look.
+
+## 8. Review of Prompt 35 (the agent's triggers)
+
+Fixed: tests seeded for today (the agent reads the real date); a trip impacted by any active incident gets no "risk now" card; advice for a cancelled flight names the departure city; nothing is proposed that the trip audience would refuse (a citizen traveller, no active traveller); a trip with a flight already in the air gets "notify", not "cancel"; evidence lists the flight's events and the country risk breakdown; TRP-8811's travellers are Berlin staff.
+
+Accepted as specified (TA-08), for the record:
+- **One proposal per cause and level, ever.** HOLDING → AIRBORNE → HOLDING gives no second card, and a level that falls and rises again re-uses its key, so a rejected or expired card is not repeated.
+- **HIGH then CRITICAL can leave two CANCEL_TRIP cards** pending for one trip; approving one makes the other fail ("not APPROVED"). Prompt 36's card shows both with their levels.
+- **Only incident-driven rises are seen.** A change to a country's simulated base level publishes no event, so the agent does not react to it (no feed changes `country_risk` in the pilot).

@@ -15,10 +15,13 @@ from sqlalchemy import text
 from app.core.config import get_settings
 from app.core.db import tenant_session
 from app.core.events import Event
+from app.core.security import CurrentUser
+from app.modules.agents import proposals
 from app.modules.agents.agents.travel_air import TravelAir
 from app.modules.agents.runner import run_agents
 from app.modules.agents.service import AgentIn, PolicyIn, ensure_agents, ensure_policies
 from app.modules.people.service import PersonIn, load_persons
+from app.modules.tenancy import service as tenancy
 from app.modules.travel.service import (
     AirportIn,
     CountryRiskIn,
@@ -60,6 +63,7 @@ class World:
         approved_at: str = "LOW",
         restricted: bool = False,
         flight: bool = False,
+        status: str = "APPROVED",
     ) -> uuid.UUID:
         trip_id = uuid.uuid4()
         start = self.today() + timedelta(days=starts_in_days)
@@ -77,7 +81,7 @@ class World:
                 ends_on=start + timedelta(days=3),
                 traveller_ids=travellers,
                 risk_level=approved_at,
-                approval_status="APPROVED",
+                approval_status=status,
                 restricted=restricted,
                 segments=[
                     SegmentSeed(
@@ -127,6 +131,22 @@ class World:
             await self.sql(f"UPDATE flight SET {column} = :v WHERE id = :f", v=value, f=flight)
         return flight
 
+    async def user(self, sub: str, role: str) -> CurrentUser:
+        async with tenant_session(self.tenant, self.engine) as session:
+            roles = await tenancy.ensure_roles(session)
+            user_id = await tenancy.ensure_user(
+                session, external_id=sub, email=f"{sub}@x.invalid", display_name=sub
+            )
+            await tenancy.grant_role(session, user_id=user_id, role_id=roles[role], mission_id=None)
+            await session.commit()
+        return CurrentUser(
+            id=user_id,
+            tenant_id=self.tenant,
+            external_id=sub,
+            email=f"{sub}@x.invalid",
+            display_name=sub,
+        )
+
     async def incident(self, severity: str = "CRITICAL", status: str = "ACTIVE") -> uuid.UUID:
         incident = uuid.uuid4()
         await self.sql(
@@ -155,7 +175,7 @@ class World:
 async def world(db: DbUrls, api_engine: Any) -> World:
     tenant = await create_tenant(db, "Travel agent")
     mission = uuid.uuid4()
-    people = [uuid.uuid4() for _ in range(6)]
+    people = [uuid.uuid4() for _ in range(8)]
     async with tenant_session(tenant, api_engine) as session:
         await session.execute(
             text(
@@ -185,7 +205,7 @@ async def world(db: DbUrls, api_engine: Any) -> World:
         await load_persons(
             session,
             [
-                PersonIn(p, mission, "DIPLOMAT", f"Fictional Officer {n}")
+                PersonIn(p, mission, "CITIZEN" if n == 7 else "DIPLOMAT", f"Fictional Officer {n}")
                 for n, p in enumerate(people)
             ],
         )
@@ -346,3 +366,102 @@ async def test_the_kill_switch_stops_the_agent(db: DbUrls, world: World) -> None
         await admin.close()
     incident = await world.incident("CRITICAL")
     assert await world.run("EXPOSURE_COMPUTED", incident_id=str(incident)) == []
+
+
+# --- review of Prompt 35 ------------------------------------------------------------------------
+
+
+async def test_a_trip_impacted_by_another_incident_gets_no_risk_card(world: World) -> None:
+    """M1: the impacted message only, whichever incident in the country fires next."""
+    trip_id = await world.trip(world.people[:2], starts_in_days=-1)
+    first = await world.incident("CRITICAL")
+    await world.expose(first, world.people[0])
+    await world.run("EXPOSURE_COMPUTED", incident_id=str(first))
+    second = await world.incident("HIGH")
+    proposals_ = await world.run("EXPOSURE_COMPUTED", incident_id=str(second))
+    assert [k for _, k, _, _ in proposals_] == [f"NOTIFY_TRAVELLERS:impacted:{trip_id}:{first}"]
+
+
+async def test_a_cancelled_flight_is_rebooked_from_where_they_are(world: World) -> None:
+    """M2: never cancelled once airborne, so the travellers are at the departure airport."""
+    trip_id = await world.trip(world.people[:2], starts_in_days=0, flight=True)
+    flight = await world.flight_to(trip_id, "CANCELLED")
+    found = await world.run("FLIGHT_UPDATED", flight_id=str(flight), status="CANCELLED")
+    assert sorted(a for a, _, _, _ in found) == ["ADVISE_REBOOKING", "NOTIFY_TRAVELLERS"]
+    advice = await world.sql(
+        "SELECT action_payload->>'at' FROM agent_proposal WHERE action_type = 'ADVISE_REBOOKING'"
+    )
+    assert advice == [("Abu Dhabi",)]
+
+
+async def test_nothing_is_proposed_that_would_certainly_fail(world: World) -> None:
+    """M3: a citizen traveller (D-31) or no active traveller: the trip audience refuses."""
+    await world.trip([world.people[0], world.people[7]], starts_in_days=-1)
+    await world.trip([world.people[1]], starts_in_days=-1)
+    await world.sql("UPDATE person SET is_active = false WHERE id = :p", p=world.people[1])
+    flown = await world.trip([world.people[7]], starts_in_days=0, flight=True)
+    flight = await world.flight_to(flown, "AIRBORNE", "HOLDING")
+    incident = await world.incident("CRITICAL")
+    await world.expose(incident, world.people[0])
+    assert await world.run("EXPOSURE_COMPUTED", incident_id=str(incident)) == []
+    assert await world.run("FLIGHT_UPDATED", flight_id=str(flight)) == []
+
+
+async def test_a_trip_with_a_flight_already_up_gets_notify_not_cancel(world: World) -> None:
+    """L2: cancel_by_agent would refuse it."""
+    trip_id = await world.trip(world.people[:2], starts_in_days=1, flight=True)
+    await world.flight_to(trip_id, "AIRBORNE")
+    incident = await world.incident("CRITICAL")
+    found = await world.run("EXPOSURE_COMPUTED", incident_id=str(incident))
+    assert [k for _, k, _, _ in found] == [f"NOTIFY_TRAVELLERS:risk:{trip_id}:CRITICAL"]
+
+
+async def test_pending_trips_get_the_impacted_message_but_no_risk_card(world: World) -> None:
+    impacted = await world.trip(world.people[:1], starts_in_days=-1, status="PENDING")
+    await world.trip(world.people[1:2], starts_in_days=5, status="PENDING")
+    incident = await world.incident("CRITICAL")
+    await world.expose(incident, world.people[0])
+    found = await world.run("EXPOSURE_COMPUTED", incident_id=str(incident))
+    assert [k for _, k, _, _ in found] == [f"NOTIFY_TRAVELLERS:impacted:{impacted}:{incident}"]
+
+
+async def test_replaying_an_incident_proposes_nothing_new(world: World) -> None:
+    await world.trip(world.people[:2], starts_in_days=5)
+    incident = await world.incident("CRITICAL")
+    first = await world.run("EXPOSURE_COMPUTED", incident_id=str(incident))
+    assert first
+    assert await world.run("EXPOSURE_COMPUTED", incident_id=str(incident)) == first
+
+
+async def test_a_delay_before_departure_is_proposed_too(world: World) -> None:
+    trip_id = await world.trip(world.people[:2], starts_in_days=0, flight=True)
+    flight = await world.flight_to(trip_id, "DELAYED")
+    await world.sql(
+        "UPDATE flight SET estimated_dep = estimated_dep + interval '90 minutes', "
+        "estimated_arr = estimated_arr + interval '90 minutes' WHERE id = :f",
+        f=flight,
+    )
+    found = await world.run("FLIGHT_UPDATED", flight_id=str(flight), status="DELAYED")
+    assert [k for _, k, _, _ in found] == [f"NOTIFY_TRAVELLERS:flight:{flight}:DELAY60"]
+
+
+async def test_the_flight_path_ignores_restricted_and_cancelled_trips(world: World) -> None:
+    trip_id = await world.trip(world.people[:2], starts_in_days=0, flight=True)
+    flight = await world.flight_to(trip_id, "AIRBORNE", "HOLDING")
+    await world.sql("UPDATE trip SET approval_status = 'CANCELLED' WHERE id = :t", t=trip_id)
+    assert await world.run("FLIGHT_UPDATED", flight_id=str(flight)) == []
+
+
+async def test_an_approved_proposal_from_the_agent_executes(world: World) -> None:
+    """The agent's own payload runs through the merged executor (Prompt 34)."""
+    trip_id = await world.trip(world.people[:2], starts_in_days=0, flight=True)
+    flight = await world.flight_to(trip_id, "AIRBORNE", "HOLDING")
+    await world.run("FLIGHT_UPDATED", flight_id=str(flight))
+    proposal_id = (await world.sql("SELECT id FROM agent_proposal"))[0][0]
+    desk = await world.user("desk", "TRAVEL_DESK")
+    async with tenant_session(world.tenant, world.engine) as session:
+        outcome = await proposals.approve(session, desk, proposal_id)
+        await session.commit()
+    assert outcome.proposal.status == "APPROVED"
+    sent = await world.sql("SELECT audience_filter->>'trip_id' FROM notification_campaign")
+    assert sent == [(str(trip_id),)]

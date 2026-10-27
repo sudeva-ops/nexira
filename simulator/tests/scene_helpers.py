@@ -22,13 +22,14 @@ from nexira_sim.seed.load import seed_all
 DAY = date(2026, 10, 20)
 
 
-async def seed(db: DbUrls, engine: AsyncEngine, tenant_id: uuid.UUID) -> None:
-    """A fully seeded tenant (people, missions, playbooks, agents, the scenario)."""
+async def seed(db: DbUrls, engine: AsyncEngine, tenant_id: uuid.UUID, day: date = DAY) -> None:
+    """A fully seeded tenant (people, missions, playbooks, agents, the scenario). Tests of
+    the Travel & Air agent pass today: its "started / ended" checks use the real date."""
     await seed_all(
         engine,
         owner_dsn=db.owner,
         issuer=f"https://kc.test/realms/scene-{tenant_id}",
-        scenario_date=DAY,
+        scenario_date=day,
         tenant_id=tenant_id,
     )
 

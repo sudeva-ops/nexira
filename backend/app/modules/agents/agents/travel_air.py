@@ -32,22 +32,29 @@ CODE = "TRAVEL_AIR"
 
 _FLIGHT = text(
     """
-    SELECT f.id, f.flight_number, f.status, f.to_airport, ta.city AS to_city,
-           f.diverted_to, da.city AS diverted_city, f.scheduled_arr, f.estimated_arr,
-           t.id AS trip_id, t.reference, t.approval_status, t.restricted,
-           (SELECT count(*) FROM trip_traveller tt WHERE tt.trip_id = t.id) AS travellers
+    SELECT f.id, f.flight_number, f.status, fa.city AS from_city, f.to_airport,
+           ta.city AS to_city, f.diverted_to, da.city AS diverted_city, f.scheduled_arr,
+           f.estimated_arr, t.id AS trip_id, t.reference, t.approval_status, t.restricted,
+           (SELECT count(*) FROM trip_traveller tt JOIN person p ON p.id = tt.person_id
+             WHERE tt.trip_id = t.id AND p.is_active) AS travellers,
+           EXISTS (SELECT 1 FROM trip_traveller tt JOIN person p ON p.id = tt.person_id
+                    WHERE tt.trip_id = t.id AND p.person_type = 'CITIZEN') AS citizens
       FROM flight f
       JOIN trip_segment s ON s.id = f.trip_segment_id
       JOIN trip t ON t.id = s.trip_id
+      JOIN airport fa ON fa.tenant_id = f.tenant_id AND fa.iata = f.from_airport
       JOIN airport ta ON ta.tenant_id = f.tenant_id AND ta.iata = f.to_airport
       LEFT JOIN airport da ON da.tenant_id = f.tenant_id AND da.iata = f.diverted_to
      WHERE f.id = :flight
     """
 )
 
+
+# Both queries keep only trips NOTIFY_TRAVELLERS can reach (the trip audience, D-31;
+# review of Prompt 35, M3): an active traveller and no citizen, or it would always fail.
 _IMPACTED = text(
     """
-    SELECT DISTINCT t.id, t.reference, t.destination
+    SELECT DISTINCT t.id, t.reference
       FROM trip t
       JOIN trip_traveller tt ON tt.trip_id = t.id
       JOIN incident_exposure e ON e.subject_type = 'PERSON' AND e.subject_id = tt.person_id
@@ -55,6 +62,10 @@ _IMPACTED = text(
      WHERE i.id = :incident AND i.status = 'ACTIVE'
        AND t.approval_status IN ('PENDING', 'APPROVED') AND NOT t.restricted
        AND (i.opened_at AT TIME ZONE 'UTC')::date BETWEEN t.starts_on AND t.ends_on
+       AND EXISTS (SELECT 1 FROM trip_traveller tt2 JOIN person p2 ON p2.id = tt2.person_id
+                    WHERE tt2.trip_id = t.id AND p2.is_active)
+       AND NOT EXISTS (SELECT 1 FROM trip_traveller tt3 JOIN person p3 ON p3.id = tt3.person_id
+                        WHERE tt3.trip_id = t.id AND p3.person_type = 'CITIZEN')
     """
 )
 
@@ -64,7 +75,21 @@ _IN_COUNTRY = text(
            t.approved_risk_level
       FROM trip t
      WHERE t.approval_status = 'APPROVED' AND NOT t.restricted
-       AND t.destination_country = :country
+       AND t.destination_country = :country AND t.ends_on >= :today
+       AND EXISTS (SELECT 1 FROM trip_traveller tt2 JOIN person p2 ON p2.id = tt2.person_id
+                    WHERE tt2.trip_id = t.id AND p2.is_active)
+       AND NOT EXISTS (SELECT 1 FROM trip_traveller tt3 JOIN person p3 ON p3.id = tt3.person_id
+                        WHERE tt3.trip_id = t.id AND p3.person_type = 'CITIZEN')
+    """
+)
+
+_FLIGHT_EVENTS = text("SELECT event_type FROM flight_event WHERE flight_id = :flight ORDER BY id")
+
+_FLIGHT_UNDER_WAY = text(
+    """
+    SELECT 1 FROM flight f JOIN trip_segment s ON s.id = f.trip_segment_id
+     WHERE s.trip_id = :trip AND f.status NOT IN ('SCHEDULED', 'DELAYED', 'CANCELLED')
+     LIMIT 1
     """
 )
 
@@ -92,6 +117,8 @@ class TravelAir:
         f = (await session.execute(_FLIGHT, {"flight": flight_id})).first()
         if f is None or f.restricted or f.approval_status not in ("PENDING", "APPROVED"):
             return []  # TA-07; restricted trips have no flights anyway (PC-19)
+        if f.citizens or not f.travellers:
+            return []  # the trip audience would refuse it (review of Prompt 35, M3)
         delay = max(0, round((f.estimated_arr - f.scheduled_arr).total_seconds() / 60))
         people = f"{f.travellers} traveller{'s' if f.travellers != 1 else ''}"
         if f.status == "HOLDING":
@@ -121,11 +148,13 @@ class TravelAir:
             )
         else:
             return []
+        events = [e for (e,) in await session.execute(_FLIGHT_EVENTS, {"flight": f.id})]
         evidence = [
             {
                 "text": f"{f.flight_number} {headline} ({f.reference}, {people})",
                 "source": "flight tracker (simulated)",
-            }
+            },
+            {"text": "Events: " + (" → ".join(events) or "none yet"), "source": "flight events"},
         ]
         drafts = [
             ProposalIn(
@@ -145,7 +174,9 @@ class TravelAir:
             )
         ]
         if cause in ("DIVERTED", "CANCELLED"):
-            at = f.diverted_city or f.diverted_to if cause == "DIVERTED" else f.to_city
+            # Diverted: where they landed. Cancelled: never once airborne (PC-19), so they
+            # are still at the departure airport (review of Prompt 35, M2).
+            at = (f.diverted_city or f.diverted_to) if cause == "DIVERTED" else f.from_city
             drafts.append(
                 ProposalIn(
                     agent_code=CODE,
@@ -171,14 +202,12 @@ class TravelAir:
             return []
         drafts: list[ProposalIn] = []
         impacted: set[uuid.UUID] = set()
-        for trip_id, reference, destination in await session.execute(
-            _IMPACTED, {"incident": incident.id}
-        ):
+        for trip_id, reference in await session.execute(_IMPACTED, {"incident": incident.id}):
             impacted.add(trip_id)
             message = (
-                f"An incident ({incident.reference}, {incident.severity}) is affecting "
-                f"{destination}. Stay somewhere safe, avoid the area, and answer the safety "
-                "check-in when it arrives."
+                f"An incident ({incident.reference}, {incident.severity}) is close to where "
+                "you are. Stay somewhere safe, avoid the area, and answer the safety check-in "
+                "when it arrives."
             )
             drafts.append(
                 ProposalIn(
@@ -211,8 +240,19 @@ class TravelAir:
         if trips.rank(live.level) < trips.rank("HIGH"):
             return drafts
         today = datetime.now(ZoneInfo(get_settings().home_tz)).date()
-        for t in await session.execute(_IN_COUNTRY, {"country": country}):
-            if t.id in impacted or t.ends_on < today:
+        in_country = list(await session.execute(_IN_COUNTRY, {"country": country, "today": today}))
+        # Impacted by ANY active incident, not just this one: those travellers get the
+        # impacted message only (plan §2; review of Prompt 35, M1).
+        impacted |= set(await trips.impacted_by(session, [t.id for t in in_country]))
+        base = live.base
+        breakdown = (
+            f"security {base.security}, unrest {base.unrest}, health {base.health}, "
+            f"transport {base.transport} (base {base.level})"
+            if base
+            else "no simulated base level (MODERATE)"
+        )
+        for t in in_country:
+            if t.id in impacted:
                 continue
             if trips.rank(live.level) <= trips.rank(t.approved_risk_level):
                 continue
@@ -222,14 +262,16 @@ class TravelAir:
                     f"(approved at {t.approved_risk_level}); "
                     f"raised by {', '.join(live.incidents) or incident.reference}",
                     "source": "destination risk (simulated)",
-                }
+                },
+                {"text": f"{country}: {breakdown}", "source": "country risk (simulated)"},
             ]
             notify = _notify(
                 t.id,
                 f"The security situation in {t.destination} has worsened (risk now "
                 f"{live.level}). Follow the mission's guidance and keep the Travel Desk informed.",
             )
-            if t.starts_on > today:
+            under_way = await session.scalar(_FLIGHT_UNDER_WAY, {"trip": t.id})
+            if t.starts_on > today and not under_way:  # a red-eye in the air: notify (L2)
                 drafts.append(
                     ProposalIn(
                         agent_code=CODE,
