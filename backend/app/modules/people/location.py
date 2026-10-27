@@ -10,7 +10,9 @@ Formula (deterministic; the same inputs and as_of give the same result):
     confidence = round(max(0, base - decay * age_hours))
 
 The observation with the highest confidence wins; ties go to the most recent.
-Observations newer than as_of, or older than MAX_AGE, are ignored. A person
+Observations newer than as_of, or older than MAX_AGE, are ignored. A landing (a FLIGHT
+observation, D-33 AT-04) means the person moved: observations from before their latest
+landing no longer count, however good they were (a badge at the embassy they flew from). A person
 with no usable observation gets no current location (and so is never exposed).
 
 Per-source quality:
@@ -103,6 +105,9 @@ def best(observations: list[LocationObservation], as_of: datetime) -> Current | 
         for o in observations
         if as_of - MAX_AGE <= o.observed_at <= as_of
     ]
+    landed = max((c.observed_at for c in candidates if c.source == "FLIGHT"), default=None)
+    if landed is not None:
+        candidates = [c for c in candidates if c.observed_at >= landed]
     if not candidates:
         return None
     return max(candidates, key=lambda c: (c.confidence, c.observed_at, c.observation_id))
