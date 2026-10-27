@@ -95,3 +95,7 @@ No write endpoints: flights are written only by the tracker.
 1. **G-7:** hide a restricted trip's flight segments from roles other than the requester, Travel Desk, Security Officer and Admin? (Proposed: yes.)
 
 The other gaps follow from D-33, the approved PCs and the defaults in requirements-pilot.md §18.
+
+## 8. Product owner (2026-10-27, PR #31)
+
+The plan is approved. **G-7 is still open:** no answer yet on hiding a restricted trip's flight segments; it does not affect Prompt 29 and must be settled before Prompt 30.
