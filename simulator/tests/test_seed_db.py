@@ -290,6 +290,7 @@ async def test_journey_seed_country_risk_trips_and_counter(seeded: Seeded) -> No
         )
     }
     assert trips == {
+        "TRP-8811": ("APPROVED", "LOW", True),  # the France scenario's CANCEL_TRIP (D-34)
         "TRP-8812": ("APPROVED", "MODERATE", True),
         "TRP-8814": ("PENDING", "HIGH", False),
         "TRP-8815": ("APPROVED", "LOW", True),
