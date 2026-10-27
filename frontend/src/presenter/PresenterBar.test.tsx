@@ -7,6 +7,11 @@ import type { ScenarioState } from "../api/scenario";
 import { SUMMARY, VIEWER } from "../test/fixtures";
 import { DUTY_OFFICER, mockApi, renderApp } from "../test/render";
 
+// "Next scene" navigates to the map screens; jsdom has no WebGL, so the maps are stubbed
+// (as in the screens' own tests).
+vi.mock("../map/OperationsMap", () => ({ OperationsMap: () => <div data-testid="operations-map" /> }));
+vi.mock("../map/AirMap", () => ({ AirMap: () => <div data-testid="air-map" /> }));
+
 const NAMES = ["Calm", "Signals fused", "Impact", "Playbook", "Check-in", "Decisions", "Review"];
 const STATE: ScenarioState = {
   code: "NBO-CIVIL-UNREST",
