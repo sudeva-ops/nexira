@@ -146,6 +146,9 @@ DEFAULT_COUNTRY_RISK = (20, 15, 10, 15)
 # except the draft, which belongs to the demo Travel Desk user so it can be edited and
 # submitted. TRIP_SCOPE: the approval scope, the single mission in the country (plan G-2).
 EXTRA_TRIPS: list[tuple[str, str, str, int, str, str, int, int, str, str]] = [
+    # Approved at LOW: the France scenario makes France CRITICAL, so the Travel & Air agent
+    # proposes cancelling it (D-34, plan-pilot-ta G-6).
+    ("TRP-8811", "Cultural exchange · Paris", "PAR", 2, "Paris", "FR", 5, 2, "APPROVED", "LOW"),
     ("TRP-8814", "Security assessment", "AMM", 2, "Baghdad", "IQ", 5, 3, "PENDING", "HIGH"),
     ("TRP-8815", "EU coordination meeting", "LON", 1, "Brussels", "BE", 2, 1, "APPROVED", "LOW"),
     ("TRP-8816", "Donor roundtable", "NBO", 2, "Addis Ababa", "ET", 4, 2, "DRAFT", "LOW"),

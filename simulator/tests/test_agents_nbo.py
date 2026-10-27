@@ -110,8 +110,19 @@ async def test_scenes_1_to_3_give_one_proposal_per_agent_per_trigger(db: DbUrls)
         await bus.deliver(scene_1(tenant_id))  # the same events again: nothing new
 
         found = await all_proposals(engine, tenant_id)
+        # Travel & Air (pilot module 4, D-34) also proposes here: a safety message for
+        # TRP-8812, whose delegates are in the zone (plan-pilot-ta G-5). Its "trip has
+        # started / ended" checks use the real date, so only what it proposes is checked,
+        # not how many: always level 2, pending, never executed.
+        travel = [row for row in found if row[0] == "TRAVEL_AIR"]
+        assert travel
+        assert {(action, status, level) for _, action, status, level in travel} == {
+            ("NOTIFY_TRAVELLERS", "PENDING", 2)
+        }
         assert Counter(
-            (agent, action, status, level) for agent, action, status, level in found
+            (agent, action, status, level)
+            for agent, action, status, level in found
+            if agent != "TRAVEL_AIR"
         ) == {
             # Scene 1: the Watch Officer logs both incidents (Nairobi, Paris; plan G-12).
             ("WATCH_OFFICER", "LOG_INFO", "AUTO_EXECUTED", 0): 2,
@@ -162,7 +173,9 @@ async def test_scenes_1_to_3_give_one_proposal_per_agent_per_trigger(db: DbUrls)
         assert sent.proposal.status == "APPROVED"
         assert campaign is not None
         assert campaign.status == "SENT"  # through the simulated adapter only
-        counted = Counter(agent for agent, *_ in await all_proposals(engine, tenant_id))
+        counted = Counter(
+            agent for agent, *_ in await all_proposals(engine, tenant_id) if agent != "TRAVEL_AIR"
+        )  # Travel & Air is checked above
         assert counted == {
             "WATCH_OFFICER": 2,
             "EXPOSURE": 2,
