@@ -103,6 +103,13 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
   expect(scene2.some((p) => p.agent_code === "EXPOSURE" && p.incident_id === nairobi.id && p.status === "AUTO_EXECUTED")).toBe(true);
   const pb07 = scene2.find((p) => p.action_type === "START_PLAYBOOK" && p.incident_id === nairobi.id);
   expect([pb07?.status, pb07?.effective_level]).toEqual(["PENDING", 2]);
+  // JR-06 (Prompt 27): while the incident is ACTIVE, TRP-8812 shows as impacted. Scene 6
+  // sets it to MONITORING, so the Journey acceptance cannot check this later.
+  const journeys = await signedIn(browser, "travel.desk", "/journeys");
+  const trp8812 = journeys.getByRole("table", { name: "Trips" }).getByRole("row", { name: /TRP-8812/ });
+  await expect(trp8812).toContainText(`Impacted · INC-${year}-1042`);
+  await expect(journeys.getByRole("alert")).toContainText(`TRP-8812 impacted by INC-${year}-1042`);
+  await journeys.context().close();
 
   // --- Scene 3 · Playbook: the Duty Officer approves; step 7 needs the Nairobi HoM -------
   await presenter.getByRole("button", { name: "Next scene" }).click();
