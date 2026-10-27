@@ -27,6 +27,7 @@ describe("app shell", () => {
       "Incidents",
       "People & Sites",
       "Journey Management", // pilot module 2 (D-30)
+      "Air Travel Tracking", // pilot module 3 (D-30)
       "Response Playbooks",
       "Mass Notification", // pilot module 1 (D-30)
       "Safety Check-in",

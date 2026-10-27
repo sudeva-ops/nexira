@@ -1,7 +1,8 @@
-import { Button, Classes, HTMLSelect, Icon, InputGroup } from "@blueprintjs/core";
+import { Button, Classes, HTMLSelect, Icon, InputGroup, Switch } from "@blueprintjs/core";
 import { useState } from "react";
 
 import { ApiError } from "../../api/client";
+import { useAirports } from "../../api/flights";
 import { usePeople } from "../../api/people";
 import { type SegmentKind, type TripDetail, type TripPlan, useSaveTrip } from "../../api/trips";
 import { HOME_TZ_LABEL, homeInputToIso, isoToHomeInput } from "../../app/time";
@@ -110,6 +111,7 @@ export function TripPlanner({
   const [draft, setDraft] = useState<Draft>(() => fromTrip(editing));
   const [query, setQuery] = useState("");
   const people = usePeople(query, 8).data?.items ?? [];
+  const airportOptions = (useAirports().data ?? []).map((a) => ({ value: a.iata, label: `${a.iata} · ${a.city}` }));
   const save = useSaveTrip();
   const change = (patch: Partial<Draft>) => setDraft({ ...draft, ...patch });
   const setSegment = (n: number, patch: Partial<SegmentRow>) =>
@@ -121,7 +123,14 @@ export function TripPlanner({
     draft.starts_on &&
     draft.ends_on &&
     draft.travellers.length > 0 &&
-    draft.segments.every((s) => s.title.trim() && s.starts_at && s.ends_at);
+    draft.segments.every(
+      (s) =>
+        s.title.trim() &&
+        s.starts_at &&
+        s.ends_at &&
+        // A tracked flight needs its number and both airports, or none of them (PC-17).
+        [s.flight_number, s.from_airport, s.to_airport].filter(Boolean).length % 3 === 0,
+    );
 
   return (
     <Card
@@ -244,6 +253,12 @@ export function TripPlanner({
           {draft.travellers.length === 0 && <span className="nx-dim">Nobody yet</span>}
         </div>
 
+        <Switch
+          label="Restricted (VIP or ministerial): its flights are never tracked or shown"
+          checked={draft.restricted}
+          disabled={!!editing && editing.approval_status !== "DRAFT"}
+          onChange={(e) => change({ restricted: e.currentTarget.checked })}
+        />
         <div className="nx-lbl">Itinerary ({HOME_TZ_LABEL})</div>
         {draft.segments.map((s, n) => (
           <div key={n} className="nx-segment" role="group" aria-label={`Segment ${n + 1}`}>
@@ -288,6 +303,29 @@ export function TripPlanner({
               aria-label={`Remove segment ${n + 1}`}
               onClick={() => change({ segments: draft.segments.filter((_, i) => i !== n) })}
             />
+            {s.kind === "FLIGHT" && (
+              <>
+                <InputGroup
+                  aria-label="Flight number"
+                  placeholder="Flight no. (tracked)"
+                  value={s.flight_number ?? ""}
+                  maxLength={8}
+                  onChange={(e) => setSegment(n, { flight_number: e.currentTarget.value.toUpperCase() || null })}
+                />
+                <HTMLSelect
+                  aria-label="From airport"
+                  value={s.from_airport ?? ""}
+                  onChange={(e) => setSegment(n, { from_airport: e.currentTarget.value || null })}
+                  options={[{ value: "", label: "From" }, ...airportOptions]}
+                />
+                <HTMLSelect
+                  aria-label="To airport"
+                  value={s.to_airport ?? ""}
+                  onChange={(e) => setSegment(n, { to_airport: e.currentTarget.value || null })}
+                  options={[{ value: "", label: "To" }, ...airportOptions]}
+                />
+              </>
+            )}
           </div>
         ))}
         <div>

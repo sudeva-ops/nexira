@@ -4,6 +4,7 @@ import { Route, Routes } from "react-router-dom";
 import type { ReactElement } from "react";
 
 import { AgentsScreen } from "../screens/agents/AgentsScreen";
+import { AirScreen } from "../screens/air/AirScreen";
 import { AuditScreen } from "../screens/audit/AuditScreen";
 import { CheckinScreen } from "../screens/checkin/CheckinScreen";
 import { IncidentsScreen } from "../screens/incidents/IncidentsScreen";
@@ -24,6 +25,7 @@ const BUILT: Record<string, ReactElement> = {
   "/incidents": <IncidentsScreen />,
   "/people": <PeopleScreen />,
   "/journeys": <JourneysScreen />,
+  "/air": <AirScreen />,
   "/playbooks": <PlaybooksScreen />,
   "/notifications": <NotifyScreen />,
   "/checkin": <CheckinScreen />,

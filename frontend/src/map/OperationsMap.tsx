@@ -1,40 +1,13 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 
-import {
-  addProtocol,
-  type GeoJSONSource,
-  Map as MapLibreMap,
-  Marker,
-  NavigationControl,
-  Popup,
-  setWorkerUrl,
-} from "maplibre-gl";
-// MapLibre looks for its worker next to its own module; the bundle has it elsewhere.
-import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
-import { Protocol } from "pmtiles";
+import { type GeoJSONSource, Map as MapLibreMap, Marker, NavigationControl, Popup } from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
 
 import type { Exposure, Incident } from "../api/intel";
 import type { Mission } from "../api/people";
 import { exposureFeatures, missionFeatures, SEVERITY_COLOUR, zoneFeatures } from "./geo";
-import { ATTRIBUTION, baseStyle, CITY_MINZOOM, TILES_PATH } from "./style";
-
-let protocolRegistered = false;
-function registerPmtiles() {
-  if (protocolRegistered) return;
-  setWorkerUrl(workerUrl);
-  addProtocol("pmtiles", new Protocol().tile);
-  protocolRegistered = true;
-}
-
-async function tilesAvailable(): Promise<boolean> {
-  try {
-    const response = await fetch(`${TILES_PATH}/world.pmtiles`, { method: "HEAD" });
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
+import { registerPmtiles, tilesAvailable } from "./base";
+import { ATTRIBUTION, baseStyle, CITY_MINZOOM } from "./style";
 
 const EMPTY = { type: "FeatureCollection" as const, features: [] };
 

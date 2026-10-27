@@ -1,6 +1,7 @@
 import type { QueryKey } from "@tanstack/react-query";
 
 import { checkinKeys } from "./checkin";
+import { flightKeys } from "./flights";
 import { keys } from "./intel";
 import { peopleKeys } from "./people";
 import { playbookKeys } from "./playbooks";
@@ -63,6 +64,10 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
     }
     case "TRIP_UPDATED":
       return [tripKeys.all];
+    case "FLIGHT_UPDATED": // the trip shows each flight's status (AT-07)
+      return [flightKeys.all, tripKeys.all];
+    case "FLIGHT_POSITIONS": // the list and the open flight's altitude and speed
+      return [flightKeys.all];
     default:
       return [];
   }

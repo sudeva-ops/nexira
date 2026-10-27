@@ -132,6 +132,11 @@ COUNTRY_RISK: dict[str, tuple[int, int, int, int]] = {
     "BR": (40, 28, 22, 30),
     "SG": (8, 6, 10, 8),
     "KR": (12, 15, 10, 10),
+    # Destinations of the tracked-flight trips without a mission (D-33): rated, so they are
+    # not counted MODERATE as unrated countries are (review of Prompt 25, M1).
+    "AE": (18, 10, 10, 12),
+    "NL": (15, 20, 8, 12),
+    "PT": (12, 18, 8, 10),
 }
 DEFAULT_COUNTRY_RISK = (20, 15, 10, 15)
 

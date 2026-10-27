@@ -26,6 +26,7 @@ export type ScenarioCommand = "play" | "pause" | "next" | "reset";
 export const DEMO_SCENARIOS = [
   { code: "NBO-CIVIL-UNREST", label: "Nairobi civil unrest" },
   { code: "FRA-NATIONAL-PROTESTS", label: "France protests" },
+  { code: "NBO-AIR-DIVERSION", label: "Inbound flight diversion" },
 ] as const;
 export type DemoScenario = (typeof DEMO_SCENARIOS)[number]["code"];
 export const DEMO_SCENARIO: DemoScenario = DEMO_SCENARIOS[0].code;
