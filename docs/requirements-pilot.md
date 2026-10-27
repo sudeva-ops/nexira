@@ -189,12 +189,12 @@ Evacuation charter flights (AIR-05: there is no Evacuation module in the pilot);
 
 Playwright on the real stack: the Nairobi scenario's inbound XW 451 (Abu Dhabi → Nairobi, 3 HQ staff, an approved seeded trip) appears on the air picture; when the incident affects the airport roads it shows HOLDING, then DIVERTED · Mombasa, then LANDED; the banner and the trip's detail update live; the 3 travellers' current location becomes Mombasa (source FLIGHT); a seeded restricted trip's flight never appears; the audit chain verifies; `make acceptance` (Nairobi, Mass Notification, Journey) still passes.
 
-## 18. Questions for the product owner (each has a proposed default)
+## 18. Questions answered by the product owner (2026-10-27: "use the defaults")
 
-1. **Which trips are tracked?** *Default:* APPROVED only. (Alternative: PENDING too.)
-2. **Restricted (VIP/ministerial) trips:** *Default:* a `restricted` flag set by the planner; their flights are never tracked or shown to anyone. (Alternative: tracked but shown only to SECURITY_OFFICER.)
-3. **Delay threshold:** *Default:* 30 minutes late against schedule.
-4. **Disruptions without the agent:** *Default:* banner, table and trip detail, live; no Decision Queue proposal until the Travel & Air agent (module 4).
-5. **Location on landing:** *Default:* yes, one `FLIGHT` observation per traveller at the landing airport.
-6. **Flight time in the demo:** *Default:* scenario flights run compressed (minutes), other seeded flights in real time.
-7. **Flight numbers:** *Default:* fictional (e.g. "XW 451"), as the demo; no real airline schedules.
+1. **Which trips are tracked:** APPROVED only.
+2. **Restricted (VIP/ministerial) trips:** a `restricted` flag set by the planner; their flights are never tracked or shown to anyone.
+3. **Delay threshold:** 30 minutes late against schedule.
+4. **Disruptions without the agent:** banner, table and trip detail, live; no Decision Queue proposal until the Travel & Air agent (module 4).
+5. **Location on landing:** yes, one `FLIGHT` observation per traveller at the landing airport.
+6. **Flight time in the demo:** scenario flights run compressed (minutes), other seeded flights in real time.
+7. **Flight numbers:** fictional (e.g. "XW 451"), as the demo; no real airline schedules.
