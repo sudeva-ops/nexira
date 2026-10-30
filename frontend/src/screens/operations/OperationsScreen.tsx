@@ -58,7 +58,7 @@ export function OperationsScreen() {
         <Kpi
           icon="people"
           label="Personnel tracked"
-          value={summary?.personnel.toLocaleString("en-GB") ?? "—"}
+          value={summary?.personnel ?? "—"}
           detail={
             summary?.avg_location_confidence != null &&
             `${summary.avg_location_confidence}% avg. location confidence`

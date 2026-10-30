@@ -7,6 +7,7 @@ import { useMissions } from "../../api/people";
 import { canPlanTrip } from "../../api/permissions";
 import { type Trip, type TripDetail as Detail, type TripFilters, useTrip, useTrips } from "../../api/trips";
 import { HOME_TZ, formatDays } from "../../app/time";
+import { FlashRow } from "../../ui/motion";
 import { Card, Kpi, Sev } from "../../ui/primitives";
 import { RiskCard, TripDetail } from "./TripDetail";
 import { TripPlanner } from "./TripPlanner";
@@ -166,7 +167,13 @@ export function JourneysScreen() {
                   {list.map((t) => {
                     const [status, statusClass] = where(t, today);
                     return (
-                      <tr key={t.id} className={t.id === selectedId ? "on" : undefined} onClick={() => select(t.id)}>
+                      <FlashRow
+                        key={t.id}
+                        watch={`${t.approval_status} ${t.risk_level} ${status}`}
+                        tone={t.approval_status === "REJECTED" ? "danger" : t.approval_status === "APPROVED" ? "success" : "info"}
+                        className={t.id === selectedId ? "on" : undefined}
+                        onClick={() => select(t.id)}
+                      >
                         <td className="nx-mono nx-dim nx-nowrap">{t.reference}</td>
                         <td>
                           <button type="button" className="nx-linkbtn" onClick={() => select(t.id)}>
@@ -188,7 +195,7 @@ export function JourneysScreen() {
                           {APPROVAL[t.approval_status]?.[0] ?? t.approval_status}
                         </td>
                         <td className={statusClass}>{status}</td>
-                      </tr>
+                      </FlashRow>
                     );
                   })}
                 </tbody>

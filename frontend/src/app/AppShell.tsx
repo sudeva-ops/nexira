@@ -4,9 +4,9 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAgents, usePendingCount } from "../api/proposals";
 import { PresenterBar } from "../presenter/PresenterBar";
 import { RealtimeProvider } from "../api/realtime";
-import { useRealtimeStatus } from "../api/realtimeContext";
 
 import { Clock } from "./Clock";
+import { LastEvent, LiveIndicator } from "./Heartbeat";
 import { SCREENS, type Screen } from "./screens";
 import { UserMenu } from "./UserMenu";
 
@@ -57,17 +57,6 @@ function DecisionsPill() {
   );
 }
 
-function LiveIndicator() {
-  const status = useRealtimeStatus();
-  const label = { live: "LIVE", connecting: "CONNECTING", offline: "OFFLINE" }[status];
-  return (
-    <span className={`nx-live ${status}`} role="status" aria-label={`Realtime ${status}`}>
-      <i />
-      {label}
-    </span>
-  );
-}
-
 interface Props {
   onLogout: () => void;
 }
@@ -100,6 +89,7 @@ export function AppShell({ onLogout }: Props) {
           <Tag intent="warning" minimal>
             SIMULATED DATA
           </Tag>
+          <LastEvent />
           <LiveIndicator />
           <Clock />
           <UserMenu onLogout={onLogout} />

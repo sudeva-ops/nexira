@@ -13,6 +13,7 @@ import {
   useSetAutonomy,
 } from "../../api/proposals";
 import { roleLabel } from "../../ui/format";
+import { CountUp } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
 
 const WATCHES: Record<string, string> = {
@@ -110,7 +111,7 @@ export function AgentsScreen() {
         <Kpi
           icon="shield"
           label="Executed without approval"
-          value={<span className={outside ? "nx-help" : "nx-safe"}>{outside}</span>}
+          value={<span className={outside ? "nx-help" : "nx-safe"}><CountUp value={outside} /></span>}
           detail="Checked against each proposal's approvals"
         />
       </div>

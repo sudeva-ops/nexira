@@ -10,6 +10,7 @@ import {
 } from "../../api/notifications";
 import { useMissions } from "../../api/people";
 import { formatStamp } from "../../app/time";
+import { FlashRow } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
 import { CampaignDetail } from "./CampaignDetail";
 import { Composer } from "./Composer";
@@ -147,8 +148,10 @@ export function NotifyScreen() {
                 </thead>
                 <tbody>
                   {list.map((c) => (
-                    <tr
+                    <FlashRow
                       key={c.id}
+                      watch={`${c.status} ${c.recipients}`}
+                      tone={c.status === "SENT" ? "success" : "info"}
                       className={c.id === selectedId ? "on" : undefined}
                       onClick={() => select(c.id)}
                     >
@@ -162,7 +165,7 @@ export function NotifyScreen() {
                       <td className={STATUS[c.status]?.[1]}>{STATUS[c.status]?.[0] ?? c.status}</td>
                       <td className="nx-mono">{c.recipients || "—"}</td>
                       <td className="nx-dim nx-nowrap">{formatStamp(c.created_at)}</td>
-                    </tr>
+                    </FlashRow>
                   ))}
                 </tbody>
               </table>

@@ -1,10 +1,11 @@
 import { Icon, NonIdealState, Spinner } from "@blueprintjs/core";
 import { Link, useSearchParams } from "react-router-dom";
 
-import { type Flight, type FlightDetail, IN_AIR, useFlight, useFlights } from "../../api/flights";
+import { type Flight, type FlightDetail, type FlightStatus, IN_AIR, useFlight, useFlights } from "../../api/flights";
 import { formatStamp } from "../../app/time";
 import { AirMap } from "../../map/AirMap";
 import { flightColour } from "../../map/geo";
+import { FlashRow, type FlashTone } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
 import { PendingProposals } from "../queue/PendingProposals";
 
@@ -24,6 +25,14 @@ const EVENT_LABEL: Record<string, string> = {
   DIVERTED: "Diverted",
   LANDED: "Landed",
   CANCELLED: "Cancelled",
+};
+
+const FLIGHT_TONE: Partial<Record<FlightStatus, FlashTone>> = {
+  DELAYED: "warning",
+  HOLDING: "warning",
+  DIVERTED: "danger",
+  CANCELLED: "danger",
+  LANDED: "success",
 };
 
 function hhmm(iso: string): string {
@@ -202,7 +211,13 @@ export function AirScreen() {
                 </thead>
                 <tbody>
                   {list.map((f) => (
-                    <tr key={f.id} className={f.id === selectedId ? "on" : undefined} onClick={() => select(f.id)}>
+                    <FlashRow
+                      key={f.id}
+                      watch={`${f.status} ${f.diverted_to} ${f.estimated_arr}`}
+                      tone={FLIGHT_TONE[f.status] ?? "info"}
+                      className={f.id === selectedId ? "on" : undefined}
+                      onClick={() => select(f.id)}
+                    >
                       <td className="nx-mono">
                         <button type="button" className="nx-linkbtn" onClick={() => select(f.id)}>
                           <b>{f.flight_number}</b>
@@ -222,7 +237,7 @@ export function AirScreen() {
                       <td className="nx-mono nx-nowrap">{altitude(f)}</td>
                       <td className="nx-mono nx-nowrap">{f.status === "LANDED" ? "Arrived" : hhmm(f.estimated_arr)}</td>
                       <td style={{ color: flightColour(f.status) }}>{statusText(f)}</td>
-                    </tr>
+                    </FlashRow>
                   ))}
                 </tbody>
               </table>
