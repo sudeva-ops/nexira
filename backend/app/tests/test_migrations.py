@@ -56,9 +56,9 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     command.upgrade(cfg, "head")
     upgraded = asyncio.run(_snapshot(admin))
     # The schema's 33 tables, message_template (0002), trip_segment and country_risk
-    # (0003), airport, flight and flight_event (0004), weather_current (0005), and
-    # alembic_version.
-    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 1
+    # (0003), airport, flight and flight_event (0004), weather_current (0005), partner and
+    # partner_request (0006), and alembic_version.
+    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 2 + 1
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
 
@@ -304,4 +304,55 @@ def test_downgrading_0005_restores_0004_exactly(fresh: DbUrls) -> None:
     )
     assert "weather_current_mission_id_fkey" in cast(list[str], at_head["mission_fks"])
     assert (at_head["functions"], at_head["policies"]) == (1, 1)
+    command.upgrade(cfg, "head")
+
+
+async def _partner_shape(admin_url: str) -> dict[str, object]:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        tables = await conn.fetch(
+            "SELECT relname, relforcerowsecurity, relacl::text AS acl FROM pg_class "
+            "WHERE relname IN ('partner', 'partner_request') ORDER BY relname"
+        )
+        functions = await conn.fetchval(
+            "SELECT count(*) FROM pg_proc WHERE proname = 'partner_request_guard'"
+        )
+        policies = await conn.fetchval(
+            "SELECT count(*) FROM pg_policies WHERE tablename IN ('partner', 'partner_request')"
+        )
+    finally:
+        await conn.close()
+    return {"tables": [tuple(t) for t in tables], "functions": functions, "policies": policies}
+
+
+def test_downgrading_0006_restores_0005_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0005")
+    at_0005 = asyncio.run(_partner_shape(admin))
+    at_0005_weather = asyncio.run(_weather_shape(admin))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_partner_shape(admin))
+    command.downgrade(cfg, "0005")
+    assert asyncio.run(_partner_shape(admin)) == at_0005
+    assert asyncio.run(_weather_shape(admin)) == at_0005_weather
+    assert at_0005["tables"] == []
+    # The app reads and seeds partners only; requests are read, made and moved, never
+    # deleted; nothing else (no TRUNCATE, REFERENCES or TRIGGER).
+    assert at_head["tables"] == [
+        (
+            "partner",
+            True,
+            "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+            "nexira_app=ar/nexira_owner}",
+        ),
+        (
+            "partner_request",
+            True,
+            "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+            "nexira_app=arw/nexira_owner}",
+        ),
+    ]
+    assert (at_head["functions"], at_head["policies"]) == (1, 2)
     command.upgrade(cfg, "head")

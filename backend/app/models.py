@@ -13,6 +13,7 @@ from app.modules.intel.models import (
     RawSignal,
 )
 from app.modules.notifications.models import NotificationCampaign, NotificationDelivery
+from app.modules.partners.models import Partner, PartnerRequest
 from app.modules.people.models import (
     LocationObservation,
     Mission,
@@ -43,6 +44,8 @@ __all__ = [
     "Mission",
     "NotificationCampaign",
     "NotificationDelivery",
+    "Partner",
+    "PartnerRequest",
     "Person",
     "PersonLocationCurrent",
     "Playbook",
