@@ -113,6 +113,9 @@ ROWS: dict[str, str] = {
     "'{segment}', 'XW 1', 'AAA', 'AAA', now(), now(), now(), now())",
     "flight_event": "INSERT INTO flight_event (tenant_id, flight_id, event_type) "
     "VALUES ('{t}', '{flight}', 'DEPARTED')",
+    "weather_current": "INSERT INTO weather_current (tenant_id, mission_id, observed_at, "
+    "temperature_c, condition, wind_kph, gust_kph) VALUES ('{t}', '{mission}', now(), 24.5, "
+    "'CLEAR', 10, 15)",
     "message_template": "INSERT INTO message_template (tenant_id, code, kind, name, texts) "
     "VALUES ('{t}', 'T', 'ADVISORY', 'T', '{{\"en\": \"m\"}}')",
     "notification_delivery": "INSERT INTO notification_delivery (tenant_id, campaign_id, "
@@ -146,6 +149,7 @@ NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELE
     "notification_delivery",
     "trip",  # cancelled, never deleted (PC-15)
     "flight",  # written only by the tracker; never deleted (PC-19)
+    "weather_current",  # current values, refreshed by the feed; never deleted (PC-20)
 }
 
 
@@ -277,7 +281,10 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
     # tenant B cannot see tenant A's trip (migration 0003).
     with pytest.raises(
         (asyncpg.InsufficientPrivilegeError, asyncpg.RaiseError),
-        match=r"row-level security|trip: no such trip|flight: no such flight",
+        match=(
+            r"row-level security|trip: no such trip|flight: no such flight"
+            r"|weather: no such mission"
+        ),
     ):
         await api.execute(sql_for(table, world.a))
 

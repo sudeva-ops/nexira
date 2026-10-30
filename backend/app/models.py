@@ -24,6 +24,7 @@ from app.modules.playbooks.models import Playbook, PlaybookRun, PlaybookRunStep,
 from app.modules.scenarios.models import Scenario, ScenarioEvent, ScenarioRun
 from app.modules.tenancy.models import AppUser, ReferenceCounter, Role, Tenant, UserRole
 from app.modules.travel.models import Trip, TripTraveller
+from app.modules.weather.models import WeatherCurrent
 
 __all__ = [
     "ActionPolicy",
@@ -60,4 +61,5 @@ __all__ = [
     "Trip",
     "TripTraveller",
     "UserRole",
+    "WeatherCurrent",
 ]

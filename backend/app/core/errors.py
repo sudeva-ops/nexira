@@ -33,6 +33,7 @@ REFUSAL_PREFIXES = (
     "notification_delivery:",  # a delivery keeps its campaign, person and channel
     "trip:",  # approval, frozen trip and itinerary, forward-only status (D-32)
     "flight:",  # only approved, unrestricted trips; status table; append-only events (D-33)
+    "weather:",  # a row's mission is in its own tenant and never changes (D-35)
 )
 
 

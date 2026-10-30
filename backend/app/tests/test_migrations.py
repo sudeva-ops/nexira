@@ -2,6 +2,7 @@
 
 import asyncio
 from pathlib import Path
+from typing import cast
 
 import asyncpg
 import pytest
@@ -55,8 +56,9 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     command.upgrade(cfg, "head")
     upgraded = asyncio.run(_snapshot(admin))
     # The schema's 33 tables, message_template (0002), trip_segment and country_risk
-    # (0003), airport, flight and flight_event (0004), and alembic_version.
-    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1
+    # (0003), airport, flight and flight_event (0004), weather_current (0005), and
+    # alembic_version.
+    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 1
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
 
@@ -252,4 +254,54 @@ def test_downgrading_0004_restores_0003_exactly(fresh: DbUrls) -> None:
         ("flight_event", True),
     ]
     assert at_head["functions"] == ["flight_event_guard", "flight_guard", "trip_restricted_guard"]
+    command.upgrade(cfg, "head")
+
+
+async def _weather_shape(admin_url: str) -> dict[str, object]:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        table = await conn.fetchrow(
+            "SELECT relforcerowsecurity, relacl::text AS acl FROM pg_class "
+            "WHERE relname = 'weather_current'"
+        )
+        functions = await conn.fetchval(
+            "SELECT count(*) FROM pg_proc WHERE proname = 'weather_current_guard'"
+        )
+        policies = await conn.fetchval(
+            "SELECT count(*) FROM pg_policies WHERE tablename = 'weather_current'"
+        )
+        mission = await conn.fetch(
+            "SELECT conname FROM pg_constraint WHERE confrelid = 'mission'::regclass ORDER BY 1"
+        )
+    finally:
+        await conn.close()
+    return {
+        "table": tuple(table) if table else None,
+        "functions": functions,
+        "policies": policies,
+        "mission_fks": [r["conname"] for r in mission],
+    }
+
+
+def test_downgrading_0005_restores_0004_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0004")
+    at_0004 = asyncio.run(_weather_shape(admin))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_weather_shape(admin))
+    command.downgrade(cfg, "0004")
+    assert asyncio.run(_weather_shape(admin)) == at_0004
+    assert at_0004["table"] is None
+    table = at_head["table"]
+    assert isinstance(table, tuple)
+    assert table[0] is True  # FORCE RLS
+    # The app reads, inserts and updates; nothing more (no DELETE, TRUNCATE, REFERENCES).
+    assert table[1] == (
+        "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+        "nexira_app=arw/nexira_owner}"
+    )
+    assert "weather_current_mission_id_fkey" in cast(list[str], at_head["mission_fks"])
+    assert (at_head["functions"], at_head["policies"]) == (1, 1)
     command.upgrade(cfg, "head")
