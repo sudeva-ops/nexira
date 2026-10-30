@@ -76,7 +76,7 @@ The second provider is Dataminr with a new `Tropical storm` → STORM entry in i
 
 ## 7. Migration 0005 (Prompt 39, 🔒)
 
-- PC-20: `weather_current` with FORCE RLS and `tenant_isolation`; SELECT, INSERT, UPDATE for `nexira_app`; no DELETE; range CHECKs (temperature −60..60 °C, wind and gusts 0..400 km/h, gusts ≥ wind, rain 0..1000 mm); `condition` from the seven values; `mission_id` a composite foreign key with the tenant, so a row's mission is in its own tenant (the lesson of Prompts 24 and 29).
+- PC-20: `weather_current` with FORCE RLS and `tenant_isolation`; SELECT, INSERT, UPDATE for `nexira_app`; no DELETE; range CHECKs (temperature −60..60 °C, wind and gusts 0..400 km/h, gusts ≥ wind, rain 0..1000 mm); `condition` from the seven values; a guard trigger refuses a row whose mission is not visible in its own tenant (the lesson of Prompts 24 and 29: foreign keys ignore RLS). A composite foreign key would need a new UNIQUE `(tenant_id, id)` on `mission`, a schema change outside PC-20, so it is not used.
 - `nexira_backup` reads it through the default privileges; the downgrade restores 0004 exactly.
 
 ## 8. Decisions needed from the product owner
