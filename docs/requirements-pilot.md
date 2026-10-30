@@ -86,8 +86,9 @@ The Nairobi acceptance scenario and the France scenario still pass. The France s
 | Journey Management (JRN-01..05) | **Written: §9 (approved, built: Prompts 23–27)** | — |
 | Air Travel Tracking (AIR-01..07) | **Written: §14 (approved, built: Prompts 28–32)** | — |
 | Travel & Air agent | **Written: §19 (approved, built: Prompts 33–37)** | — |
-| Assistance Partners (AST-01..04) | **Written: §29 (approved)** | — |
-| Weather (WX), D-35 | **Written: §24 (approved)** | — |
+| Assistance Partners (AST-01..04) | **Written: §29 (approved, built: Prompts 43–47)** | — |
+| Weather (WX), D-35 | **Written: §24 (approved, built: Prompts 38–42)** | — |
+| Document Expiry (DX) | **Written: §34 (approved)** | — |
 
 ## 8. Questions answered by the product owner (2026-10-25)
 
@@ -356,3 +357,59 @@ Playwright on the real stack: the Assistance Partners screen lists the five part
 6. **SOS suggestion:** shown on Safety Check-in next to each NEED_HELP and on the partner screen; nearest capable partner by coverage, then SLA; a person clicks to request. No agent in the pilot.
 7. **What a partner sees:** as AS-08; restricted travellers excluded.
 8. **Demo:** in NBO-CIVIL-UNREST scene 4, Peter Mwangi's HELP leads to a Sentinel secure-transport request (as in the design); no new scenario.
+
+---
+
+# Pilot module 7 · Document Expiry (approved 2026-10-30, PR #57)
+
+For the product owner, who approves this part; then for the coding agent (Prompts 48–52 in `docs/prompts-pilot.md`). Rules: D-30, and **D-37**. Everything runs on **simulated documents** from the simulator seed: no HR, passport or visa system is contacted, and no real document data is stored.
+
+## 34. Purpose and starting point
+
+Know whose passports, visas, accreditations and clearances are about to expire, start renewals in time, and see whether a mission's people could leave at short notice. When a mission's risk rises and someone's travel document would block an evacuation, an agent proposes urgent renewal and reminders; a person decides. This is the design's Document Expiry screen ("Compliance · Passports, visas & clearances") and its proactive proposal.
+
+| Exists today | Where |
+|---|---|
+| People with a type (DIPLOMAT, LOCAL_STAFF, DEPENDANT, CONTRACTOR, DELEGATE, CITIZEN), a mission, a phone and an email | `person` |
+| Staff campaigns through the notification service, with simulated channels; an `audience_filter` that can name people (the "trip travellers" audience, TA-05) | Mass Notification, D-31 |
+| Mission risk (display risk) and active incidents | intel, D-08 |
+| Trips with travellers, approval and a pre-travel checklist | Journey Management, PC-15 |
+| The agent framework: proposals, policies, levels, approvals, executors | D-12 to D-17 |
+| No documents, no expiry, no renewal, no Document Expiry screen | — |
+
+## 35. Requirements: Document Expiry (DX)
+
+| ID | Requirement | Pri. | Acceptance |
+|---|---|---|---|
+| DX-01 | **Document register.** For each staff member and dependant (DIPLOMAT, LOCAL_STAFF, DEPENDANT, CONTRACTOR), their travel and status documents: type (PASSPORT, DIPLOMATIC_PASSPORT, VISA, RESIDENCE_PERMIT, ACCREDITATION, SECURITY_CLEARANCE), issuing country and valid-until date. **No document numbers, scans or photos** are stored. Simulated, labelled so (D-19). | M | The screen lists the seeded documents with type, holder, mission and days left. |
+| DX-02 | **Urgency.** From days left (UTC date): EXPIRED (< 0), CRITICAL (< 30), HIGH (< 90), MODERATE (a passport with < 180 days, the six-month rule), OK otherwise. Sorted most urgent first. | M | Hana Takeda's diplomatic passport (21 days) shows CRITICAL. |
+| DX-03 | **Evacuation readiness.** A person is travel-ready when they hold a passport or diplomatic passport valid for at least 180 more days. Per mission and overall: the share of people who are travel-ready. A document is flagged **"Could block evacuation"** when its holder is not travel-ready and their mission's risk is HIGH or CRITICAL, or the mission has an active incident. | M | In NBO-CIVIL-UNREST, the two Nairobi passports are flagged; the KPI shows the share travel-ready. |
+| DX-04 | **Renewal tracking.** A document's renewal goes NONE → REQUESTED → IN_PROGRESS → RENEWED (a new valid-until date, later than the old one, is entered). Forward only; each step names who did it and when; audited; pushed to browsers. | M | A Consular Officer starts a renewal; the row shows "Renewal in progress". |
+| DX-05 | **Renewal reminders.** Select expiring documents and send a reminder to their holders as a staff campaign through the notification service (a new "document holders" audience in `audience_filter`, as TA-05). Never to citizens. A dependant's reminder goes to the dependant's own contact in the seed. | M | "Send renewal reminders" queues one staff campaign; the funnel shows deliveries (simulated). |
+| DX-06 | **Trips warn.** When a trip's traveller has no passport valid for 180 days after the trip ends, the trip shows a warning, and the pre-travel checklist names it. It does not block approval. | S | A Paris trip with such a traveller shows the warning. |
+| DX-07 | **Compliance agent (proactive).** When a mission's risk is HIGH or CRITICAL, or it has an active incident, and documents there would block evacuation, the agent proposes "Start urgent renewal and send reminders" for those documents, with evidence (days left, the six-month rule, the mission's risk) and an alternative ("Issue emergency travel documents only if needed", advice only). Level **Approve**; a Consular Officer or Duty Officer decides. Executing starts the renewals and sends the reminders through the same services people use. One open proposal per mission. | S | In NBO-CIVIL-UNREST, the proposal appears in the Decision Queue; approving it starts two renewals and sends reminders. |
+| DX-08 | **Document Expiry screen.** KPIs from data: documents tracked, expiring in < 30 days, expiring in < 90 days (and how many are in renewal), evacuation-ready %. A table of expiring documents (holder, mission, document, days left, urgency, impact, renewal), filters by mission, type and urgency, and actions shown from `GET /api/me/permissions`. Blueprint dark, as the design. | M | — |
+| DX-09 | **Who sees what.** DUTY_OFFICER, SECURITY_OFFICER, CONSULAR_OFFICER, HQ_CRISIS_DIRECTOR, TRAVEL_DESK and ADMIN see all; HEAD_OF_MISSION sees their own mission (D-05). VIEWER sees the KPIs only, no names. Renewals and reminders: CONSULAR_OFFICER and DUTY_OFFICER for any mission, HEAD_OF_MISSION for their own. | M | A Viewer gets KPIs and no list; a Head of Mission sees only their mission. |
+
+### Not in this module
+Document numbers, scans or photos; real HR, passport-office or visa systems; visa requirements by destination; issuing emergency travel documents; citizens' documents (consular work, a later module); costs.
+
+## 36. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-23 · `travel_document`**: tenant, person, type, issuing country, valid-until date, renewal status, who and when for each renewal step, timestamps. FORCE RLS; SELECT and INSERT for `nexira_app`, and UPDATE only of the renewal columns and `valid_until`; no DELETE. A guard trigger: forward-only renewal; `valid_until` changes only on RENEWED and only to a later date; same-tenant person; the holder is not a CITIZEN or DELEGATE; step timestamps written by the database.
+- The Compliance agent, its action policy (START_DOCUMENT_RENEWAL at level 2, approvers CONSULAR_OFFICER or DUTY_OFFICER) and the "document holders" audience are data (seed and `audience_filter`), not schema.
+
+## 37. Acceptance for the module
+
+Playwright on the real stack: the Document Expiry screen shows the seeded documents and KPIs, labelled simulated; Hana Takeda's diplomatic passport is CRITICAL. In NBO-CIVIL-UNREST, the two Nairobi documents are flagged "Could block evacuation" and the Compliance agent's proposal appears; a Consular Officer approves it; the two renewals show "in progress" and the reminders campaign is delivered (simulated); a Viewer sees KPIs and no names; the Head of Mission for another mission sees none of Nairobi's documents; the audit chain verifies; `make acceptance` (all existing specs) still passes.
+
+## 38. Questions answered by the product owner (2026-10-30: "use the defaults")
+
+1. **Seed:** about 1 to 3 documents for each staff member and dependant across the 36 missions (passport or diplomatic passport for everyone, plus visas, residence permits and accreditations where they apply), with expiry dates spread so that about 6 expire within 30 days and about 30 within 90 days, as the design shows. In Nairobi: **Hana Takeda's diplomatic passport (21 days)** and **her dependant child's passport (12 days)**, both fictional.
+2. **Who renews and reminds:** CONSULAR_OFFICER and DUTY_OFFICER for any mission; HEAD_OF_MISSION for their own (D-05). No second person: reminders are staff-only (MN-05).
+3. **The six-month rule:** a passport needs at least 180 days left to count as travel-ready, for every destination (no per-country visa rules in the pilot).
+4. **The agent:** a new **Compliance agent** (rule-based, no model), proposing at level Approve. It cannot be set to Auto (the policy floor is 2). Agents never renew or remind without a person's approval.
+5. **No document numbers** are stored, not even in part.
+6. **Trips:** warn, do not block (DX-06).
+7. **Demo:** in NBO-CIVIL-UNREST, after scene 3 the Compliance agent's proposal appears; no new scenario.
+8. **🔒 prompts:** the migration (RLS and grants) and the agent policy (D-29) need your named sign-off, as before.
