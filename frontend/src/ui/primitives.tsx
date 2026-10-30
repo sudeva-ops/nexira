@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 
 import type { Severity, SourceRef } from "../api/intel";
 import { sourceLabel } from "./format";
+import { CountUp } from "./motion";
+import { useFlash } from "./useMotion";
 
 const SEV_CLASS: Record<Severity, string> = {
   CRITICAL: "crit",
@@ -61,13 +63,15 @@ export function Kpi({
   detail?: ReactNode;
   alert?: boolean;
 }) {
+  // A plain number counts to its new value; any plain value glows when it changes.
+  const flash = useFlash(typeof value === "number" || typeof value === "string" ? String(value) : "");
   return (
     <div className={`nx-card nx-kpi${alert ? " alert" : ""}`}>
       <div className="l">
         <Icon icon={icon} size={11} />
         {label}
       </div>
-      <div className="v">{value}</div>
+      <div className={`v ${flash}`}>{typeof value === "number" ? <CountUp value={value} /> : value}</div>
       {detail && <div className="d">{detail}</div>}
     </div>
   );

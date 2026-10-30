@@ -10,6 +10,7 @@ import {
   weatherLevel,
   worstFirst,
 } from "../../api/weather";
+import { FlashRow } from "../../ui/motion";
 import { Card } from "../../ui/primitives";
 
 /** WX-02: current conditions at every mission, worst first; stale readings flagged (G-6). */
@@ -46,7 +47,12 @@ export function WeatherPanel() {
                 const old = isStale(w, now);
                 const colour = LEVEL_COLOUR[weatherLevel(w)];
                 return (
-                  <tr key={w.mission_id} className={old ? "nx-stale" : undefined}>
+                  <FlashRow
+                    key={w.mission_id}
+                    watch={`${w.condition} ${weatherLevel(w)}`}
+                    tone={weatherLevel(w) === "SEVERE" ? "danger" : weatherLevel(w) === "ROUGH" ? "warning" : "info"}
+                    className={old ? "nx-stale" : undefined}
+                  >
                     <td>
                       <b>{w.city}</b> <span className="nx-dim nx-mono">{w.mission_code}</span>
                     </td>
@@ -63,7 +69,7 @@ export function WeatherPanel() {
                     <td className="nx-dim" title={`Updated ${ago(w.observed_at)}`}>
                       {old && <span className="nx-stale-tag">Stale · {ago(w.observed_at).replace(" ago", "")}</span>}
                     </td>
-                  </tr>
+                  </FlashRow>
                 );
               })}
             </tbody>

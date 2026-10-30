@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { LEVEL_COLOUR, LEVELS, useAgentActivity, useAgents, useProposals } from "../../api/proposals";
 import { formatTime, HOME_TZ } from "../../app/time";
+import { CountUp } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
 import { metrics, queueOrder } from "./format";
 import { ProposalCard } from "./ProposalCard";
@@ -59,7 +60,7 @@ export function DecisionQueueScreen() {
         <Kpi
           icon="inbox"
           label="Awaiting decision"
-          value={<span className={m.pending ? "nx-pending" : "nx-safe"}>{m.pending}</span>}
+          value={<span className={m.pending ? "nx-pending" : "nx-safe"}><CountUp value={m.pending} /></span>}
           detail={m.pending ? "Oldest deadline first" : "Queue clear"}
         />
         <Kpi icon="trending-up" label="Raised proactively" value={m.proactive} detail="Before an incident" />

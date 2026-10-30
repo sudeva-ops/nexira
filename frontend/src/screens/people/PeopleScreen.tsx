@@ -155,7 +155,7 @@ export function PeopleScreen() {
         <Kpi
           icon="people"
           label="Personnel"
-          value={summary?.personnel.toLocaleString("en-GB") ?? "—"}
+          value={summary?.personnel ?? "—"}
           detail="Diplomats, local staff, delegates"
         />
         <Kpi
@@ -173,7 +173,7 @@ export function PeopleScreen() {
         <Kpi
           icon="people"
           label="Registered citizens abroad"
-          value={summary?.citizens.toLocaleString("en-GB") ?? "—"}
+          value={summary?.citizens ?? "—"}
           detail="Consular registration"
         />
       </div>

@@ -1886,3 +1886,129 @@ body {
   margin-bottom: 6px;
   color: var(--nx-tx2);
 }
+
+/* --- Motion: it shows what changed, and is still otherwise -------------------------- */
+/* ui/motion.tsx alternates nx-flash-a and nx-flash-b so each change replays the flash. */
+:root {
+  --nx-tone-info: #4c90f0;
+  --nx-tone-warning: #ec9a3c;
+  --nx-tone-danger: #e76a6e;
+  --nx-tone-success: #32a467;
+}
+
+tr.nx-tone-info {
+  --nx-tone: var(--nx-tone-info);
+}
+tr.nx-tone-warning {
+  --nx-tone: var(--nx-tone-warning);
+}
+tr.nx-tone-danger {
+  --nx-tone: var(--nx-tone-danger);
+}
+tr.nx-tone-success {
+  --nx-tone: var(--nx-tone-success);
+}
+
+tr.nx-flash-a > td {
+  animation: nx-row-a 1.8s ease-out;
+}
+tr.nx-flash-b > td {
+  animation: nx-row-b 1.8s ease-out;
+}
+
+@keyframes nx-row-a {
+  from {
+    background-color: color-mix(
+      in srgb,
+      var(--nx-tone, #4c90f0) 35%,
+      transparent
+    );
+  }
+}
+
+@keyframes nx-row-b {
+  from {
+    background-color: color-mix(
+      in srgb,
+      var(--nx-tone, #4c90f0) 35%,
+      transparent
+    );
+  }
+}
+
+/* A number or a line of text glows briefly when it changes. */
+:not(tr).nx-flash-a {
+  animation: nx-glow-a 1.4s ease-out;
+}
+:not(tr).nx-flash-b {
+  animation: nx-glow-b 1.4s ease-out;
+}
+
+@keyframes nx-glow-a {
+  from {
+    text-shadow: 0 0 12px rgba(76, 144, 240, 0.9);
+  }
+}
+
+@keyframes nx-glow-b {
+  from {
+    text-shadow: 0 0 12px rgba(76, 144, 240, 0.9);
+  }
+}
+
+/* The heartbeat: the live dot breathes; reconnecting is amber. */
+.nx-live.live i {
+  animation: nx-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes nx-breathe {
+  50% {
+    box-shadow: 0 0 0 5px rgba(50, 164, 103, 0.08);
+  }
+}
+
+.nx-live.reconnecting {
+  color: #fbb360;
+}
+
+.nx-live.reconnecting i {
+  background: #ec9a3c;
+  animation: nx-blink 1s steps(2) infinite;
+}
+
+@keyframes nx-blink {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.nx-last-event {
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--nx-tx3);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A new proposal arrives in the queue rather than appearing. */
+.nx-proposal {
+  animation: nx-arrive 0.35s ease-out;
+}
+
+@keyframes nx-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

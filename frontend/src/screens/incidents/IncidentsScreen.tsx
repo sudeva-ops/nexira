@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 
 import { type IncidentStatus, useIncidents } from "../../api/intel";
 import { ago } from "../../app/time";
+import { FlashRow } from "../../ui/motion";
 import { Card, Sev } from "../../ui/primitives";
 import { IncidentDetail } from "./IncidentDetail";
 
@@ -65,8 +66,10 @@ export function IncidentsScreen() {
             </thead>
             <tbody>
               {incidents.map((i) => (
-                <tr
+                <FlashRow
                   key={i.id}
+                  watch={`${i.severity} ${i.status} ${i.signal_count}`}
+                  tone={i.severity === "CRITICAL" ? "danger" : i.severity === "HIGH" ? "warning" : "info"}
                   className={`click${i.id === selectedId ? " sel" : ""}`}
                   onClick={() => setParams({ id: i.id })}
                 >
@@ -87,7 +90,7 @@ export function IncidentsScreen() {
                       {i.status[0] + i.status.slice(1).toLowerCase()}
                     </span>
                   </td>
-                </tr>
+                </FlashRow>
               ))}
             </tbody>
           </table>

@@ -21,6 +21,7 @@ import {
 import { canRequestPartner } from "../../api/permissions";
 import { formatStamp } from "../../app/time";
 import { initials } from "../../ui/format";
+import { FlashRow } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
 import { type RequestFor, RequestDialog } from "./RequestDialog";
 
@@ -52,7 +53,11 @@ function useSos(requests: PartnerRequest[]) {
 function RequestRow({ r, canAct }: { r: PartnerRequest; canAct: boolean }) {
   const action = useRequestAction();
   return (
-    <tr data-request={r.reference}>
+    <FlashRow
+      data-request={r.reference}
+      watch={`${r.status} ${r.eta}`}
+      tone={r.status === "DECLINED" ? "danger" : r.status === "COMPLETED" ? "success" : "info"}
+    >
       <td className="nx-mono nx-dim">{r.reference}</td>
       <td>
         <b>{r.partner_name}</b>
@@ -93,7 +98,7 @@ function RequestRow({ r, canAct }: { r: PartnerRequest; canAct: boolean }) {
           <div className="nx-error">{action.error instanceof ApiError ? action.error.message : "Not done"}</div>
         )}
       </td>
-    </tr>
+    </FlashRow>
   );
 }
 
