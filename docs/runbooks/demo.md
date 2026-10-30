@@ -80,6 +80,17 @@ Best right after storyline 2, while the Paris incident is active.
 
 XW 451 can land only once. To show it again, run `make reset-demo`.
 
+## 6b. Storyline 5 · Weather (about 4 minutes)
+
+1. Window A, **Global Operations**: the **Weather at missions** panel lists current conditions for every mission, worst first, labelled xWeather (simulated); each mission has a weather icon on the map, and hovering a mission shows its conditions. The **Weather** chip hides the layer. A reading older than 30 minutes is greyed and tagged "Stale" (the worker refreshes every 15 minutes).
+2. Presenter bar: pick **Manila tropical storm** and press →: Manila turns cloudy and windy (45 km/h, gusts 65).
+3. → and wait about 30 seconds: Manila goes to **Storm** (110 km/h, gusts 150) and moves to the top of the panel; xWeather and Dataminr warnings fuse into one **CRITICAL STORM** incident 40 km east of Manila. Click it: a 60 km impact zone (unrest uses 5 km) with the Manila embassy, residence, staff and the TRP-8810 travellers inside.
+4. **Decision Queue**: the Response Planner proposes **PB-06 · Severe weather near mission**; approve it as the Duty Officer. Its staff alert uses the Manila text; the Communications agent then proposes the Manila citizen advisory (English only until translations are reviewed). Travel & Air proposes a safety message to TRP-8810's travellers.
+5. **Journey Management**: TRP-8810 (Kuala Lumpur staff in Manila) shows **Impacted**, and the Philippines' destination risk is raised by the storm.
+6. Optional → : a separate **Flood** incident in the city (25 km), its own exposure and its own PB-06 proposal.
+
+The storm's conditions hold for 6 hours. To show it again, run `make reset-demo`.
+
 ## 7. If something goes wrong
 
 | Symptom | Fix |

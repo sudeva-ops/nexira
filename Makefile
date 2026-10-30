@@ -49,7 +49,7 @@ acceptance: env reset-demo up
 	cd frontend && npx playwright install chromium
 	set -a && . ./.env && set +a && cd frontend && npx playwright test e2e/acceptance.spec.ts \
 	  e2e/ntf-acceptance.spec.ts e2e/jrn-acceptance.spec.ts e2e/air-acceptance.spec.ts \
-	  e2e/ta-acceptance.spec.ts
+	  e2e/ta-acceptance.spec.ts e2e/wx-acceptance.spec.ts
 
 lint: lint-backend lint-simulator lint-frontend
 
