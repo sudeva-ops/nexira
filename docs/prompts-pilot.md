@@ -398,3 +398,56 @@ the suggestion.
 Playwright, real stack (requirements-pilot.md §32). Report the real output; make
 acceptance (all specs) still passes.
 ```
+
+---
+
+## Pilot module 7 · Document Expiry (proposed)
+
+Sources: D-37, `docs/requirements-pilot.md` §34–38 (DX-01..09), PC-23. Simulated documents only; no document numbers.
+
+### Prompt 48 · Read and plan (no code)
+```
+Read D-05, D-08, D-12..D-17, D-19, D-29, D-30, D-31, D-37, requirements-pilot.md §34-38,
+the person and mission model, Mass Notification (audience_filter, staff campaigns), the
+Travel & Air agent (the pattern for a rule-based agent with its own action type and
+audience), and Journey Management's checklist. Write docs/plan-pilot-dx.md:
+requirement-to-code mapping, urgency and travel-readiness rules, the Compliance agent's
+trigger and its one-open-proposal-per-mission rule, the seed (§38 Q1), gaps with proposed
+answers, and the migration for PC-23 (only after it is approved). No code.
+```
+
+### Prompt 49 · Document table (migration) 🔒
+```
+PC-23, once approved. A new migration: travel_document with FORCE RLS and
+tenant_isolation, the grants as proposed, the guard trigger with a pinned search_path.
+Tests (as nexira_api): isolation; every refusal of the guard; no DELETE; column grants;
+the backup role reads it; the downgrade restores the previous revision exactly.
+```
+
+### Prompt 50 · Register, renewals, reminders and the Compliance agent 🔒
+```
+DX-01..07, DX-09. app/modules/documents: service (list with urgency and readiness,
+renewal steps, reminders through the notification service with a "document holders"
+audience; role checks through app/core/approvals.py), router, DOCUMENT_UPDATED events to
+browsers. The Compliance agent and its policy (START_DOCUMENT_RENEWAL, level 2, floor 2;
+executor calls the same services). The trip warning (DX-06). Seed the documents (§38 Q1).
+🔒: agent policy and executor (D-29).
+Tests: urgency and readiness at the boundaries (29/30, 89/90, 179/180 days), roles and
+mission scope, the forward-only renewal, reminders never to citizens, the agent's trigger,
+one open proposal per mission, the executor writing the same rows and audit as a person.
+```
+
+### Prompt 51 · Document Expiry screen
+```
+DX-02, DX-03, DX-08, DX-09. The screen (as the design, Blueprint dark): KPIs, expiring
+documents with urgency, impact and renewal, filters, "Send renewal reminders" and renewal
+actions from /api/me/permissions; KPIs only for a Viewer; the trip warning on Journey
+Management; the navigation entry; rows flash on change (ui/motion). Tests: Vitest for
+the list, filters, actions by role and the Viewer view.
+```
+
+### Prompt 52 · Document Expiry acceptance
+```
+Playwright, real stack (requirements-pilot.md §37). Report the real output; make
+acceptance (all specs) still passes.
+```
