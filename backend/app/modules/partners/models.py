@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import CHAR, Boolean, DateTime, ForeignKey, Integer, Text, text
+from sqlalchemy import CHAR, Boolean, DateTime, FetchedValue, ForeignKey, Integer, Text, text
 from sqlalchemy.dialects.postgresql import ARRAY, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -55,11 +55,20 @@ class PartnerRequest(Base):
     eta: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_by_type: Mapped[str] = mapped_column(Text, nullable=False)  # USER, PLAYBOOK
     created_by: Mapped[str] = mapped_column(Text, nullable=False)
+    # Written by the guard trigger: the ORM reads them back rather than trusting its own
+    # values (review of Prompt 44, N9).
     requested_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True), nullable=False, server_default=FetchedValue()
     )
-    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    accepted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_onupdate=FetchedValue()
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), server_onupdate=FetchedValue()
+    )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=text("now()")
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=FetchedValue(),
+        server_onupdate=FetchedValue(),
     )

@@ -149,6 +149,7 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "airport",
     "flight_event",
     "partner",  # seeded; no UPDATE or DELETE in the pilot (PC-21)
+    "partner_request",  # UPDATE of status and ETA only, never DELETE (PC-22; review of Prompt 44)
 }
 NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELETE)
     "message_template",
@@ -157,7 +158,6 @@ NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELE
     "trip",  # cancelled, never deleted (PC-15)
     "flight",  # written only by the tracker; never deleted (PC-19)
     "weather_current",  # current values, refreshed by the feed; never deleted (PC-20)
-    "partner_request",  # cancelled, never deleted (PC-22)
 }
 
 

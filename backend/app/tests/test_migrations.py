@@ -320,9 +320,19 @@ async def _partner_shape(admin_url: str) -> dict[str, object]:
         policies = await conn.fetchval(
             "SELECT count(*) FROM pg_policies WHERE tablename IN ('partner', 'partner_request')"
         )
+        columns = await conn.fetch(
+            "SELECT a.attname, a.attacl::text AS acl FROM pg_attribute a "
+            "JOIN pg_class c ON c.oid = a.attrelid WHERE c.relname = 'partner_request' "
+            "AND a.attacl IS NOT NULL ORDER BY a.attname"
+        )
     finally:
         await conn.close()
-    return {"tables": [tuple(t) for t in tables], "functions": functions, "policies": policies}
+    return {
+        "tables": [tuple(t) for t in tables],
+        "functions": functions,
+        "policies": policies,
+        "columns": [tuple(c) for c in columns],
+    }
 
 
 def test_downgrading_0006_restores_0005_exactly(fresh: DbUrls) -> None:
@@ -338,8 +348,8 @@ def test_downgrading_0006_restores_0005_exactly(fresh: DbUrls) -> None:
     assert asyncio.run(_partner_shape(admin)) == at_0005
     assert asyncio.run(_weather_shape(admin)) == at_0005_weather
     assert at_0005["tables"] == []
-    # The app reads and seeds partners only; requests are read, made and moved, never
-    # deleted; nothing else (no TRUNCATE, REFERENCES or TRIGGER).
+    # The app reads and seeds partners only; requests are read and made, and only their
+    # status and ETA move; never deleted; nothing else (no TRUNCATE, REFERENCES or TRIGGER).
     assert at_head["tables"] == [
         (
             "partner",
@@ -351,8 +361,13 @@ def test_downgrading_0006_restores_0005_exactly(fresh: DbUrls) -> None:
             "partner_request",
             True,
             "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
-            "nexira_app=arw/nexira_owner}",
+            "nexira_app=ar/nexira_owner}",
         ),
+    ]
+    # UPDATE only of status and ETA (review of Prompt 44, M3).
+    assert at_head["columns"] == [
+        ("eta", "{nexira_app=w/nexira_owner}"),
+        ("status", "{nexira_app=w/nexira_owner}"),
     ]
     assert (at_head["functions"], at_head["policies"]) == (1, 2)
     command.upgrade(cfg, "head")

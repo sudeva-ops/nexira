@@ -9,12 +9,15 @@ CREATE TABLE partner (
   tenant_id    uuid NOT NULL REFERENCES tenant(id),
   code         text NOT NULL CHECK (code ~ '^[A-Z]{2,10}$'),
   name         text NOT NULL CHECK (length(name) BETWEEN 1 AND 100),
+  -- One-dimensional, no NULLs (a NULL would make "= ANY" unknown: review of Prompt 44, M1).
   services     text[] NOT NULL CHECK (
-                 cardinality(services) > 0
+                 cardinality(services) > 0 AND array_ndims(services) = 1
+                 AND array_position(services, NULL) IS NULL
                  AND services <@ ARRAY['MEDICAL','EVACUATION','SECURE_TRANSPORT','WELFARE','RELOCATION']
                ),
   coverage     char(2)[] NOT NULL CHECK (
-                 cardinality(coverage) > 0
+                 cardinality(coverage) > 0 AND array_ndims(coverage) = 1
+                 AND array_position(coverage, NULL) IS NULL
                  AND array_to_string(coverage, ',') ~ '^[A-Z]{2}(,[A-Z]{2})*$'
                ),
   sla_minutes  integer NOT NULL CHECK (sla_minutes BETWEEN 1 AND 10080),
@@ -58,7 +61,10 @@ CREATE TABLE partner_request (
   CHECK (CASE WHEN status IN ('ACCEPTED','EN_ROUTE','COMPLETED') THEN accepted_at IS NOT NULL
               WHEN status IN ('REQUESTED','DECLINED') THEN accepted_at IS NULL
               ELSE true END),
-  CHECK ((status = 'COMPLETED') = (completed_at IS NOT NULL))
+  CHECK ((status = 'COMPLETED') = (completed_at IS NOT NULL)),
+  -- An accepted request has an ETA, never before it was made (review of Prompt 44, N7).
+  CHECK (status NOT IN ('ACCEPTED','EN_ROUTE') OR eta IS NOT NULL),
+  CHECK (eta IS NULL OR eta >= requested_at)
 );
 CREATE INDEX partner_request_status_idx ON partner_request (tenant_id, status);
 CREATE INDEX partner_request_incident_idx ON partner_request (incident_id);
@@ -66,7 +72,9 @@ ALTER TABLE partner_request ENABLE ROW LEVEL SECURITY;
 ALTER TABLE partner_request FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON partner_request
   USING (tenant_id = current_tenant_id()) WITH CHECK (tenant_id = current_tenant_id());
-GRANT SELECT, INSERT, UPDATE ON partner_request TO nexira_app;
+-- Only status and ETA move (review of Prompt 44, M3); the trigger writes the timestamps.
+GRANT SELECT, INSERT ON partner_request TO nexira_app;
+GRANT UPDATE (status, eta) ON partner_request TO nexira_app;
 
 -- The request rules (plan-pilot-ast.md §2, §7, §10, G-5). Foreign keys ignore RLS, so the
 -- tenant of every reference is checked here (the lesson of Prompts 24 and 29). The trigger
@@ -80,11 +88,11 @@ DECLARE
 BEGIN
   IF TG_OP = 'UPDATE' THEN
     -- Content is fixed once requested; only status and ETA move.
-    IF (NEW.tenant_id, NEW.reference, NEW.partner_id, NEW.service, NEW.mission_id,
+    IF (NEW.id, NEW.tenant_id, NEW.reference, NEW.partner_id, NEW.service, NEW.mission_id,
         NEW.incident_id, NEW.person_id, NEW.place_label, NEW.location::text, NEW.note,
         NEW.created_by_type, NEW.created_by, NEW.requested_at)
        IS DISTINCT FROM
-       (OLD.tenant_id, OLD.reference, OLD.partner_id, OLD.service, OLD.mission_id,
+       (OLD.id, OLD.tenant_id, OLD.reference, OLD.partner_id, OLD.service, OLD.mission_id,
         OLD.incident_id, OLD.person_id, OLD.place_label, OLD.location::text, OLD.note,
         OLD.created_by_type, OLD.created_by, OLD.requested_at) THEN
       RAISE EXCEPTION 'partner request: its content is fixed once requested';
@@ -133,10 +141,10 @@ BEGIN
   IF NOT p.is_active THEN
     RAISE EXCEPTION 'partner request: % is not active', p.code;
   END IF;
-  IF NOT (NEW.service = ANY (p.services)) THEN
+  IF NOT coalesce(NEW.service = ANY (p.services), false) THEN
     RAISE EXCEPTION 'partner request: % does not offer %', p.code, NEW.service;
   END IF;
-  IF NOT (country = ANY (p.coverage)) THEN
+  IF NOT coalesce(country = ANY (p.coverage), false) THEN
     RAISE EXCEPTION 'partner request: % does not cover %', p.code, country;
   END IF;
   IF NEW.incident_id IS NOT NULL AND NOT EXISTS (
@@ -148,12 +156,16 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM person WHERE id = NEW.person_id AND tenant_id = NEW.tenant_id) THEN
       RAISE EXCEPTION 'partner request: no such person';
     END IF;
-    -- AS-08, G-5: never a traveller on a restricted trip that will happen or is under way.
-    IF EXISTS (
-      SELECT 1 FROM trip t JOIN trip_traveller tt ON tt.trip_id = t.id
-       WHERE tt.person_id = NEW.person_id AND t.tenant_id = NEW.tenant_id AND t.restricted
-         AND t.approval_status IN ('PENDING','APPROVED') AND t.ends_on >= current_date
-    ) THEN
+    -- AS-08, G-5: never a traveller on a restricted trip that is being prepared, will
+    -- happen or is under way. DRAFT counts: a trip is marked restricted only as a draft
+    -- (review of Prompt 44, M2). The trips are locked against a concurrent change (L6);
+    -- dates in UTC, as trips (Journey plan G-11; review N8).
+    PERFORM 1 FROM trip t JOIN trip_traveller tt ON tt.trip_id = t.id
+     WHERE tt.person_id = NEW.person_id AND t.tenant_id = NEW.tenant_id AND t.restricted
+       AND t.approval_status IN ('DRAFT','PENDING','APPROVED')
+       AND t.ends_on >= (now() AT TIME ZONE 'UTC')::date
+       FOR SHARE OF t;
+    IF FOUND THEN
       RAISE EXCEPTION 'partner request: a restricted traveller cannot be named';
     END IF;
   END IF;

@@ -127,7 +127,23 @@ async def request(
 
 
 async def move(conn: asyncpg.Connection, request_id: uuid.UUID, status: str) -> None:
-    await conn.execute("UPDATE partner_request SET status = $2 WHERE id = $1", request_id, status)
+    """A status change; acceptance comes with an ETA, as the simulated partner gives one."""
+    eta = ", eta = now() + interval '15 minutes'" if status == "ACCEPTED" else ""
+    await conn.execute(
+        f"UPDATE partner_request SET status = $2{eta} WHERE id = $1", request_id, status
+    )
+
+
+@pytest.fixture
+async def owner(db: DbUrls, tenant: tuple[asyncpg.Connection, Ids]) -> Any:
+    """The table owner in the same tenant: it may UPDATE any column, so the guard's own
+    rules are tested behind the column grant (defence in depth; review of Prompt 44, M3)."""
+    conn = await asyncpg.connect(db.owner_plain)
+    await set_tenant(conn, await tenant[0].fetchval("SELECT current_tenant_id()"))
+    try:
+        yield conn
+    finally:
+        await conn.close()
 
 
 # --- the life of a request --------------------------------------------------------------------
@@ -211,28 +227,29 @@ async def test_a_request_starts_as_requested(
         await request(conn, ids, **start)
 
 
-@pytest.mark.parametrize(
-    "change",
-    [
-        "partner_id = gen_random_uuid()",
-        "service = 'SECURE_TRANSPORT'",
-        "mission_id = gen_random_uuid()",
-        "incident_id = NULL",
-        "person_id = NULL",
-        "place_label = 'Elsewhere'",
-        "location = 'SRID=4326;POINT(1 1)'",
-        "note = 'changed'",
-        "created_by = 'someone else'",
-        "created_by_type = 'PLAYBOOK'",
-        "requested_at = now() - interval '1 day'",
-        "reference = 'REQ-999999'",
-    ],
-)
-async def test_content_is_fixed_once_requested(
-    tenant: tuple[asyncpg.Connection, Ids], change: str
-) -> None:
-    conn, ids = tenant
-    req = await request(
+CHANGES = [
+    "id = gen_random_uuid()",
+    "tenant_id = gen_random_uuid()",
+    "partner_id = gen_random_uuid()",
+    "service = 'SECURE_TRANSPORT'",
+    "mission_id = gen_random_uuid()",
+    "incident_id = NULL",
+    "person_id = NULL",
+    "place_label = 'Elsewhere'",
+    "location = 'SRID=4326;POINT(1 1)'",
+    "note = 'changed'",
+    "created_by = 'someone else'",
+    "created_by_type = 'PLAYBOOK'",
+    "requested_at = now() - interval '1 day'",
+    "reference = 'REQ-999999'",
+    "accepted_at = now()",
+    "completed_at = now()",
+    "updated_at = now() - interval '1 day'",
+]
+
+
+async def full_request(conn: asyncpg.Connection, ids: Ids) -> uuid.UUID:
+    return await request(
         conn,
         ids,
         incident_id=ids.incident,
@@ -241,28 +258,61 @@ async def test_content_is_fixed_once_requested(
         note="Vehicle blocked",
         located=True,
     )
-    with pytest.raises(REFUSED, match="content is fixed"):
+
+
+@pytest.mark.parametrize("change", CHANGES)
+async def test_the_app_may_change_only_status_and_eta(
+    tenant: tuple[asyncpg.Connection, Ids], change: str
+) -> None:
+    """GRANT UPDATE (status, eta): anything else is refused by privilege."""
+    conn, ids = tenant
+    req = await full_request(conn, ids)
+    with pytest.raises(asyncpg.InsufficientPrivilegeError):
         await conn.execute(f"UPDATE partner_request SET {change} WHERE id = $1", req)
 
 
+@pytest.mark.parametrize("change", CHANGES[:14])
+async def test_content_is_fixed_once_requested_even_for_the_owner(
+    tenant: tuple[asyncpg.Connection, Ids], owner: asyncpg.Connection, change: str
+) -> None:
+    conn, ids = tenant
+    req = await full_request(conn, ids)
+    with pytest.raises(REFUSED, match="content is fixed"):
+        await owner.execute(f"UPDATE partner_request SET {change} WHERE id = $1", req)
+
+
 async def test_a_missing_location_cannot_be_added_later(
-    tenant: tuple[asyncpg.Connection, Ids],
+    tenant: tuple[asyncpg.Connection, Ids], owner: asyncpg.Connection
 ) -> None:
     conn, ids = tenant
     req = await request(conn, ids)
     with pytest.raises(REFUSED, match="content is fixed"):
-        await conn.execute(f"UPDATE partner_request SET location = {PT} WHERE id = $1", req)
+        await owner.execute(f"UPDATE partner_request SET location = {PT} WHERE id = $1", req)
+
+
+async def test_updated_at_is_the_databases_whatever_the_owner_writes(
+    tenant: tuple[asyncpg.Connection, Ids], owner: asyncpg.Connection
+) -> None:
+    conn, ids = tenant
+    req = await request(conn, ids, updated_at=datetime(2000, 1, 1, tzinfo=UTC))
+    assert (
+        await conn.fetchval("SELECT updated_at FROM partner_request WHERE id = $1", req)
+    ).year > 2000
+    await owner.execute("UPDATE partner_request SET updated_at = '2000-01-01' WHERE id = $1", req)
+    assert (
+        await conn.fetchval("SELECT updated_at FROM partner_request WHERE id = $1", req)
+    ).year > 2000
 
 
 @pytest.mark.parametrize("column", ["accepted_at", "completed_at"])
-async def test_timestamps_are_written_by_the_database(
-    tenant: tuple[asyncpg.Connection, Ids], column: str
+async def test_timestamps_are_written_by_the_database_even_for_the_owner(
+    tenant: tuple[asyncpg.Connection, Ids], owner: asyncpg.Connection, column: str
 ) -> None:
     conn, ids = tenant
     req = await request(conn, ids)
     await move(conn, req, "ACCEPTED")
     with pytest.raises(REFUSED, match="written by the database"):
-        await conn.execute(f"UPDATE partner_request SET {column} = now() WHERE id = $1", req)
+        await owner.execute(f"UPDATE partner_request SET {column} = now() WHERE id = $1", req)
 
 
 async def test_an_eta_only_once_accepted(tenant: tuple[asyncpg.Connection, Ids]) -> None:
@@ -277,6 +327,30 @@ async def test_an_eta_only_once_accepted(tenant: tuple[asyncpg.Connection, Ids])
     await move(conn, req, "COMPLETED")
     with pytest.raises(REFUSED, match="ETA is set only once accepted"):
         await conn.execute(eta, req)
+    other = await request(conn, ids)
+    await move(conn, other, "ACCEPTED")
+    with pytest.raises(REFUSED, match="ETA is set only once accepted"):
+        await conn.execute(
+            "UPDATE partner_request SET status = 'CANCELLED', eta = now() + interval '2 hours' "
+            "WHERE id = $1",
+            other,
+        )
+
+
+@pytest.mark.parametrize(
+    "update",
+    [
+        "status = 'ACCEPTED'",  # accepted without an ETA
+        "status = 'ACCEPTED', eta = now() - interval '1 day'",  # an ETA before the request
+    ],
+)
+async def test_an_accepted_request_has_a_sensible_eta(
+    tenant: tuple[asyncpg.Connection, Ids], update: str
+) -> None:
+    conn, ids = tenant
+    req = await request(conn, ids)
+    with pytest.raises(asyncpg.CheckViolationError):
+        await conn.execute(f"UPDATE partner_request SET {update} WHERE id = $1", req)
 
 
 # --- who can be asked, about what --------------------------------------------------------------
@@ -315,35 +389,46 @@ async def test_every_reference_is_in_the_requests_tenant(
             await request(conn, mine, **foreign)
 
 
+@pytest.mark.parametrize(
+    ("status", "ends", "restricted", "refused"),
+    [
+        ("DRAFT", "current_date + 3", True, True),  # being prepared (review of Prompt 44, M2)
+        ("PENDING", "current_date + 3", True, True),
+        ("APPROVED", "current_date + 3", True, True),  # will happen or under way
+        ("APPROVED", "current_date", True, True),  # ends today (UTC)
+        ("APPROVED", "current_date - 1", True, False),  # over
+        ("REJECTED", "current_date + 3", True, False),  # will not happen
+        ("CANCELLED", "current_date + 3", True, False),
+        ("APPROVED", "current_date + 3", False, False),  # not restricted
+    ],
+)
 async def test_a_restricted_traveller_cannot_be_named(
-    tenant: tuple[asyncpg.Connection, Ids],
+    tenant: tuple[asyncpg.Connection, Ids], status: str, ends: str, restricted: bool, refused: bool
 ) -> None:
-    """AS-08, G-5: not while the restricted trip will happen or is under way."""
+    """AS-08, G-5: not while a restricted trip is prepared, will happen or is under way."""
     conn, ids = tenant
-
-    async def trip(status: str, ends: str) -> None:
-        trip_id = uuid.uuid4()
-        # As the seed loads trips: the trip and its travellers in one transaction.
-        async with conn.transaction():
-            await conn.execute(
-                "INSERT INTO trip (id, tenant_id, reference, origin, destination, starts_on, "
-                f"ends_on, approval_status, restricted) VALUES ($1, current_tenant_id(), $2, 'A', "
-                f"'B', current_date - 10, {ends}, $3, true)",
-                trip_id,
-                f"TRP-{trip_id.hex[:6]}",
-                status,
-            )
-            await conn.execute(
-                "INSERT INTO trip_traveller (tenant_id, trip_id, person_id) "
-                "VALUES (current_tenant_id(), $1, $2)",
-                trip_id,
-                ids.person,
-            )
-
-    await trip("APPROVED", "current_date - 1")  # over: no longer protected
-    await request(conn, ids, person_id=ids.person)
-    await trip("PENDING", "current_date + 3")
-    with pytest.raises(REFUSED, match="restricted traveller"):
+    trip_id = uuid.uuid4()
+    # As the seed loads trips: the trip and its travellers in one transaction.
+    async with conn.transaction():
+        await conn.execute(
+            "INSERT INTO trip (id, tenant_id, reference, origin, destination, starts_on, "
+            f"ends_on, approval_status, restricted) VALUES ($1, current_tenant_id(), $2, 'A', "
+            f"'B', current_date - 10, {ends}, $3, $4)",
+            trip_id,
+            f"TRP-{trip_id.hex[:6]}",
+            status,
+            restricted,
+        )
+        await conn.execute(
+            "INSERT INTO trip_traveller (tenant_id, trip_id, person_id) "
+            "VALUES (current_tenant_id(), $1, $2)",
+            trip_id,
+            ids.person,
+        )
+    if refused:
+        with pytest.raises(REFUSED, match="restricted traveller"):
+            await request(conn, ids, person_id=ids.person)
+    else:
         await request(conn, ids, person_id=ids.person)
 
 
@@ -364,6 +449,17 @@ async def test_nothing_is_deleted_and_partners_are_not_edited(
             await conn.execute(statement)
 
 
+async def test_a_two_dimensional_coverage_is_refused(
+    tenant: tuple[asyncpg.Connection, Ids],
+) -> None:
+    conn, _ = tenant
+    with pytest.raises(asyncpg.CheckViolationError):
+        await conn.execute(
+            "INSERT INTO partner (tenant_id, code, name, services, coverage, sla_minutes) "
+            "VALUES (current_tenant_id(), 'BAD', 'Bad', '{MEDICAL}', '{{KE},{FR}}', 30)"
+        )
+
+
 @pytest.mark.parametrize(
     ("services", "coverage", "sla"),
     [
@@ -373,10 +469,15 @@ async def test_nothing_is_deleted_and_partners_are_not_edited(
         (["MEDICAL"], ["ke"], 30),  # not a country code
         (["MEDICAL"], ["KE"], 0),  # SLA out of range
         (["MEDICAL"], ["KE"], 10081),
+        (["MEDICAL"], ["KE", None], 30),  # a NULL would cover everywhere (review, M1)
+        (["MEDICAL", None], ["KE"], 30),
     ],
 )
 async def test_partner_values_are_checked(
-    tenant: tuple[asyncpg.Connection, Ids], services: list[str], coverage: list[str], sla: int
+    tenant: tuple[asyncpg.Connection, Ids],
+    services: list[str | None],
+    coverage: list[str | None],
+    sla: int,
 ) -> None:
     conn, _ = tenant
     with pytest.raises(asyncpg.CheckViolationError):
