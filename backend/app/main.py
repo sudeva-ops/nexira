@@ -13,6 +13,7 @@ from app.modules.audit.router import router as audit_router
 from app.modules.checkin.router import router as checkin_router
 from app.modules.intel.router import router as intel_router
 from app.modules.notifications.router import router as notifications_router
+from app.modules.partners.router import router as partners_router
 from app.modules.people.router import router as people_router
 from app.modules.playbooks.router import router as playbooks_router
 from app.modules.scenarios.router import router as scenarios_router
@@ -55,6 +56,7 @@ def create_app(app_env: str) -> FastAPI:
         people_router,
         playbooks_router,
         notifications_router,
+        partners_router,
         checkin_router,
         agents_router,
         travel_router,

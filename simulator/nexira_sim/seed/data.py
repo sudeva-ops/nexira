@@ -711,6 +711,43 @@ TRAVEL_POLICIES: list[tuple[str, int, list[str], bool, int]] = [
     ("CANCEL_TRIP", 2, ["SECURITY_OFFICER"], False, 3600),
 ]
 
+# --- Assistance Partners (D-36, plan-pilot-ast §8): fictional partners, simulated -----------
+MISSION_COUNTRIES = sorted({cc for _code, _city, _name, cc, *_ in MISSIONS})
+# Africa, the Middle East and Europe: Sentinel's secure-transport coverage.
+EMEA = ["GB", "FR", "DE", "BE", "CH", "IT", "ES", "RU", "TR", "EG", "MA", "NG", "KE", "ET", "ZA",
+        "JO", "IQ", "SA", "OM"]  # fmt: skip
+# (code, name, services, coverage, SLA minutes, hours). Canberra and Buenos Aires have no
+# evacuation partner: the two coverage gaps on the screen (AS-07).
+PARTNERS: list[tuple[str, str, list[str], list[str], int, str]] = [
+    ("KES", "Kestrel Medical Assistance", ["MEDICAL"], MISSION_COUNTRIES, 15, "24/7"),
+    (
+        "ATL",
+        "Atlas Air Evacuation",
+        ["EVACUATION"],
+        [cc for cc in MISSION_COUNTRIES if cc not in ("AU", "AR")],
+        240,
+        "24/7",
+    ),
+    ("SEN", "Sentinel Secure Transport", ["SECURE_TRANSPORT"], EMEA, 30, "24/7"),
+    (
+        "HAR",
+        "Harbor Crisis Support",
+        ["WELFARE"],
+        MISSION_COUNTRIES,
+        120,
+        "24/7 · remote / on-site",
+    ),
+    (
+        "MER",
+        "Meridian Relocation",
+        ["RELOCATION", "SECURE_TRANSPORT"],
+        MISSION_COUNTRIES,
+        60,
+        "24/7",
+    ),
+]
+REQ_START = 550  # next request: REQ-0551
+
 # --- reference counters (D-18) -------------------------------------------------------------------
 INC_START = 1041  # next incident: INC-<year>-1042
 NTF_START = 3100  # next campaign: NTF-3101

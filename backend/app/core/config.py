@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     # CHK-04: channel adapters are pluggable, but Phase 1 has only the simulated one
     # (no real SMS, email or WhatsApp). Any other value fails at startup.
     channel_adapter: Literal["simulated"] = "simulated"
+    # AS-04, D-36: partners are simulated too; any other value fails at startup.
+    partner_adapter: Literal["simulated"] = "simulated"
 
 
 @lru_cache

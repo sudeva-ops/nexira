@@ -12,6 +12,8 @@ from app.modules.agents.runner import agents_handler, observed_types
 from app.modules.checkin.consumer import clock_handler, response_handler
 from app.modules.intel.consumer import exposure_handler, raw_signal_handler
 from app.modules.notifications.consumer import campaign_handler, tick
+from app.modules.partners import service as partners
+from app.modules.partners.adapter import PartnerAdapter, adapter_for
 from app.modules.playbooks.consumer import resume_runs, run_handler
 from app.modules.travel import tracker
 from app.modules.weather import feed as weather
@@ -20,6 +22,7 @@ RESUME_EVERY_S = 60
 TICK_EVERY_S = 2  # dispatch leftovers, delivery receipts, check-in escalation
 FLIGHTS_EVERY_S = 5  # the simulated flight tracker (D-33)
 WEATHER_EVERY_S = 15 * 60  # the simulated weather feed (WX §28 Q2)
+PARTNERS_EVERY_S = 2  # the simulated partners answer requests (AS-04, plan G-8)
 
 log = logging.getLogger("app.workers")
 
@@ -76,6 +79,18 @@ async def weather_loop(
         await asyncio.sleep(WEATHER_EVERY_S)
 
 
+async def partners_loop(
+    engine: AsyncEngine, publisher: Publisher, tenant_ids: list[uuid.UUID], adapter: PartnerAdapter
+) -> None:
+    while True:
+        for tenant_id in tenant_ids:
+            try:
+                await partners.tick(engine, tenant_id, publisher, adapter)
+            except Exception:
+                log.exception("partner tick failed for %s", tenant_id)
+        await asyncio.sleep(PARTNERS_EVERY_S)
+
+
 async def main() -> None:
     settings = get_settings()
     engine = get_engine()
@@ -86,6 +101,7 @@ async def main() -> None:
     on_incident = exposure_handler(engine, publisher)
     on_run = run_handler(engine, publisher, settings.playbook_step_delay_s)
     tenant_ids = [uuid.UUID(t) for t in settings.worker_tenant_ids]
+    partner_adapter = adapter_for(settings.partner_adapter)  # D-36: simulated only
     # One consumer group per concern, so each keeps its own position in the stream.
     consumers = [
         StreamConsumer(
@@ -158,6 +174,7 @@ async def main() -> None:
             tasks.create_task(tick_loop(engine, publisher, tenant_ids, settings.channel_adapter))
             tasks.create_task(flights_loop(engine, publisher, tenant_ids))
             tasks.create_task(weather_loop(engine, publisher, tenant_ids))
+            tasks.create_task(partners_loop(engine, publisher, tenant_ids, partner_adapter))
     finally:
         await client.aclose()
         await engine.dispose()
