@@ -91,6 +91,15 @@ XW 451 can land only once. To show it again, run `make reset-demo`.
 
 The storm's conditions hold for 6 hours. To show it again, run `make reset-demo`.
 
+## 6c. Storyline 6 · Assistance Partners (about 3 minutes, after Storyline 1)
+
+1. **Assistance Partners**: the five contracted partners (fictional, simulated) with services, coverage and response times; coverage 34 / 36, with Canberra and Buenos Aires named as gaps (no evacuation partner).
+2. **PB-07 step 6** (approved in Storyline 1) asked Kestrel Medical to stand by: the request (REQ-0551) shows *by playbook*, accepted with an ETA by the simulated partner.
+3. **Safety Check-in**, the Nairobi check-in: next to Peter Mwangi's *NEEDS HELP*, press **Request partner**. The platform suggests the nearest capable partner (Sentinel Secure Transport, 30 min); add a note and press **Request**. Nothing is sent until a person decides.
+4. Back on **Assistance Partners**: the request goes *Accepted* (with an ETA), then *En route*, live. When the partner is done, press **Complete**. Every step is in the Audit view.
+
+The partners are simulated: no partner is contacted (D-36). A request can be made only by a Duty Officer, Security Officer, or the Head of Mission for that mission.
+
 ## 7. If something goes wrong
 
 | Symptom | Fix |

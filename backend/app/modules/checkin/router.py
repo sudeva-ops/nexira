@@ -142,7 +142,9 @@ _RESPONSES = text(
       JOIN person p ON p.id = l.person_id
       LEFT JOIN mission m ON m.id = p.mission_id
      WHERE l.campaign_id = :campaign_id
-     ORDER BY l.responded_at DESC, p.full_name
+     -- Who needs help first, then the newest: a HELP must not drop off a busy list (AS-06;
+     -- Prompt 47).
+     ORDER BY l.status = 'NEED_HELP' DESC, l.responded_at DESC, p.full_name
      LIMIT :limit
     """
 )
@@ -155,7 +157,7 @@ async def responses(
     session: Db,
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
 ) -> list[CheckinPersonOut]:
-    """The live list: each person's latest answer, newest first."""
+    """The live list: each person's latest answer, those who need help first, then newest."""
     campaign = await _checkin(session, campaign_id)
     show_notes = await user_has_role(session, _user, RESPOND_ROLES)
     rows = await session.execute(_RESPONSES, {"campaign_id": campaign.id, "limit": limit})
