@@ -34,6 +34,7 @@ REFUSAL_PREFIXES = (
     "trip:",  # approval, frozen trip and itinerary, forward-only status (D-32)
     "flight:",  # only approved, unrestricted trips; status table; append-only events (D-33)
     "weather:",  # a row's mission is in its own tenant and never changes (D-35)
+    "partner request:",  # status table, frozen content, coverage, restricted travellers (D-36)
 )
 
 

@@ -37,6 +37,7 @@ class Ids:
     flight_trip: uuid.UUID
     segment: uuid.UUID
     flight: uuid.UUID
+    partner: uuid.UUID
 
 
 PT = "'SRID=4326;POINT(36.8245 -1.2838)'"
@@ -116,6 +117,11 @@ ROWS: dict[str, str] = {
     "weather_current": "INSERT INTO weather_current (tenant_id, mission_id, observed_at, "
     "temperature_c, condition, wind_kph, gust_kph) VALUES ('{t}', '{mission}', now(), 24.5, "
     "'CLEAR', 10, 15)",
+    "partner": "INSERT INTO partner (id, tenant_id, code, name, services, coverage, sla_minutes) "
+    "VALUES ('{partner}', '{t}', 'KES', 'Kestrel', '{{MEDICAL}}', '{{KE}}', 15)",
+    "partner_request": "INSERT INTO partner_request (tenant_id, reference, partner_id, service, "
+    "mission_id, created_by_type, created_by) VALUES ('{t}', 'REQ-1', '{partner}', 'MEDICAL', "
+    "'{mission}', 'USER', 'u')",
     "message_template": "INSERT INTO message_template (tenant_id, code, kind, name, texts) "
     "VALUES ('{t}', 'T', 'ADVISORY', 'T', '{{\"en\": \"m\"}}')",
     "notification_delivery": "INSERT INTO notification_delivery (tenant_id, campaign_id, "
@@ -142,6 +148,8 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "country_risk",
     "airport",
     "flight_event",
+    "partner",  # seeded; no UPDATE or DELETE in the pilot (PC-21)
+    "partner_request",  # UPDATE of status and ETA only, never DELETE (PC-22; review of Prompt 44)
 }
 NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELETE)
     "message_template",
@@ -283,7 +291,7 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
         (asyncpg.InsufficientPrivilegeError, asyncpg.RaiseError),
         match=(
             r"row-level security|trip: no such trip|flight: no such flight"
-            r"|weather: no such mission"
+            r"|weather: no such mission|partner request: no such partner"
         ),
     ):
         await api.execute(sql_for(table, world.a))
