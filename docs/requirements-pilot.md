@@ -85,8 +85,9 @@ The Nairobi acceptance scenario and the France scenario still pass. The France s
 |---|---|---|
 | Journey Management (JRN-01..05) | **Written: §9 (approved, built: Prompts 23–27)** | — |
 | Air Travel Tracking (AIR-01..07) | **Written: §14 (approved, built: Prompts 28–32)** | — |
-| Travel & Air agent | **Written: §19 (approved)** | — |
+| Travel & Air agent | **Written: §19 (approved, built: Prompts 33–37)** | — |
 | Assistance Partners (AST-01..04) | nothing | only if the pilot customer wants it |
+| Weather (WX), proposed with D-35 | **Written: §24 (draft for approval)** | — |
 
 ## 8. Questions answered by the product owner (2026-10-25)
 
@@ -250,3 +251,55 @@ Playwright on the real stack: in NBO-AIR-DIVERSION, XW 451 holding gives a NOTIF
 5. **Restricted trips:** the agent never proposes anything about them.
 6. **Rebooking and hotels:** advice only (level 4), since the pilot has no booking integration.
 7. **Decision deadline:** 60 minutes, then the proposal expires (AGT-06).
+
+---
+
+# Pilot module 6 · Weather (draft for approval)
+
+For the product owner, who approves this part; then for the coding agent (Prompts 38–42 in `docs/prompts-pilot.md`). Rules: D-30 as amended by **D-35** (proposed with this draft). Everything runs on **simulated weather**: no weather provider is called (AGENTS.md: no external URLs at runtime). A real provider later replaces only the simulated feed.
+
+## 24. Purpose and starting point
+
+Two things: an **overview of current conditions** where our people are, and **severe-weather warnings** that the platform acts on like any other threat. This brings forward a slice of the master spec's Natural Hazards & Climate module (HAZ, Phase 3: HAZ-02 "arm severe-weather playbooks ahead of landfall") and the PB-06 "severe weather" playbook (PB-06 initial library).
+
+| Exists today | Where |
+|---|---|
+| An **xWeather** intel source (simulated), mapping provider categories `Flood` → `FLOOD` and `Storm` → `STORM` | seed, D-09 |
+| Signals → fused incidents → exposure → agents and playbooks → notifications and check-in | Phase 1 |
+| Incidents count for their mission's country risk; the Travel & Air agent reacts to incidents | JR-03 (G-1), D-34 |
+| Fusion within 3 km and a 5 km default impact radius: right for a protest, too small for a storm | `intel/fusion.py`, `incident.impact_radius_m` |
+| Nothing for current conditions, no weather playbook, no weather scenario | — |
+
+## 25. Requirements: Weather (WX)
+
+| ID | Requirement | Master | Pri. | Acceptance |
+|---|---|---|---|---|
+| WX-01 | **Current conditions per mission city**: temperature, condition (clear, cloud, rain, storm, dust, fog, snow), wind and gusts, rainfall, and when observed. Labelled "xWeather (simulated)" (D-19). | HAZ-01 | M | Every mission shows conditions no older than 30 minutes. |
+| WX-02 | **Shown where people look**: a weather panel on Global Operations (worst conditions first), a weather layer on the map (an icon per mission), and the conditions in the mission popup. | HAZ-01, OPS-01 | M | — |
+| WX-03 | **Severe-weather warnings are intelligence.** The simulated xWeather feed sends warnings (storm, flood, dust storm, extreme heat) as signals; they become incidents through the existing pipeline, with exposure, agents and playbooks as for any incident. | HAZ-01, INT | M | A storm warning near Manila gives one STORM incident with people and sites exposed. |
+| WX-04 | **The right size for weather.** A weather incident's impact radius and fusion distance follow its category (§28 Q4), not the 3 km / 5 km used for unrest. | HAZ-01 | M | A storm 40 km from Manila exposes the Manila mission. |
+| WX-05 | **Severe-weather playbook (PB-06).** The Response Planner proposes PB-06 for a HIGH or CRITICAL storm or flood near a mission: staff alert, safety check-in, and a citizen advisory from a per-mission template (D-31: a second person approves citizen messages). | HAZ-02, PB-06 | M | The Manila storm gives a pending PB-06 proposal. |
+| WX-06 | **Weather and travel.** A weather incident raises its country's destination risk and makes trips "impacted" like any incident; the Travel & Air agent reacts as it does today (D-34). | JRN-04, JRN-05 | S | A trip to Manila during the storm shows "Impacted". |
+| WX-07 | **A demo scenario** `MNL-TROPICAL-STORM`: conditions in Manila worsen over the scenes (wind, rain), then xWeather warnings arrive and the platform responds. | PLT-06 | M | Played from the presenter bar. |
+| WX-08 | **Simulated feed with the seams of a real one.** A simulated weather feed in the worker updates conditions for every mission on a slow, plausible daily cycle; scenarios override a city's conditions. A real provider later replaces only the feed. | HAZ-01 | M | — |
+
+### Not in this module
+Forecasts and long-term climate exposure (HAZ-03..), earthquakes and other seismic events, air quality, any real weather provider, and weather on flight routes (Air Travel uses its own simulated feed).
+
+## 26. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-20 · `weather_current`**: one row per mission (tenant, mission, observed time, temperature, condition, wind, gusts, rainfall, source), FORCE RLS; written by the simulated feed as `nexira_api`, read by every role. Warnings need no schema change: they are signals and incidents.
+
+## 27. Acceptance for the module
+
+Playwright on the real stack: Global Operations shows current conditions for the missions, labelled simulated; in `MNL-TROPICAL-STORM`, Manila's conditions turn stormy, an xWeather storm warning becomes a STORM incident that exposes the Manila mission (larger radius, WX-04), the Response Planner proposes PB-06, and a Duty Officer approves it; a seeded trip to Manila shows as impacted; the audit chain verifies; `make acceptance` (all existing specs) still passes.
+
+## 28. Questions for the product owner (each has a proposed default)
+
+1. **Which places:** *Default:* every mission city (36).
+2. **How fresh:** *Default:* conditions updated every 15 minutes by the simulated feed; anything older than 30 minutes is shown as stale.
+3. **Warning categories:** *Default:* STORM, FLOOD, DUST_STORM and EXTREME_HEAT (the two existing xWeather categories plus two).
+4. **Size of a weather incident:** *Default:* impact radius STORM 60 km, FLOOD 25 km, DUST_STORM 40 km, EXTREME_HEAT 30 km; signals fuse within the same distance. Unrest keeps 3 km / 5 km.
+5. **Weather and travel risk:** *Default:* yes, a weather incident raises its country's risk and triggers the Travel & Air agent, like any incident.
+6. **PB-06:** *Default:* proposed for HIGH or CRITICAL STORM or FLOOD within the radius of a mission; steps: staff alert, safety check-in, citizen advisory (second person).
+7. **Demo scenario:** *Default:* a tropical storm approaching Manila (MNL), with one seeded staff trip to Manila.
