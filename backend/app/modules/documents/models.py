@@ -33,9 +33,7 @@ class TravelDocument(Base):
     doc_type: Mapped[str] = mapped_column(Text, nullable=False)
     issuing_country: Mapped[str] = mapped_column(CHAR(2), nullable=False)
     valid_until: Mapped[date] = mapped_column(Date, nullable=False)
-    renewal_status: Mapped[str] = mapped_column(
-        Text, nullable=False, server_default=text("'NONE'")
-    )
+    renewal_status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'NONE'"))
     renewal_requested_by: Mapped[str | None] = mapped_column(Text)
     renewal_started_by: Mapped[str | None] = mapped_column(Text)
     renewed_by: Mapped[str | None] = mapped_column(Text)
