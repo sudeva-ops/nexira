@@ -119,6 +119,8 @@ ROWS: dict[str, str] = {
     "'CLEAR', 10, 15)",
     "partner": "INSERT INTO partner (id, tenant_id, code, name, services, coverage, sla_minutes) "
     "VALUES ('{partner}', '{t}', 'KES', 'Kestrel', '{{MEDICAL}}', '{{KE}}', 15)",
+    "travel_document": "INSERT INTO travel_document (tenant_id, person_id, doc_type, "
+    "issuing_country, valid_until) VALUES ('{t}', '{person}', 'PASSPORT', 'KE', current_date)",
     "partner_request": "INSERT INTO partner_request (tenant_id, reference, partner_id, service, "
     "mission_id, created_by_type, created_by) VALUES ('{t}', 'REQ-1', '{partner}', 'MEDICAL', "
     "'{mission}', 'USER', 'u')",
@@ -150,6 +152,7 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "flight_event",
     "partner",  # seeded; no UPDATE or DELETE in the pilot (PC-21)
     "partner_request",  # UPDATE of status and ETA only, never DELETE (PC-22; review of Prompt 44)
+    "travel_document",  # UPDATE of the renewal only, never DELETE (PC-23)
 }
 NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELETE)
     "message_template",
@@ -292,6 +295,7 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
         match=(
             r"row-level security|trip: no such trip|flight: no such flight"
             r"|weather: no such mission|partner request: no such partner"
+            r"|travel document: no such person"
         ),
     ):
         await api.execute(sql_for(table, world.a))
