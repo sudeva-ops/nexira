@@ -4,8 +4,10 @@ import { type GeoJSONSource, Map as MapLibreMap, NavigationControl } from "mapli
 import { useEffect, useRef, useState } from "react";
 
 import type { Flight } from "../api/flights";
+import { useReducedMotion } from "../ui/useMotion";
 import { registerPmtiles, tilesAvailable } from "./base";
 import { flightFeatures, routeFeatures } from "./geo";
+import { DASH_FRAMES, DASH_STEP_MS, GLIDE_MS, glideFlights, type LonLat, positions } from "./motion";
 import { ATTRIBUTION, baseStyle } from "./style";
 
 const EMPTY = { type: "FeatureCollection" as const, features: [] };
@@ -22,6 +24,8 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [baseMissing, setBaseMissing] = useState(false);
   const onSelectRef = useRef(onSelect);
+  const reduced = useReducedMotion();
+  const drawn = useRef(new Map<string, LonLat>()); // where each aircraft is on screen now
   useEffect(() => {
     onSelectRef.current = onSelect;
   });
@@ -98,8 +102,51 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
 
   useEffect(() => {
     (map?.getSource("routes") as GeoJSONSource | undefined)?.setData(routeFeatures(flights));
-    (map?.getSource("flights") as GeoJSONSource | undefined)?.setData(flightFeatures(flights));
   }, [map, flights]);
+
+  // Aircraft glide from where they are drawn to their new position (positions arrive
+  // every 15 s, D-33) instead of jumping.
+  useEffect(() => {
+    const source = map?.getSource("flights") as GeoJSONSource | undefined;
+    if (!source) return;
+    const from = new Map(drawn.current);
+    const draw = (shown: Flight[]) => {
+      source.setData(flightFeatures(shown));
+      drawn.current = positions(shown);
+    };
+    if (reduced || from.size === 0) {
+      draw(flights);
+      return;
+    }
+    let frame = 0;
+    let start: number | null = null;
+    const step = (now: number) => {
+      start ??= now;
+      const k = (now - start) / GLIDE_MS;
+      draw(k >= 1 ? flights : glideFlights(from, flights, k));
+      if (k < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [map, flights, reduced]);
+
+  // Flight paths move along, so the picture reads as live.
+  useEffect(() => {
+    if (!map || reduced) return;
+    let frame = 0;
+    let last = 0;
+    let i = 0;
+    const step = (now: number) => {
+      if (now - last >= DASH_STEP_MS) {
+        last = now;
+        i = (i + 1) % DASH_FRAMES.length;
+        if (map.getLayer("routes")) map.setPaintProperty("routes", "line-dasharray", DASH_FRAMES[i]);
+      }
+      frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [map, reduced]);
 
   useEffect(() => {
     const flight = flights.find((f) => f.id === selectedId);

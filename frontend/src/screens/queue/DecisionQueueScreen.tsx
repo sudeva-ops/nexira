@@ -1,4 +1,4 @@
-import { Icon, NonIdealState, Spinner } from "@blueprintjs/core";
+import { Icon, NonIdealState } from "@blueprintjs/core";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -6,6 +6,7 @@ import { LEVEL_COLOUR, LEVELS, useAgentActivity, useAgents, useProposals } from 
 import { formatTime, HOME_TZ } from "../../app/time";
 import { CountUp } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
+import { SkeletonRows } from "../../ui/Skeleton";
 import { metrics, queueOrder } from "./format";
 import { ProposalCard } from "./ProposalCard";
 
@@ -100,7 +101,7 @@ export function DecisionQueueScreen() {
             ))}
           </div>
           {isPending ? (
-            <Spinner />
+            <SkeletonRows />
           ) : list.length ? (
             list.map((p) => <ProposalCard key={p.id} p={p} />)
           ) : (

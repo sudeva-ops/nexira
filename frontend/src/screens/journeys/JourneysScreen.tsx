@@ -1,4 +1,4 @@
-import { Button, HTMLSelect, Icon, NonIdealState, Spinner } from "@blueprintjs/core";
+import { Button, HTMLSelect, Icon, NonIdealState } from "@blueprintjs/core";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -9,6 +9,7 @@ import { type Trip, type TripDetail as Detail, type TripFilters, useTrip, useTri
 import { HOME_TZ, formatDays } from "../../app/time";
 import { FlashRow } from "../../ui/motion";
 import { Card, Kpi, Sev } from "../../ui/primitives";
+import { SkeletonRows } from "../../ui/Skeleton";
 import { RiskCard, TripDetail } from "./TripDetail";
 import { TripPlanner } from "./TripPlanner";
 
@@ -146,7 +147,7 @@ export function JourneysScreen() {
           }
         >
           {trips.isLoading ? (
-            <Spinner size={20} />
+            <SkeletonRows />
           ) : list.length === 0 ? (
             <NonIdealState icon="airplane" title="No trips" description="Nothing matches these filters." />
           ) : (

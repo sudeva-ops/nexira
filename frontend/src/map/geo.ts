@@ -62,14 +62,15 @@ export function missionFeatures(missions: Mission[]): FeatureCollection<Point> {
   };
 }
 
-export function zoneFeatures(incidents: Incident[]): FeatureCollection<Polygon> {
+/** Impact zones; `scale` draws a zone partly grown (0..1), as when an incident appears. */
+export function zoneFeatures(incidents: Incident[], scale: (id: string) => number = () => 1): FeatureCollection<Polygon> {
   return {
     type: "FeatureCollection",
     features: incidents.map(
       (i): Feature<Polygon> => ({
         type: "Feature",
         id: i.reference,
-        geometry: circlePolygon(i.lon, i.lat, i.impact_radius_m),
+        geometry: circlePolygon(i.lon, i.lat, Math.max(1, i.impact_radius_m * scale(i.id))),
         properties: { reference: i.reference, colour: SEVERITY_COLOUR[i.severity] },
       }),
     ),

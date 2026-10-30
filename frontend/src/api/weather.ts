@@ -115,6 +115,7 @@ export interface WeatherMarker {
   lat: number;
   icon: IconName;
   colour: string;
+  severe: boolean; // a current SEVERE reading (not stale)
   title: string;
 }
 
@@ -128,6 +129,7 @@ export function weatherMarkers(rows: Weather[], now: number = Date.now()): Weath
       lat: w.lat,
       icon: CONDITION_ICON[w.condition],
       colour: stale ? "#738091" : LEVEL_COLOUR[weatherLevel(w)],
+      severe: !stale && weatherLevel(w) === "SEVERE",
       title: `${w.city} · ${weatherSummary(w)}${stale ? " · stale" : ""}`,
     };
   });

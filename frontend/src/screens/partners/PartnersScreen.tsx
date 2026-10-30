@@ -1,4 +1,4 @@
-import { Button, Icon, NonIdealState, Spinner } from "@blueprintjs/core";
+import { Button, Icon, NonIdealState } from "@blueprintjs/core";
 import { useState } from "react";
 
 import { useCampaigns, useCheckinResponses } from "../../api/checkin";
@@ -22,7 +22,11 @@ import { canRequestPartner } from "../../api/permissions";
 import { formatStamp } from "../../app/time";
 import { initials } from "../../ui/format";
 import { FlashRow } from "../../ui/motion";
+import { Ring } from "../../ui/Ring";
+import { remaining } from "../../ui/spark";
+import { useNow } from "../../ui/useNow";
 import { Card, Kpi } from "../../ui/primitives";
+import { SkeletonRows } from "../../ui/Skeleton";
 import { type RequestFor, RequestDialog } from "./RequestDialog";
 
 const STATUS_SEV: Record<RequestStatus, string> = {
@@ -52,6 +56,8 @@ function useSos(requests: PartnerRequest[]) {
 
 function RequestRow({ r, canAct }: { r: PartnerRequest; canAct: boolean }) {
   const action = useRequestAction();
+  const arriving = !!r.eta && !!r.accepted_at && (r.status === "ACCEPTED" || r.status === "EN_ROUTE");
+  const now = useNow(arriving);
   return (
     <FlashRow
       data-request={r.reference}
@@ -74,7 +80,12 @@ function RequestRow({ r, canAct }: { r: PartnerRequest; canAct: boolean }) {
       <td>
         <span className={`nx-sev ${STATUS_SEV[r.status]}`}>{STATUS_LABEL[r.status].toUpperCase()}</span>
       </td>
-      <td className="nx-mono">{r.eta && OPEN.includes(r.status) ? hhmm(r.eta) : "—"}</td>
+      <td className="nx-mono nx-nowrap">
+        {arriving && r.accepted_at && r.eta && (
+          <Ring left={remaining(r.accepted_at, r.eta, now)} label="Time until the partner arrives" />
+        )}{" "}
+        {r.eta && OPEN.includes(r.status) ? hhmm(r.eta) : "—"}
+      </td>
       <td>
         {canAct && r.status === "EN_ROUTE" && (
           <Button
@@ -171,7 +182,7 @@ export function PartnersScreen() {
       <div className="nx-partners-grid">
         <Card icon="heart" title="Partner network" sub="Fictional partners · simulated">
           {partners.isLoading ? (
-            <Spinner size={20} />
+            <SkeletonRows />
           ) : list.length === 0 ? (
             <NonIdealState icon="heart" title="No partners" description="Seeded with `make reset-demo` (D-36)." />
           ) : (

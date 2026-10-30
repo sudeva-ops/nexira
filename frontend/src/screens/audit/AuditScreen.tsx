@@ -3,6 +3,7 @@ import { Callout, HTMLTable, NonIdealState, Spinner, Tag } from "@blueprintjs/co
 import { useAuditLog, useAuditVerify } from "../../api/audit";
 import { ApiError } from "../../api/client";
 import { hasRole, useMe } from "../../api/me";
+import { SkeletonRows } from "../../ui/Skeleton";
 
 // Audit view (admin, D-25). The backend enforces ADMIN; this only avoids
 // showing an empty screen to other roles.
@@ -31,7 +32,7 @@ export function AuditScreen() {
         </Callout>
       )}
       {log.isPending ? (
-        <Spinner />
+        <SkeletonRows rows={8} />
       ) : (
         <HTMLTable compact striped className="nx-table" aria-label="Audit log">
           <thead>

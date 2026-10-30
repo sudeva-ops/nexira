@@ -1,4 +1,4 @@
-import { Icon, NonIdealState, Spinner } from "@blueprintjs/core";
+import { Icon, NonIdealState } from "@blueprintjs/core";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { type Flight, type FlightDetail, type FlightStatus, IN_AIR, useFlight, useFlights } from "../../api/flights";
@@ -7,6 +7,7 @@ import { AirMap } from "../../map/AirMap";
 import { flightColour } from "../../map/geo";
 import { FlashRow, type FlashTone } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
+import { SkeletonRows } from "../../ui/Skeleton";
 import { PendingProposals } from "../queue/PendingProposals";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -193,7 +194,7 @@ export function AirScreen() {
           </Card>
           <Card icon="airplane" title="Tracked flights" sub={`${list.length} shown`}>
             {flights.isLoading ? (
-              <Spinner size={20} />
+              <SkeletonRows />
             ) : list.length === 0 ? (
               <NonIdealState icon="airplane" title="No tracked flights" description="Approved trips' flights appear 24 hours before departure." />
             ) : (

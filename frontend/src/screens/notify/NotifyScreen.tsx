@@ -1,4 +1,4 @@
-import { HTMLSelect, NonIdealState, Spinner } from "@blueprintjs/core";
+import { HTMLSelect, NonIdealState } from "@blueprintjs/core";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -12,6 +12,7 @@ import { useMissions } from "../../api/people";
 import { formatStamp } from "../../app/time";
 import { FlashRow } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
+import { SkeletonRows } from "../../ui/Skeleton";
 import { CampaignDetail } from "./CampaignDetail";
 import { Composer } from "./Composer";
 
@@ -130,7 +131,7 @@ export function NotifyScreen() {
             }
           >
             {campaigns.isLoading ? (
-              <Spinner size={20} />
+              <SkeletonRows />
             ) : list.length === 0 ? (
               <NonIdealState icon="send-message" title="No campaigns" description="Nothing matches these filters." />
             ) : (
