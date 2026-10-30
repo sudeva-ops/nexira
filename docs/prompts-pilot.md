@@ -401,7 +401,7 @@ acceptance (all specs) still passes.
 
 ---
 
-## Pilot module 7 · Document Expiry (proposed)
+## Pilot module 7 · Document Expiry (approved 2026-10-30, PR #57)
 
 Sources: D-37, `docs/requirements-pilot.md` §34–38 (DX-01..09), PC-23. Simulated documents only; no document numbers.
 

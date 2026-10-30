@@ -183,7 +183,7 @@ Record each sign-off in the PR.
 | 4. **Travel & Air agent** | Real SMS, email or WhatsApp delivery: channels stay simulated (D-19, AGENTS.md) |
 | 5. **Assistance Partners** (AST): asked for by the pilot customer (D-36) | |
 | 6. **Weather** (WX), simulated: current conditions and severe-weather warnings (D-35) | |
-| 7. **Document Expiry** (DX), simulated (D-37, proposed) | |
+| 7. **Document Expiry** (DX), simulated (D-37) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -232,7 +232,7 @@ Rules:
 - **People request.** Only a person with the right role requests support, or a playbook step a person approved (D-16). Agents never request; the platform only suggests a partner for an SOS.
 - **Share the minimum.** A request carries what the partner needs to help (AS-08) and never a restricted traveller (D-33).
 
-**D-37 · Document Expiry (simulated).** *Proposed; approved when the product owner approves PR for §34–38.* Requirements DX-01 to DX-09 in `docs/requirements-pilot.md`, with the defaults in §38. Amends D-30 by adding Document Expiry to the pilot.
+**D-37 · Document Expiry (simulated).** Approved by the product owner on 2026-10-30 (PR #57), with the defaults in `docs/requirements-pilot.md` §38. Requirements DX-01 to DX-09 in `docs/requirements-pilot.md`, with the defaults in §38. Amends D-30 by adding Document Expiry to the pilot.
 - **No document numbers.** The platform stores the type, issuing country and valid-until date of a document, never its number, a scan or a photo (DX-01).
 - **People decide.** The Compliance agent only proposes, at level Approve or higher; renewals and reminders are started by a person or by a proposal a person approved (D-12, D-16).
 - **Further modules.** On 2026-10-30 the product owner asked for these modules after the UI work, in this order: Document Expiry, Natural Hazards, Health Intelligence, Evacuation Management, Fleet, VIP Protection, Site Twin, Supply Chain, Wellbeing, Exercises, After-Action Review, Predictive Risk, Executive Overview, AI Risk Copilot chat. Each still needs its own requirements approved before code (D-30). The AI Risk Copilot needs the local model server (D-30, AGR-08).

@@ -88,7 +88,7 @@ The Nairobi acceptance scenario and the France scenario still pass. The France s
 | Travel & Air agent | **Written: §19 (approved, built: Prompts 33–37)** | — |
 | Assistance Partners (AST-01..04) | **Written: §29 (approved, built: Prompts 43–47)** | — |
 | Weather (WX), D-35 | **Written: §24 (approved, built: Prompts 38–42)** | — |
-| Document Expiry (DX) | **Written: §34 (proposed)** | §38 |
+| Document Expiry (DX) | **Written: §34 (approved)** | — |
 
 ## 8. Questions answered by the product owner (2026-10-25)
 
@@ -360,9 +360,9 @@ Playwright on the real stack: the Assistance Partners screen lists the five part
 
 ---
 
-# Pilot module 7 · Document Expiry (proposed, awaiting the product owner)
+# Pilot module 7 · Document Expiry (approved 2026-10-30, PR #57)
 
-For the product owner, who approves this part; then for the coding agent (Prompts 48–52 in `docs/prompts-pilot.md`). Rules: D-30, and **D-37** once approved. Everything runs on **simulated documents** from the simulator seed: no HR, passport or visa system is contacted, and no real document data is stored.
+For the product owner, who approves this part; then for the coding agent (Prompts 48–52 in `docs/prompts-pilot.md`). Rules: D-30, and **D-37**. Everything runs on **simulated documents** from the simulator seed: no HR, passport or visa system is contacted, and no real document data is stored.
 
 ## 34. Purpose and starting point
 
@@ -403,7 +403,7 @@ Document numbers, scans or photos; real HR, passport-office or visa systems; vis
 
 Playwright on the real stack: the Document Expiry screen shows the seeded documents and KPIs, labelled simulated; Hana Takeda's diplomatic passport is CRITICAL. In NBO-CIVIL-UNREST, the two Nairobi documents are flagged "Could block evacuation" and the Compliance agent's proposal appears; a Consular Officer approves it; the two renewals show "in progress" and the reminders campaign is delivered (simulated); a Viewer sees KPIs and no names; the Head of Mission for another mission sees none of Nairobi's documents; the audit chain verifies; `make acceptance` (all existing specs) still passes.
 
-## 38. Questions for the product owner (proposed defaults)
+## 38. Questions answered by the product owner (2026-10-30: "use the defaults")
 
 1. **Seed:** about 1 to 3 documents for each staff member and dependant across the 36 missions (passport or diplomatic passport for everyone, plus visas, residence permits and accreditations where they apply), with expiry dates spread so that about 6 expire within 30 days and about 30 within 90 days, as the design shows. In Nairobi: **Hana Takeda's diplomatic passport (21 days)** and **her dependant child's passport (12 days)**, both fictional.
 2. **Who renews and reminds:** CONSULAR_OFFICER and DUTY_OFFICER for any mission; HEAD_OF_MISSION for their own (D-05). No second person: reminders are staff-only (MN-05).
