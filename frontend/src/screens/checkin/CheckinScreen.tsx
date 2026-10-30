@@ -1,4 +1,5 @@
 import { Button, HTMLSelect, NonIdealState, Spinner } from "@blueprintjs/core";
+import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import {
@@ -11,12 +12,13 @@ import {
 import { ApiError } from "../../api/client";
 import { useIncident } from "../../api/intel";
 import { useMe } from "../../api/me";
-import { canRecordCheckin } from "../../api/permissions";
+import { canRecordCheckin, canRequestPartner } from "../../api/permissions";
 import { formatTime, HOME_TZ } from "../../app/time";
 import { initials, personTypeLabel } from "../../ui/format";
 import { Card, Kpi } from "../../ui/primitives";
 import { Donut } from "./Donut";
 import { escalationText } from "./escalation";
+import { type RequestFor, RequestDialog } from "../partners/RequestDialog";
 import { PhonePreview } from "./PhonePreview";
 
 const SAFE = "#32A467";
@@ -35,6 +37,9 @@ export function CheckinScreen() {
   const me = useMe().data;
   const escalate = useEscalate(campaign?.id ?? "");
   const canRecord = !!incident && canRecordCheckin(me, incident.mission_id);
+  // AS-06: next to each HELP, a partner request (suggested; a person decides).
+  const canRequest = !!incident && canRequestPartner(me, incident.mission_id);
+  const [helpFor, setHelpFor] = useState<RequestFor | null>(null);
 
   if (!campaign) {
     return (
@@ -168,6 +173,21 @@ export function CheckinScreen() {
                   <span className={`nx-sev ${r.status === "SAFE" ? "ok" : "crit"}`}>
                     {r.status === "SAFE" ? "SAFE" : "NEEDS HELP"}
                   </span>
+                  {canRequest && r.status === "NEED_HELP" && (
+                    <Button
+                      size="small"
+                      icon="heart"
+                      text="Request partner"
+                      onClick={() =>
+                        setHelpFor({
+                          kind: "sos",
+                          personId: r.person_id,
+                          personName: r.full_name,
+                          incidentId: campaign.incident_id,
+                        })
+                      }
+                    />
+                  )}
                   <span className="nx-dim nx-mono nx-ci-time">
                     {r.responded_at ? formatTime(new Date(r.responded_at), HOME_TZ) : ""}
                   </span>
@@ -180,6 +200,7 @@ export function CheckinScreen() {
         </Card>
         <PhonePreview campaign={campaign} pending={pending} canAnswer={canRecord} />
       </div>
+      {helpFor && <RequestDialog target={helpFor} onClose={() => setHelpFor(null)} />}
     </div>
   );
 }

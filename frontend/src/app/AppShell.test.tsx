@@ -30,6 +30,7 @@ describe("app shell", () => {
       "Air Travel Tracking", // pilot module 3 (D-30)
       "Response Playbooks",
       "Mass Notification", // pilot module 1 (D-30)
+      "Assistance Partners", // pilot module 5 (D-30, D-36)
       "Safety Check-in",
       "Audit",
     ]);

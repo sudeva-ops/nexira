@@ -96,11 +96,22 @@ describe("Safety Check-in", () => {
     ]);
   });
 
+  it("offers a partner next to each HELP, suggested, for a person to send (AS-06)", async () => {
+    setup(DUTY_OFFICER);
+    renderApp("/checkin");
+    const live = await screen.findByLabelText("Live responses");
+    const buttons = within(live).getAllByRole("button", { name: "Request partner" });
+    expect(buttons).toHaveLength(1); // Peter only: Grace is safe
+    await userEvent.click(buttons[0] as HTMLElement);
+    expect(await screen.findByRole("dialog", { name: "Request help for Peter Mwangi" })).toBeInTheDocument();
+  });
+
   it("is read-only for a Viewer", async () => {
     setup(VIEWER);
     renderApp("/checkin");
     expect(await screen.findByText("Preview only.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Escalate non-responders" })).toBeNull();
     expect(screen.queryByRole("button", { name: "I'm safe" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Request partner" })).toBeNull();
   });
 });
