@@ -130,6 +130,8 @@ describe("realtime client (PLT-05)", () => {
     expect(staleKeys(event("FLIGHT_POSITIONS"))).toEqual([["flights"]]);
     // D-35: every 15 minutes and on a scenario override.
     expect(staleKeys(event("WEATHER_UPDATED", { missions: 36 }))).toEqual([["weather"]]);
+    // D-36: a request made or moved (by a person, a playbook or the simulated partner).
+    expect(staleKeys(event("PARTNER_REQUEST_UPDATED", { request_id: "r1" }))).toEqual([["partners"]]);
     expect(staleKeys(event("SOMETHING_ELSE"))).toEqual([]);
   });
 });

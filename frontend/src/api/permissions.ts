@@ -47,6 +47,13 @@ export function canPlanTrip(me: Me | undefined): boolean {
   return me?.roles.some((r) => TRIP_CREATORS.includes(r.code)) ?? false;
 }
 
+// backend/app/modules/partners/service.py REQUESTERS (D-36, §33 Q2), scoped to the mission.
+const PARTNER_ROLES = ["DUTY_OFFICER", "SECURITY_OFFICER", "HEAD_OF_MISSION"];
+
+export function canRequestPartner(me: Me | undefined, missionId: string | null): boolean {
+  return holds(me, PARTNER_ROLES, missionId);
+}
+
 export function canRecordCheckin(me: Me | undefined, missionId: string | null): boolean {
   return holds(me, RESPOND_ROLES, missionId);
 }

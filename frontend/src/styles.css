@@ -1857,3 +1857,32 @@ body {
   background: rgba(236, 154, 60, 0.08);
   font-size: 12px;
 }
+
+/* --- Assistance Partners (AS-01..08, D-36) -------------------------------------- */
+.nx-partners-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.nx-logo {
+  width: 30px;
+  height: 30px;
+  color: #fff;
+  font-size: 11px;
+}
+
+.nx-gaps {
+  margin: 0;
+  padding-inline-start: 18px;
+}
+
+.nx-gaps li {
+  margin: 3px 0;
+}
+
+.nx-suggested {
+  margin-bottom: 6px;
+  color: var(--nx-tx2);
+}
