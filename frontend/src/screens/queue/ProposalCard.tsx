@@ -1,22 +1,15 @@
 import { Button, Icon, TextArea } from "@blueprintjs/core";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ApiError } from "../../api/client";
 import { LEVEL_COLOUR, LEVELS, type Proposal, travelLinks, useDecide } from "../../api/proposals";
 import { ago, formatTime, HOME_TZ } from "../../app/time";
 import { roleLabel } from "../../ui/format";
+import { Ring } from "../../ui/Ring";
+import { remaining, ringTone } from "../../ui/spark";
+import { useNow } from "../../ui/useNow";
 import { countdown, nextStep, REJECT_REASONS } from "./format";
-
-function useNow(active: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!active) return undefined;
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [active]);
-  return now;
-}
 
 const STATUS_BADGE: Partial<Record<Proposal["status"], [string, string]>> = {
   AUTO_EXECUTED: ["ok", "AUTO-EXECUTED"],
@@ -99,6 +92,13 @@ export function ProposalCard({ p }: { p: Proposal }) {
         <b className="nx-grow">{p.title}</b>
         {pending ? (
           <span className={`nx-deadline${countdown(p.deadline_at, now) === "OVERDUE" ? " over" : ""}`}>
+            {level !== 4 && p.deadline_at && (
+              <Ring
+                left={remaining(p.created_at, p.deadline_at, now)}
+                tone={ringTone(remaining(p.created_at, p.deadline_at, now))}
+                label="Time left to decide"
+              />
+            )}
             {level === 4 ? "Advice" : countdown(p.deadline_at, now)}
           </span>
         ) : (

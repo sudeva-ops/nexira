@@ -24,7 +24,8 @@ export function OperationsScreen() {
   const selectedId = params.get("incident");
   const summary = useOperationsSummary().data;
   const missions = useMissions().data ?? [];
-  const incidents = useIncidents("ACTIVE").data ?? [];
+  const incidentsQuery = useIncidents("ACTIVE");
+  const incidents = incidentsQuery.data ?? [];
   const signals = useSignals(50).data ?? [];
   const selected = useIncident(selectedId ?? undefined).data;
   const weatherQuery = useWeather();
@@ -95,6 +96,7 @@ export function OperationsScreen() {
           <OperationsMap
             missions={missions}
             incidents={incidents}
+            incidentsLoaded={incidentsQuery.isSuccess}
             exposure={selected?.exposure ?? NO_EXPOSURE}
             selectedId={selectedId}
             onSelect={select}

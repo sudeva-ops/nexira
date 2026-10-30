@@ -2003,6 +2003,143 @@ tr.nx-flash-b > td {
   }
 }
 
+/* --- Motion B: maps, countdowns, agents, loading ------------------------------------ */
+/* Screens fade in when you navigate. */
+.nx-view > * {
+  animation: nx-fadein 0.25s ease-out;
+}
+
+@keyframes nx-fadein {
+  from {
+    opacity: 0;
+  }
+}
+
+/* A new incident's marker pings three times (map/OperationsMap.tsx). */
+.nx-incident-marker.nx-new::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border: 2px solid var(--c, #cd4246);
+  animation: nx-sonar 1.2s ease-out 3;
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes nx-sonar {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(3.2);
+  }
+}
+
+/* A severe-weather icon turns slowly. */
+.nx-wx-marker.severe svg {
+  animation: nx-turn 6s linear infinite;
+}
+
+@keyframes nx-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Countdown rings (ui/Ring.tsx): they empty as time runs out. */
+.nx-ring {
+  margin-inline-end: 4px;
+  vertical-align: -2px;
+  --nx-tone: var(--nx-tone-info);
+}
+
+.nx-ring.nx-tone-warning {
+  --nx-tone: var(--nx-tone-warning);
+}
+
+.nx-ring.nx-tone-danger {
+  --nx-tone: var(--nx-tone-danger);
+}
+
+.nx-ring circle {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.nx-ring .track {
+  stroke: var(--nx-panel2);
+}
+
+.nx-ring .left {
+  stroke: var(--nx-tone);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear;
+}
+
+/* Sparklines (ui/Sparkline.tsx). */
+.nx-spark {
+  vertical-align: middle;
+  overflow: visible;
+}
+
+.nx-spark polyline {
+  fill: none;
+  stroke: #4c90f0;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+}
+
+.nx-spark circle {
+  fill: #8abbff;
+}
+
+/* An agent assessing an event it watches: three dots. */
+.nx-assessing i {
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  margin-inline-start: 2px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: nx-dots 1.2s ease-in-out infinite;
+}
+
+.nx-assessing i:nth-of-type(2) {
+  animation-delay: 0.2s;
+}
+
+.nx-assessing i:nth-of-type(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes nx-dots {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Loading placeholders shaped like a list (ui/Skeleton.tsx). */
+.nx-skeleton {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.nx-skeleton > div {
+  height: 14px;
+  border-radius: 2px;
+}
+
+.nx-skeleton > div:nth-child(odd) {
+  width: 85%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   ::before,

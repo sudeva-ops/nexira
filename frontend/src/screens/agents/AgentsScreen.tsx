@@ -9,12 +9,19 @@ import {
   LEVELS,
   useAgents,
   useKillSwitch,
+  useAgentActivity,
   useProposals,
   useSetAutonomy,
 } from "../../api/proposals";
 import { roleLabel } from "../../ui/format";
 import { CountUp } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
+import { buckets } from "../../ui/spark";
+import { Sparkline } from "../../ui/Sparkline";
+import { useNow } from "../../ui/useNow";
+import { useAssessing } from "./useAssessing";
+
+const HOUR_MS = 3_600_000;
 
 const WATCHES: Record<string, string> = {
   INCIDENT_CREATED: "New incidents",
@@ -73,6 +80,9 @@ export function AgentsScreen() {
   const setAutonomy = useSetAutonomy();
   // Unscoped ADMIN only (the backend requires it too).
   const admin = me?.roles.some((r) => r.code === "ADMIN" && r.mission_id === null) ?? false;
+  const assessing = useAssessing(data?.agents ?? []);
+  const activity = useAgentActivity().data ?? [];
+  const now = useNow(true, 30_000);
   if (!data) return <Spinner />;
 
   const decided = proposals.filter((p) => ["APPROVED", "EDITED_APPROVED", "REJECTED"].includes(p.status));
@@ -130,6 +140,7 @@ export function AgentsScreen() {
               <th>Proposals</th>
               <th>Accepted</th>
               <th>Pending</th>
+              <th>Last hour</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -170,8 +181,26 @@ export function AgentsScreen() {
                 <td className="nx-mono">{a.accepted_pct === null ? "—" : `${a.accepted_pct}%`}</td>
                 <td className="nx-mono">{a.proposals_pending}</td>
                 <td>
+                  <Sparkline
+                    values={buckets(
+                      activity.filter((x) => x.actor === a.name).map((x) => x.occurred_at),
+                      now,
+                      HOUR_MS,
+                      12,
+                    )}
+                    label={`${a.name} activity, last hour`}
+                  />
+                </td>
+                <td>
                   {data.paused ? (
                     <span className="nx-sev crit">PAUSED</span>
+                  ) : a.is_enabled && assessing.has(a.code) ? (
+                    <span className="nx-sev ok nx-assessing">
+                      ASSESSING
+                      <i />
+                      <i />
+                      <i />
+                    </span>
                   ) : a.is_enabled ? (
                     <span className="nx-sev ok">ACTIVE</span>
                   ) : (

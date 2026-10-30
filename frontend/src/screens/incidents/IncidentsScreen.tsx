@@ -1,4 +1,4 @@
-import { NonIdealState, Spinner } from "@blueprintjs/core";
+import { NonIdealState } from "@blueprintjs/core";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -6,6 +6,7 @@ import { type IncidentStatus, useIncidents } from "../../api/intel";
 import { ago } from "../../app/time";
 import { FlashRow } from "../../ui/motion";
 import { Card, Sev } from "../../ui/primitives";
+import { SkeletonRows } from "../../ui/Skeleton";
 import { IncidentDetail } from "./IncidentDetail";
 
 const TABS: { label: string; status?: IncidentStatus }[] = [
@@ -52,7 +53,7 @@ export function IncidentsScreen() {
         }
       >
         {isPending ? (
-          <Spinner />
+          <SkeletonRows />
         ) : incidents?.length ? (
           <table className="nx-table-plain" aria-label="Incident register">
             <thead>

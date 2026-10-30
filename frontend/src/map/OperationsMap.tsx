@@ -8,8 +8,10 @@ import { createPortal } from "react-dom";
 import type { Exposure, Incident } from "../api/intel";
 import type { Mission } from "../api/people";
 import { type Weather, weatherMarkers, weatherSummary } from "../api/weather";
+import { useReducedMotion } from "../ui/useMotion";
 import { exposureFeatures, missionFeatures, SEVERITY_COLOUR, zoneFeatures } from "./geo";
 import { registerPmtiles, tilesAvailable } from "./base";
+import { GROW_MS, growScale } from "./motion";
 import { ATTRIBUTION, baseStyle, CITY_MINZOOM } from "./style";
 
 const EMPTY = { type: "FeatureCollection" as const, features: [] };
@@ -17,6 +19,7 @@ const EMPTY = { type: "FeatureCollection" as const, features: [] };
 interface Props {
   missions: Mission[];
   incidents: Incident[]; // ACTIVE incidents: marker and impact zone
+  incidentsLoaded: boolean; // incidents present at first load are drawn whole; later ones grow in
   exposure: Exposure[]; // the selected incident's exposure (people at city zoom)
   selectedId: string | null;
   onSelect: (incident: Incident) => void;
@@ -24,7 +27,16 @@ interface Props {
   weatherAt: number; // when it was fetched: staleness is judged from then (plan G-6)
 }
 
-export function OperationsMap({ missions, incidents, exposure, selectedId, onSelect, weather, weatherAt }: Props) {
+export function OperationsMap({
+  missions,
+  incidents,
+  incidentsLoaded,
+  exposure,
+  selectedId,
+  onSelect,
+  weather,
+  weatherAt,
+}: Props) {
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [baseMissing, setBaseMissing] = useState(false);
@@ -34,6 +46,8 @@ export function OperationsMap({ missions, incidents, exposure, selectedId, onSel
   const wxMarkers = useRef(new Map<string, Marker>());
   const [wxElements, setWxElements] = useState(new Map<string, HTMLElement>());
   const wxData = useMemo(() => weatherMarkers(weather, weatherAt), [weather, weatherAt]);
+  const reduced = useReducedMotion();
+  const known = useRef<Set<string> | null>(null); // incidents already on the map
   useEffect(() => {
     onSelectRef.current = onSelect;
     weatherRef.current = new Map(weather.map((w) => [w.mission_code, w]));
@@ -132,8 +146,25 @@ export function OperationsMap({ missions, incidents, exposure, selectedId, onSel
   }, [map, missions]);
 
   useEffect(() => {
-    if (!map) return;
-    (map.getSource("zones") as GeoJSONSource | undefined)?.setData(zoneFeatures(incidents));
+    if (!map || !incidentsLoaded) return;
+    // A new incident's zone grows out from its centre and its marker pings; those
+    // already there when the screen opened are drawn as they are.
+    const fresh = known.current ? incidents.filter((i) => !known.current?.has(i.id)).map((i) => i.id) : [];
+    known.current = new Set(incidents.map((i) => i.id));
+    const zones = map.getSource("zones") as GeoJSONSource | undefined;
+    let frame = 0;
+    if (reduced || fresh.length === 0) {
+      zones?.setData(zoneFeatures(incidents));
+    } else {
+      let start: number | null = null;
+      const step = (now: number) => {
+        start ??= now;
+        const k = growScale(now - start);
+        zones?.setData(zoneFeatures(incidents, (id) => (fresh.includes(id) ? k : 1)));
+        if (now - start < GROW_MS) frame = requestAnimationFrame(step);
+      };
+      frame = requestAnimationFrame(step);
+    }
     const seen = new Set<string>();
     for (const incident of incidents) {
       seen.add(incident.id);
@@ -141,7 +172,7 @@ export function OperationsMap({ missions, incidents, exposure, selectedId, onSel
       if (!marker) {
         const el = document.createElement("button");
         el.type = "button";
-        el.className = "nx-incident-marker";
+        el.className = fresh.includes(incident.id) ? "nx-incident-marker nx-new" : "nx-incident-marker";
         el.dataset.testid = `incident-marker-${incident.reference}`;
         el.addEventListener("click", () => {
           const current = incidents.find((i) => i.id === incident.id) ?? incident;
@@ -162,7 +193,8 @@ export function OperationsMap({ missions, incidents, exposure, selectedId, onSel
         markers.current.delete(id);
       }
     }
-  }, [map, incidents]);
+    return () => cancelAnimationFrame(frame);
+  }, [map, incidents, incidentsLoaded, reduced]);
 
   useEffect(() => {
     (map?.getSource("exposure") as GeoJSONSource | undefined)?.setData(exposureFeatures(exposure));
@@ -187,6 +219,7 @@ export function OperationsMap({ missions, incidents, exposure, selectedId, onSel
       }
       const el = marker.getElement();
       el.style.setProperty("--c", w.colour);
+      el.classList.toggle("severe", w.severe); // a severe-weather icon turns slowly
       el.title = w.title;
       el.setAttribute("aria-label", w.title);
     }
