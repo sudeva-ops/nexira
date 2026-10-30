@@ -68,6 +68,7 @@ FORWARDED = frozenset(
         "TRIP_UPDATED",
         "FLIGHT_UPDATED",
         "FLIGHT_POSITIONS",  # at most every 15 s per tenant (D-33)
+        "WEATHER_UPDATED",  # every 15 min, and on a scenario override (D-35)
         "CHECKIN_ESCALATED",
         "PROPOSAL_CREATED",
         "PROPOSAL_UPDATED",

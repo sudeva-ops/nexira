@@ -39,8 +39,9 @@ async def test_paris_gets_paris_words_from_pb07_v2(db: DbUrls) -> None:
         await bus.deliver(paris_march(tenant_id))
 
         async with tenant_session(tenant_id, engine) as session:
-            active = list(await session.scalars(select(Playbook).where(Playbook.is_active)))
-            assert [(p.code, p.version) for p in active] == [("PB-07", 2)]
+            active = await session.scalars(select(Playbook).where(Playbook.is_active))
+            # PB-07 v1 is retired; PB-06 (D-35) never matches unrest.
+            assert sorted((p.code, p.version) for p in active) == [("PB-06", 1), ("PB-07", 2)]
             planner = await session.scalar(
                 select(AgentProposal).where(AgentProposal.action_type == "START_PLAYBOOK")
             )

@@ -14,10 +14,12 @@ from app.modules.intel.consumer import exposure_handler, raw_signal_handler
 from app.modules.notifications.consumer import campaign_handler, tick
 from app.modules.playbooks.consumer import resume_runs, run_handler
 from app.modules.travel import tracker
+from app.modules.weather import feed as weather
 
 RESUME_EVERY_S = 60
 TICK_EVERY_S = 2  # dispatch leftovers, delivery receipts, check-in escalation
 FLIGHTS_EVERY_S = 5  # the simulated flight tracker (D-33)
+WEATHER_EVERY_S = 15 * 60  # the simulated weather feed (WX §28 Q2)
 
 log = logging.getLogger("app.workers")
 
@@ -59,6 +61,19 @@ async def flights_loop(
             except Exception:
                 log.exception("flight tracker tick failed for %s", tenant_id)
         await asyncio.sleep(FLIGHTS_EVERY_S)
+
+
+async def weather_loop(
+    engine: AsyncEngine, publisher: Publisher, tenant_ids: list[uuid.UUID]
+) -> None:
+    """From start, so every mission has conditions as soon as the worker runs."""
+    while True:
+        for tenant_id in tenant_ids:
+            try:
+                await weather.tick(engine, tenant_id, publisher)
+            except Exception:
+                log.exception("weather tick failed for %s", tenant_id)
+        await asyncio.sleep(WEATHER_EVERY_S)
 
 
 async def main() -> None:
@@ -115,6 +130,12 @@ async def main() -> None:
         ),
         StreamConsumer(
             client,
+            group="weather",
+            consumer=name,
+            handlers={"WEATHER_FEED": weather.feed_handler(engine, publisher)},
+        ),
+        StreamConsumer(
+            client,
             group="checkin",
             consumer=name,
             handlers={
@@ -124,7 +145,8 @@ async def main() -> None:
         ),
     ]
     log.info(
-        "consumers started: intel, exposure, playbooks, notifications, agents, flights, checkin"
+        "consumers started: intel, exposure, playbooks, notifications, agents, flights, weather, "
+        "checkin"
     )
     try:
         async with asyncio.TaskGroup() as tasks:
@@ -135,6 +157,7 @@ async def main() -> None:
             )
             tasks.create_task(tick_loop(engine, publisher, tenant_ids, settings.channel_adapter))
             tasks.create_task(flights_loop(engine, publisher, tenant_ids))
+            tasks.create_task(weather_loop(engine, publisher, tenant_ids))
     finally:
         await client.aclose()
         await engine.dispose()

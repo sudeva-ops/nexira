@@ -167,6 +167,21 @@ EXTRA_TRIPS: list[tuple[str, str, str, int, str, str, int, int, str, str]] = [
 ]
 
 TRIP_SCOPE = {"TRP-8814": "BGW"}
+
+# Weather (D-35, WX-06): Kuala Lumpur staff at a Manila hotel, on a trip active on the
+# scenario date, so MNL-TROPICAL-STORM's storm makes it "Impacted". They stay away from
+# every Phase 1 scenario. (reference, purpose, traveller mission, travellers, destination,
+# country, hotel (lat, lon), place)
+MANILA_TRIP = (
+    "TRP-8810",
+    "Regional consular meeting · Manila",
+    "KUL",
+    2,
+    "Manila",
+    "PH",
+    (14.5547, 121.0244),
+    "Hotel · Makati (TRP-8810)",
+)
 TRIP_REQUESTER = {"TRP-8816": "travel.desk"}
 
 # --- Air Travel Tracking (D-33, PC-17..19) -----------------------------------------------------
@@ -275,7 +290,11 @@ SOURCES: list[tuple[str, str, Decimal, dict[str, str], dict[str, str], bool, boo
         "Dataminr",
         Decimal("0.60"),
         {"Low": "LOW", "Medium": "MODERATE", "High": "HIGH", "Critical": "CRITICAL"},
-        {"Protest / Civil Unrest": "CIVIL_UNREST", "Transport Disruption": "TRANSPORT_STRIKE"},
+        {
+            "Protest / Civil Unrest": "CIVIL_UNREST",
+            "Transport Disruption": "TRANSPORT_STRIKE",
+            "Tropical storm": "STORM",  # MNL-TROPICAL-STORM's second provider (plan-pilot-wx §5)
+        },
         True,
         True,
     ),
@@ -336,7 +355,13 @@ SOURCES: list[tuple[str, str, Decimal, dict[str, str], dict[str, str], bool, boo
         "xWeather",
         Decimal("0.50"),
         GENERIC_SEVERITY,
-        {"Flood": "FLOOD", "Storm": "STORM"},
+        # WX §28 Q3: the two Phase 1 categories plus two (D-35).
+        {
+            "Flood": "FLOOD",
+            "Storm": "STORM",
+            "Dust storm": "DUST_STORM",
+            "Extreme heat": "EXTREME_HEAT",
+        },
         True,
         True,
     ),
@@ -447,6 +472,47 @@ MESSAGE_TEMPLATES: list[tuple[str, str, str | None, str, dict[str, str]]] = [
     ),
 ]
 
+# PB-06 (D-35, WX-05): English only until reviewed (D-15); generic with a Manila text, as
+# the unrest templates have Nairobi and Paris ones.
+WEATHER_SHELTER = "SEVERE_WEATHER_SHELTER"
+WEATHER_STAFF_ALERT = "SEVERE_WEATHER_STAFF_ALERT"
+MESSAGE_TEMPLATES += [
+    (
+        WEATHER_SHELTER,
+        "ADVISORY",
+        None,
+        "Severe weather: shelter in place",
+        {
+            "en": "Severe weather warning for {city}. Stay indoors, away from windows and "
+            "flood water, and reply SAFE or HELP. Updates every 2 hours."
+        },
+    ),
+    (
+        WEATHER_SHELTER,
+        "ADVISORY",
+        "MNL",
+        "Severe weather: shelter in place (Manila)",
+        {
+            "en": "Tropical storm warning for Manila. Stay indoors, away from windows, Manila "
+            "Bay and flooded streets, and reply SAFE or HELP. Updates every 2 hours."
+        },
+    ),
+    (
+        WEATHER_STAFF_ALERT,
+        "ALERT",
+        None,
+        "Severe weather: staff alert",
+        {"en": "Severe weather warning for {city}. Stay indoors and away from windows."},
+    ),
+    (
+        WEATHER_STAFF_ALERT,
+        "ALERT",
+        "MNL",
+        "Severe weather: staff alert (Manila)",
+        {"en": "Tropical storm warning. Stay indoors; avoid Manila Bay and low-lying roads."},
+    ),
+]
+
 PERSONNEL_TYPES = ["DIPLOMAT", "LOCAL_STAFF", "DELEGATE"]
 
 # (seq, name, action_type, action_config, requires_approval_role)
@@ -554,6 +620,65 @@ PB07_STEP4_V2: dict[str, object] = {
 PB07_STEPS_V2 = [
     (seq, name, kind, PB07_STEP4_V2 if seq == 4 else config, role)
     for seq, name, kind, config, role in PB07_STEPS
+]
+
+# PB-06 · Severe weather (WX-05, plan-pilot-wx.md §4; WX §28 Q6): HIGH or CRITICAL storm or
+# flood with a mission site inside the incident's radius.
+PB06_TRIGGER = {
+    "categories": ["STORM", "FLOOD"],
+    "min_severity": "HIGH",
+    "mission_site_exposed": True,
+}
+PB06_STEPS: list[tuple[int, str, str, dict[str, object], str | None]] = [
+    (
+        1,
+        "Confirm the warning & its reach",
+        "TASK",
+        {"summary": "Fusion engine · weather sources, severity and impact radius confirmed"},
+        None,
+    ),
+    (
+        2,
+        "Notify Head of Mission & Security Attaché",
+        "NOTIFY",
+        {
+            "campaign_type": "ALERT",
+            "audience": {
+                "mission": "incident",
+                "role_titles": ["Head of Mission", "Security Attaché"],
+            },
+            "channels": ["APP", "SMS", "VOICE"],
+            "message": "URGENT: Severe weather warning for the mission — security team alert",
+        },
+        None,
+    ),
+    (
+        3,
+        "Alert exposed staff to shelter",
+        "NOTIFY",
+        {
+            "campaign_type": "ALERT",
+            "audience": {"exposed": True, "person_types": PERSONNEL_TYPES},
+            "channels": ["APP", "SMS", "WHATSAPP"],
+            "message_template": WEATHER_STAFF_ALERT,
+            # Used by the Communications agent when this step is done (D-15, D-31).
+            "citizen_advisory_template": WEATHER_SHELTER,
+            "citizen_advisory_channels": ["SMS", "WHATSAPP", "APP"],
+        },
+        None,
+    ),
+    (
+        4,
+        "Send safety check-in",
+        "CHECKIN",
+        {
+            "audience": {"exposed": True},
+            "channels": ["APP", "SMS", "WHATSAPP"],
+            "message": "Safety check-in: are you safe? Reply SAFE or HELP.",
+            "escalate_after_s": 600,
+        },
+        None,
+    ),
 ]
 
 # --- agents and policies (D-17 seed table) --------------------------------------------------------

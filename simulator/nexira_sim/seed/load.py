@@ -30,6 +30,7 @@ from app.modules.travel.service import (
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from nexira_sim.scenarios import fra_national_protests as fra
+from nexira_sim.scenarios import mnl_tropical_storm as mnl
 from nexira_sim.scenarios import nbo_air_diversion as air
 from nexira_sim.scenarios import nbo_civil_unrest as nbo
 from nexira_sim.seed import data, world
@@ -124,6 +125,23 @@ async def seed_all(
                 else None,
             )
 
+        ref, purpose, home, _count, dest, cc, _hotel, _place = data.MANILA_TRIP
+        report["extra_trips"] += await ensure_trip(
+            session,
+            trip_id=seed_id(tenant_id, "trip", ref),
+            reference=ref,
+            purpose=purpose,
+            origin=missions_by_code[home].city,
+            destination=dest,
+            destination_country=cc,
+            # Active on the scenario date, like TRP-8812 (D-22, plan G-11).
+            starts_on=scenario_date - timedelta(days=1),
+            ends_on=scenario_date + timedelta(days=2),
+            traveller_ids=w.manila_trip_ids,
+            risk_level="LOW",
+            approval_status="APPROVED",
+        )
+
         report["airports"] = await ensure_airports(session, [AirportIn(*a) for a in data.AIRPORTS])
         report["air_trips"] = await _air_trips(
             session, tenant_id, w, scenario_date, missions_by_code
@@ -166,6 +184,20 @@ async def seed_all(
             version=version,
         )
         report["playbook_retired"] = await retire_older_versions(session, "PB-07", version)
+        report["playbook_pb06"] = await ensure_playbook(
+            session,
+            playbook_id=seed_id(tenant_id, "playbook", "PB-06:v1"),
+            code="PB-06",
+            name="Severe weather near mission",
+            category="Natural hazard",
+            trigger_rules=data.PB06_TRIGGER,
+            steps=[StepIn(*step) for step in data.PB06_STEPS],
+            step_ids=[
+                seed_id(tenant_id, "playbook_step", f"PB-06:v1:{seq}")
+                for seq, *_ in data.PB06_STEPS
+            ],
+            version=1,
+        )
 
         report["templates"] = await ensure_templates(
             session,
@@ -226,6 +258,14 @@ async def seed_all(
             name=air.NAME,
             description=air.DESCRIPTION,
             events=air.build_events(w, tenant_id),
+        )
+        report["scenario_mnl"] = await ensure_scenario(
+            session,
+            scenario_id=seed_id(tenant_id, "scenario", mnl.CODE),
+            code=mnl.CODE,
+            name=mnl.NAME,
+            description=mnl.DESCRIPTION,
+            events=mnl.build_events(w, tenant_id),
         )
         await session.commit()
     return report

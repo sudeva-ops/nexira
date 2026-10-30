@@ -38,6 +38,31 @@ def test_trigger_rules(category: str, severity: str, nearest: int | None, expect
     assert matches(PB07, incident, nearest) is expected
 
 
+PB06 = {"categories": ["STORM", "FLOOD"], "min_severity": "HIGH", "mission_site_exposed": True}
+
+
+@pytest.mark.parametrize(
+    ("category", "severity", "nearest", "expected"),
+    [
+        ("STORM", "CRITICAL", 40_000, True),  # Manila (WX-05)
+        ("FLOOD", "HIGH", 6_000, True),
+        ("STORM", "MODERATE", 1_000, False),  # below min_severity
+        ("DUST_STORM", "CRITICAL", 1_000, False),  # not a PB-06 category
+        ("EXTREME_HEAT", "CRITICAL", 1_000, False),
+        ("CIVIL_UNREST", "CRITICAL", 1_000, False),  # unrest is PB-07's
+        ("STORM", "CRITICAL", None, False),  # no mission site inside the radius
+    ],
+)
+def test_pb06_trigger_rules(
+    category: str, severity: str, nearest: int | None, expected: bool
+) -> None:
+    """WX §28 Q6: HIGH or CRITICAL storm or flood with a mission site in the radius."""
+    incident: Any = SimpleNamespace(category=category, severity=severity)
+    assert matches(PB06, incident, nearest) is expected
+    if category != "CIVIL_UNREST":
+        assert matches(PB07, incident, nearest) is False  # weather is never PB-07's
+
+
 class WritingAgent:
     """Misbehaves: writes in observe(). The runner must discard it."""
 

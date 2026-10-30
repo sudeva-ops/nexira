@@ -262,7 +262,17 @@ async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> No
         ("CIVIL_UNREST_STAFF_ALERT", None, "ALERT"),
         ("CIVIL_UNREST_STAFF_ALERT", "NBO", "ALERT"),
         ("CIVIL_UNREST_STAFF_ALERT", "PAR", "ALERT"),
+        # PB-06 (D-35): English only, generic and Manila.
+        ("SEVERE_WEATHER_SHELTER", None, "ADVISORY"),
+        ("SEVERE_WEATHER_SHELTER", "MNL", "ADVISORY"),
+        ("SEVERE_WEATHER_STAFF_ALERT", None, "ALERT"),
+        ("SEVERE_WEATHER_STAFF_ALERT", "MNL", "ALERT"),
     ]
+    weather, rows = rows[6:], rows[:6]
+    assert [set(json.loads(r["texts"])) for r in weather] == [{"en"}] * 4
+    assert [json.loads(r["reviewed"]) for r in weather] == [{}] * 4
+    assert "{city}" in json.loads(weather[0]["texts"])["en"]
+    assert "Manila" in json.loads(weather[1]["texts"])["en"]
     texts = [json.loads(r["texts"]) for r in rows]
     assert "{city}" in texts[0]["en"]
     assert texts[1] == data.CITIZEN_ADVISORY
@@ -290,6 +300,7 @@ async def test_journey_seed_country_risk_trips_and_counter(seeded: Seeded) -> No
         )
     }
     assert trips == {
+        "TRP-8810": ("APPROVED", "LOW", True),  # Kuala Lumpur staff in Manila (WX-06)
         "TRP-8811": ("APPROVED", "LOW", True),  # the France scenario's CANCEL_TRIP (D-34)
         "TRP-8812": ("APPROVED", "MODERATE", True),
         "TRP-8814": ("PENDING", "HIGH", False),

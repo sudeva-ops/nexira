@@ -88,6 +88,8 @@ XW 451 can land only once. To show it again, run `make reset-demo`.
 | No presenter bar | Sign in as `duty.officer` or `admin`; check `VITE_DEMO_MODE=true` in `.env`, then `make up`. |
 | "Live" indicator is grey | The page lost its connection; reload. If it persists, `make up`. |
 | A scenario does nothing, or XW 451 stays landed | The scenario was already played: `make reset-demo` and sign in again. |
+| Manila's weather stays stormy after the storm scenario | A scenario's conditions hold for 6 hours (plan-pilot-wx G-1); `make reset-demo` clears them. |
+| No weather incidents for dust storms or heat, or the storm stays separate from Dataminr's report | The database was seeded before the Weather module, and new source categories are added only to a fresh seed (plan-pilot-wx G-2): `make reset-demo`. |
 | Everything is slow or stuck after the laptop slept | `make up`, then `make reset-demo`; keep `caffeinate -dims` running. |
 | Logs | `make logs` (the worker shows signals, exposure, flights and agents). |
 

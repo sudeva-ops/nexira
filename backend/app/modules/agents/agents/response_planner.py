@@ -1,10 +1,14 @@
 """Response Planner: proposes a playbook when an incident matches its trigger rules
 (EXPOSURE_COMPUTED -> START_PLAYBOOK, plan G-15).
 
-PB-07's rules ({"category", "min_severity", "max_distance_m"}) depend on the
-escalated severity and on exposure, so the planner reacts to EXPOSURE_COMPUTED.
-max_distance_m is met when a mission site (any type except HOTEL) is exposed at or
-within that distance. The key START_PLAYBOOK:{incident}:{playbook} makes it one
+Rules depend on the escalated severity and on exposure, so the planner reacts to
+EXPOSURE_COMPUTED. A rule may hold:
+- category (PB-07) or categories (a list, PB-06): the incident's category;
+- min_severity: the incident's severity or higher;
+- max_distance_m (PB-07): a mission site (any type except HOTEL) is exposed at or within
+  that distance;
+- mission_site_exposed (PB-06, WX-05): such a site is exposed at all, i.e. inside the
+  incident's radius. The key START_PLAYBOOK:{incident}:{playbook} makes it one
 proposal per incident and playbook (plan G-15)."""
 
 from typing import Any
@@ -38,12 +42,24 @@ async def _nearest_mission_site_m(session: AsyncSession, incident: Incident) -> 
 def matches(rules: dict[str, Any], incident: Incident, nearest_site_m: int | None) -> bool:
     if rules.get("category") and rules["category"] != incident.category:
         return False
+    if rules.get("categories") and incident.category not in rules["categories"]:
+        return False
+    if rules.get("mission_site_exposed") and nearest_site_m is None:
+        return False
     if rules.get("min_severity") and severity_rank(incident.severity) < severity_rank(
         str(rules["min_severity"])
     ):
         return False
     limit = rules.get("max_distance_m")
     return limit is None or (nearest_site_m is not None and nearest_site_m <= int(limit))
+
+
+# What each playbook does, for the proposal's text; another playbook gets a plain line.
+SUMMARIES = {
+    "PB-06": "warn the mission's security team, alert exposed staff, safety check-in, then a "
+    "citizen advisory.",
+    "PB-07": "notify the mission and HQ, shelter in place, safety check-in, partner standby.",
+}
 
 
 class ResponsePlanner:
@@ -86,8 +102,8 @@ class ResponsePlanner:
                     action_type="START_PLAYBOOK",
                     title=f"Run {playbook.code} · {playbook.name}",
                     proposed_action=(
-                        f"Start {playbook.code} for {incident.reference}: notify the mission and "
-                        "HQ, shelter in place, safety check-in, partner standby."
+                        f"Start {playbook.code} for {incident.reference}: "
+                        + SUMMARIES.get(playbook.code, f"{playbook.name.lower()}.")
                     ),
                     action_payload={"playbook_code": playbook.code},
                     incident_id=incident.id,
