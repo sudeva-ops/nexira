@@ -87,6 +87,18 @@ async def test_a_row_keeps_its_mission(tenant: asyncpg.Connection) -> None:
     await tenant.execute(UPSERT, manila, 25, "CLEAR", 5, 5, 0)
     with pytest.raises(REFUSED, match="keeps its mission"):
         await tenant.execute("UPDATE weather_current SET mission_id = $1", other)
+    with pytest.raises(REFUSED, match="keeps its mission"):
+        await tenant.execute("UPDATE weather_current SET tenant_id = gen_random_uuid()")
+
+
+async def test_a_temporary_mission_table_does_not_fool_the_guard(
+    tenant: asyncpg.Connection,
+) -> None:
+    fake = uuid.uuid4()
+    await tenant.execute("CREATE TEMP TABLE mission (id uuid, tenant_id uuid)")
+    await tenant.execute("INSERT INTO mission VALUES ($1, current_tenant_id())", fake)
+    with pytest.raises(REFUSED, match="no such mission"):
+        await tenant.execute(UPSERT, fake, 25, "CLEAR", 5, 5, 0)
 
 
 async def test_rows_are_never_deleted_and_the_source_is_labelled(

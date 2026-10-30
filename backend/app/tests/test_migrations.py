@@ -2,6 +2,7 @@
 
 import asyncio
 from pathlib import Path
+from typing import cast
 
 import asyncpg
 import pytest
@@ -296,5 +297,11 @@ def test_downgrading_0005_restores_0004_exactly(fresh: DbUrls) -> None:
     table = at_head["table"]
     assert isinstance(table, tuple)
     assert table[0] is True  # FORCE RLS
+    # The app reads, inserts and updates; nothing more (no DELETE, TRUNCATE, REFERENCES).
+    assert table[1] == (
+        "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+        "nexira_app=arw/nexira_owner}"
+    )
+    assert "weather_current_mission_id_fkey" in cast(list[str], at_head["mission_fks"])
     assert (at_head["functions"], at_head["policies"]) == (1, 1)
     command.upgrade(cfg, "head")

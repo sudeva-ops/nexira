@@ -27,7 +27,8 @@ GRANT SELECT, INSERT, UPDATE ON weather_current TO nexira_app;
 -- A row's mission is in its own tenant (foreign keys ignore RLS: plan-pilot-wx.md §7, the
 -- lesson of Prompts 24 and 29), and a row never moves to another mission or tenant. The
 -- trigger runs as the caller, so RLS on mission already hides other tenants' missions; the
--- tenant_id condition keeps the rule true for a role that bypasses RLS.
+-- tenant_id condition keeps the rule true for a role that bypasses RLS. search_path is
+-- pinned, pg_temp last, so a temporary table named mission cannot stand in for the real one.
 CREATE FUNCTION weather_current_guard() RETURNS trigger AS $$
 BEGIN
   IF TG_OP = 'UPDATE' AND (NEW.tenant_id IS DISTINCT FROM OLD.tenant_id
@@ -39,6 +40,6 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
 CREATE TRIGGER weather_current_guard BEFORE INSERT OR UPDATE ON weather_current
   FOR EACH ROW EXECUTE FUNCTION weather_current_guard();
