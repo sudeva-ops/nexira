@@ -456,3 +456,17 @@ async def test_live_responses_are_newest_first(client: AsyncClient, idp: Idp, wo
         ("Peter", "NEED_HELP"),
         ("Grace", "NEED_HELP"),
     ]
+
+
+async def test_live_responses_list_who_needs_help_first(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    """A HELP stays at the top of a busy list (limit), ahead of newer SAFE answers."""
+    await answer(client, idp, world, "Grace", "NEED_HELP")
+    await answer(client, idp, world, "Peter", "SAFE")
+    rows = (
+        await client.get(
+            f"/api/checkin/{world.campaign_id}/responses?limit=1", headers=idp.headers("viewer")
+        )
+    ).json()
+    assert [(r["full_name"], r["status"]) for r in rows] == [("Grace", "NEED_HELP")]
