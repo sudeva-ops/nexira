@@ -33,6 +33,7 @@ from app.modules.intel import exposure
 from app.modules.intel.models import Incident, IncidentEvent
 from app.modules.notifications import templates
 from app.modules.notifications.service import AudienceError, CampaignIn, create_campaign
+from app.modules.partners import service as partners
 from app.modules.playbooks.models import Playbook, PlaybookRun, PlaybookRunStep, PlaybookStep
 from app.modules.tenancy.service import Actor
 
@@ -168,6 +169,13 @@ async def _execute(
             result["notified_roles"] = list(config["notify_user_roles"])
         return f"{step.name}: {summary}", result
     if kind == "PARTNER_REQUEST":
+        # AS-05: a tracked request to the named partner; without one (a tenant seeded before
+        # the partners, or a test), the Phase 1 text (plan-pilot-ast §5, G-1).
+        if run.incident_id is not None:
+            incident = await session.get_one(Incident, run.incident_id)
+            tracked = await partners.standby(session, incident, config, run.id, ENGINE)
+            if tracked is not None:
+                return f"{step.name}: {tracked[0]}", tracked[1]
         partner = str(config.get("partner") or "Assistance partner")
         return (
             f"{step.name}: {partner} placed on standby (simulated)",

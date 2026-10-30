@@ -13,6 +13,7 @@ from app.core.db import tenant_session
 from app.modules.agents.service import AgentIn, PolicyIn, ensure_agents, ensure_policies
 from app.modules.intel.service import SourceIn, ensure_sources
 from app.modules.notifications.templates import TemplateIn, ensure_templates
+from app.modules.partners.service import PartnerIn, ensure_partners
 from app.modules.people import location
 from app.modules.people.service import add_observations, ensure_mission, load_persons, load_sites
 from app.modules.playbooks.service import StepIn, ensure_playbook, retire_older_versions
@@ -215,6 +216,8 @@ async def seed_all(
             ],
         )
 
+        report["partners"] = await ensure_partners(session, [PartnerIn(*p) for p in data.PARTNERS])
+
         report["agents"] = await ensure_agents(
             session, [AgentIn(code, name, desc, level) for code, name, desc, level in data.AGENTS]
         )
@@ -233,6 +236,9 @@ async def seed_all(
             ),
             await ensure_reference_counter(
                 session, prefix="TRP", with_year=False, last_value=data.TRP_START
+            ),
+            await ensure_reference_counter(
+                session, prefix="REQ", with_year=False, last_value=data.REQ_START
             ),
         ]
         report["scenario"] = await ensure_scenario(

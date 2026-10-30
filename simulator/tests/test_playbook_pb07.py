@@ -14,6 +14,7 @@ from app.core.approvals import ApprovalDeniedError
 from app.core.db import create_engine, tenant_session
 from app.modules.intel.models import IncidentEvent
 from app.modules.notifications.models import NotificationCampaign
+from app.modules.partners.models import Partner, PartnerRequest
 from app.modules.playbooks import engine as playbook_engine
 from app.modules.playbooks import service
 from app.modules.playbooks.models import Playbook, PlaybookRun, PlaybookRunStep, PlaybookStep
@@ -106,6 +107,8 @@ async def test_pb07_runs_to_step_7_waits_for_the_nairobi_hom_and_completes(
         assert [s.status for s in state] == ["DONE"] * 6 + ["AWAITING_APPROVAL", "PENDING"]
         recipients = {s.seq: s.result.get("recipients") for s in state if "recipients" in s.result}
         assert recipients == {2: 2, 4: 17, 5: 229}  # plan G-14
+        # AS-05: step 6 asked Kestrel to stand by, tracked (plan-pilot-ast §5).
+        assert state[5].result["request_reference"] == "REQ-0551"
 
         # PB-03: the Duty Officer and the Cairo Head of Mission are refused (D-05).
         for username in ("duty.officer", "hom.cairo"):
@@ -127,6 +130,19 @@ async def test_pb07_runs_to_step_7_waits_for_the_nairobi_hom_and_completes(
                     ).order_by(NotificationCampaign.reference)
                 )
             )
+            standby = list(
+                await session.execute(
+                    select(
+                        PartnerRequest.reference,
+                        Partner.code,
+                        PartnerRequest.service,
+                        PartnerRequest.incident_id,
+                        PartnerRequest.created_by_type,
+                        PartnerRequest.created_by,
+                        PartnerRequest.status,
+                    ).join(Partner, Partner.id == PartnerRequest.partner_id)
+                )
+            )
             briefing = await session.scalar(
                 select(IncidentEvent.summary).where(
                     IncidentEvent.event_type == "PLAYBOOK_STEP",
@@ -137,6 +153,10 @@ async def test_pb07_runs_to_step_7_waits_for_the_nairobi_hom_and_completes(
         await engine.dispose()
 
     assert run_row.status == "COMPLETED"
+    # One standby request despite the crash in step 5, made by the run (D-16, AS-05).
+    assert [tuple(r) for r in standby] == [
+        ("REQ-0551", "KES", "MEDICAL", incident_id, "PLAYBOOK", str(run_id), "REQUESTED")
+    ]
     # Four campaigns, no gaps or duplicates despite the crash (D-18 numbering).
     assert [c.campaign_type for c in campaigns] == ["ALERT", "ALERT", "CHECKIN", "ALERT"]
     assert all(re.fullmatch(r"NTF-\d{4}", c.reference) for c in campaigns)
