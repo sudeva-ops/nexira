@@ -86,7 +86,7 @@ The Nairobi acceptance scenario and the France scenario still pass. The France s
 | Journey Management (JRN-01..05) | **Written: §9 (approved, built: Prompts 23–27)** | — |
 | Air Travel Tracking (AIR-01..07) | **Written: §14 (approved, built: Prompts 28–32)** | — |
 | Travel & Air agent | **Written: §19 (approved, built: Prompts 33–37)** | — |
-| Assistance Partners (AST-01..04) | nothing | only if the pilot customer wants it |
+| Assistance Partners (AST-01..04) | **Written: §29 (draft for approval)** | §33 questions |
 | Weather (WX), D-35 | **Written: §24 (approved)** | — |
 
 ## 8. Questions answered by the product owner (2026-10-25)
@@ -303,3 +303,56 @@ Playwright on the real stack: Global Operations shows current conditions for the
 5. **Weather and travel risk:** yes, a weather incident raises its country's risk and triggers the Travel & Air agent, like any incident.
 6. **PB-06:** proposed for HIGH or CRITICAL STORM or FLOOD within the radius of a mission; steps: staff alert, safety check-in, citizen advisory (second person).
 7. **Demo scenario:** a tropical storm approaching Manila (MNL), with one seeded staff trip to Manila.
+
+---
+
+# Pilot module 5 · Assistance Partners (draft for approval)
+
+For the product owner, who approves this part; then for the coding agent (Prompts 43–47 in `docs/prompts-pilot.md`). Rules: D-30, and **D-36** (proposed with this draft). The pilot customer has asked for this module (D-30 row 5). Everything runs on **simulated partners**: no partner system, email or phone is contacted (AGENTS.md: no external URLs at runtime, channels simulated). A real partner integration later replaces only the simulated partner adapter.
+
+## 29. Purpose and starting point
+
+Know which contracted partners (medical, evacuation, secure transport, welfare, relocation) can help where, ask one for help in a few clicks, and follow the request until it is done. When someone answers a safety check-in with HELP, suggest the nearest partner that can help. Master spec §5.14, AST-01..04.
+
+| Exists today | Where |
+|---|---|
+| PB-07 step 6 "Place assistance partner on standby" (PARTNER_REQUEST): writes "Kestrel Medical Assistance placed on standby (simulated)" to the run's timeline; nothing is stored or tracked | `playbooks/engine.py`, seed |
+| Safety check-in answers SAFE or NEED_HELP; a NEED_HELP is escalated to the duty team | `checkin/service.py`, D-14 |
+| People's current locations with a confidence; missions and their countries | Location engine, `mission` |
+| No partner directory, no requests, no partner screen | — |
+
+## 30. Requirements: Assistance Partners (AS)
+
+| ID | Requirement | Master | Pri. | Acceptance |
+|---|---|---|---|---|
+| AS-01 | **Partner directory.** Contracted partners with their services (MEDICAL, EVACUATION, SECURE_TRANSPORT, WELFARE, RELOCATION), coverage (countries), response time (SLA, minutes) and hours. Fictional partners, labelled simulated (D-19). Every role reads it. | AST-01 | M | The screen lists the five seeded partners with services, coverage and SLA. |
+| AS-02 | **Request support.** A Duty Officer or Security Officer (or a Head of Mission for their own mission) asks a partner for one service, for a mission, optionally about an incident and a person, with a short note. Refused if the partner does not offer that service or does not cover the mission's country. | AST-02 | M | A request is created and shows as REQUESTED. |
+| AS-03 | **Track it.** Status REQUESTED → ACCEPTED (with an ETA) → EN_ROUTE → COMPLETED; or DECLINED by the partner, or CANCELLED by us before completion. Forward only. Every change is timestamped, audited and pushed to browsers. | AST-02 | M | The request moves to ACCEPTED with an ETA, then EN_ROUTE, without a reload. |
+| AS-04 | **Simulated partners.** A simulated partner adapter in the worker answers like a partner would: it accepts within its SLA (scaled down for the demo), sets an ETA and goes en route; a person marks the request COMPLETED. A real integration later replaces only the adapter. | — | M | — |
+| AS-05 | **Playbooks use it.** A PARTNER_REQUEST step creates a real request (PB-07 step 6: Kestrel Medical, MEDICAL, standby for the incident's mission), tracked like any other. | AST-02 | M | After PB-07 runs, the Nairobi standby request is on the screen. |
+| AS-06 | **Suggest a partner for an SOS.** When a person answers a check-in with NEED_HELP, the platform suggests the nearest capable partner: covering the person's location's country, for the service the duty team picks (default SECURE_TRANSPORT for staff in the zone), shortest SLA first. A person decides; nothing is requested automatically. | AST-03 | S | Peter Mwangi's HELP shows "Suggested: Sentinel Secure Transport"; one click creates the request. |
+| AS-07 | **Coverage gaps.** Per mission and service, whether an active partner covers the mission's country; missions without a service are flagged. | AST-04 | S | The screen shows "34 / 36 missions covered" and names the gaps. |
+| AS-08 | **Share the minimum.** A request carries the person's name and role, the place label and approximate location, the service and the note; no health details, no other personal data. Restricted (VIP) trips' travellers cannot be the subject of a request in the pilot. | — | M | — |
+
+### Not in this module
+Contracts, invoices and costs; partner portals or logins; real partner APIs, email or phone; automatic requests by an agent; medical records.
+
+## 31. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-21 · `partner`**: tenant, code, name, services, coverage (country codes), SLA minutes, hours, active; FORCE RLS; seeded through the service layer; read by every role.
+- **PC-22 · `partner_request`**: tenant, reference (REQ-…), partner, service, mission, optional incident and person, place label and location, note, status, ETA, who asked (user or playbook run), timestamps; FORCE RLS; no DELETE; a guard trigger for forward-only status, same-tenant references, and a partner that offers the service and covers the mission's country.
+
+## 32. Acceptance for the module
+
+Playwright on the real stack: the Assistance Partners screen lists the five partners and the coverage (labelled simulated); in NBO-CIVIL-UNREST, approving PB-07 creates the Kestrel standby request, which the simulated partner accepts; Peter Mwangi's NEED_HELP shows a suggested partner, a Duty Officer requests secure transport, it goes ACCEPTED then EN_ROUTE live, and the Duty Officer marks it COMPLETED; a Viewer cannot request; the audit chain verifies; `make acceptance` (all existing specs) still passes.
+
+## 33. Questions for the product owner (each has a proposed default)
+
+1. **Partners:** *Default:* the design's five fictional partners: Kestrel Medical Assistance (MEDICAL), Atlas Air Evacuation (EVACUATION), Sentinel Secure Transport (SECURE_TRANSPORT), Harbor Crisis Support (WELFARE), Meridian Relocation (RELOCATION, SECURE_TRANSPORT), with coverage chosen so that 34 of 36 missions are fully covered and two show gaps.
+2. **Who can request:** *Default:* DUTY_OFFICER and SECURITY_OFFICER for any mission; HEAD_OF_MISSION for their own mission (D-05). Viewers and others read only.
+3. **Second person:** *Default:* none. A request is operational, not a public message; it is sent by the person who raises it and audited. Agents never request (they may only suggest in a later module).
+4. **Simulated partner timing:** *Default:* accepts 5–15 seconds after the request, sets the ETA from its SLA, goes en route 10 seconds later; a person marks it completed. About 1 in 10 ad-hoc requests is declined, never in the demo scenario.
+5. **PB-07 step 6:** *Default:* creates a tracked MEDICAL standby request to Kestrel for the incident's mission. The Phase 1 figures (D-23) do not change.
+6. **SOS suggestion:** *Default:* shown on Safety Check-in next to each NEED_HELP and on the partner screen; nearest capable partner by coverage, then SLA; a person clicks to request. No agent in the pilot.
+7. **What a partner sees:** *Default:* as AS-08; restricted travellers excluded.
+8. **Demo:** *Default:* in NBO-CIVIL-UNREST scene 4, Peter Mwangi's HELP leads to a Sentinel secure-transport request (as in the design); no new scenario.
