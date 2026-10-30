@@ -181,7 +181,7 @@ Record each sign-off in the PR.
 | 2. **Journey Management** (JRN) | Local-Language OSINT (OSN): needs a real feed, licensing and a privacy review |
 | 3. **Air Travel Tracking** (AIR), on simulated flights | Integrations console (INT): needs real connectors |
 | 4. **Travel & Air agent** | Real SMS, email or WhatsApp delivery: channels stay simulated (D-19, AGENTS.md) |
-| 5. **Assistance Partners** (AST), only if the pilot customer asks for it | |
+| 5. **Assistance Partners** (AST): asked for by the pilot customer (D-36) | |
 | 6. **Weather** (WX), simulated: current conditions and severe-weather warnings (D-35) | |
 
 Rules:
@@ -225,6 +225,11 @@ Rules:
 - **Simulated only.** Current conditions and warnings come from a simulated xWeather feed in the worker, labelled simulated (D-19); no weather provider is called at runtime. A real provider later replaces only the feed.
 - **Warnings are intelligence.** Severe-weather warnings are signals of the existing xWeather source and go through fusion, exposure, agents and playbooks unchanged. Weather incidents use category-sized radii (WX-04).
 - **People decide.** PB-06 is proposed by the Response Planner and approved by a person (D-16); citizen advisories still need a second person (D-31).
+
+**D-36 · Assistance Partners (simulated).** Approved by the product owner on 2026-10-30 (PR #49), with the defaults in `docs/requirements-pilot.md` §33. Requirements AS-01 to AS-08.
+- **Simulated partners.** Partners are fictional and answer through a simulated partner adapter in the worker, labelled simulated (D-19). No partner system, email or phone is contacted. A real integration later replaces only the adapter, which is reviewed like a channel adapter (D-29).
+- **People request.** Only a person with the right role requests support, or a playbook step a person approved (D-16). Agents never request; the platform only suggests a partner for an SOS.
+- **Share the minimum.** A request carries what the partner needs to help (AS-08) and never a restricted traveller (D-33).
 
 ---
 

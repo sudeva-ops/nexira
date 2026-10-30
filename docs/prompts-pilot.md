@@ -350,4 +350,51 @@ acceptance (all specs) still passes.
 
 ---
 
-The prompts for Assistance Partners (if the customer wants it) are written after its requirements are approved (requirements-pilot.md §7).
+## Pilot module 5 · Assistance Partners (approved 2026-10-30, PR #49)
+
+Sources: D-36, `docs/requirements-pilot.md` §29–33 (AS-01..08), PC-21, PC-22. Simulated partners only.
+
+### Prompt 43 · Read and plan (no code)
+```
+Read D-05, D-14, D-16, D-19, D-22, D-29, D-30, D-33, D-36, requirements-pilot.md §29-33,
+the playbook engine (PARTNER_REQUEST), Safety Check-in (NEED_HELP), the location engine,
+the channel adapters (the pattern for a simulated external system) and the flight
+tracker. Write docs/plan-pilot-ast.md: requirement-to-code mapping, the simulated partner
+adapter and its timing, how PB-07 step 6 creates a request without moving the Phase 1
+figures (D-23), the SOS suggestion rule, coverage gaps, the seed partners, gaps with
+proposed answers, and the migration for PC-21/22 (only after they are approved). No code.
+```
+
+### Prompt 44 · Partner tables (migration) 🔒
+```
+PC-21 and PC-22, once approved. A new migration: partner and partner_request with FORCE
+RLS and tenant_isolation, grants as proposed, the REQ reference series, the guard
+trigger. Tests (as nexira_api): isolation; every refusal of the guard; no DELETE; the
+backup role reads them; the downgrade restores the previous revision exactly.
+```
+
+### Prompt 45 · Requests, the simulated partner and PB-07 🔒
+```
+AS-02..06, AS-08. app/modules/partners: service (request, cancel, complete; role checks
+through app/core/approvals.py), the simulated partner adapter in the worker (accept,
+ETA, en route; declines per §33 Q4), PARTNER_REQUESTED/PARTNER_REQUEST_UPDATED events to
+browsers, the SOS suggestion, coverage. PB-07 step 6 creates the Kestrel standby
+request. Seed the five partners. 🔒: the adapter is an external-system boundary (D-29).
+Tests: the status table, roles, refusals (service, coverage, restricted traveller),
+the adapter's timing with a fake clock, PB-07 unchanged in the D-23 figures.
+```
+
+### Prompt 46 · Assistance Partners screen
+```
+AS-01, AS-03, AS-06, AS-07. The screen (as the design, Blueprint dark): partner network,
+requests with status and ETA (live), coverage KPI and gaps, the SOS banner with the
+suggested partner; "Request partner" on Safety Check-in next to a NEED_HELP; the
+navigation entry. Tests: Vitest for the list, the request form, the status updates and
+the suggestion.
+```
+
+### Prompt 47 · Assistance Partners acceptance
+```
+Playwright, real stack (requirements-pilot.md §32). Report the real output; make
+acceptance (all specs) still passes.
+```
