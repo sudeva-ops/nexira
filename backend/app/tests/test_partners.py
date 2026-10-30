@@ -19,6 +19,7 @@ from app.modules.intel.models import Incident
 from app.modules.partners import service
 from app.modules.partners.adapter import (
     Pending,
+    Response,
     SimulatedPartnerAdapter,
     UnsupportedPartnerAdapterError,
     adapter_for,
@@ -441,3 +442,160 @@ async def test_standby_falls_back_without_the_partner_or_without_coverage(world:
         assert [(r.created_by_type, r.created_by, r.note) for r in requests] == [
             ("PLAYBOOK", str(run), "Standby · INC-T")
         ]
+
+
+# --- review of Prompt 45 --------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("who", ["hom.par", "duty"])
+async def test_a_request_is_for_one_mission(world: World, who: str) -> None:
+    """H1: the person (Nairobi) and the incident (Nairobi) cannot be named under Paris, by
+    the Paris Head of Mission or anyone: role, coverage and place follow one mission."""
+    response = await world.ask(
+        who, partner_id=str(world.partners["KES"]), service="MEDICAL", mission_id=str(world.par)
+    )
+    assert response.status_code == 422, response.text
+    assert "must be at the same mission" in response.text
+    assert await world.audited("PARTNER_REQUEST.") == []
+    # The Paris Head of Mission may ask for Paris itself.
+    own = await world.ask(
+        "hom.par",
+        partner_id=str(world.partners["KES"]),
+        service="MEDICAL",
+        mission_id=str(world.par),
+        person_id=None,
+        incident_id=None,
+    )
+    assert own.status_code == 201, own.text
+
+
+async def test_a_person_and_an_incident_at_different_missions_are_refused(world: World) -> None:
+    await world.sql(
+        "UPDATE person_location_current SET location = 'SRID=4326;POINT(2.36 48.87)' "
+        "WHERE person_id = :p",
+        p=world.peter,
+    )
+    response = await world.ask(partner_id=str(world.partners["MER"]))
+    assert response.status_code == 422
+    assert "the person's nearest mission, the incident's mission differ" in response.text
+
+
+async def test_the_location_is_approximate_and_the_place_bounded(world: World) -> None:
+    """L3, L4 (AS-08): about 100 m, and a long place label cannot break the request."""
+    await world.sql(
+        "UPDATE person_location_current SET place_label = :label WHERE person_id = :p",
+        label="x" * 300,
+        p=world.peter,
+    )
+    req = (await world.ask()).json()
+    [(x, y, label)] = await world.sql(
+        "SELECT ST_X(location::geometry), ST_Y(location::geometry), place_label "
+        "FROM partner_request WHERE id = :id",
+        id=req["id"],
+    )
+    assert len(label) == 200
+    assert (round(x * 1000, 6) % 1, round(y * 1000, 6) % 1) == (0, 0)  # on a 0.001° grid
+    # Half a grid step at most (36.8195 sits exactly half-way).
+    assert (abs(x - 36.8195) <= 0.00051, abs(y + 1.2985) <= 0.00051) == (True, True)
+
+
+async def test_restricted_travellers_are_not_suggested_and_are_masked_later(world: World) -> None:
+    """L2 (AS-08, G-5): a request made earlier hides the person once restricted."""
+    req = (await world.ask()).json()
+    assert req["person_role"] == "Driver"
+    trip = uuid.uuid4()
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        await session.execute(
+            text(
+                "INSERT INTO trip (id, tenant_id, reference, origin, destination, starts_on, "
+                "ends_on, restricted) VALUES (:t, current_tenant_id(), 'TRP-D', 'A', 'B', "
+                "current_date + 1, current_date + 2, true)"
+            ),
+            {"t": trip},
+        )
+        await session.execute(
+            text(
+                "INSERT INTO trip_traveller (tenant_id, trip_id, person_id) "
+                "VALUES (current_tenant_id(), :t, :p)"
+            ),
+            {"t": trip, "p": world.peter},
+        )
+        await session.commit()
+    suggested = await world.client.get(
+        f"/api/partners/suggest?person_id={world.peter}", headers=world.idp.headers("viewer")
+    )
+    assert suggested.status_code == 409
+    [shown] = (
+        await world.client.get("/api/partner-requests", headers=world.idp.headers("viewer"))
+    ).json()
+    assert (shown["person_id"], shown["person_name"], shown["person_role"]) == (
+        None,
+        "Restricted traveller",
+        None,
+    )
+    again = await world.ask()  # a DRAFT restricted trip protects too
+    assert again.status_code == 409
+
+
+async def test_standby_picks_the_partner_that_offers_the_service_among_namesakes(
+    world: World,
+) -> None:
+    """L1: names are not unique."""
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        await service.ensure_partners(
+            session, [PartnerIn("AAA", "Kestrel Medical Assistance", ["WELFARE"], ["KE"], 5)]
+        )
+        incident = await session.get_one(Incident, world.incident)
+        tracked = await service.standby(
+            session,
+            incident,
+            {"partner": "Kestrel Medical Assistance"},
+            uuid.uuid4(),
+            Actor(type="SYSTEM", id="playbook.engine"),
+        )
+        assert tracked is not None
+        request = await session.get_one(PartnerRequest, uuid.UUID(tracked[1]["request_id"]))
+        assert request.partner_id == world.partners["KES"]
+        # Two namesakes that both offer it: the first by code, always the same one.
+        await service.ensure_partners(
+            session, [PartnerIn("ZZZ", "Kestrel Medical Assistance", ["MEDICAL"], ["KE"], 5)]
+        )
+        again = await service.standby(
+            session,
+            incident,
+            {"partner": "Kestrel Medical Assistance"},
+            uuid.uuid4(),
+            Actor(type="SYSTEM", id="playbook.engine"),
+        )
+        assert again is not None
+        second = await session.get_one(PartnerRequest, uuid.UUID(again[1]["request_id"]))
+        assert second.partner_id == world.partners["KES"]  # KES before ZZZ
+
+
+class Decliner:
+    name = "test"
+
+    def respond(self, request: Pending, now: datetime) -> Any:
+        return Response("DECLINED") if request.status == "REQUESTED" else None
+
+
+async def test_a_decline_through_the_tick_is_final_and_audited(world: World) -> None:
+    req = (await world.ask()).json()
+    [declined] = await service.tick(
+        world.idp.engine, world.idp.tenant_id, world.publisher, Decliner(), now=datetime.now
+    )
+    assert declined.status == "DECLINED"
+    assert (
+        await world.post("duty", f"/api/partner-requests/{req['id']}/cancel")
+    ).status_code == 409
+    assert await world.audited("PARTNER_REQUEST.") == [
+        "PARTNER_REQUEST.CREATE",
+        "PARTNER_REQUEST.DECLINE",
+    ]
+
+
+async def test_a_head_of_mission_cancels_for_their_own_mission(world: World) -> None:
+    req = (await world.ask()).json()
+    cancelled = await world.post("hom.nbo", f"/api/partner-requests/{req['id']}/cancel")
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "CANCELLED"

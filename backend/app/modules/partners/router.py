@@ -51,6 +51,22 @@ async def _publish(publisher: Publisher, events: list[Event]) -> None:
             log.exception("publishing %s failed after commit", event.type)
 
 
+def _name(
+    people: dict[uuid.UUID, Person], hidden: set[uuid.UUID], pid: uuid.UUID | None
+) -> str | None:
+    if pid is None:
+        return None
+    return "Restricted traveller" if pid in hidden else people[pid].full_name
+
+
+def _role(
+    people: dict[uuid.UUID, Person], hidden: set[uuid.UUID], pid: uuid.UUID | None
+) -> str | None:
+    if pid is None or pid in hidden:
+        return None
+    return people[pid].role_title
+
+
 async def requests_out(session: AsyncSession, rows: list[PartnerRequest]) -> list[RequestOut]:
     if not rows:
         return []
@@ -73,11 +89,14 @@ async def requests_out(session: AsyncSession, rows: list[PartnerRequest]) -> lis
         )
     }
     people = {
-        p.id: p.full_name
+        p.id: p
         for p in await session.scalars(
             select(Person).where(Person.id.in_({r.person_id for r in rows if r.person_id}))
         )
     }
+    # AS-08: a person who has since become a restricted traveller is not shown (review of
+    # Prompt 45, L2).
+    hidden = await service.restricted_people(session, set(people))
     return [
         RequestOut(
             id=r.id,
@@ -89,8 +108,9 @@ async def requests_out(session: AsyncSession, rows: list[PartnerRequest]) -> lis
             mission_code=missions[r.mission_id],
             incident_id=r.incident_id,
             incident_reference=incidents.get(r.incident_id) if r.incident_id else None,
-            person_id=r.person_id,
-            person_name=people.get(r.person_id) if r.person_id else None,
+            person_id=None if r.person_id in hidden else r.person_id,
+            person_name=_name(people, hidden, r.person_id),
+            person_role=_role(people, hidden, r.person_id),
             place_label=r.place_label,
             note=r.note,
             status=r.status,

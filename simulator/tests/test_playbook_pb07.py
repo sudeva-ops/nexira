@@ -109,6 +109,11 @@ async def test_pb07_runs_to_step_7_waits_for_the_nairobi_hom_and_completes(
         assert recipients == {2: 2, 4: 17, 5: 229}  # plan G-14
         # AS-05: step 6 asked Kestrel to stand by, tracked (plan-pilot-ast §5).
         assert state[5].result["request_reference"] == "REQ-0551"
+        # ... and browsers hear of it at once (review of Prompt 45, M1).
+        announced = [e for e in publisher.events if e.type == "PARTNER_REQUEST_UPDATED"]
+        assert [(e.payload["reference"], e.payload["status"]) for e in announced] == [
+            ("REQ-0551", "REQUESTED")
+        ]
 
         # PB-03: the Duty Officer and the Cairo Head of Mission are refused (D-05).
         for username in ("duty.officer", "hom.cairo"):

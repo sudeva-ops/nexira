@@ -320,6 +320,21 @@ async def advance_one(session: AsyncSession, run_id: uuid.UUID) -> Outcome | Non
                 source="playbook.engine",
             )
         )
+    if "request_id" in result:
+        # AS-05: browsers see the standby request at once (review of Prompt 45, M1).
+        events.append(
+            Event(
+                type="PARTNER_REQUEST_UPDATED",
+                tenant_id=run.tenant_id,
+                payload={
+                    "request_id": result["request_id"],
+                    "reference": result["request_reference"],
+                    "status": "REQUESTED",
+                    "incident_id": str(run.incident_id),
+                },
+                source="playbook.engine",
+            )
+        )
     return Outcome("STEP_DONE", events)
 
 

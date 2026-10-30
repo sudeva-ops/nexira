@@ -58,6 +58,7 @@ class RequestOut(BaseModel):
     incident_reference: str | None
     person_id: uuid.UUID | None
     person_name: str | None
+    person_role: str | None
     place_label: str | None
     note: str | None
     status: str

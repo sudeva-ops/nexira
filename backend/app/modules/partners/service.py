@@ -14,6 +14,7 @@ Every change is audited (PARTNER_REQUEST.*) and announced after commit as
 PARTNER_REQUEST_UPDATED.
 """
 
+import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -34,6 +35,8 @@ from app.modules.partners.adapter import PartnerAdapter, Pending
 from app.modules.partners.models import SERVICES, Partner, PartnerRequest
 from app.modules.people.models import Mission, Person
 from app.modules.tenancy.service import SYSTEM, Actor
+
+log = logging.getLogger(__name__)
 
 REQUESTERS = "DUTY_OFFICER|SECURITY_OFFICER|HEAD_OF_MISSION"  # §33 Q2, scoped to the mission
 PARTNER = Actor(type="SYSTEM", id="partners.simulated")
@@ -175,6 +178,8 @@ async def suggest(
     person = await session.get(Person, person_id)
     if person is None:
         raise PartnerError(404, "No such person")
+    if await _restricted(session, person.id):
+        raise PartnerError(409, "A restricted traveller cannot be named (AS-08)")
     mission_id = await mission_for_person(session, person)
     if mission_id is None:
         raise PartnerError(422, "This person has no location and no mission")
@@ -233,7 +238,8 @@ _INSERT = text(
     INSERT INTO partner_request (tenant_id, reference, partner_id, service, mission_id,
            incident_id, person_id, place_label, location, note, created_by_type, created_by)
     SELECT current_tenant_id(), next_reference('REQ', false), :partner, :service, m.id,
-           :incident, :person, coalesce(l.place_label, m.city), coalesce(l.location, m.location),
+           :incident, :person, left(coalesce(l.place_label, m.city), 200),
+           ST_SnapToGrid(coalesce(l.location, m.location)::geometry, 0.001)::geography,
            :note, :by_type, :by
       FROM mission m LEFT JOIN person_location_current l ON l.person_id = :person
      WHERE m.id = :mission
@@ -250,8 +256,9 @@ async def _insert(
     created_by: str,
     actor: Actor,
 ) -> PartnerRequest:
-    """AS-08: the request holds the place and location (the person's, else the mission's,
-    plan G-9), the service and the note; nothing else about the person."""
+    """AS-08: the request holds the place and an approximate location (the person's, else
+    the mission's, plan G-9, on a 0.001° grid: about 100 m), the service and the note;
+    nothing else about the person."""
     request_id = await session.scalar(
         _INSERT,
         {
@@ -297,17 +304,34 @@ async def create_request(session: AsyncSession, user: CurrentUser, body: Request
     partner = await session.get(Partner, body.partner_id)
     if partner is None:
         raise PartnerError(404, "No such partner")
-    mission_id = body.mission_id
+    # The request is for one mission: the role, coverage and the place all follow it, so a
+    # person or incident elsewhere cannot be named under another mission (D-05; review of
+    # Prompt 45, H1).
+    candidates: list[tuple[str, uuid.UUID | None]] = []
+    if body.mission_id is not None:
+        candidates.append(("the mission named", body.mission_id))
     if body.person_id is not None:
         person = await session.get(Person, body.person_id)
         if person is None:
             raise PartnerError(404, "No such person")
-        mission_id = mission_id or await mission_for_person(session, person)
+        candidates.append(
+            ("the person's nearest mission", await mission_for_person(session, person))
+        )
     if body.incident_id is not None:
         incident = await session.get(Incident, body.incident_id)
         if incident is None:
             raise PartnerError(404, "No such incident")
-        mission_id = mission_id or incident.mission_id
+        if incident.mission_id is not None:
+            candidates.append(("the incident's mission", incident.mission_id))
+    known = {m for _, m in candidates if m is not None}
+    if len(known) > 1:
+        raise PartnerError(
+            422,
+            "The mission, the person and the incident must be at the same mission: "
+            + ", ".join(what for what, _ in candidates)
+            + " differ",
+        )
+    mission_id = next(iter(known), None)
     if mission_id is None:
         raise PartnerError(
             422, "A request is for a mission: name the mission, a person or an incident"
@@ -336,6 +360,22 @@ async def create_request(session: AsyncSession, user: CurrentUser, body: Request
     actor = Actor(type="USER", id=str(user.id))
     request = await _insert(session, clean, mission_id, "USER", str(user.id), actor)
     return Outcome(request, [request_event(request)])
+
+
+async def restricted_people(session: AsyncSession, person_ids: set[uuid.UUID]) -> set[uuid.UUID]:
+    """Those of person_ids who are restricted travellers now (plan G-5)."""
+    if not person_ids:
+        return set()
+    rows = await session.scalars(
+        text(
+            "SELECT DISTINCT tt.person_id FROM trip t JOIN trip_traveller tt ON tt.trip_id = t.id "
+            "WHERE tt.person_id = ANY(:ids) AND t.restricted "
+            "AND t.approval_status IN ('DRAFT', 'PENDING', 'APPROVED') "
+            "AND t.ends_on >= (now() AT TIME ZONE 'UTC')::date"
+        ),
+        {"ids": list(person_ids)},
+    )
+    return set(rows)
 
 
 async def _restricted(session: AsyncSession, person_id: uuid.UUID) -> bool:
@@ -458,7 +498,10 @@ async def tick(
         moved = await respond_all(session, adapter, now())
         await session.commit()
     for request in moved:
-        await publisher.publish(request_event(request))
+        try:
+            await publisher.publish(request_event(request))
+        except Exception:
+            log.exception("publishing PARTNER_REQUEST_UPDATED failed after commit")
     return moved
 
 
@@ -477,8 +520,15 @@ async def standby(
     keeps the Phase 1 behaviour."""
     name = str(config.get("partner") or "")
     service = str(config.get("service_code") or "MEDICAL")
-    partner = await session.scalar(select(Partner).where(Partner.name == name, Partner.is_active))
-    if partner is None or service not in partner.services or incident.mission_id is None:
+    # Names are not unique: the active partner of that name offering the service, by code
+    # (review of Prompt 45, L1).
+    partner = await session.scalar(
+        select(Partner)
+        .where(Partner.name == name, Partner.is_active, Partner.services.contains([service]))
+        .order_by(Partner.code)
+        .limit(1)
+    )
+    if partner is None or incident.mission_id is None:
         return None
     mission = await session.get_one(Mission, incident.mission_id)
     if mission.country_code not in partner.coverage:
