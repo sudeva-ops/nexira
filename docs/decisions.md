@@ -182,7 +182,7 @@ Record each sign-off in the PR.
 | 3. **Air Travel Tracking** (AIR), on simulated flights | Integrations console (INT): needs real connectors |
 | 4. **Travel & Air agent** | Real SMS, email or WhatsApp delivery: channels stay simulated (D-19, AGENTS.md) |
 | 5. **Assistance Partners** (AST), only if the pilot customer asks for it | |
-| 6. **Weather** (WX), simulated: current conditions and severe-weather warnings (D-35, *proposed*) | |
+| 6. **Weather** (WX), simulated: current conditions and severe-weather warnings (D-35) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -221,7 +221,7 @@ Rules:
 - **Never about restricted trips** (D-33).
 - Changes to its action types, policies and executors need a named human sign-off (D-29).
 
-**D-35 · Weather (simulated).** *Proposed* with the draft in `docs/requirements-pilot.md` §24–28 (WX-01 to WX-08); not in force until the product owner approves it. Amends D-30 by adding Weather to the pilot.
+**D-35 · Weather (simulated).** Approved by the product owner on 2026-10-30 (PR #43), with the defaults in `docs/requirements-pilot.md` §28. Requirements WX-01 to WX-08. Amends D-30 by adding Weather to the pilot.
 - **Simulated only.** Current conditions and warnings come from a simulated xWeather feed in the worker, labelled simulated (D-19); no weather provider is called at runtime. A real provider later replaces only the feed.
 - **Warnings are intelligence.** Severe-weather warnings are signals of the existing xWeather source and go through fusion, exposure, agents and playbooks unchanged. Weather incidents use category-sized radii (WX-04).
 - **People decide.** PB-06 is proposed by the Response Planner and approved by a person (D-16); citizen advisories still need a second person (D-31).

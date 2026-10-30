@@ -300,7 +300,7 @@ acceptance (all specs) still passes.
 
 ---
 
-## Pilot module 6 · Weather (draft for approval)
+## Pilot module 6 · Weather (approved 2026-10-30, PR #43)
 
 Sources: D-35, `docs/requirements-pilot.md` §24–28 (WX-01..08), PC-20. Simulated weather only.
 
