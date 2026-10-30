@@ -350,9 +350,9 @@ acceptance (all specs) still passes.
 
 ---
 
-## Pilot module 5 · Assistance Partners (draft for approval)
+## Pilot module 5 · Assistance Partners (approved 2026-10-30, PR #49)
 
-Sources: D-36 (proposed), `docs/requirements-pilot.md` §29–33 (AS-01..08), PC-21, PC-22. Simulated partners only. Not started until the product owner approves.
+Sources: D-36, `docs/requirements-pilot.md` §29–33 (AS-01..08), PC-21, PC-22. Simulated partners only.
 
 ### Prompt 43 · Read and plan (no code)
 ```
