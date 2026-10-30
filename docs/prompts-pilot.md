@@ -300,4 +300,54 @@ acceptance (all specs) still passes.
 
 ---
 
+## Pilot module 6 · Weather (approved 2026-10-30, PR #43)
+
+Sources: D-35, `docs/requirements-pilot.md` §24–28 (WX-01..08), PC-20. Simulated weather only.
+
+### Prompt 38 · Read and plan (no code)
+```
+Read D-09..D-11, D-19, D-22, D-30, D-32, D-34, D-35, requirements-pilot.md §24-28, the intel
+pipeline (normalise, fusion, exposure), the Response Planner, playbooks and templates,
+the flight tracker (the pattern for a simulated feed). Write docs/plan-pilot-wx.md:
+requirement-to-code mapping, the simulated feed and how scenarios override it, how
+category-sized radii fit fusion and exposure without changing unrest (D-23 must not
+move), PB-06's steps and trigger, the MNL-TROPICAL-STORM scenario, gaps with proposed
+answers, and the migration for PC-20 (only after it is approved). No code changes.
+```
+
+### Prompt 39 · Current weather table (migration) 🔒
+```
+PC-20, once approved. A new migration: weather_current with FORCE RLS and
+tenant_isolation, grants as PC-20, range CHECKs. Seed nothing (the feed fills it).
+Tests (as nexira_api): isolation; refusals; backup role reads it; the downgrade
+restores the previous revision exactly.
+```
+
+### Prompt 40 · Weather feed, warnings and PB-06
+```
+WX-01, WX-03..06, WX-08. The simulated feed in the worker (every 15 min, a daily cycle
+per city; WEATHER_FEED events from scenarios override a city), GET /api/weather,
+WEATHER_UPDATED to browsers. xWeather categories (§28 Q3) and category-sized radii
+(Q4) in normalisation, fusion and exposure. PB-06 (severe weather) and a per-mission
+severe-weather advisory template; the Response Planner's rule for it. The
+MNL-TROPICAL-STORM scenario and a seeded staff trip to Manila.
+Tests: the feed and overrides; radii per category; unrest unchanged (the Phase 1
+acceptance and D-23 counts); PB-06 proposed for STORM/FLOOD HIGH+ near a mission only.
+```
+
+### Prompt 41 · Weather on the screens
+```
+WX-02, WX-07. Global Operations weather panel (worst first, stale flagged), map weather
+layer and mission popup, the presenter bar entry for MNL-TROPICAL-STORM.
+Tests: Vitest for the panel, stale flag and layer data.
+```
+
+### Prompt 42 · Weather acceptance
+```
+Playwright, real stack (requirements-pilot.md §27). Report the real output; make
+acceptance (all specs) still passes.
+```
+
+---
+
 The prompts for Assistance Partners (if the customer wants it) are written after its requirements are approved (requirements-pilot.md §7).
