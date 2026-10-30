@@ -1,14 +1,17 @@
 import { Spinner } from "@blueprintjs/core";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { type Incident, useIncident, useIncidents, useOperationsSummary, useSignals } from "../../api/intel";
 import { useMissions } from "../../api/people";
+import { useWeather } from "../../api/weather";
 import { Card, Kpi } from "../../ui/primitives";
 import { ImpactPanel } from "./ImpactPanel";
 import { LiveFeed } from "./LiveFeed";
+import { WeatherPanel } from "./WeatherPanel";
 
 const NO_EXPOSURE: never[] = [];
+const NO_WEATHER: never[] = [];
 
 // MapLibre is most of the bundle; load it only with this screen.
 const OperationsMap = lazy(() =>
@@ -24,6 +27,9 @@ export function OperationsScreen() {
   const incidents = useIncidents("ACTIVE").data ?? [];
   const signals = useSignals(50).data ?? [];
   const selected = useIncident(selectedId ?? undefined).data;
+  const weatherQuery = useWeather();
+  const weather = weatherQuery.data ?? NO_WEATHER;
+  const [showWeather, setShowWeather] = useState(true);
 
   const select = (incident: Incident) => setParams({ incident: incident.id });
   const worst = incidents.find((i) => i.severity === summary?.highest_active_severity);
@@ -92,6 +98,8 @@ export function OperationsScreen() {
             exposure={selected?.exposure ?? NO_EXPOSURE}
             selectedId={selectedId}
             onSelect={select}
+            weather={showWeather ? weather : NO_WEATHER}
+            weatherAt={weatherQuery.dataUpdatedAt}
           />
         </Suspense>
         <div className="nx-legend">
@@ -101,6 +109,15 @@ export function OperationsScreen() {
           <span className="nx-chip"><i style={{ background: "#8ABBFF" }} />Staff</span>
           <span className="nx-chip"><i style={{ background: "#BDADFF" }} />Delegate</span>
           <span className="nx-chip"><i style={{ background: "#FBB360" }} />Citizen</span>
+          <button
+            type="button"
+            className="nx-chip nx-chip-toggle"
+            aria-pressed={showWeather}
+            onClick={() => setShowWeather((on) => !on)}
+          >
+            <i style={{ background: showWeather ? "#8ABBFF" : "transparent" }} />
+            Weather
+          </button>
         </div>
         <div className="nx-maptitle">
           {selected ? (
@@ -125,13 +142,16 @@ export function OperationsScreen() {
           )}
         </div>
       </div>
-      {selectedId ? (
-        <ImpactPanel incidentId={selectedId} onClose={() => setParams({})} />
-      ) : (
-        <Card icon="feed" title="Live intelligence feed" className="nx-side">
-          <LiveFeed incidents={incidents} signals={signals} onSelect={select} />
-        </Card>
-      )}
+      <div className="nx-sidecol">
+        {selectedId ? (
+          <ImpactPanel incidentId={selectedId} onClose={() => setParams({})} />
+        ) : (
+          <Card icon="feed" title="Live intelligence feed" className="nx-side">
+            <LiveFeed incidents={incidents} signals={signals} onSelect={select} />
+          </Card>
+        )}
+        <WeatherPanel />
+      </div>
     </div>
   );
 }

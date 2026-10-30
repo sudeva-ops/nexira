@@ -349,6 +349,16 @@ body {
   white-space: nowrap;
 }
 
+.nx-chip-toggle {
+  border: 1px solid var(--nx-line);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.nx-chip-toggle i {
+  box-shadow: inset 0 0 0 1px #8abbff;
+}
+
 .nx-chip i {
   display: inline-block;
   width: 6px;
@@ -635,6 +645,56 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+/* The right-hand column: the feed or impact panel, then the weather (WX-02). */
+.nx-sidecol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.nx-sidecol > .nx-side {
+  flex: 1 1 60%;
+}
+
+.nx-weather {
+  display: flex;
+  flex: 0 1 40%;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.nx-weather-body {
+  overflow: auto;
+}
+
+.nx-weather-table td {
+  padding: 4px 6px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.nx-weather-table tr.nx-stale td {
+  opacity: 0.55;
+}
+
+.nx-stale-tag {
+  color: #fbb360;
+}
+
+/* The map's weather layer: one icon per mission, beside its dot. */
+.nx-wx-marker {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--nx-line);
+  border-radius: 50%;
+  background: var(--nx-panel2);
+  color: var(--c, #8abbff);
+  pointer-events: auto;
 }
 
 .nx-feed {

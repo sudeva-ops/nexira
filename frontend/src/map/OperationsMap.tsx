@@ -1,10 +1,13 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import { type GeoJSONSource, Map as MapLibreMap, Marker, NavigationControl, Popup } from "maplibre-gl";
-import { useEffect, useRef, useState } from "react";
+import { Icon } from "@blueprintjs/core";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import type { Exposure, Incident } from "../api/intel";
 import type { Mission } from "../api/people";
+import { type Weather, weatherMarkers, weatherSummary } from "../api/weather";
 import { exposureFeatures, missionFeatures, SEVERITY_COLOUR, zoneFeatures } from "./geo";
 import { registerPmtiles, tilesAvailable } from "./base";
 import { ATTRIBUTION, baseStyle, CITY_MINZOOM } from "./style";
@@ -17,16 +20,23 @@ interface Props {
   exposure: Exposure[]; // the selected incident's exposure (people at city zoom)
   selectedId: string | null;
   onSelect: (incident: Incident) => void;
+  weather: Weather[]; // WX-02: the weather layer and the popup line; empty hides the layer
+  weatherAt: number; // when it was fetched: staleness is judged from then (plan G-6)
 }
 
-export function OperationsMap({ missions, incidents, exposure, selectedId, onSelect }: Props) {
+export function OperationsMap({ missions, incidents, exposure, selectedId, onSelect, weather, weatherAt }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [baseMissing, setBaseMissing] = useState(false);
   const markers = useRef(new Map<string, Marker>());
   const onSelectRef = useRef(onSelect);
+  const weatherRef = useRef(new Map<string, Weather>());
+  const wxMarkers = useRef(new Map<string, Marker>());
+  const [wxElements, setWxElements] = useState(new Map<string, HTMLElement>());
+  const wxData = useMemo(() => weatherMarkers(weather, weatherAt), [weather, weatherAt]);
   useEffect(() => {
     onSelectRef.current = onSelect;
+    weatherRef.current = new Map(weather.map((w) => [w.mission_code, w]));
   });
 
   useEffect(() => {
@@ -91,9 +101,10 @@ export function OperationsMap({ missions, incidents, exposure, selectedId, onSel
             const f = e.features?.[0];
             if (!f || f.geometry.type !== "Point") return;
             const p = f.properties as Record<string, string | number | null>;
+            const wx = layer === "missions" ? weatherRef.current.get(String(p.code)) : undefined;
             const text =
               layer === "missions"
-                ? `${p.city} (${p.code}) · ${p.label}`
+                ? `${p.city} (${p.code}) · ${p.label}${wx ? ` · ${weatherSummary(wx)}` : ""}`
                 : `${p.name}${p.confidence != null ? ` · ${p.confidence}%` : ""}`;
             popup
               .setLngLat(f.geometry.coordinates as [number, number])
@@ -106,10 +117,12 @@ export function OperationsMap({ missions, incidents, exposure, selectedId, onSel
       });
     });
     const placed = markers.current;
+    const wxPlaced = wxMarkers.current;
     return () => {
       disposed = true;
-      for (const marker of placed.values()) marker.remove();
+      for (const marker of [...placed.values(), ...wxPlaced.values()]) marker.remove();
       placed.clear();
+      wxPlaced.clear();
       created?.remove();
     };
   }, []);
@@ -155,6 +168,40 @@ export function OperationsMap({ missions, incidents, exposure, selectedId, onSel
     (map?.getSource("exposure") as GeoJSONSource | undefined)?.setData(exposureFeatures(exposure));
   }, [map, exposure]);
 
+  // The weather layer (WX-02): a marker per mission, offset from its dot; the icon is
+  // rendered into it by a portal below.
+  useEffect(() => {
+    if (!map) return;
+    const seen = new Set<string>();
+    let changed = false;
+    for (const w of wxData) {
+      seen.add(w.code);
+      let marker = wxMarkers.current.get(w.code);
+      if (!marker) {
+        const el = document.createElement("div");
+        el.className = "nx-wx-marker";
+        el.dataset.testid = `weather-marker-${w.code}`;
+        marker = new Marker({ element: el, offset: [14, -14] }).setLngLat([w.lon, w.lat]).addTo(map);
+        wxMarkers.current.set(w.code, marker);
+        changed = true;
+      }
+      const el = marker.getElement();
+      el.style.setProperty("--c", w.colour);
+      el.title = w.title;
+      el.setAttribute("aria-label", w.title);
+    }
+    for (const [code, marker] of wxMarkers.current) {
+      if (!seen.has(code)) {
+        marker.remove();
+        wxMarkers.current.delete(code);
+        changed = true;
+      }
+    }
+    if (changed) {
+      setWxElements(new Map([...wxMarkers.current].map(([code, m]) => [code, m.getElement()])));
+    }
+  }, [map, wxData]);
+
   useEffect(() => {
     const incident = incidents.find((i) => i.id === selectedId);
     if (map && incident) map.flyTo({ center: [incident.lon, incident.lat], zoom: 11.2 });
@@ -164,6 +211,10 @@ export function OperationsMap({ missions, incidents, exposure, selectedId, onSel
 
   return (
     <div className="nx-map" ref={container} data-testid="operations-map">
+      {wxData.map((w) => {
+        const el = wxElements.get(w.code);
+        return el ? createPortal(<Icon icon={w.icon} size={11} />, el, w.code) : null;
+      })}
       {baseMissing && (
         <div className="nx-map-note">Base map not installed. Run `make tiles` (D-24).</div>
       )}
