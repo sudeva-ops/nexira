@@ -2,11 +2,12 @@
 
 A normalised signal joins an ACTIVE incident when all of these hold:
 - same norm_category;
-- within FUSION_RADIUS_M of incident.location (the first signal's location; it
-  never moves);
+- within the category's fusion distance of incident.location (the first signal's
+  location; it never moves): FUSION_RADIUS_M, or WEATHER_SIZES for weather (WX-04);
 - occurred_at within FUSION_WINDOW of incident.last_signal_at, either side;
 - the source takes part in fusion (checked by the caller, see service.py).
-Otherwise it opens a new incident. If several incidents match, it joins the nearest.
+Otherwise it opens a new incident, with the category's impact radius (5 km, or
+WEATHER_SIZES). If several incidents match, it joins the nearest.
 
 Fusion runs under a per-tenant transaction advisory lock, so two signals
 handled at the same time cannot both open an incident for the same event.
@@ -33,6 +34,10 @@ from app.modules.intel.normalise import max_severity, severity_rank
 from app.modules.tenancy.service import Actor
 
 FUSION_RADIUS_M = 3_000
+IMPACT_RADIUS_M = 5_000  # the schema default (incident.impact_radius_m)
+# WX §28 Q4 (plan-pilot-wx.md §3): impact radius = fusion distance for weather. Every other
+# category (CIVIL_UNREST, TRANSPORT_STRIKE, ...) keeps 3 km / 5 km, so D-23 does not move.
+WEATHER_SIZES = {"STORM": 60_000, "FLOOD": 25_000, "DUST_STORM": 40_000, "EXTREME_HEAT": 30_000}
 FUSION_WINDOW_MIN = 60
 MAX_CONFIDENCE = 99
 
@@ -52,6 +57,14 @@ def confidence(reliabilities: Iterable[Decimal]) -> int:
         miss *= Decimal(1) - r
     value = (Decimal(100) * (Decimal(1) - miss)).quantize(Decimal(1), rounding=ROUND_HALF_UP)
     return min(int(value), MAX_CONFIDENCE)
+
+
+def fusion_radius_m(category: str) -> int:
+    return WEATHER_SIZES.get(category, FUSION_RADIUS_M)
+
+
+def impact_radius_m(category: str) -> int:
+    return WEATHER_SIZES.get(category, IMPACT_RADIUS_M)
 
 
 def incident_title(category: str, place_label: str | None) -> str:
@@ -78,7 +91,7 @@ async def fuse(
     session: AsyncSession, signal: RawSignal, source: IntelSource, actor: Actor
 ) -> Fused:
     """Link a NORMALISED signal to an incident, opening one if none matches."""
-    _normalised(signal)
+    category, _ = _normalised(signal)
     await session.execute(
         text("SELECT pg_advisory_xact_lock(hashtext('nexira:fusion:' || current_tenant_id()))")
     )
@@ -88,7 +101,7 @@ async def fuse(
         .where(
             Incident.status == "ACTIVE",
             Incident.category == RawSignal.norm_category,
-            func.ST_DWithin(Incident.location, RawSignal.location, FUSION_RADIUS_M),
+            func.ST_DWithin(Incident.location, RawSignal.location, fusion_radius_m(category)),
             func.abs(func.extract("epoch", RawSignal.occurred_at - Incident.last_signal_at))
             <= FUSION_WINDOW_MIN * 60,
         )
@@ -140,6 +153,7 @@ async def _open(session: AsyncSession, signal: RawSignal, source: IntelSource) -
                     "place_label",
                     "opened_at",
                     "last_signal_at",
+                    "impact_radius_m",
                 ],
                 select(
                     RawSignal.tenant_id,
@@ -153,6 +167,7 @@ async def _open(session: AsyncSession, signal: RawSignal, source: IntelSource) -
                     RawSignal.place_label,
                     RawSignal.occurred_at,
                     RawSignal.occurred_at,
+                    literal(impact_radius_m(category)),
                 ).where(RawSignal.id == signal.id),
             )
             .returning(Incident.id, Incident.reference)

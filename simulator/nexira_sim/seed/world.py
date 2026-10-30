@@ -59,6 +59,7 @@ class World:
     persons: list[PersonIn] = field(default_factory=list)
     observations: list[ObservationIn] = field(default_factory=list)
     delegate_ids: list[uuid.UUID] = field(default_factory=list)
+    manila_trip_ids: list[uuid.UUID] = field(default_factory=list)  # data.MANILA_TRIP
 
 
 def _observation_for(
@@ -274,6 +275,19 @@ def build(scenario_date: date, tenant_id: uuid.UUID) -> World:
             )
         )
 
+    # The Manila trip's travellers (WX-06): the first diplomats of their mission, booked at
+    # the Manila hotel instead of seen at home. Nothing new is drawn from rng, so everyone
+    # else is where they were.
+    _ref, _purpose, home, count, *_rest, (hotel_lat, hotel_lon), hotel = data.MANILA_TRIP
+    home_id = next(m.id for m in w.missions if m.code == home)
+    w.manila_trip_ids = [
+        p.id for p in w.persons if p.mission_id == home_id and p.person_type == "DIPLOMAT"
+    ][:count]
+    for n, o in enumerate(w.observations):
+        if o.person_id in w.manila_trip_ids:
+            w.observations[n] = _observation_for(
+                o.person_id, "TRAVEL_BOOKING", 89, hotel_lat, hotel_lon, hotel, as_of
+            )
     return w
 
 
