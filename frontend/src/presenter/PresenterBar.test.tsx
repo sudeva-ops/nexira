@@ -4,6 +4,7 @@ import { vi } from "vitest";
 
 import type { Me } from "../api/me";
 import type { ScenarioState } from "../api/scenario";
+import { SCENE_SCREEN } from "./scenes";
 import { SUMMARY, VIEWER } from "../test/fixtures";
 import { DUTY_OFFICER, mockApi, renderApp } from "../test/render";
 
@@ -102,5 +103,25 @@ describe("Presenter bar", () => {
     expect(fetchMock.mock.calls.some(([url]) => String(url) === "/api/scenarios/FRA-NATIONAL-PROTESTS")).toBe(
       true,
     );
+  });
+
+  it("offers every demo scenario, the Manila storm included (WX-07)", async () => {
+    vi.stubEnv("VITE_DEMO_MODE", "true");
+    setup(DUTY_OFFICER);
+    renderApp("/");
+    const bar = await screen.findByRole("toolbar", { name: "Presenter" });
+    const options = within(within(bar).getByLabelText("Scenario")).getAllByRole("option");
+    expect(options.map((o) => o.textContent)).toEqual([
+      "Nairobi civil unrest",
+      "France protests",
+      "Inbound flight diversion",
+      "Manila tropical storm",
+    ]);
+    expect(SCENE_SCREEN["MNL-TROPICAL-STORM"]).toEqual({
+      0: "/operations",
+      1: "/operations",
+      2: "/operations",
+      3: "/operations",
+    });
   });
 });

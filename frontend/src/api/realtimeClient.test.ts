@@ -128,6 +128,8 @@ describe("realtime client (PLT-05)", () => {
     // D-33: a flight's status also shows on its trip (AT-07); positions only on the air view.
     expect(staleKeys(event("FLIGHT_UPDATED", { flight_id: "f1" }))).toEqual([["flights"], ["trips"]]);
     expect(staleKeys(event("FLIGHT_POSITIONS"))).toEqual([["flights"]]);
+    // D-35: every 15 minutes and on a scenario override.
+    expect(staleKeys(event("WEATHER_UPDATED", { missions: 36 }))).toEqual([["weather"]]);
     expect(staleKeys(event("SOMETHING_ELSE"))).toEqual([]);
   });
 });

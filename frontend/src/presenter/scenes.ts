@@ -25,4 +25,11 @@ export const SCENE_SCREEN: Record<DemoScenario, Record<number, string>> = {
     2: "/air",
     3: "/air",
   },
+  // D-35 (WX-07): the weather panel and the storm on the map; PB-06 in the Decision Queue.
+  "MNL-TROPICAL-STORM": {
+    0: "/operations",
+    1: "/operations",
+    2: "/operations",
+    3: "/operations",
+  },
 };
