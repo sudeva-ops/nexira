@@ -5,7 +5,7 @@ export interface Screen {
   title: string;
   subtitle: string;
   icon: IconName;
-  group: "COMMAND" | "MONITOR" | "RESPOND" | "ADMIN";
+  group: "COMMAND" | "MONITOR" | "RESPOND" | "PLAN & INSIGHT" | "ADMIN";
   builtIn: string; // prompt that builds the real screen
 }
 
@@ -24,5 +24,7 @@ export const SCREENS: readonly Screen[] = [
   { path: "/notifications", title: "Mass Notification", subtitle: "Comms · Multi-channel delivery", icon: "send-message", group: "RESPOND", builtIn: "Prompt 21" },
   { path: "/partners", title: "Assistance Partners", subtitle: "Response · Medical, evacuation & secure transport", icon: "heart", group: "RESPOND", builtIn: "Prompt 46" },
   { path: "/checkin", title: "Safety Check-in", subtitle: "Workflows · Personnel accountability", icon: "tick-circle", group: "RESPOND", builtIn: "Prompt 11" },
+  // Plan-pilot-dx G-9: PLAN & INSIGHT, as the design; Predictive Risk and Executive Overview join it later.
+  { path: "/documents", title: "Document Expiry", subtitle: "Compliance · Passports, visas & clearances", icon: "document", group: "PLAN & INSIGHT", builtIn: "Prompt 51" },
   { path: "/audit", title: "Audit", subtitle: "Admin · Hash-chained audit log", icon: "history", group: "ADMIN", builtIn: "Prompt 3" },
 ];

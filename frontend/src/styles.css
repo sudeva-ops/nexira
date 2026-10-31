@@ -1887,6 +1887,32 @@ body {
   color: var(--nx-tx2);
 }
 
+/* --- Document Expiry (DX-02..09, D-37) ------------------------------------------- */
+.nx-docs {
+  margin-top: 8px;
+}
+
+.nx-docs td {
+  font-size: 11.5px;
+}
+
+.nx-docs .bp6-control {
+  margin: 0;
+}
+
+.nx-docs-block {
+  color: #fa999c;
+}
+
+.nx-docs-renewed {
+  color: #72ca9b;
+}
+
+.nx-doc-warning {
+  margin-top: 6px;
+  color: #fbb360;
+}
+
 /* --- Motion: it shows what changed, and is still otherwise -------------------------- */
 /* ui/motion.tsx alternates nx-flash-a and nx-flash-b so each change replays the flash. */
 :root {

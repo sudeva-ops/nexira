@@ -32,6 +32,7 @@ describe("app shell", () => {
       "Mass Notification", // pilot module 1 (D-30)
       "Assistance Partners", // pilot module 5 (D-30, D-36)
       "Safety Check-in",
+      "Document Expiry", // pilot module 7 (D-30, D-37), under PLAN & INSIGHT (plan-pilot-dx G-9)
       "Audit",
     ]);
     for (const outOfScope of ["Evacuation", "Copilot", "Executive", "Integrations", "OSINT"]) {

@@ -87,10 +87,18 @@ export interface CountryRisk {
   simulated: boolean;
 }
 
+/** DX-06: no passport valid for 180 days after the trip ends. A warning; it never blocks approval. */
+export interface DocumentWarning {
+  person_id: string;
+  full_name: string;
+  valid_until: string | null; // the latest passport-type date; null if they hold none
+}
+
 export interface TripDetail extends Trip {
   travellers: { id: string; full_name: string; person_type: string }[];
   segments: Segment[];
   country_risk: CountryRisk | null;
+  document_warnings: DocumentWarning[]; // DX-06: within the caller's document read scope
 }
 
 export interface TripPlan {

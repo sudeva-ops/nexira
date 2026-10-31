@@ -132,6 +132,13 @@ export function TripDetail({ trip, onEdit }: { trip: Detail; onEdit: (trip: Deta
               ))}
               <Checkbox label="Security approval" checked={trip.checklist.security_approval} disabled />
             </div>
+            {trip.document_warnings.map((w) => (
+              <div key={w.person_id} className="nx-doc-warning" role="note">
+                Travel document: {w.full_name} has no passport valid 180 days after the trip
+                {w.valid_until ? ` (valid until ${w.valid_until})` : ""}. Renewal advised; approval is not blocked
+                (DX-06).
+              </div>
+            ))}
             {risky && openItems > 0 && trip.approval_status === "PENDING" && (
               <div className="nx-dim">HIGH and CRITICAL trips need all four ticked before approval (JR-05)</div>
             )}

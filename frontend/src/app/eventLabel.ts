@@ -19,6 +19,7 @@ const EVENT_LABEL: Record<string, string> = {
   FLIGHT_POSITIONS: "Flight positions",
   PARTNER_REQUEST_UPDATED: "Partner request",
   WEATHER_UPDATED: "Weather updated",
+  DOCUMENT_UPDATED: "Document updated",
   PROPOSAL_CREATED: "New proposal",
   PROPOSAL_UPDATED: "Proposal decided",
   PROPOSAL_EXPIRED: "Proposal expired",
