@@ -4,8 +4,9 @@ Each Phase 1 action type has a payload schema and an executor. Executors only
 call the service functions a logged-in user's request calls: incident notes,
 playbooks.start_run, notifications.create_campaign, for the Travel & Air agent
 (D-34) the trip audience of create_campaign and trips.cancel_by_agent, for the
-Compliance agent (D-37) documents.renew_by_agent, and for arming ahead of a cyclone
-landfall (D-38) playbooks.arm_run. Agents never
+Compliance agent (D-37) documents.renew_by_agent, for arming ahead of a cyclone
+landfall (D-38) playbooks.arm_run, and for a health advisory (D-39)
+health_intel.prepare_by_agent, which leaves the campaign for a second person. Agents never
 reach channels, external systems or tables directly (AGENTS.md).
 
 An action type with no entry here can still be proposed: the database makes it
@@ -31,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.events import Event
 from app.modules.documents import service as documents
+from app.modules.health_intel import service as health
 from app.modules.intel import service as intel
 from app.modules.intel.models import Incident
 from app.modules.notifications.channels import CHANNELS
@@ -119,6 +121,18 @@ class DocumentRenewalPayload(_Payload):
     proposal quotes (documents.REMINDER), so it is not in the payload."""
 
     document_ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+
+class HealthAdvisoryPayload(_Payload):
+    """PREPARE_HEALTH_ADVISORY (D-39, HL-07): a health advisory for one mission's staff,
+    dependants and citizens. Approving creates the campaign, which a second person then
+    approves before anything is sent (plan-pilot-hl G-2)."""
+
+    advisory_id: uuid.UUID
+    mission_id: uuid.UUID
+    message: str = Field(min_length=1, max_length=2000)
+    translations: dict[str, str] = Field(default_factory=dict)
+    channels: list[str] = Field(min_length=1, max_length=5)
 
 
 @dataclass
@@ -343,6 +357,31 @@ async def _start_document_renewal(
     }
 
 
+async def _prepare_health_advisory(
+    session: AsyncSession, payload: HealthAdvisoryPayload, ctx: Context
+) -> dict[str, Any]:
+    try:
+        outcome = await health.prepare_by_agent(
+            session,
+            advisory_id=payload.advisory_id,
+            mission_id=payload.mission_id,
+            message=payload.message,
+            translations=payload.translations,
+            channels=payload.channels,
+            proposal_id=ctx.proposal_id,
+            approved_by=ctx.approved_by,
+            actor=ctx.agent_actor,
+        )
+    except health.HealthError as e:
+        raise ActionError(str(e)) from None
+    ctx.events.extend(outcome.events)
+    return {
+        "campaign_id": str(outcome.campaign.id),
+        "reference": outcome.campaign.reference,
+        "status": outcome.campaign.status,  # PENDING_APPROVAL: a second person decides
+    }
+
+
 ACTIONS: dict[str, Action] = {
     "LOG_INFO": Action(NotePayload, _note, _retract_note),
     "POST_INTERNAL_NOTE": Action(NotePayload, _note, _retract_note),
@@ -357,6 +396,9 @@ ACTIONS: dict[str, Action] = {
     "CANCEL_TRIP": Action(CancelTripPayload, _cancel_trip),
     # Compliance agent (D-37). ADVISE_EMERGENCY_DOCUMENTS has no entry: advice only.
     "START_DOCUMENT_RENEWAL": Action(DocumentRenewalPayload, _start_document_renewal),
+    # Communications agent, health (D-39). Not undoable: the campaign is rejected or
+    # cancelled on Mass Notification instead.
+    "PREPARE_HEALTH_ADVISORY": Action(HealthAdvisoryPayload, _prepare_health_advisory),
 }
 
 

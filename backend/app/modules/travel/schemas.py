@@ -4,6 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.modules.health_intel.schemas import RequirementOut
+
 
 class SegmentIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -133,6 +135,8 @@ class TripDetailOut(TripOut):
     segments: list[SegmentOut]
     country_risk: CountryRiskOut | None
     document_warnings: list[DocumentWarningOut]
+    # HL-03: the destination's entry requirements (illustrative); shown, never a warning.
+    health_requirement: RequirementOut | None = None
 
 
 class FlightOut(BaseModel):

@@ -238,6 +238,48 @@ async def create_draft(
     return campaign
 
 
+async def prepare_for_approval(
+    session: AsyncSession,
+    content: Content,
+    *,
+    proposal_id: uuid.UUID,
+    submitted_by: uuid.UUID,
+    actor: Actor,
+) -> Outcome:
+    """An approved agent proposal's campaign, waiting for a second person (D-31; plan-
+    pilot-hl G-2): the agent is the author, the proposal's approver submitted it, and the
+    gate lets neither decide. Nothing is queued until someone else approves it."""
+    spec = await _validate(session, content)
+    reference = await session.scalar(text("SELECT next_reference('NTF', false)"))
+    campaign = NotificationCampaign(
+        tenant_id=session.info["tenant_id"],
+        reference=reference,
+        incident_id=content.incident_id,
+        campaign_type=content.kind,
+        message=content.message,
+        translations=content.translations,
+        channels=content.channels,
+        audience_filter=spec,
+        created_by_type="AGENT",
+        created_by=str(proposal_id),
+        status="PENDING_APPROVAL",
+        submitted_by=submitted_by,
+        template_id=content.template_id,
+    )
+    session.add(campaign)
+    await session.flush()
+    await audit.write(
+        session,
+        actor_type=actor.type,
+        actor_id=actor.id,
+        action="CAMPAIGN.PREPARE",
+        entity_type="notification_campaign",
+        entity_id=campaign.reference,
+        details={"kind": content.kind, "audience": spec, "submitted_by": str(submitted_by)},
+    )
+    return Outcome(campaign, [_event(campaign)])
+
+
 async def update_draft(
     session: AsyncSession, user: CurrentUser, campaign_id: uuid.UUID, content: Content
 ) -> NotificationCampaign:

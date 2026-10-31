@@ -11,6 +11,7 @@ from app.core.events import Publisher, RedisPublisher, StreamConsumer, get_redis
 from app.modules.agents.runner import agents_handler, observed_types
 from app.modules.checkin.consumer import clock_handler, response_handler
 from app.modules.hazards import consumer as hazards
+from app.modules.health_intel.consumer import advisory_handler
 from app.modules.intel.consumer import exposure_handler, raw_signal_handler
 from app.modules.notifications.consumer import campaign_handler, tick
 from app.modules.partners import service as partners
@@ -182,10 +183,16 @@ async def main() -> None:
             consumer=name,
             handlers={"DEMO_CLOCK": hazards.clock_handler(engine, publisher)},
         ),
+        StreamConsumer(
+            client,
+            group="health",
+            consumer=name,
+            handlers={"HEALTH_ADVISORY": advisory_handler(engine, publisher)},
+        ),
     ]
     log.info(
         "consumers started: intel, exposure, playbooks, notifications, agents, flights, weather, "
-        "checkin, hazards"
+        "checkin, hazards, health"
     )
     try:
         async with asyncio.TaskGroup() as tasks:

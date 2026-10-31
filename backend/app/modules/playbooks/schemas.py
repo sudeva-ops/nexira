@@ -89,3 +89,4 @@ class PermissionsOut(BaseModel):
     arm_playbook: bool = False  # hazards: may arm a playbook for this incident (HZ-10, G-1)
     start_armed: bool = False  # hazards: may start its armed run now
     disarm: bool = False  # hazards: may disarm it
+    send_advisory: bool = False  # health: may send a health advisory to this mission (HL-06)
