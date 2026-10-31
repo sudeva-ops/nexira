@@ -57,8 +57,8 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     upgraded = asyncio.run(_snapshot(admin))
     # The schema's 33 tables, message_template (0002), trip_segment and country_risk
     # (0003), airport, flight and flight_event (0004), weather_current (0005), partner and
-    # partner_request (0006), and alembic_version.
-    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 2 + 1
+    # partner_request (0006), travel_document (0007), and alembic_version.
+    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
 
@@ -370,4 +370,85 @@ def test_downgrading_0006_restores_0005_exactly(fresh: DbUrls) -> None:
         ("status", "{nexira_app=w/nexira_owner}"),
     ]
     assert (at_head["functions"], at_head["policies"]) == (1, 2)
+    command.upgrade(cfg, "head")
+
+
+async def _document_shape(admin_url: str) -> dict[str, object]:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        tables = await conn.fetch(
+            "SELECT relname, relforcerowsecurity, relacl::text AS acl FROM pg_class "
+            "WHERE relname = 'travel_document'"
+        )
+        functions = await conn.fetchval(
+            "SELECT count(*) FROM pg_proc WHERE proname = 'travel_document_guard'"
+        )
+        policies = await conn.fetchval(
+            "SELECT count(*) FROM pg_policies WHERE tablename = 'travel_document'"
+        )
+        columns = await conn.fetch(
+            "SELECT a.attname, a.attacl::text AS acl FROM pg_attribute a "
+            "JOIN pg_class c ON c.oid = a.attrelid WHERE c.relname = 'travel_document' "
+            "AND a.attacl IS NOT NULL ORDER BY a.attname"
+        )
+        search_path = await conn.fetchval(
+            "SELECT proconfig::text FROM pg_proc WHERE proname = 'travel_document_guard'"
+        )
+        # Everything in public, so a leftover of 0007 shows (review of Prompt 49, L4).
+        public = await conn.fetchrow(
+            "SELECT (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "        WHERE n.nspname = 'public') AS relations, "
+            "       (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace "
+            "        WHERE n.nspname = 'public') AS functions, "
+            "       (SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal) AS triggers, "
+            "       (SELECT count(*) FROM pg_policy) AS policies"
+        )
+    finally:
+        await conn.close()
+    return {
+        "tables": [tuple(t) for t in tables],
+        "functions": functions,
+        "policies": policies,
+        "columns": [tuple(c) for c in columns],
+        "search_path": search_path,
+        "public": tuple(public or ()),
+    }
+
+
+def test_downgrading_0007_restores_0006_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0006")
+    at_0006 = asyncio.run(_document_shape(admin))
+    at_0006_partners = asyncio.run(_partner_shape(admin))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_document_shape(admin))
+    command.downgrade(cfg, "0006")
+    assert asyncio.run(_document_shape(admin)) == at_0006
+    assert asyncio.run(_partner_shape(admin)) == at_0006_partners
+    assert at_0006["tables"] == []
+    # The app reads and adds documents and moves their renewal; never deletes them; nothing
+    # else (no TRUNCATE, REFERENCES or TRIGGER). The backup role reads it.
+    assert at_head["tables"] == [
+        (
+            "travel_document",
+            True,
+            "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+            "nexira_app=ar/nexira_owner}",
+        ),
+    ]
+    # UPDATE only of the renewal: status, new date and who did each step (plan G-1).
+    assert at_head["columns"] == [
+        (column, "{nexira_app=w/nexira_owner}")
+        for column in (
+            "renewal_requested_by",
+            "renewal_started_by",
+            "renewal_status",
+            "renewed_by",
+            "valid_until",
+        )
+    ]
+    assert (at_head["functions"], at_head["policies"]) == (1, 1)
+    assert at_head["search_path"] == '{"search_path=pg_catalog, public, pg_temp"}'
     command.upgrade(cfg, "head")
