@@ -480,9 +480,9 @@ Playwright on the real stack: the Natural Hazards screen shows the hazard events
 
 ---
 
-# Pilot module 9 · Health Intelligence (proposed, for approval)
+# Pilot module 9 · Health Intelligence (approved 2026-10-31, PR #70)
 
-For the product owner, who approves this part; then for the coding agent (Prompts 59–64 in `docs/prompts-pilot.md`). Rules: D-30, and **D-39** (proposed). Everything runs on **simulated health advisories, sample medical facilities and illustrative entry requirements**: no WHO, ministry or health-intelligence provider is called (AGENTS.md: no external URLs at runtime). A real feed later replaces only the simulated feed, after its terms of use are checked (master HLT-05).
+For the product owner, who approves this part; then for the coding agent (Prompts 59–64 in `docs/prompts-pilot.md`). Rules: D-30, and **D-39**. Everything runs on **simulated health advisories, sample medical facilities and illustrative entry requirements**: no WHO, ministry or health-intelligence provider is called (AGENTS.md: no external URLs at runtime). A real feed later replaces only the simulated feed, after its terms of use are checked (master HLT-05).
 
 ## 44. Purpose and starting point
 
@@ -527,7 +527,7 @@ Real WHO, ministry or provider feeds; person-level health data of any kind (medi
 
 Playwright on the real stack: the Health Intelligence screen shows the six seeded advisories, the entry requirements, Nairobi's facilities and readiness counts, labelled simulated. In NBO-CIVIL-UNREST, Nairobi Central Medical Centre is flagged "Avoid" while the incident is ACTIVE. In `NBO-CHOLERA`, the cholera advisory becomes HIGH and the Communications agent's proposal appears; a Duty Officer approves it; a draft campaign from the Nairobi health template exists, and a second person (Consular Officer) approves and sends it; deliveries are simulated. A Viewer sees the screen with no send button and no names. The audit chain verifies; `make acceptance` (all existing specs) still passes.
 
-## 48. Questions for the product owner (proposed defaults)
+## 48. Questions answered by the product owner (2026-10-31: "use the defaults")
 
 1. **Advisories are not incidents.** Outbreaks cover countries and last days or weeks; they are a reference list, not signals fused into incidents with a radius. So they start no playbooks and do not count as active incidents. *Default: yes, a separate `health_advisory` list.*
 2. **Seeded advisories:** the design's six (cholera in Kenya MODERATE, dengue in Bangladesh, mpox in central Africa, avian influenza in Southeast Asia, measles in Pakistan, a heat-health warning in Delhi), fictional and simulated, present after `make reset-demo`. They are not incidents, so the Phase 1 scenario still starts with no active incident and an empty Decision Queue.

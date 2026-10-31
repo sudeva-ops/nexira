@@ -510,7 +510,7 @@ Playwright, real stack (requirements-pilot.md §42). Report the real output; mak
 acceptance (all specs) still passes.
 ```
 
-## Pilot module 9 · Health Intelligence (Prompts 59–64, proposed)
+## Pilot module 9 · Health Intelligence (approved 2026-10-31, PR #70)
 
 Sources: D-39, `docs/requirements-pilot.md` §44–48 (HL-01..10), PC-26..29. Simulated advisories, sample facilities and illustrative requirements only.
 

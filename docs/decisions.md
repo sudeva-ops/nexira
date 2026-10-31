@@ -185,7 +185,7 @@ Record each sign-off in the PR.
 | 6. **Weather** (WX), simulated: current conditions and severe-weather warnings (D-35) | |
 | 7. **Document Expiry** (DX), simulated (D-37) | |
 | 8. **Natural Hazards & Climate** (HZ), simulated (D-38) | |
-| 9. **Health Intelligence** (HL), simulated (D-39, proposed) | |
+| 9. **Health Intelligence** (HL), simulated (D-39) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -244,7 +244,7 @@ Rules:
 - **Arming is a scheduled playbook run.** An armed playbook starts by itself at the time a person or an approved proposal chose, and stays a normal run (gates, second person for citizens). Agents only propose arming, at level Approve or higher (D-12, D-16).
 - **Climate scores are illustrative.** They are labelled simulated, shown for planning, and used by no rule or agent.
 
-**D-39 · Health Intelligence (simulated). Proposed, not yet approved.** Requirements HL-01 to HL-10 in `docs/requirements-pilot.md` §44–48, with the proposed defaults in §48. Amends D-30 by adding Health Intelligence to the pilot.
+**D-39 · Health Intelligence (simulated).** Approved by the product owner on 2026-10-31 (PR #70). Requirements HL-01 to HL-10 in `docs/requirements-pilot.md` §44–48, with the defaults in §48. Amends D-30 by adding Health Intelligence to the pilot.
 - **Advisories are reference intelligence, not incidents.** Outbreaks and health advisories are a country-level list with their own updates; they are not fused into incidents and start no playbook.
 - **No person-level health data.** Staff health readiness is counts per mission only. Medical records, blood types and per-person vaccination records are out of the pilot; recording them needs a privacy review and a lawful basis first.
 - **People decide.** A health advisory is a Mass Notification campaign under D-31 (a second person for citizens). The Communications agent only proposes it, at level Approve or higher (D-12, D-16).
