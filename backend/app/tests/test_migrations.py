@@ -57,8 +57,9 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     upgraded = asyncio.run(_snapshot(admin))
     # The schema's 33 tables, message_template (0002), trip_segment and country_risk
     # (0003), airport, flight and flight_event (0004), weather_current (0005), partner and
-    # partner_request (0006), travel_document (0007), and alembic_version.
-    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1
+    # partner_request (0006), travel_document (0007), mission_climate_risk (0008), and
+    # alembic_version.
+    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 1
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
 
@@ -451,4 +452,150 @@ def test_downgrading_0007_restores_0006_exactly(fresh: DbUrls) -> None:
     ]
     assert (at_head["functions"], at_head["policies"]) == (1, 1)
     assert at_head["search_path"] == '{"search_path=pg_catalog, public, pg_temp"}'
+    command.upgrade(cfg, "head")
+
+
+async def _hazard_shape(admin_url: str) -> dict[str, object]:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        run_columns = await conn.fetch(
+            "SELECT column_name, data_type, is_nullable, column_default "
+            "FROM information_schema.columns WHERE table_name = 'playbook_run' ORDER BY column_name"
+        )
+        run_checks = await conn.fetch(
+            "SELECT conname, pg_get_constraintdef(oid) AS def FROM pg_constraint "
+            "WHERE conrelid = 'playbook_run'::regclass ORDER BY conname"
+        )
+        run_indexes = await conn.fetch(
+            "SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'playbook_run' "
+            "ORDER BY indexname"
+        )
+        run_acl = await conn.fetchval(
+            "SELECT relacl::text FROM pg_class WHERE relname = 'playbook_run'"
+        )
+        climate = await conn.fetch(
+            "SELECT relname, relforcerowsecurity, relacl::text AS acl FROM pg_class "
+            "WHERE relname = 'mission_climate_risk'"
+        )
+        search_paths = await conn.fetch(
+            "SELECT proname, proconfig::text AS config FROM pg_proc "
+            "WHERE proname IN ('playbook_run_guard', 'mission_climate_risk_guard') ORDER BY proname"
+        )
+        policies = await conn.fetchval(
+            "SELECT count(*) FROM pg_policies WHERE tablename = 'mission_climate_risk'"
+        )
+        # Everything in public, so a leftover of 0008 shows (review of Prompt 49, L4).
+        public = await conn.fetchrow(
+            "SELECT (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "        WHERE n.nspname = 'public') AS relations, "
+            "       (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace "
+            "        WHERE n.nspname = 'public') AS functions, "
+            "       (SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal) AS triggers, "
+            "       (SELECT count(*) FROM pg_policy) AS policies"
+        )
+    finally:
+        await conn.close()
+    return {
+        "run_columns": [tuple(c) for c in run_columns],
+        "run_checks": [tuple(c) for c in run_checks],
+        "run_indexes": [tuple(i) for i in run_indexes],
+        "status_check": next(
+            r["def"] for r in run_checks if r["conname"] == "playbook_run_status_check"
+        ),
+        "live_index": next(
+            r["indexdef"] for r in run_indexes if r["indexname"] == "playbook_run_live_uq"
+        ),
+        "run_acl": run_acl,
+        "climate": [tuple(t) for t in climate],
+        "search_paths": [tuple(f) for f in search_paths],
+        "policies": policies,
+        "public": tuple(public or ()),
+    }
+
+
+def test_downgrading_0008_restores_0007_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0007")
+    at_0007 = asyncio.run(_hazard_shape(admin))
+    at_0007_documents = asyncio.run(_document_shape(admin))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_hazard_shape(admin))
+    command.downgrade(cfg, "0007")
+    assert asyncio.run(_hazard_shape(admin)) == at_0007
+    assert asyncio.run(_document_shape(admin)) == at_0007_documents
+    assert at_0007["climate"] == []
+    # PC-24: grants on playbook_run unchanged; the armed statuses and G-8's live index.
+    assert at_head["run_acl"] == at_0007["run_acl"]
+    assert ("scheduled_for", "timestamp with time zone", "YES", None) in cast(
+        list[tuple[object, ...]], at_head["run_columns"]
+    )
+    assert "'SCHEDULED'" in str(at_head["status_check"])
+    assert "'SCHEDULED'" in str(at_head["live_index"])
+    assert "'SCHEDULED'" not in str(at_0007["live_index"])
+    # PC-25: read and added by the app, never changed or deleted; the backup role reads it.
+    assert at_head["climate"] == [
+        (
+            "mission_climate_risk",
+            True,
+            "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+            "nexira_app=ar/nexira_owner}",
+        ),
+    ]
+    assert at_head["policies"] == 1
+    assert at_head["search_paths"] == [
+        ("mission_climate_risk_guard", '{"search_path=pg_catalog, public, pg_temp"}'),
+        ("playbook_run_guard", '{"search_path=pg_catalog, public, pg_temp"}'),
+    ]
+    command.upgrade(cfg, "head")
+
+
+def test_downgrading_0008_refuses_while_a_run_is_armed(fresh: DbUrls) -> None:
+    """SCHEDULED and DISARMED do not exist in 0007: the downgrade fails, nothing is rewritten."""
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.upgrade(cfg, "head")
+
+    async def arm() -> None:
+        conn = await asyncpg.connect(admin)
+        try:
+            tenant = await conn.fetchval(
+                "INSERT INTO tenant (name, oidc_issuer) VALUES ('Armed', 'https://idp.test/armed') "
+                "RETURNING id"
+            )
+            playbook = await conn.fetchval(
+                "INSERT INTO playbook (tenant_id, code, name, category) "
+                "VALUES ($1, 'PB-06', 'Severe weather', 'WEATHER') RETURNING id",
+                tenant,
+            )
+            await conn.execute(
+                "INSERT INTO playbook_run (tenant_id, playbook_id, status, scheduled_for) "
+                "VALUES ($1, $2, 'SCHEDULED', now() + interval '1 day')",
+                tenant,
+                playbook,
+            )
+        finally:
+            await conn.close()
+
+    async def clean() -> None:
+        conn = await asyncpg.connect(admin)
+        try:
+            # The guard keeps armed runs, so the superuser skips triggers to clean up.
+            await conn.execute("SET session_replication_role = replica")
+            await conn.execute("DELETE FROM playbook_run")
+            await conn.execute("DELETE FROM playbook")
+            await conn.execute("DELETE FROM tenant WHERE name = 'Armed'")
+        finally:
+            await conn.close()
+
+    at_head = asyncio.run(_hazard_shape(admin))
+    asyncio.run(arm())
+    try:
+        with pytest.raises(Exception, match="playbook_run_status_check"):
+            command.downgrade(cfg, "0007")
+        assert asyncio.run(_hazard_shape(admin)) == at_head  # rolled back, nothing dropped
+    finally:
+        asyncio.run(clean())
+    command.downgrade(cfg, "0007")
     command.upgrade(cfg, "head")

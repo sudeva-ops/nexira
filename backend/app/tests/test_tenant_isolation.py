@@ -121,6 +121,8 @@ ROWS: dict[str, str] = {
     "VALUES ('{partner}', '{t}', 'KES', 'Kestrel', '{{MEDICAL}}', '{{KE}}', 15)",
     "travel_document": "INSERT INTO travel_document (tenant_id, person_id, doc_type, "
     "issuing_country, valid_until) VALUES ('{t}', '{person}', 'PASSPORT', 'KE', current_date)",
+    "mission_climate_risk": "INSERT INTO mission_climate_risk (tenant_id, mission_id, hazards, "
+    "score_today, score_2050, scenario) VALUES ('{t}', '{mission}', '{{FLOOD}}', 40, 60, 'x')",
     "partner_request": "INSERT INTO partner_request (tenant_id, reference, partner_id, service, "
     "mission_id, created_by_type, created_by) VALUES ('{t}', 'REQ-1', '{partner}', 'MEDICAL', "
     "'{mission}', 'USER', 'u')",
@@ -153,6 +155,7 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "partner",  # seeded; no UPDATE or DELETE in the pilot (PC-21)
     "partner_request",  # UPDATE of status and ETA only, never DELETE (PC-22; review of Prompt 44)
     "travel_document",  # UPDATE of the renewal only, never DELETE (PC-23)
+    "mission_climate_risk",  # seeded reference data; no UPDATE or DELETE in the pilot (PC-25)
 }
 NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELETE)
     "message_template",
@@ -295,7 +298,7 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
         match=(
             r"row-level security|trip: no such trip|flight: no such flight"
             r"|weather: no such mission|partner request: no such partner"
-            r"|travel document: no such person"
+            r"|travel document: no such person|climate risk: no such mission"
         ),
     ):
         await api.execute(sql_for(table, world.a))
