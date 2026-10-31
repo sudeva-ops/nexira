@@ -355,13 +355,36 @@ SOURCES: list[tuple[str, str, Decimal, dict[str, str], dict[str, str], bool, boo
         "xWeather",
         Decimal("0.50"),
         GENERIC_SEVERITY,
-        # WX §28 Q3: the two Phase 1 categories plus two (D-35).
+        # WX §28 Q3: the two Phase 1 categories plus two (D-35); cyclone forecasts and
+        # wildfire (D-38, §43 Q1).
         {
             "Flood": "FLOOD",
             "Storm": "STORM",
             "Dust storm": "DUST_STORM",
             "Extreme heat": "EXTREME_HEAT",
+            "Tropical cyclone": "TROPICAL_CYCLONE",
+            "Wildfire": "WILDFIRE",
         },
+        True,
+        True,
+    ),
+    # Natural hazards (D-38, §43 Q1): the measure in each signal decides its severity
+    # (app/modules/intel/hazards.py), so these two have no severity map.
+    (
+        "SEISMIC",
+        "Seismic network",
+        Decimal("0.70"),
+        {},
+        {"Earthquake": "EARTHQUAKE"},
+        True,
+        True,
+    ),
+    (
+        "AIRQ",
+        "Air-quality network",
+        Decimal("0.60"),
+        {},
+        {"Air quality": "AIR_QUALITY"},
         True,
         True,
     ),
@@ -510,6 +533,30 @@ MESSAGE_TEMPLATES += [
         "MNL",
         "Severe weather: staff alert (Manila)",
         {"en": "Tropical storm warning. Stay indoors; avoid Manila Bay and low-lying roads."},
+    ),
+]
+
+# PB-01 (D-38, HZ-07): English only until reviewed (D-15).
+QUAKE_ADVISORY = "EARTHQUAKE_CITIZEN_ADVISORY"
+QUAKE_STAFF_ALERT = "EARTHQUAKE_STAFF_ALERT"
+MESSAGE_TEMPLATES += [
+    (
+        QUAKE_ADVISORY,
+        "ADVISORY",
+        None,
+        "Earthquake: aftershock advice",
+        {
+            "en": "A strong earthquake has affected the {city} area. Expect aftershocks: stay "
+            "out of damaged buildings, follow local authorities, and reply SAFE or HELP. "
+            "Updates every 2 hours."
+        },
+    ),
+    (
+        QUAKE_STAFF_ALERT,
+        "ALERT",
+        None,
+        "Earthquake: staff alert",
+        {"en": "Earthquake near {city}. Leave damaged buildings, expect aftershocks, report in."},
     ),
 ]
 
@@ -680,6 +727,117 @@ PB06_STEPS: list[tuple[int, str, str, dict[str, object], str | None]] = [
         None,
     ),
 ]
+
+# PB-01 · Earthquake (D-38, HZ-07; plan-pilot-hz §7): HIGH or CRITICAL with a mission site
+# inside its radius. Safety check-in first, then the staff alert (the Communications agent
+# then proposes the citizen advisory: a second person approves it, D-31), then the mission's
+# security team. No approval gate, as PB-06 (plan §7 named one; PB-06 has none, G-14).
+PB01_TRIGGER = {
+    "categories": ["EARTHQUAKE"],
+    "min_severity": "HIGH",
+    "mission_site_exposed": True,
+}
+PB01_STEPS: list[tuple[int, str, str, dict[str, object], str | None]] = [
+    (
+        1,
+        "Send safety check-in",
+        "CHECKIN",
+        {
+            "audience": {"exposed": True},
+            "channels": ["APP", "SMS", "WHATSAPP"],
+            "message": "Earthquake: are you safe? Reply SAFE or HELP.",
+            "escalate_after_s": 600,
+        },
+        None,
+    ),
+    (
+        2,
+        "Alert exposed staff",
+        "NOTIFY",
+        {
+            "campaign_type": "ALERT",
+            "audience": {"exposed": True, "person_types": PERSONNEL_TYPES},
+            "channels": ["APP", "SMS", "WHATSAPP"],
+            "message_template": QUAKE_STAFF_ALERT,
+            "citizen_advisory_template": QUAKE_ADVISORY,
+            "citizen_advisory_channels": ["SMS", "WHATSAPP", "APP"],
+        },
+        None,
+    ),
+    (
+        3,
+        "Notify Head of Mission & Security Attaché",
+        "NOTIFY",
+        {
+            "campaign_type": "ALERT",
+            "audience": {
+                "mission": "incident",
+                "role_titles": ["Head of Mission", "Security Attaché"],
+            },
+            "channels": ["APP", "SMS", "VOICE"],
+            "message": "URGENT: Earthquake near the mission — security team alert",
+        },
+        None,
+    ),
+]
+
+# --- Natural Hazards & Climate (D-38) -----------------------------------------------------------
+# HZ-08, §43 Q7: illustrative, fictional scores for every mission (0-100, today and 2050),
+# from the design for its seven cities and plausible for the rest. Jakarta is highest in 2050.
+CLIMATE_SCENARIO = "Illustrative 2050 (simulated)"
+CLIMATE: dict[str, tuple[list[str], int, int]] = {
+    "JKT": (["Flood", "Sea-level rise"], 82, 88),
+    "DAC": (["Cyclone", "Flood"], 79, 86),
+    "DEL": (["Heat", "Air quality"], 74, 83),
+    "MNL": (["Typhoon", "Flood"], 76, 81),
+    "RUH": (["Heat", "Dust"], 70, 79),
+    "BGW": (["Heat", "Water stress"], 66, 77),
+    "MCT": (["Heat", "Cyclone"], 62, 72),
+    "KUL": (["Flood", "Heat"], 58, 67),
+    "SIN": (["Sea-level rise", "Heat"], 52, 64),
+    "ISB": (["Heat", "Flash flood"], 55, 64),
+    "CAI": (["Heat", "Water stress"], 54, 63),
+    "TYO": (["Earthquake", "Typhoon"], 57, 62),
+    "MEX": (["Earthquake", "Water stress"], 50, 58),
+    "ABV": (["Flood", "Heat"], 45, 56),
+    "ANK": (["Earthquake", "Drought"], 48, 54),
+    "AMM": (["Water stress", "Heat"], 44, 54),
+    "BJS": (["Heat", "Air quality"], 46, 53),
+    "RBA": (["Drought", "Heat"], 40, 51),
+    "NBO": (["Drought", "Flash flood"], 41, 49),
+    "ADD": (["Drought", "Flash flood"], 38, 47),
+    "PRY": (["Drought", "Heat"], 36, 45),
+    "BSB": (["Drought", "Wildfire"], 34, 44),
+    "CBR": (["Wildfire", "Heat"], 35, 44),
+    "NYC": (["Coastal flood", "Storm"], 33, 42),
+    "WAS": (["Heat", "Storm"], 30, 38),
+    "SEL": (["Flood", "Heat"], 30, 37),
+    "MAD": (["Heat", "Drought"], 29, 37),
+    "ROM": (["Heat", "Wildfire"], 28, 36),
+    "BUE": (["Flood", "Heat"], 27, 34),
+    "MOW": (["Heat", "Wildfire smoke"], 22, 29),
+    "PAR": (["Heat", "Flood"], 23, 29),
+    "LON": (["Flood (pluvial)"], 22, 27),
+    "BRU": (["Flood", "Heat"], 21, 26),
+    "BER": (["Heat", "Drought"], 20, 26),
+    "GVA": (["Flood", "Landslide"], 18, 23),
+    "YOW": (["Flood", "Wildfire smoke"], 17, 22),
+}
+# HZ-11, §43 Q8: three Dhaka staff live in flood-prone wards and two Jakarta staff in North
+# Jakarta, as the design ("Jakarta mission · 2 staff homes"). Fictional coordinates. The last
+# generated staff of each mission are moved home; nobody is added and nothing is drawn from
+# rng, so the seeded totals stay as they are.
+HAZARD_HOMES: dict[str, list[tuple[str, float, float]]] = {
+    "DAC": [
+        ("Home · Mirpur (flood-prone ward)", 23.8223, 90.3654),
+        ("Home · Jatrabari (flood-prone ward)", 23.7104, 90.4348),
+        ("Home · Badda (flood-prone ward)", 23.7806, 90.4265),
+    ],
+    "JKT": [
+        ("Home · Penjaringan, North Jakarta (flood-prone)", -6.1260, 106.7900),
+        ("Home · Kampung Melayu, Ciliwung bank (flood-prone)", -6.2230, 106.8660),
+    ],
+}
 
 # --- agents and policies (D-17 seed table) --------------------------------------------------------
 AGENTS: list[tuple[str, str, str, int]] = [

@@ -32,4 +32,14 @@ export const SCENE_SCREEN: Record<DemoScenario, Record<number, string>> = {
     2: "/operations",
     3: "/operations",
   },
+  // D-38 (HZ-11): the events on the map; the arming proposal in the Decision Queue; the armed
+  // PB-06 starting. Prompt 57 moves these to the Natural Hazards screen.
+  "DAC-CYCLONE": {
+    0: "/operations",
+    1: "/operations",
+    2: "/",
+    3: "/incidents",
+    4: "/operations",
+    5: "/operations",
+  },
 };

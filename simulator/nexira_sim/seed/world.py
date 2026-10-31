@@ -309,6 +309,22 @@ def build(scenario_date: date, tenant_id: uuid.UUID) -> World:
                 data.DEPENDANT_CHILD_PLACE,
                 as_of,
             )
+
+    # Natural hazards (D-38, HZ-11): staff at home in flood-prone wards, the last generated
+    # staff of their mission. Nothing is drawn from rng and nobody is added.
+    for code, homes in data.HAZARD_HOMES.items():
+        mission = next(m for m in w.missions if m.code == code)
+        at_home = [
+            p.id
+            for p in w.persons
+            if p.mission_id == mission.id and p.person_type in ("DIPLOMAT", "LOCAL_STAFF")
+        ][-len(homes) :]
+        for person_id, (place, lat, lon) in zip(at_home, homes, strict=True):
+            for k, o in enumerate(w.observations):
+                if o.person_id == person_id:
+                    w.observations[k] = _observation_for(
+                        person_id, "MANUAL", 60, lat, lon, place, as_of
+                    )
     return w
 
 

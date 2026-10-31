@@ -12,6 +12,7 @@ from typing import Any
 from app.core.db import tenant_session
 from app.modules.agents.service import AgentIn, PolicyIn, ensure_agents, ensure_policies
 from app.modules.documents.service import ensure_documents, start_renewals
+from app.modules.hazards.service import ensure_climate
 from app.modules.intel.service import SourceIn, ensure_sources
 from app.modules.notifications.templates import TemplateIn, ensure_templates
 from app.modules.partners.service import PartnerIn, ensure_partners
@@ -31,6 +32,7 @@ from app.modules.travel.service import (
 )
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
+from nexira_sim.scenarios import dac_cyclone as dac
 from nexira_sim.scenarios import fra_national_protests as fra
 from nexira_sim.scenarios import mnl_tropical_storm as mnl
 from nexira_sim.scenarios import nbo_air_diversion as air
@@ -199,6 +201,21 @@ async def seed_all(
             version=1,
         )
 
+        report["playbook_pb01"] = await ensure_playbook(
+            session,
+            playbook_id=seed_id(tenant_id, "playbook", "PB-01:v1"),
+            code="PB-01",
+            name="Earthquake near mission",
+            category="Natural hazard",
+            trigger_rules=data.PB01_TRIGGER,
+            steps=[StepIn(*step) for step in data.PB01_STEPS],
+            step_ids=[
+                seed_id(tenant_id, "playbook_step", f"PB-01:v1:{seq}")
+                for seq, *_ in data.PB01_STEPS
+            ],
+            version=1,
+        )
+
         report["templates"] = await ensure_templates(
             session,
             [
@@ -235,6 +252,21 @@ async def seed_all(
         report["documents"] = len(created)
         report["renewals_started"] = await start_renewals(
             session, [d for d in in_progress if d in created]
+        )
+
+        # HZ-08 (D-38): the illustrative climate scores, through the service (PC-25).
+        report["climate"] = await ensure_climate(
+            session,
+            [
+                {
+                    "mission_id": mission_ids[code],
+                    "hazards": hazards,
+                    "score_today": today,
+                    "score_2050": in_2050,
+                    "scenario": data.CLIMATE_SCENARIO,
+                }
+                for code, (hazards, today, in_2050) in data.CLIMATE.items()
+            ],
         )
 
         report["counters"] = [
@@ -282,6 +314,14 @@ async def seed_all(
             name=mnl.NAME,
             description=mnl.DESCRIPTION,
             events=mnl.build_events(w, tenant_id),
+        )
+        report["scenario_dac"] = await ensure_scenario(
+            session,
+            scenario_id=seed_id(tenant_id, "scenario", dac.CODE),
+            code=dac.CODE,
+            name=dac.NAME,
+            description=dac.DESCRIPTION,
+            events=dac.build_events(w, tenant_id),
         )
         await session.commit()
     return report
