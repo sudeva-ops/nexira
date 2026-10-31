@@ -43,13 +43,15 @@ e2e: env
 # Prompt 22: then the Mass Notification acceptance (requirements-pilot.md §6).
 # Prompt 27: then the Journey Management acceptance (requirements-pilot.md §12).
 # Prompt 32: then the Air Travel Tracking acceptance (requirements-pilot.md §17).
-# Prompt 37: then the Travel & Air agent acceptance (requirements-pilot.md §22), last.
+# Prompt 37: then the Travel & Air agent acceptance (requirements-pilot.md §22).
+# Prompt 52: then the Document Expiry acceptance (requirements-pilot.md §37), last.
 acceptance: env reset-demo up
 	$(COMPOSE) restart backend worker
 	cd frontend && npx playwright install chromium
 	set -a && . ./.env && set +a && cd frontend && npx playwright test e2e/acceptance.spec.ts \
 	  e2e/ntf-acceptance.spec.ts e2e/jrn-acceptance.spec.ts e2e/air-acceptance.spec.ts \
-	  e2e/ta-acceptance.spec.ts e2e/wx-acceptance.spec.ts e2e/ast-acceptance.spec.ts
+	  e2e/ta-acceptance.spec.ts e2e/wx-acceptance.spec.ts e2e/ast-acceptance.spec.ts \
+	  e2e/dx-acceptance.spec.ts
 
 lint: lint-backend lint-simulator lint-frontend
 
