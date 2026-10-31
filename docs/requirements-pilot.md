@@ -416,7 +416,7 @@ Playwright on the real stack: the Document Expiry screen shows the seeded docume
 
 ---
 
-# Pilot module 8 · Natural Hazards & Climate (draft, for approval)
+# Pilot module 8 · Natural Hazards & Climate (approved 2026-10-31, PR #63)
 
 For the product owner, who approves this part; then for the coding agent (Prompts 53–58 in `docs/prompts-pilot.md`). Rules: D-30, and **D-38** (proposed). Everything runs on **simulated hazard feeds** and **illustrative climate scores**: no seismic, weather, air-quality or climate provider is called (AGENTS.md: no external URLs at runtime). A real provider later replaces only the simulated feed.
 
@@ -461,7 +461,7 @@ Real hazard, weather, seismic, air-quality or climate providers; tsunami and vol
 
 Playwright on the real stack: the Natural Hazards screen shows the hazard events and climate exposure, labelled simulated. In `DAC-CYCLONE`, the background events appear, with the Ankara earthquake LOW and outside its range; the Dhaka forecast becomes a HIGH TROPICAL_CYCLONE incident showing "landfall in 60 h" and exposing the Dhaka mission; the Response Planner proposes arming PB-06; a Security Officer approves it; the playbook shows as armed and starts by itself when the scenario reaches 36 h; a Viewer sees events and scores with no names and no "Arm playbook"; the audit chain verifies; `make acceptance` (all existing specs) still passes.
 
-## 43. Questions for the product owner (proposed defaults; "use the defaults" accepts them all)
+## 43. Questions answered by the product owner (2026-10-31: "use the defaults")
 
 1. **Hazard types:** EARTHQUAKE, TROPICAL_CYCLONE, WILDFIRE and AIR_QUALITY are new; FLOOD and EXTREME_HEAT stay as Weather made them. Four simulated sources, as the design: xWeather (cyclone, flood, heat, wildfire), a seismic network, an air-quality network, and the illustrative climate model.
 2. **Range:** an event is listed with its nearest mission; it "exposes" a mission only inside its impact radius. Beyond 300 km of every mission: "No mission within 300 km".
