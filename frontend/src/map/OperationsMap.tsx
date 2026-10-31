@@ -5,6 +5,7 @@ import { Icon } from "@blueprintjs/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import { HAZARD_ICON, isHazard } from "../api/hazards";
 import type { Exposure, Incident } from "../api/intel";
 import type { Mission } from "../api/people";
 import { type Weather, weatherMarkers, weatherSummary } from "../api/weather";
@@ -45,6 +46,7 @@ export function OperationsMap({
   const weatherRef = useRef(new Map<string, Weather>());
   const wxMarkers = useRef(new Map<string, Marker>());
   const [wxElements, setWxElements] = useState(new Map<string, HTMLElement>());
+  const [hazardElements, setHazardElements] = useState(new Map<string, HTMLElement>()); // HZ-09
   const wxData = useMemo(() => weatherMarkers(weather, weatherAt), [weather, weatherAt]);
   const reduced = useReducedMotion();
   const known = useRef<Set<string> | null>(null); // incidents already on the map
@@ -166,6 +168,7 @@ export function OperationsMap({
       frame = requestAnimationFrame(step);
     }
     const seen = new Set<string>();
+    let changed = false;
     for (const incident of incidents) {
       seen.add(incident.id);
       let marker = markers.current.get(incident.id);
@@ -181,9 +184,11 @@ export function OperationsMap({
         marker = new Marker({ element: el }).setLngLat([incident.lon, incident.lat]);
         marker.addTo(map);
         markers.current.set(incident.id, marker);
+        changed = true;
       }
       const el = marker.getElement();
       el.style.setProperty("--c", SEVERITY_COLOUR[incident.severity]);
+      el.classList.toggle("nx-hazard", isHazard(incident.category)); // its own icon (HZ-09)
       el.setAttribute("aria-label", `${incident.reference} · ${incident.severity} · ${incident.title}`);
       el.title = `${incident.reference} · ${incident.title}`;
     }
@@ -191,8 +196,10 @@ export function OperationsMap({
       if (!seen.has(id)) {
         marker.remove();
         markers.current.delete(id);
+        changed = true;
       }
     }
+    if (changed) setHazardElements(new Map([...markers.current].map(([id, m]) => [id, m.getElement()])));
     return () => cancelAnimationFrame(frame);
   }, [map, incidents, incidentsLoaded, reduced]);
 
@@ -244,6 +251,12 @@ export function OperationsMap({
 
   return (
     <div className="nx-map" ref={container} data-testid="operations-map">
+      {incidents.map((i) => {
+        const el = hazardElements.get(i.id);
+        return el && isHazard(i.category)
+          ? createPortal(<Icon icon={HAZARD_ICON[i.category]} size={10} />, el, i.id)
+          : null;
+      })}
       {wxData.map((w) => {
         const el = wxElements.get(w.code);
         return el ? createPortal(<Icon icon={w.icon} size={11} />, el, w.code) : null;

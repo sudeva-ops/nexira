@@ -60,6 +60,7 @@ const RUN: PlaybookRun = {
   started_by_name: "Daniel Mercer",
   proposal_id: null,
   started_at: NOW,
+  scheduled_for: null,
   completed_at: null,
   steps: [
     runStep(0, "DONE", { summary: "Fusion engine · sources and confidence confirmed" }),

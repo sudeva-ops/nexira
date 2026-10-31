@@ -132,6 +132,18 @@ describe("realtime client (PLT-05)", () => {
     expect(staleKeys(event("WEATHER_UPDATED", { missions: 36 }))).toEqual([["weather"]]);
     // D-36: a request made or moved (by a person, a playbook or the simulated partner).
     expect(staleKeys(event("PARTNER_REQUEST_UPDATED", { request_id: "r1" }))).toEqual([["partners"]]);
+    // D-38: arming, disarming and the demo clock refresh the hazards screen (HZ-04, HZ-05).
+    expect(staleKeys(event("PLAYBOOK_RUN_ARMED", { run_id: "r1", incident_id: "i1" }))).toEqual([
+      ["hazards"],
+      ["playbook-runs"],
+      ["audit"],
+      ["playbook-run", "r1"],
+    ]);
+    expect(staleKeys(event("PLAYBOOK_RUN_DISARMED", { run_id: "r1" }))).toContainEqual(["hazards"]);
+    expect(staleKeys(event("HAZARD_CLOCK_ADVANCED", { advance_h: 24 }))).toEqual([["hazards"]]);
+    expect(staleKeys(event("PLAYBOOK_RUN_STARTED", { run_id: "r1" }))).toContainEqual(["hazards"]);
+    expect(staleKeys(event("INCIDENT_UPDATED", { incident_id: "i1" }))).toContainEqual(["hazards"]);
+    expect(staleKeys(event("EXPOSURE_COMPUTED", { incident_id: "i1" }))).toContainEqual(["hazards"]);
     expect(staleKeys(event("SOMETHING_ELSE"))).toEqual([]);
   });
 });

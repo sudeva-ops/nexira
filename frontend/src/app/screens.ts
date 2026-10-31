@@ -20,6 +20,7 @@ export const SCREENS: readonly Screen[] = [
   { path: "/people", title: "People & Sites", subtitle: "Location confidence", icon: "people", group: "MONITOR", builtIn: "Prompt 8" },
   { path: "/journeys", title: "Journey Management", subtitle: "Travel risk · Trip approvals & itineraries", icon: "airplane", group: "MONITOR", builtIn: "Prompt 26" },
   { path: "/air", title: "Air Travel Tracking", subtitle: "Travel · Officials in the air, delays & diversions", icon: "satellite", group: "MONITOR", builtIn: "Prompt 31" },
+  { path: "/hazards", title: "Natural Hazards & Climate", subtitle: "Hazards · Live events & long-term site exposure", icon: "globe-network", group: "MONITOR", builtIn: "Prompt 57" },
   { path: "/playbooks", title: "Response Playbooks", subtitle: "Workflows · Automated response", icon: "flash", group: "RESPOND", builtIn: "Prompt 11" },
   { path: "/notifications", title: "Mass Notification", subtitle: "Comms · Multi-channel delivery", icon: "send-message", group: "RESPOND", builtIn: "Prompt 21" },
   { path: "/partners", title: "Assistance Partners", subtitle: "Response · Medical, evacuation & secure transport", icon: "heart", group: "RESPOND", builtIn: "Prompt 46" },

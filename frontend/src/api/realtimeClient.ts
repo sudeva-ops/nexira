@@ -4,6 +4,7 @@ import { checkinKeys } from "./checkin";
 import { documentKeys } from "./documents";
 import { partnerKeys } from "./partners";
 import { flightKeys } from "./flights";
+import { hazardKeys } from "./hazards";
 import { keys } from "./intel";
 import { peopleKeys } from "./people";
 import { playbookKeys } from "./playbooks";
@@ -34,7 +35,7 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
       return [keys.signals, keys.summary];
     case "INCIDENT_CREATED":
     case "INCIDENT_UPDATED":
-      return [keys.incidents, keys.signals, keys.summary, peopleKeys.missions, ...incident];
+      return [keys.incidents, keys.signals, keys.summary, peopleKeys.missions, hazardKeys.all, ...incident];
     case "EXPOSURE_COMPUTED":
       return [
         keys.incidents,
@@ -42,6 +43,7 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
         peopleKeys.missions,
         peopleKeys.people,
         peopleKeys.sites,
+        hazardKeys.all, // the hazards screen's exposure counts (HZ-03)
         ...incident,
       ];
     case "INCIDENT_NOTE_ADDED":
@@ -51,8 +53,15 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
     case "PLAYBOOK_STEP":
     case "PLAYBOOK_STEP_APPROVED": {
       const runId = typeof event.data.run_id === "string" ? [playbookKeys.run(event.data.run_id)] : [];
-      return [playbookKeys.runs, playbookKeys.permissions, ["audit"], ...runId, ...incident];
+      return [playbookKeys.runs, playbookKeys.permissions, ["audit"], hazardKeys.all, ...runId, ...incident];
     }
+    case "PLAYBOOK_RUN_ARMED": // the banner and the event's armed run (HZ-05, HZ-09)
+    case "PLAYBOOK_RUN_DISARMED": {
+      const runId = typeof event.data.run_id === "string" ? [playbookKeys.run(event.data.run_id)] : [];
+      return [hazardKeys.all, playbookKeys.runs, ["audit"], ...runId];
+    }
+    case "HAZARD_CLOCK_ADVANCED": // countdowns read the hazard clock (plan-pilot-hz G-9)
+      return [hazardKeys.all];
     case "PROPOSAL_CREATED":
     case "PROPOSAL_UPDATED":
     case "PROPOSAL_EXPIRED":

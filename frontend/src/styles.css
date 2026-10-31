@@ -632,6 +632,17 @@ body {
   animation: nx-pulse 1.6s ease-out infinite;
 }
 
+/* A hazard event (HZ-09): a round marker with its hazard's icon. */
+.nx-incident-marker.nx-hazard {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #fff;
+  transform: none;
+}
+
 @keyframes nx-pulse {
   0% {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--c, #cd4246) 70%, transparent);
@@ -1885,6 +1896,46 @@ body {
 .nx-suggested {
   margin-bottom: 6px;
   color: var(--nx-tx2);
+}
+
+/* --- Natural Hazards & Climate (HZ-03, HZ-04, HZ-09, D-38) --------------------------- */
+.nx-hz-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .nx-hz-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nx-hz-table td {
+  font-size: 11.5px;
+}
+
+.nx-hz-table td.nx-nowrap {
+  white-space: nowrap;
+}
+
+.nx-hz-icon {
+  color: var(--nx-tx2);
+}
+
+.nx-hz-updated {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.nx-hz-score {
+  gap: 6px;
+}
+
+.nx-hz-high,
+.nx-hz-changed {
+  color: #fa999c;
 }
 
 /* --- Document Expiry (DX-02..09, D-37) ------------------------------------------- */

@@ -28,6 +28,7 @@ describe("app shell", () => {
       "People & Sites",
       "Journey Management", // pilot module 2 (D-30)
       "Air Travel Tracking", // pilot module 3 (D-30)
+      "Natural Hazards & Climate", // pilot module 8 (D-30, D-38), last under MONITOR as the design
       "Response Playbooks",
       "Mass Notification", // pilot module 1 (D-30)
       "Assistance Partners", // pilot module 5 (D-30, D-36)
