@@ -155,7 +155,13 @@ async def trip_detail(session: AsyncSession, trip: Trip, user: CurrentUser) -> T
             simulated=True,
         )
     people = travellers.all()
-    warnings = await documents.trip_warnings(session, [i for i, _, _ in people], trip.ends_on)
+    # Only for those who may read the travellers' documents (DX-09; review of Prompt 50, M1).
+    readable = await documents.read_scope(session, user)
+    warnings = [
+        w
+        for w in await documents.trip_warnings(session, [i for i, _, _ in people], trip.ends_on)
+        if readable is not None and readable.covers(w.mission_id)
+    ]
     return TripDetailOut(
         **summary.model_dump(),
         travellers=[TravellerOut(id=i, full_name=n, person_type=p) for i, n, p in people],

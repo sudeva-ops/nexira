@@ -16,6 +16,7 @@ from app.core.db import tenant_session
 from app.core.events import Event, get_publisher
 from app.main import app
 from app.modules.agents import proposals
+from app.modules.agents.actions import ActionError, validate
 from app.modules.agents.agents.compliance import Compliance
 from app.modules.agents.models import AgentProposal
 from app.modules.agents.runner import run_agents
@@ -469,6 +470,13 @@ async def test_a_trip_warns_of_a_passport_short_of_180_days_after_it_ends(world:
         }
     ]
     assert detail["approval_status"] == "APPROVED"  # a warning, never a block (§38 Q6)
+    # DX-09: only those who may read Paul's documents see it (review of Prompt 50, M1).
+    for who in ("viewer", "hom.nbo"):
+        hidden = (await world.get(who, f"/api/trips/{trip_id}")).json()
+        assert hidden["document_warnings"] == [], who
+    assert (
+        len((await world.get("hom.par", f"/api/trips/{trip_id}")).json()["document_warnings"]) == 1
+    )
     async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
         edge = await service.trip_warnings(
             session, [world.people["peter"]], TODAY + timedelta(days=400 - 180)
@@ -575,15 +583,14 @@ async def test_approving_starts_the_renewals_and_sends_reminders_as_a_person_wou
             "ADVISORY",
             incident,
         )
-        assert sorted(campaign.audience_filter["document_ids"]) == sorted(
-            str(world.docs[k]) for k in ("hana.dp", "aiko.pp")
-        )
+        # Only the holder whose renewal it requested (review of Prompt 50, M4).
+        assert campaign.audience_filter["document_ids"] == [str(world.docs["hana.dp"])]
         result = await session.scalar(
             select(AuditLog.details).where(AuditLog.action == "PROPOSAL.EXECUTE")
         )
     assert result is not None
     assert result["result"]["skipped"] == [str(world.docs["aiko.pp"])]
-    assert result["result"]["recipients"] == 2
+    assert result["result"]["recipients"] == 1
     kinds = [e.type for e in world.publisher.events]
     assert "DOCUMENT_UPDATED" in kinds
     assert "CAMPAIGN_QUEUED" in kinds
@@ -613,3 +620,47 @@ async def test_the_executor_refuses_a_document_of_another_mission(world: World) 
     )
     assert renewal[0][0] == "NONE"
     assert await world.audited("DOCUMENT.") == []
+
+
+async def test_an_inactive_holders_document_is_not_renewed(world: World) -> None:
+    """Review of Prompt 50, M3: refused before anything is written."""
+    await world.sql("UPDATE person SET is_active = false WHERE id = :p", p=world.people["hana"])
+    response = await world.step("duty", "hana.dp", "REQUESTED")
+    assert (response.status_code, response.json()["detail"]) == (
+        409,
+        "The holder is no longer active",
+    )
+    assert await world.audited("DOCUMENT.") == []
+
+
+async def test_nothing_still_at_risk_means_no_renewal_and_no_reminder(world: World) -> None:
+    """Review of Prompt 50, M4: Aiko's renewal is under way and Hana's passport was renewed
+    before the approval: both skipped, and no campaign."""
+    await world.observe(await world.incident(world.nbo))
+    for step in ("IN_PROGRESS", "RENEWED"):
+        valid = TODAY + timedelta(days=3650) if step == "RENEWED" else None
+        assert (await world.step("duty", "hana.dp", step, valid)).status_code == 200
+    assert (await world.step("duty", "aiko.pp", "IN_PROGRESS")).status_code == 200
+    response = await _approve(world, "consular")
+    assert response.json()["status"] == "APPROVED"
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        assert await session.scalar(select(NotificationCampaign)) is None
+        result = await session.scalar(
+            select(AuditLog.details).where(AuditLog.action == "PROPOSAL.EXECUTE")
+        )
+    assert result is not None
+    assert result["result"]["requested"] == []
+    assert sorted(result["result"]["skipped"]) == sorted(
+        str(world.docs[k]) for k in ("hana.dp", "aiko.pp")
+    )
+    assert "DOCUMENT.REMINDERS" not in [a for a, *_ in await world.audited("DOCUMENT.")]
+
+
+def test_an_advisory_cannot_name_documents_or_a_trip() -> None:
+    """Review of Prompt 50, L1: those audiences have their own actions and approvers."""
+    for audience in ({"document_ids": [str(uuid.uuid4())]}, {"trip_id": str(uuid.uuid4())}):
+        with pytest.raises(ActionError):
+            validate(
+                "SEND_EXTERNAL_MESSAGE",
+                {"message": "Hello", "channels": ["APP"], "audience": audience},
+            )

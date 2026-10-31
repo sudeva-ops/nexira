@@ -57,6 +57,15 @@ class MessagePayload(_Payload):
     channels: list[str] = Field(min_length=1)
     audience: dict[str, Any]
 
+    @field_validator("audience")
+    @classmethod
+    def _incident_audiences(cls, audience: dict[str, Any]) -> dict[str, Any]:
+        """The trip and document audiences have their own actions, approvers and scope
+        (review of Prompt 50, L1)."""
+        if "trip_id" in audience or "document_ids" in audience:
+            raise ValueError("an advisory cannot name a trip or documents")
+        return audience
+
 
 class EvacuationPayload(_Payload):
     route: str = Field(min_length=1)
@@ -272,12 +281,13 @@ async def _start_document_renewal(
     except documents.DocumentError as e:
         raise ActionError(str(e)) from None
     ctx.events.extend(done.events)
+    sent = done.reminders
     return {
         "requested": [str(d) for d in done.requested],
-        "skipped": [str(d) for d in done.skipped],  # already in renewal
-        "campaign_id": str(done.reminders.campaign.id),
-        "reference": done.reminders.campaign.reference,
-        "recipients": done.reminders.recipients,
+        "skipped": [str(d) for d in done.skipped],  # in renewal or no longer at risk
+        "campaign_id": str(sent.campaign.id) if sent else None,
+        "reference": sent.campaign.reference if sent else None,
+        "recipients": sent.recipients if sent else 0,
     }
 
 

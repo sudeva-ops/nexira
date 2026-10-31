@@ -416,13 +416,6 @@ async def _locked(session: AsyncSession, document_id: uuid.UUID) -> TravelDocume
     return document
 
 
-async def _holder_mission(session: AsyncSession, document: TravelDocument) -> uuid.UUID | None:
-    mission_id: uuid.UUID | None = await session.scalar(
-        select(Person.mission_id).where(Person.id == document.person_id)
-    )
-    return mission_id
-
-
 async def renew(
     session: AsyncSession,
     user: CurrentUser,
@@ -434,13 +427,16 @@ async def renew(
     if step not in STEPS:
         raise DocumentError(422, f"step is one of {', '.join(STEPS)}")
     document = await _locked(session, document_id)
-    mission_id = await _holder_mission(session, document)
+    holder = await session.get_one(Person, document.person_id)
+    mission_id = holder.mission_id
     if not await user_has_role(session, user, RENEWERS, mission_id):
         raise DocumentError(
             403,
             "Renewing a document needs Consular Officer, Duty Officer, or Head of Mission "
             "for the holder's mission",
         )
+    if not holder.is_active:  # the register shows active holders only (review, M3)
+        raise DocumentError(409, "The holder is no longer active")
     await _step(
         session, document, step, str(user.id), Actor(type="USER", id=str(user.id)), valid_until
     )
@@ -546,8 +542,8 @@ async def send_reminders(
 @dataclass
 class AgentRenewal:
     requested: list[uuid.UUID]
-    skipped: list[uuid.UUID]  # already in renewal (or renewed)
-    reminders: Reminders
+    skipped: list[uuid.UUID]  # in renewal, renewed, or no longer at risk
+    reminders: Reminders | None  # None when nothing was requested
     events: list[Event]
 
 
@@ -562,8 +558,9 @@ async def renew_by_agent(
     proposal_id: uuid.UUID,
 ) -> AgentRenewal:
     """START_DOCUMENT_RENEWAL, once a person approved it: the step REQUESTED for each
-    document still at NONE (the same step, row update and audit as a person's, with the
-    approver recorded as who requested it), then one reminders campaign."""
+    document still at NONE and still at risk (the same step, row update and audit as a
+    person's, with the approver recorded as who requested it), then one reminders campaign
+    to those documents' holders only (review of Prompt 50, M4)."""
     ids = sorted(set(document_ids))
     found = (
         await session.execute(
@@ -579,10 +576,11 @@ async def renew_by_agent(
     # The approver decided for the incident's mission (D-05): nothing elsewhere runs.
     if mission_id is None or any(m != mission_id for _, m in found):
         raise DocumentError(409, "Every document must be at the incident's mission")
+    still = {r.document.id for r in await at_risk(session, mission_id, today_utc())}
     who = str(approved_by) if approved_by else f"agent:{actor.id}"
     requested, skipped, events = [], [], []
     for document, _ in found:
-        if document.renewal_status != "NONE":
+        if document.renewal_status != "NONE" or document.id not in still:
             skipped.append(document.id)
             continue
         await _step(
@@ -596,9 +594,11 @@ async def renew_by_agent(
         )
         requested.append(document.id)
         events.append(document_event(document, mission_id))
+    if not requested:
+        return AgentRenewal(requested, skipped, None, events)
     reminders = await _remind(
         session,
-        ids,
+        requested,
         incident_id=incident_id,
         created_by_type="AGENT",
         created_by=str(proposal_id),
@@ -614,6 +614,7 @@ async def renew_by_agent(
 class TripWarning:
     person_id: uuid.UUID
     full_name: str
+    mission_id: uuid.UUID | None
     valid_until: date | None  # the latest passport-type date; None if they hold none
 
 
@@ -625,14 +626,20 @@ async def trip_warnings(
     if not person_ids:
         return []
     rows = await session.execute(
-        select(Person.id, Person.full_name, TravelDocument.doc_type, TravelDocument.valid_until)
+        select(
+            Person.id,
+            Person.full_name,
+            Person.mission_id,
+            TravelDocument.doc_type,
+            TravelDocument.valid_until,
+        )
         .join(TravelDocument, TravelDocument.person_id == Person.id)
         .where(Person.id.in_(person_ids))
     )
-    names: dict[uuid.UUID, str] = {}
+    names: dict[uuid.UUID, tuple[str, uuid.UUID | None]] = {}
     best: dict[uuid.UUID, date | None] = {}
-    for person_id, name, doc_type, valid_until in rows:
-        names[person_id] = name
+    for person_id, name, mission_id, doc_type, valid_until in rows:
+        names[person_id] = (name, mission_id)
         current = best.get(person_id)
         if doc_type in PASSPORTS and (current is None or valid_until > current):
             best[person_id] = valid_until
@@ -640,7 +647,7 @@ async def trip_warnings(
             best.setdefault(person_id, None)
     needed = ends_on + timedelta(days=READY_DAYS)
     return sorted(
-        (TripWarning(p, names[p], d) for p, d in best.items() if d is None or d < needed),
+        (TripWarning(p, *names[p], d) for p, d in best.items() if d is None or d < needed),
         key=lambda w: w.full_name,
     )
 
