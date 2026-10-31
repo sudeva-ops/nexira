@@ -29,6 +29,10 @@ def advisory_handler(engine: AsyncEngine, publisher: Publisher) -> Handler:
             await session.commit()
         if result is None:
             return
+        # As the other consumers: a publish that fails after the commit is logged, not
+        # retried, since a redelivered bulletin changes nothing and publishes nothing. The
+        # advisory is right on the screen; only that bulletin's proposal may be missed, and
+        # a person can still send the advisory (review of Prompt 61, M4).
         try:
             await publisher.publish(service.advisory_event(result))
         except Exception:

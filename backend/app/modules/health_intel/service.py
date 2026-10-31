@@ -99,6 +99,9 @@ def advisory_event(result: Ingested) -> Event:
             "level": a.level,
             "previous_level": result.previous_level,
             "status": a.status,
+            # Each change is its own revision, so a fall and a new rise can propose again
+            # (review of Prompt 61, M3); a redelivered event keeps it.
+            "revision": int(a.updated_at.timestamp() * 1_000_000),
         },
         source="health.feed",
     )
@@ -123,7 +126,11 @@ async def ingest(
 ) -> Ingested | None:
     """Create or update the advisory with this feed id (§2). Only the level, guidance and
     status move; what it is about stays as first published (PC-26). None when nothing
-    changed, or the bulletin is for a closed or unknown-and-closed advisory."""
+    changed, or the bulletin is for a closed or unknown-and-closed advisory.
+
+    Two first bulletins for one feed id at once: the lock below finds no row for either,
+    so the second insert fails on UNIQUE (tenant_id, external_id) and the stream consumer
+    retries it, which then updates (review of Prompt 61, L6)."""
     advisory = await session.scalar(
         select(HealthAdvisory)
         .where(HealthAdvisory.external_id == bulletin.external_id)
@@ -450,7 +457,8 @@ async def create_campaign(
     if not await may_send(session, user, mission.id):
         raise HealthError(
             403,
-            "Sending a health advisory needs DUTY_OFFICER, SECURITY_OFFICER or CONSULAR_OFFICER",
+            "Sending a health advisory needs DUTY_OFFICER, SECURITY_OFFICER, CONSULAR_OFFICER "
+            "or ADMIN for this mission",
         )
     message = await message_for(session, advisory, mission.id)
     if message is None:
@@ -500,11 +508,20 @@ async def prepare_by_agent(
 ) -> compose.Outcome:
     """PREPARE_HEALTH_ADVISORY (HL-07, plan-pilot-hl G-2): the campaign the approvers read,
     to the same audience as a person's (HL-06), waiting for a second person: the
-    proposal's approver is its submitter, so someone else must approve it (D-31)."""
+    proposal's approver is its submitter, and no one who decided the proposal may approve
+    it (D-31). The words must be the mission's template, as proposed, and the channels the
+    health channels (review of Prompt 61, M5). The advisory must still be OPEN and affect
+    the mission; its level may have fallen since, and the second person sees that."""
     if approved_by is None:
         raise HealthError(409, "A health advisory needs a person's approval first")
     advisory, mission = await advisory_for_mission(session, advisory_id, mission_id)
     template = await message_for(session, advisory, mission.id)
+    if template is None or message != template.english:
+        raise HealthError(409, "The advisory text is not the mission's template")
+    if any(template.translations.get(lang) != t for lang, t in translations.items()):
+        raise HealthError(409, "A translation is not the template's (D-15)")
+    if not set(channels) <= set(CHANNELS):
+        raise HealthError(409, f"Health advisories go by {' · '.join(CHANNELS)} only")
     try:
         outcome = await compose.prepare_for_approval(
             session,
@@ -515,7 +532,7 @@ async def prepare_by_agent(
                 missions=[mission.id],
                 person_types=list(AUDIENCE),
                 translations=translations,
-                template_id=template.template_id if template else None,
+                template_id=template.template_id,
             ),
             proposal_id=proposal_id,
             submitted_by=approved_by,

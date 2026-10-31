@@ -24,7 +24,7 @@ from app.modules.audit.models import AuditLog
 from app.modules.health_intel import consumer
 from app.modules.health_intel import service as health
 from app.modules.notifications.templates import TemplateIn, ensure_templates
-from app.modules.tenancy.service import ensure_reference_counter
+from app.modules.tenancy.service import SYSTEM, ensure_reference_counter
 from app.tests.auth_helpers import Idp
 from app.tests.fakes import ListPublisher
 
@@ -344,13 +344,15 @@ async def test_every_role_reads_advisories_with_the_missions_they_affect(world: 
 async def test_the_summary_counts_missions_by_level_and_staff_not_offered(world: World) -> None:
     await world.bulletin(level="HIGH")
     await world.bulletin(**DENGUE)
+    measles = {"external_id": "who-don:measles-pk", "topic": "Measles", "topic_code": "MEASLES"}
+    await world.bulletin(**{**DENGUE, **measles, "countries": ["PK"]})  # no mission there
     body = (await world.get("viewer", "/api/health/summary")).json()
     assert (
         body["open_advisories"],
         body["affecting_missions"],
         body["missions_with_advisory"],
     ) == (
-        2,
+        3,
         2,
         2,
     )
@@ -520,9 +522,9 @@ async def test_a_rise_to_high_proposes_the_advisory_for_each_affected_mission(
     advisory = await world.advisory()
     assert proposal["title"] == "Health advisory recommended for Nairobi staff and citizens"
     assert (proposal["effective_level"], proposal["status"]) == (2, "PENDING")
-    assert proposal["proposal_key"] == (
-        f"PREPARE_HEALTH_ADVISORY:{advisory['id']}:{world.nbo}:HIGH"
-    )
+    assert proposal["proposal_key"].startswith(
+        f"PREPARE_HEALTH_ADVISORY:{advisory['id']}:{world.nbo}:HIGH:"
+    )  # then the revision (review M3)
     assert proposal["action_payload"]["message"] == NBO_CHOLERA.replace("{city}", "Nairobi")
     assert proposal["action_payload"]["mission_id"] == str(world.nbo)
     texts = [e["text"] for e in proposal["evidence"]]
@@ -536,10 +538,9 @@ async def test_approving_creates_a_campaign_a_second_person_must_approve(world: 
     """G-2: the proposal's approver submits; neither they nor the agent may approve it."""
     await world.bulletin(level="HIGH")
     [proposal] = await world.observe()
-    assert (await world.post("viewer", f"/api/proposals/{proposal['id']}/approve")).status_code in (
-        403,
-        409,
-    )
+    assert (
+        await world.post("viewer", f"/api/proposals/{proposal['id']}/approve")
+    ).status_code == 403
     approved = await world.post("duty", f"/api/proposals/{proposal['id']}/approve")
     assert approved.status_code == 200, approved.text
     [done] = await world.proposals()
@@ -587,3 +588,139 @@ async def test_the_english_only_alternative_drops_the_translations(world: World)
     assert [a["label"] for a in alternatives] == ["English only"]
     assert alternatives[0]["action_payload"]["translations"] == {}
     assert json.dumps(proposal["action_payload"]["translations"]).count("REVIEW REQUIRED") == 1
+
+
+# --- review of Prompt 61 ------------------------------------------------------------------------
+
+
+async def test_nobody_who_decided_a_two_step_proposal_approves_its_campaign(world: World) -> None:
+    """M1: with the policy raised to level 3, both deciders are the first step."""
+    await world.idp.user("duty.2", [("DUTY_OFFICER", None)])
+    await world.sql(
+        "UPDATE action_policy SET min_autonomy_level = 3, "
+        "approver_roles = ARRAY['DUTY_OFFICER|CONSULAR_OFFICER', 'DUTY_OFFICER|CONSULAR_OFFICER'] "
+        "WHERE action_type = 'PREPARE_HEALTH_ADVISORY'"
+    )
+    await world.bulletin(level="HIGH")
+    [proposal] = await world.observe()
+    assert proposal["effective_level"] == 3
+    for who in ("duty", "consular"):
+        response = await world.post(who, f"/api/proposals/{proposal['id']}/approve")
+        assert response.status_code == 200, response.text
+    campaign_id = (
+        await world.sql(
+            "SELECT id FROM notification_campaign WHERE created_by = :p", p=str(proposal["id"])
+        )
+    ).scalar()
+    for who in ("duty", "consular"):  # the first approver too, not only the submitter
+        refused = await world.post(who, f"/api/campaigns/{campaign_id}/approve")
+        assert refused.status_code == 403, (who, refused.text)
+    sent = await world.post("duty.2", f"/api/campaigns/{campaign_id}/approve")
+    assert sent.status_code == 200, sent.text
+
+
+async def test_a_fall_and_a_new_rise_proposes_again(world: World) -> None:
+    """M3: each change is its own revision; one PENDING at a time still holds."""
+    await world.bulletin(level="HIGH")
+    [first] = await world.observe()
+    rejected = await world.post(
+        "duty", f"/api/proposals/{first['id']}/reject", {"reason": "Not yet"}
+    )
+    assert rejected.status_code == 200, rejected.text
+    await world.bulletin(level="MODERATE")
+    await world.bulletin(level="HIGH")
+    proposals = await world.observe()
+    assert [p["status"] for p in proposals] == ["REJECTED", "PENDING"]
+
+
+async def test_a_critical_advisory_from_nothing_proposes(world: World) -> None:
+    await world.bulletin(level="CRITICAL")
+    [proposal] = await world.observe()
+    assert proposal["proposal_key"].split(":")[3] == "CRITICAL"
+
+
+async def test_no_template_means_no_proposal(world: World) -> None:
+    await world.sql("UPDATE message_template SET is_active = false")
+    await world.bulletin(level="HIGH")
+    assert await world.observe() == []
+
+
+@pytest.mark.parametrize(
+    ("change", "error"),
+    [
+        ({"message": "Something else entirely."}, "not the mission's template"),
+        ({"channels": ["VOICE"]}, "go by SMS · APP only"),
+        ({"translations": {"sw": "Different words"}}, "not the template's"),
+    ],
+)
+async def test_a_payload_that_differs_from_the_template_is_not_prepared(
+    world: World, change: dict[str, Any], error: str
+) -> None:
+    """M5: the words and channels are checked again when the action runs. (The database
+    already refuses a change to a proposal's payload; this is the executor's own check.)"""
+    await world.bulletin(level="HIGH")
+    [proposal] = await world.observe()
+    payload = {**proposal["action_payload"], **change}
+    duty = (await world.sql("SELECT id FROM app_user WHERE external_id = 'duty'")).scalar()
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        with pytest.raises(health.HealthError, match=error):
+            await health.prepare_by_agent(
+                session,
+                advisory_id=uuid.UUID(payload["advisory_id"]),
+                mission_id=uuid.UUID(payload["mission_id"]),
+                message=payload["message"],
+                translations=payload["translations"],
+                channels=payload["channels"],
+                proposal_id=proposal["id"],
+                approved_by=duty,
+                actor=SYSTEM,
+            )
+    assert (await world.sql("SELECT count(*) FROM notification_campaign")).scalar() == 0
+
+
+async def test_no_campaign_without_a_persons_approval(world: World) -> None:
+    await world.bulletin(level="HIGH")
+    advisory = await world.advisory()
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        with pytest.raises(health.HealthError, match="person's approval"):
+            await health.prepare_by_agent(
+                session,
+                advisory_id=advisory["id"],
+                mission_id=world.nbo,
+                message="x",
+                translations={},
+                channels=["SMS"],
+                proposal_id=uuid.uuid4(),
+                approved_by=None,
+                actor=SYSTEM,
+            )
+
+
+async def test_a_rejected_agent_campaign_can_be_cancelled_by_an_approver(world: World) -> None:
+    """L7: an agent's campaign has no author, so an approver for its scope may cancel it."""
+    await world.bulletin(level="HIGH")
+    [proposal] = await world.observe()
+    await world.post("duty", f"/api/proposals/{proposal['id']}/approve")
+    campaign_id = (
+        await world.sql(
+            "SELECT id FROM notification_campaign WHERE created_by = :p", p=str(proposal["id"])
+        )
+    ).scalar()
+    rejected = await world.post(
+        "consular", f"/api/campaigns/{campaign_id}/reject", {"reason": "Wording"}
+    )
+    assert rejected.status_code == 200, rejected.text
+    assert (await world.post("viewer", f"/api/campaigns/{campaign_id}/cancel")).status_code == 403
+    cancelled = await world.post("consular", f"/api/campaigns/{campaign_id}/cancel")
+    assert (cancelled.status_code, cancelled.json()["status"]) == (200, "CANCELLED")
+
+
+async def test_a_mission_scoped_security_officer_sends_for_their_mission(world: World) -> None:
+    await world.bulletin(**DENGUE)
+    advisory = await world.advisory("who-don:dengue-bd")
+    response = await world.post(
+        "security.dac",
+        f"/api/health/advisories/{advisory['id']}/campaign",
+        {"mission_id": str(world.dac)},
+    )
+    assert response.status_code == 201, response.text

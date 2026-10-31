@@ -402,11 +402,34 @@ async def _check_translations(
             )
 
 
+async def _proposal_deciders(
+    session: AsyncSession, campaign: NotificationCampaign
+) -> set[uuid.UUID]:
+    """Everyone who decided a step of the proposal behind an agent's campaign (created_by
+    is the proposal id): with a two-step policy, both are the first step here (review of
+    Prompt 61, M1)."""
+    if campaign.created_by_type != "AGENT" or campaign.created_by is None:
+        return set()
+    try:
+        proposal_id = uuid.UUID(campaign.created_by)
+    except ValueError:
+        return set()
+    rows = await session.scalars(
+        text(
+            "SELECT decided_by FROM proposal_approval "
+            "WHERE proposal_id = :p AND decided_by IS NOT NULL"
+        ),
+        {"p": proposal_id},
+    )
+    return set(rows)
+
+
 async def gate(session: AsyncSession, campaign: NotificationCampaign) -> approvals.Gate:
     """The second-person step of a campaign that reaches citizens (D-31)."""
     others = {uuid.UUID(campaign.created_by)} if campaign.created_by_type == "USER" else set()
     if campaign.submitted_by is not None:
         others.add(campaign.submitted_by)
+    others |= await _proposal_deciders(session, campaign)
     return approvals.Gate(
         subject=f"Campaign {campaign.reference}",
         required_role=APPROVERS,
@@ -491,10 +514,25 @@ async def reject(
     return Outcome(campaign, [_event(campaign)])
 
 
+async def _may_cancel(
+    session: AsyncSession, user: CurrentUser, campaign: NotificationCampaign
+) -> bool:
+    """The author or an ADMIN; for an agent's campaign, which has no author, also an
+    approver for its scope, so a rejected one is not stuck (review of Prompt 61, L7)."""
+    if _is_author(user, campaign) or await approvals.user_has_role(session, user, "ADMIN"):
+        return True
+    return campaign.created_by_type == "AGENT" and await approvals.user_has_role(
+        session, user, APPROVERS, await _mission(session, campaign)
+    )
+
+
 async def cancel(session: AsyncSession, user: CurrentUser, campaign_id: uuid.UUID) -> Outcome:
     campaign = await _locked(session, campaign_id)
-    if not (_is_author(user, campaign) or await approvals.user_has_role(session, user, "ADMIN")):
-        raise CampaignError(403, "Only the author or an ADMIN cancels a campaign")
+    if not await _may_cancel(session, user, campaign):
+        raise CampaignError(
+            403,
+            "Only the author, an approver of an agent's campaign or an ADMIN cancels a campaign",
+        )
     if campaign.status not in ("DRAFT", "PENDING_APPROVAL"):
         raise CampaignError(
             409, f"{campaign.reference} is {campaign.status}: it cannot be cancelled"
@@ -525,8 +563,8 @@ async def permissions(
     if campaign.status == "PENDING_APPROVAL":
         verdict = await approvals.can_decide(session, user, await gate(session, campaign))
         may_approve = verdict.allowed
-    may_cancel = campaign.status in ("DRAFT", "PENDING_APPROVAL") and (
-        author or await approvals.user_has_role(session, user, "ADMIN")
+    may_cancel = campaign.status in ("DRAFT", "PENDING_APPROVAL") and await _may_cancel(
+        session, user, campaign
     )
     # As enforced by _author_composing: the author, still holding a composer role.
     composing = author and draft and await approvals.user_has_role(session, user, COMPOSERS)

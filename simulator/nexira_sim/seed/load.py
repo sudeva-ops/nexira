@@ -242,7 +242,8 @@ async def seed_all(
             [PolicyIn(action, floor, roles, undo) for action, floor, roles, undo in data.POLICIES]
             + [PolicyIn(*policy) for policy in data.TRAVEL_POLICIES]
             + [PolicyIn(*policy) for policy in data.DOCUMENT_POLICIES]
-            + [PolicyIn(*policy) for policy in data.HAZARD_POLICIES],
+            + [PolicyIn(*policy) for policy in data.HAZARD_POLICIES]
+            + [PolicyIn(*policy) for policy in data.HEALTH_POLICIES],
         )
 
         # Document Expiry (D-37, plan §8): new documents only (G-8); the renewals already

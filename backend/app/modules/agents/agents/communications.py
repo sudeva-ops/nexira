@@ -12,6 +12,7 @@ Health (D-39, HL-07; plan-pilot-hl §7): when an advisory rises to HIGH or CRITI
 each mission in its countries, propose PREPARE_HEALTH_ADVISORY from the topic's template.
 Approving creates the campaign; a second person approves it before it is sent (G-2)."""
 
+import logging
 import uuid
 
 from sqlalchemy import select
@@ -25,6 +26,8 @@ from app.modules.health_intel import service as health
 from app.modules.health_intel.models import HealthAdvisory, MissionHealthReadiness
 from app.modules.notifications import templates
 from app.modules.playbooks.models import PlaybookStep
+
+log = logging.getLogger(__name__)
 
 
 class Communications:
@@ -134,8 +137,13 @@ class Communications:
                 continue  # one open proposal per advisory and mission (G-6)
             message = await health.message_for(session, advisory, mission.id)
             if message is None:
+                log.warning("no health template for %s at %s", advisory.topic_code, mission.code)
                 continue
-            out.append(await self._health_proposal(session, advisory, mission, message))
+            out.append(
+                await self._health_proposal(
+                    session, advisory, mission, message, str(event.payload.get("revision", ""))
+                )
+            )
         return out
 
     async def _health_proposal(
@@ -144,6 +152,7 @@ class Communications:
         advisory: HealthAdvisory,
         mission: health.MissionRow,
         message: health.Message,
+        revision: str,
     ) -> ProposalIn:
         payload = {
             "advisory_id": str(advisory.id),
@@ -179,7 +188,9 @@ class Communications:
         languages = ", ".join(sorted(message.translations)).upper() or "no other language"
         return ProposalIn(
             agent_code=self.code,
-            proposal_key=f"PREPARE_HEALTH_ADVISORY:{advisory.id}:{mission.id}:{advisory.level}",
+            proposal_key=(
+                f"PREPARE_HEALTH_ADVISORY:{advisory.id}:{mission.id}:{advisory.level}:{revision}"
+            ),
             action_type="PREPARE_HEALTH_ADVISORY",
             title=f"Health advisory recommended for {mission.city} staff and citizens",
             proposed_action=(
