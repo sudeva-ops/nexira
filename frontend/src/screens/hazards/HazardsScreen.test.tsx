@@ -102,7 +102,7 @@ const CLIMATE: ClimateRisk[] = [
   hazards: hazards as string[],
   score_today: today as number,
   score_2050: y2050 as number,
-  scenario: "Illustrative climate model (simulated)",
+  scenario: "Illustrative 2050 (simulated)",
   source: "Climate model (simulated)",
   simulated: true,
 }));
@@ -279,7 +279,7 @@ describe("Natural Hazards & Climate", () => {
     expect(rows.map((r) => within(r).getAllByRole("cell")[0]?.textContent)).toEqual(["Jakarta", "Dhaka", "London"]);
     expect(rows[0]).toHaveTextContent("Flood · Sea-level rise");
     expect(rows[0]).toHaveTextContent("8288");
-    expect(screen.getByText(/Illustrative climate model \(simulated\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Illustrative climate model \(simulated\) · Illustrative 2050 \(simulated\)/)).toBeInTheDocument();
   });
 });
 
