@@ -21,7 +21,9 @@ export interface Playbook {
 }
 
 export type StepStatus = "PENDING" | "RUNNING" | "AWAITING_APPROVAL" | "DONE" | "SKIPPED" | "FAILED";
-export type RunStatus = "RUNNING" | "AWAITING_APPROVAL" | "COMPLETED" | "CANCELLED" | "FAILED";
+// SCHEDULED and DISARMED: armed runs (PC-24, HZ-05).
+export type RunStatus =
+  "SCHEDULED" | "RUNNING" | "AWAITING_APPROVAL" | "COMPLETED" | "CANCELLED" | "FAILED" | "DISARMED";
 
 export interface RunStep extends PlaybookStep {
   status: StepStatus;
@@ -43,6 +45,7 @@ export interface PlaybookRun {
   started_by_name: string | null;
   proposal_id: string | null;
   started_at: string;
+  scheduled_for: string | null; // an armed run starts by itself then (HZ-05)
   completed_at: string | null;
   steps: RunStep[];
 }

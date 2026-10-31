@@ -93,11 +93,11 @@ The storm's conditions hold for 6 hours. To show it again, run `make reset-demo`
 
 ## 6b2. Storyline · Natural hazards (about 4 minutes)
 
-Simulated hazard feeds and illustrative climate scores (D-38). The Natural Hazards & Climate screen arrives in Prompt 57; until then, follow the events on Global Operations, Incidents and the Decision Queue.
+Simulated hazard feeds and illustrative climate scores (D-38). The presenter bar opens **Natural Hazards & Climate** (under MONITOR) for every scene but 2, which opens the Decision Queue. Hazard events also show on Global Operations with their own icon.
 
-1. Presenter bar: pick **Dhaka cyclone** and press →: six hazard events. They are an M5.2 earthquake 210 km from Ankara (LOW, outside its 100 km range), river flooding in Jakarta (two staff homes inside), extreme heat in Riyadh, air quality AQI 310 in New Delhi, a wildfire in Attica (no mission within 300 km), and a Category 1 cyclone forecast for Dhaka.
-2. →: the forecast is upgraded to **Category 2, landfall in 60 h**. It is HIGH, raised to **CRITICAL** because the Dhaka chancery is in its 150 km zone (D-11). **Decision Queue**: the Response Planner proposes **Arm PB-06 for Dhaka, start 36 h before landfall**. Approve it as the **Security Officer**; the run is armed (SCHEDULED).
-3. →: the demo clock moves on 24 h (**36 h to landfall**): the armed PB-06 starts by itself (staff alert, check-in, then the citizen advisory for a second person).
+1. Presenter bar: pick **Dhaka cyclone** and press →: six hazard events. They are an M5.2 earthquake 210 km from Ankara (LOW, outside its 100 km range), river flooding in Jakarta (two staff homes inside), extreme heat in Riyadh, air quality AQI 310 in New Delhi, a wildfire in Attica (no mission within 300 km), and a Category 1 cyclone forecast for Dhaka. The KPIs, the type tabs, "Jakarta mission · 2 staff homes" and the climate table (Jakarta highest in 2050) are on this screen.
+2. →: the forecast is upgraded to **Category 2, landfall in 60 h**. It is HIGH, raised to **CRITICAL** because the Dhaka chancery is in its 150 km zone (D-11). **Decision Queue**: the Response Planner proposes **Arm PB-06 for Dhaka, start 36 h before landfall**. Approve it as the **Security Officer**; the run is armed (SCHEDULED). Back on **Natural Hazards & Climate**, the banner reads "PB-06 armed for Dhaka · starts in 24 h", with **Start now** and **Disarm** for a Security or Duty Officer. (Without the proposal, a Security or Duty Officer can press **Arm playbook** on the banner; a Viewer sees no button.)
+3. →: the demo clock moves on 24 h (**36 h to landfall**): the armed PB-06 starts by itself (staff alert, check-in, then the citizen advisory for a second person). The card says "demo clock +24 h"; the cyclone's row shows "landfall in 36 h" and the run's status.
 4. →: landfall (the clock moves on 36 h more). A separate **Flood** incident in Dhaka, with the three staff homes in flood-prone wards.
 5. →: the cyclone weakens to Category 1. Set the incident to **Monitoring** when you are done.
 

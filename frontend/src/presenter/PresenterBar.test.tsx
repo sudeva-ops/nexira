@@ -124,5 +124,14 @@ describe("Presenter bar", () => {
       2: "/operations",
       3: "/operations",
     });
+    // D-38: the cyclone plays on the Natural Hazards screen; the arming proposal in the queue.
+    expect(SCENE_SCREEN["DAC-CYCLONE"]).toEqual({
+      0: "/hazards",
+      1: "/hazards",
+      2: "/",
+      3: "/hazards",
+      4: "/hazards",
+      5: "/hazards",
+    });
   });
 });
