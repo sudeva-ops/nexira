@@ -103,17 +103,17 @@ Presenter bar: scene 1 opens `/health`, scene 1's proposal is decided on `/`, an
 
 | # | Gap | Proposed answer |
 |---|---|---|
-| G-1 | **Template kind.** §46 says a HEALTH_ADVISORY template kind is "data, not schema", but `message_template.kind` has a CHECK of `ALERT`, `ADVISORY`, `CHECKIN` (migration 0002). Templates also only fill in `{city}`, and filling in an English `{guidance}` would put English inside the AR/FR/SW texts (D-15). | **Needs a decision.** Keep kind `ADVISORY` (no schema change). One template **per topic**, coded `HEALTH_<TOPIC_CODE>` (e.g. `HEALTH_CHOLERA`), generic with `{city}`, plus Nairobi's own `HEALTH_CHOLERA` with the design's text. That needs a stable `topic_code` on the advisory, so **amend PC-26: add `topic_code text NOT NULL`** (upper-case, frozen). A topic with no template gets the generic `HEALTH_GENERAL` template ("A health advisory is in force for {city}. Follow the mission's guidance."). |
+| G-1 | **Template kind** (decided 2026-10-31: as proposed). §46 says a HEALTH_ADVISORY template kind is "data, not schema", but `message_template.kind` has a CHECK of `ALERT`, `ADVISORY`, `CHECKIN` (migration 0002). Templates also only fill in `{city}`, and filling in an English `{guidance}` would put English inside the AR/FR/SW texts (D-15). | **Needs a decision.** Keep kind `ADVISORY` (no schema change). One template **per topic**, coded `HEALTH_<TOPIC_CODE>` (e.g. `HEALTH_CHOLERA`), generic with `{city}`, plus Nairobi's own `HEALTH_CHOLERA` with the design's text. That needs a stable `topic_code` on the advisory, so **amend PC-26: add `topic_code text NOT NULL`** (upper-case, frozen). A topic with no template gets the generic `HEALTH_GENERAL` template ("A health advisory is in force for {city}. Follow the mission's guidance."). |
 | G-2 | **Approving the proposal must not send.** `SEND_EXTERNAL_MESSAGE` queues the campaign as soon as the proposal is approved; HL-07 says approving "creates the campaign, which still needs its second person". | A new action `PREPARE_HEALTH_ADVISORY` (§7): the campaign is created PENDING_APPROVAL with the proposal's approver as `submitted_by`, so the existing D-31 gate needs a different person. `SEND_EXTERNAL_MESSAGE` is unchanged. 🔒 (executor and policy, D-29). |
 | G-3 | **"Vaccinations due".** HL-08's KPI says "offered, not yet given", but readiness has no "given" count (counts of offers only, PC-29). | The KPI is **"Staff not yet offered a vaccine"**: for each OPEN advisory topic in a mission's `vaccines_offered`, `staff − offered`, summed. The design's "within 30 days" is dropped. |
-| G-4 | **Nairobi's staff count.** HL-05's acceptance says "9 / 17", from the design, but Nairobi has 14 staff (12 diplomats, 2 local staff) and 3 delegates. Readiness counts staff (§5). | **Needs a decision.** Amend the acceptance to **"Cholera vaccine offered 9 / 14"** (and 14 / 14 for blood type and insurance). Counting delegates would make "staff" mean two things. |
+| G-4 | **Nairobi's staff count** (decided 2026-10-31: as proposed). HL-05's acceptance says "9 / 17", from the design, but Nairobi has 14 staff (12 diplomats, 2 local staff) and 3 delegates. Readiness counts staff (§5). | **Needs a decision.** Amend the acceptance to **"Cholera vaccine offered 9 / 14"** (and 14 / 14 for blood type and insurance). Counting delegates would make "staff" mean two things. |
 | G-5 | **Proposals without an incident** can be decided only by unscoped holders (D-06). A Head of Mission is not an approver anyway; a mission-scoped Consular Officer could not decide it. | As D-06. The demo's Duty Officer and Consular Officer are unscoped. |
 | G-6 | **One open proposal.** `proposal_key` is unique forever, so a key per advisory and mission would never propose again after a fall and a new rise. | Key by advisory, mission and level, and skip while one is PENDING (§7). |
 | G-7 | **The agent stream.** The agents runner observes the events in its allow-list only. | Add `HEALTH_ADVISORY_UPDATED` to the agents' observed events and `Communications.observes`. Phase 1 events are unchanged. |
 | G-8 | **Avoid and realtime.** The Avoid flag changes when an incident opens, closes or moves to MONITORING, with no health event. | `staleKeys` maps `INCIDENT_CREATED` and `INCIDENT_UPDATED` to the health keys too. |
 | G-9 | **Trips.** HL-03 shows requirements "on the trip". The trip detail is the Journey Management screen. | The trip detail API gains `health_requirement` (or `null`); the trip panel shows one line "Entry: … · Recommended: …". There are no warnings and no change to risk (§45 "Not in this module"). |
 
-## 12. Migration 0009 (Prompt 60, 🔒, after approval of G-1)
+## 12. Migration 0009 (Prompt 60, 🔒)
 
 `0009_health.sql` and `versions/0009_health.py`:
 - `health_advisory` (with `topic_code` if G-1 is approved):
@@ -139,3 +139,9 @@ Tests run as `nexira_api` and cover: tenant isolation; every guard refusal; no D
 | 62 | no | The simulated feed, the seed (six advisories, 36 countries' requirements, about three facilities per mission and Nairobi's four, readiness for 36 missions, the HEALTH_* templates), NBO-CHOLERA, the presenter bar entry |
 | 63 | no | The screen (§9), realtime keys, the trip line; Vitest |
 | 64 | no | Playwright (§47, with G-4's figures); `make acceptance` |
+
+## 14. Decisions by the product owner (2026-10-31, PR #71: "approved")
+
+- G-1: templates keep kind `ADVISORY`, one per topic (`HEALTH_<TOPIC_CODE>`) with the generic `HEALTH_GENERAL` fallback; PC-26 gains `topic_code text NOT NULL` (upper-case, frozen).
+- G-4: the HL-05 acceptance reads "Cholera vaccine offered 9 / 14" (Nairobi's 14 staff).
+- G-2, G-3, G-5..G-9: as proposed.
