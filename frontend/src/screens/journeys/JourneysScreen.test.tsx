@@ -86,6 +86,7 @@ const PENDING: TripDetail = {
     incidents: [],
     simulated: true,
   },
+  document_warnings: [],
 };
 const IMPACTED: TripDetail = {
   ...PENDING,
@@ -171,6 +172,22 @@ describe("Journey Management", () => {
     const risk = screen.getByLabelText("Destination risk");
     expect(risk).toHaveTextContent("Security78");
     expect(screen.getByText("Riskline (simulated)")).toBeInTheDocument();
+  });
+
+  it("names a traveller's short passport next to the checklist, without blocking approval (DX-06)", async () => {
+    server(SECURITY, { ...NONE, approve_trip: true }, {
+      "GET /api/trips/t-1": {
+        body: {
+          ...PENDING,
+          document_warnings: [{ person_id: "p-b", full_name: "Fictional Diplomat B", valid_until: "2027-03-30" }],
+        },
+      },
+    });
+    renderApp("/journeys?trip=t-1");
+    expect(await screen.findByRole("note")).toHaveTextContent(
+      "Travel document: Fictional Diplomat B has no passport valid 180 days after the trip (valid until 2027-03-30).",
+    );
+    expect(await screen.findByRole("button", { name: "Approve trip" })).toBeEnabled();
   });
 
   it("flags a risk that rose since approval", async () => {

@@ -7,6 +7,7 @@ import { AgentsScreen } from "../screens/agents/AgentsScreen";
 import { AirScreen } from "../screens/air/AirScreen";
 import { AuditScreen } from "../screens/audit/AuditScreen";
 import { CheckinScreen } from "../screens/checkin/CheckinScreen";
+import { DocumentsScreen } from "../screens/documents/DocumentsScreen";
 import { IncidentsScreen } from "../screens/incidents/IncidentsScreen";
 import { JourneysScreen } from "../screens/journeys/JourneysScreen";
 import { NotifyScreen } from "../screens/notify/NotifyScreen";
@@ -31,6 +32,7 @@ const BUILT: Record<string, ReactElement> = {
   "/notifications": <NotifyScreen />,
   "/partners": <PartnersScreen />,
   "/checkin": <CheckinScreen />,
+  "/documents": <DocumentsScreen />,
   "/audit": <AuditScreen />,
 };
 

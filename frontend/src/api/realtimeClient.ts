@@ -1,6 +1,7 @@
 import type { QueryKey } from "@tanstack/react-query";
 
 import { checkinKeys } from "./checkin";
+import { documentKeys } from "./documents";
 import { partnerKeys } from "./partners";
 import { flightKeys } from "./flights";
 import { keys } from "./intel";
@@ -74,6 +75,8 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
       return [partnerKeys.all];
     case "WEATHER_UPDATED": // the panel, the map layer and the mission popup (WX-02)
       return [weatherKeys.all];
+    case "DOCUMENT_UPDATED": // the register, its KPIs, and the trip warnings (DX-04, DX-06)
+      return [documentKeys.all, tripKeys.all];
     default:
       return [];
   }
