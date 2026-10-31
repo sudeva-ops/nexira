@@ -30,7 +30,8 @@ def build(w: World, tenant_id: uuid.UUID) -> tuple[list[DocumentIn], list[uuid.U
     ref, warn_days = data.DOCUMENT_TRIP_WARNING
     _ref, _p, home, count, *_ = next(t for t in data.EXTRA_TRIPS if t[0] == ref)
     home_id = next(m.id for m in w.missions if m.code == home)
-    warned = trip_travellers(w, home_id, count)[0]
+    travellers = trip_travellers(w, home_id, count)
+    warned = travellers[0]
 
     docs: list[DocumentIn] = []
     for p in w.persons:
@@ -50,10 +51,11 @@ def build(w: World, tenant_id: uuid.UUID) -> tuple[list[DocumentIn], list[uuid.U
                 DocumentIn(doc_id, p.id, doc_type, issuer, w.scenario_date + timedelta(days))
             )
 
-    # Elsewhere: documents picked by digest get the design's short dates.
+    # Elsewhere: documents picked by digest get the design's short dates. Not the warned
+    # trip's travellers: only the first one is short (DX-06), whatever the tenant id.
     mission_of = {p.id: p.mission_id for p in w.persons}
     candidates = sorted(
-        (d for d in docs if d.person_id != warned and mission_of[d.person_id] not in quiet),
+        (d for d in docs if d.person_id not in travellers and mission_of[d.person_id] not in quiet),
         key=lambda d: _digest(d.id),
     )
     critical = candidates[: data.DOCUMENT_CRITICAL_OTHERS]
