@@ -413,3 +413,67 @@ Playwright on the real stack: the Document Expiry screen shows the seeded docume
 6. **Trips:** warn, do not block (DX-06).
 7. **Demo:** in NBO-CIVIL-UNREST, after scene 3 the Compliance agent's proposal appears; no new scenario.
 8. **🔒 prompts:** the migration (RLS and grants) and the agent policy (D-29) need your named sign-off, as before.
+
+---
+
+# Pilot module 8 · Natural Hazards & Climate (draft, for approval)
+
+For the product owner, who approves this part; then for the coding agent (Prompts 53–58 in `docs/prompts-pilot.md`). Rules: D-30, and **D-38** (proposed). Everything runs on **simulated hazard feeds** and **illustrative climate scores**: no seismic, weather, air-quality or climate provider is called (AGENTS.md: no external URLs at runtime). A real provider later replaces only the simulated feed.
+
+## 39. Purpose and starting point
+
+The rest of the master spec's Natural Hazards & Climate module (HAZ-01..03), on top of Weather (D-35): **live hazard events** near our missions (earthquakes, tropical cyclones, floods, extreme heat, air quality, wildfire), **arming a playbook ahead of a forecast landfall**, and **long-term climate exposure** per mission for site and continuity planning. This is the design's Natural Hazards & Climate screen ("Hazards · Live events & long-term site exposure") and its proactive Dhaka cyclone proposal.
+
+| Exists today | Where |
+|---|---|
+| Severe-weather warnings (STORM, FLOOD, DUST_STORM, EXTREME_HEAT) from the simulated xWeather feed become incidents, sized by category | Weather, WX-03, WX-04 |
+| Signals → fused incidents → exposure → agents and playbooks → notifications and check-in | Phase 1 |
+| PB-06 Severe weather (staff alert, check-in, citizen advisory with a second person), proposed by the Response Planner | WX-05 |
+| Playbook runs start when someone starts them or approves a proposal; there is no way to start one **later**, at a set time | playbooks |
+| No earthquakes, cyclone forecasts, air quality or wildfire; no climate exposure; no hazards screen | — |
+
+## 40. Requirements: Natural Hazards (HZ)
+
+| ID | Requirement | Master | Pri. | Acceptance |
+|---|---|---|---|---|
+| HZ-01 | **More hazard types as intelligence.** Simulated feeds send EARTHQUAKE (magnitude, depth), TROPICAL_CYCLONE (category, expected landfall time), WILDFIRE and AIR_QUALITY (AQI) signals, alongside Weather's FLOOD and EXTREME_HEAT. They become incidents through the existing pipeline, with exposure, agents and playbooks as for any incident. Each is labelled with its simulated source. | HAZ-01 | M | An M5.2 earthquake 210 km from Ankara gives one EARTHQUAKE incident, LOW. |
+| HZ-02 | **Severity and size by hazard** (§43 Q3): severity from magnitude, cyclone category, AQI or temperature; impact radius and fusion distance per type (an earthquake's from its magnitude). | HAZ-01 | M | A Category 2 cyclone forecast for Dhaka is HIGH and exposes the Dhaka mission. |
+| HZ-03 | **Within range of a mission.** For each event: the nearest mission and its distance, whether it is exposed (inside the impact radius), and what is exposed (staff, homes, sites) from the existing exposure. Events more than 300 km from every mission are shown as "No mission within 300 km". | HAZ-01 | M | The Jakarta flood shows "Jakarta mission · 2 staff homes". |
+| HZ-04 | **Forecasts count down.** A cyclone forecast shows its expected landfall time and "landfall in N h"; a newer forecast updates it. | HAZ-02 | M | Dhaka shows "landfall in 60 h". |
+| HZ-05 | **Arm a playbook ahead of landfall.** A person, or an approved proposal, can **arm** a playbook for an incident: it starts automatically at a set time (e.g. 36 h before landfall), and until then it can be started now or disarmed. Arming, starting and disarming are audited; the run then works as any playbook run (gates, second person for citizens). | HAZ-02 | M | PB-06 armed for Dhaka starts by itself at the set time. |
+| HZ-06 | **The Response Planner proposes arming.** For a HIGH or CRITICAL cyclone forecast whose landfall is more than 36 h away and whose radius covers a mission, it proposes "Arm PB-06 for <city>, start 36 h before landfall", with evidence (track distance, people and homes exposed) and the alternative "Monitor only; reassess in 12 h" (advice only). Level **Approve**; a Security Officer or Duty Officer decides. One open proposal per incident. | HAZ-02 | M | In DAC-CYCLONE the proposal appears; approving it arms PB-06. |
+| HZ-07 | **Earthquake playbook (PB-01).** The Response Planner proposes PB-01 for a HIGH or CRITICAL earthquake whose radius covers a mission: safety check-in first, then a staff alert, then a citizen advisory from the mission template (D-31: a second person approves it). | PB-01 | S | — |
+| HZ-08 | **Long-term climate exposure.** Per mission: its main hazards and an illustrative risk score (0–100) today and in 2050, labelled "Illustrative climate model (simulated)". Read-only reference data, sorted by the 2050 score. | HAZ-03 | S | Jakarta has the highest 2050 score. |
+| HZ-09 | **Natural Hazards & Climate screen.** KPIs from data: active hazard events, missions exposed now (by level), the mission with the highest 2050 score, and the number of sources. Live hazard events with tabs per type (type, event, area, mission exposure, level, updated); a banner for a forecast that can still be armed, with "Arm playbook" shown from `GET /api/me/permissions`; the climate table. Hazard events on the Global Operations map with their own icon. Blueprint dark, as the design. | HAZ-01..03 | M | — |
+| HZ-10 | **Who sees what.** Every role, Viewer included, sees hazard events, exposure counts and climate scores (no names; names stay on People & Sites). Arming and disarming: SECURITY_OFFICER and DUTY_OFFICER for any mission, HEAD_OF_MISSION for their own (as starting a playbook). | — | M | A Viewer sees the screen with no "Arm playbook" button. |
+| HZ-11 | **A demo scenario** `DAC-CYCLONE`: scene 1 brings the background events (Ankara earthquake, Jakarta flood, Riyadh heat, New Delhi air quality, a wildfire with no mission in range) and a Category 1 forecast for Dhaka; scene 2 upgrades it to Category 2, landfall in 60 h; later scenes bring it to 36 h (the armed playbook starts), landfall, and weakening. | PLT-06 | M | Played from the presenter bar. |
+
+### Not in this module
+Real hazard, weather, seismic, air-quality or climate providers; tsunami and volcano warnings; pre-positioning supplies, fuel or vehicles (Supply Chain and Fleet, later modules); business-continuity plans (BCP); climate scenarios other than one illustrative 2050 score; using climate scores in decisions (they are shown, not acted on).
+
+## 41. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-24 · Armed playbook runs**: `playbook_run` gains `scheduled_for timestamptz` (nullable) and the statuses `SCHEDULED` and `DISARMED`. A guard: a SCHEDULED run has `scheduled_for` in the future when created; it may only move to RUNNING or DISARMED; a DISARMED run is final. Grants unchanged.
+- **PC-25 · `mission_climate_risk`**: tenant, mission (one row each), main hazards (`text[]`), score today and 2050 (0–100), scenario label, source. FORCE RLS with `tenant_isolation`; SELECT and INSERT for `nexira_app` (seeded through the service layer); no UPDATE or DELETE in the pilot.
+- Hazard events need no table: they are signals and incidents. Their details (magnitude, category, AQI, landfall time) come from the incident's latest signal payload.
+
+## 42. Acceptance for the module
+
+Playwright on the real stack: the Natural Hazards screen shows the hazard events and climate exposure, labelled simulated. In `DAC-CYCLONE`, the background events appear, with the Ankara earthquake LOW and outside its range; the Dhaka forecast becomes a HIGH TROPICAL_CYCLONE incident showing "landfall in 60 h" and exposing the Dhaka mission; the Response Planner proposes arming PB-06; a Security Officer approves it; the playbook shows as armed and starts by itself when the scenario reaches 36 h; a Viewer sees events and scores with no names and no "Arm playbook"; the audit chain verifies; `make acceptance` (all existing specs) still passes.
+
+## 43. Questions for the product owner (proposed defaults; "use the defaults" accepts them all)
+
+1. **Hazard types:** EARTHQUAKE, TROPICAL_CYCLONE, WILDFIRE and AIR_QUALITY are new; FLOOD and EXTREME_HEAT stay as Weather made them. Four simulated sources, as the design: xWeather (cyclone, flood, heat, wildfire), a seismic network, an air-quality network, and the illustrative climate model.
+2. **Range:** an event is listed with its nearest mission; it "exposes" a mission only inside its impact radius. Beyond 300 km of every mission: "No mission within 300 km".
+3. **Severity and size:**
+   - EARTHQUAKE: M < 5.5 LOW, 5.5–6.4 MODERATE, 6.5–7.4 HIGH, ≥ 7.5 CRITICAL. Radius 50 km below M5, 100 km for M5–5.9, 200 km for M6–6.9, 400 km from M7.
+   - TROPICAL_CYCLONE: Category 1 MODERATE, 2 HIGH, 3 or more CRITICAL. Radius 150 km around the forecast landfall point.
+   - AIR_QUALITY: AQI 201–300 MODERATE, 301–400 HIGH, over 400 CRITICAL. Radius 30 km.
+   - WILDFIRE: MODERATE, or HIGH within 20 km of a mission. Radius 20 km.
+4. **Arming:** the default start time is 36 h before landfall. A person can start the run now or disarm it until then. A newer forecast does not move the time by itself; the incident shows "forecast changed" instead.
+5. **Who arms:** SECURITY_OFFICER and DUTY_OFFICER for any mission, HEAD_OF_MISSION for their own. The Response Planner's arming proposal needs SECURITY_OFFICER or DUTY_OFFICER, with a policy floor of 2, so it can never be set to Auto.
+6. **PB-01 Earthquake:** a new seeded playbook: safety check-in, staff alert, citizen advisory (second person). Proposed for HIGH or CRITICAL earthquakes.
+7. **Climate scores:** illustrative and fictional, for all 36 missions. The design's figures for Jakarta, Dhaka, New Delhi, Riyadh, Manila, Nairobi and London; plausible ones for the rest.
+8. **Demo:** a new scenario `DAC-CYCLONE`. The background events come with its scene 1 rather than with `make reset-demo`, so the Phase 1 scenario still starts with no active incidents. Dhaka keeps its 15 seeded staff. Three of their homes are placed in flood-prone wards, as the design. No new people are added, so the seeded totals stay as they are.
+9. **Screen:** "Natural Hazards & Climate" under MONITOR, as the design.
+10. **🔒 prompts:** the migration (PC-24 changes playbook-run rules; PC-25 adds RLS and grants), the arming action's executor and its policy (D-29) need your named sign-off, as before.
