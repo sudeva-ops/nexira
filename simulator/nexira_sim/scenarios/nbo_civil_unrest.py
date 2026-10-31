@@ -125,8 +125,15 @@ def build_events(w: World, tenant_id: uuid.UUID) -> list[EventIn]:
         )
 
     # Scene 4 (D-07, CHK-03): every exposed Nairobi person except Hana Takeda answers.
+    # Personnel: the 17 named Nairobi people (D-23). Not Hana Takeda's child, who lives
+    # outside the zone and is never asked (plan-pilot-dx G-2).
     nbo = next(m for m in w.missions if m.code == "NBO")
-    personnel = [p for p in w.persons if p.mission_id == nbo.id and p.person_type != "CITIZEN"]
+    named = {name for name, *_ in data.NAIROBI_PEOPLE}
+    personnel = [
+        p
+        for p in w.persons
+        if p.mission_id == nbo.id and p.person_type != "CITIZEN" and p.full_name in named
+    ]
     citizens = [p for p in w.persons if p.mission_id == nbo.id and p.person_type == "CITIZEN"]
     answers: list[tuple[uuid.UUID, str, str]] = []
     for p in personnel:

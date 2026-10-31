@@ -694,6 +694,13 @@ AGENTS: list[tuple[str, str, str, int]] = [
         "Watches trips and flights; proposes messages and cancellations.",
         2,
     ),
+    # Pilot module 7 (D-37): proposes only; a Consular or Duty Officer decides.
+    (
+        "COMPLIANCE",
+        "Compliance",
+        "Watches travel documents at missions at risk; proposes urgent renewals.",
+        2,
+    ),
 ]
 # (action_type, floor, approver_roles, undoable)
 POLICIES: list[tuple[str, int, list[str], bool]] = [
@@ -710,6 +717,46 @@ TRAVEL_POLICIES: list[tuple[str, int, list[str], bool, int]] = [
     ("NOTIFY_TRAVELLERS", 2, ["TRAVEL_DESK|SECURITY_OFFICER"], False, 3600),
     ("CANCEL_TRIP", 2, ["SECURITY_OFFICER"], False, 3600),
 ]
+# Compliance agent (D-37, plan-pilot-dx §4): floor 2, so it can never be set to Auto (§38
+# Q4). ADVISE_EMERGENCY_DOCUMENTS has no policy: advice only (level 4, D-12).
+DOCUMENT_POLICIES: list[tuple[str, int, list[str], bool, int]] = [
+    ("START_DOCUMENT_RENEWAL", 2, ["CONSULAR_OFFICER|DUTY_OFFICER"], False, 3600),
+]
+
+# --- Document Expiry (D-37, plan-pilot-dx §8): simulated, never a document number ---------
+# The fictional ministry's home state issues its staff's passports: the home time zone
+# (plan Q2) and the AUH hub. Local staff hold the host country's.
+HOME_COUNTRY = "AE"
+# What each person holds: a passport-type document first (§38 Q1).
+DOCUMENTS_BY_TYPE: dict[str, tuple[str, ...]] = {
+    "DIPLOMAT": ("DIPLOMATIC_PASSPORT", "ACCREDITATION"),
+    "LOCAL_STAFF": ("PASSPORT",),
+    "DEPENDANT": ("PASSPORT", "RESIDENCE_PERMIT"),
+    "CONTRACTOR": ("PASSPORT", "VISA"),
+}
+# Plan G-2: Hana Takeda's child is the last generated dependant, moved to Nairobi and
+# placed at home 9 km from the epicentre, outside the zone (D-23 does not move).
+DEPENDANT_CHILD = "Aiko Takeda"
+DEPENDANT_CHILD_HOME = (-1.3555, 36.7765)
+DEPENDANT_CHILD_PLACE = "Home · Karen"
+# Days left on the seed date. Nairobi's two (DX-02, DX-07); nobody else in Nairobi has a
+# document under 180 days.
+NAMED_DOCUMENTS: dict[tuple[str, str], int] = {
+    ("Hana Takeda", "DIPLOMATIC_PASSPORT"): 21,
+    (DEPENDANT_CHILD, "PASSPORT"): 12,
+}
+# Elsewhere, picked by digest: with Nairobi's two, exactly 6 within 30 days and 31 within
+# 90 (the design's KPIs); about 19 of those already in renewal; a few passports under the
+# six-month rule. Not at the missions of the demo scenarios, so the only documents the
+# Compliance agent finds there are Nairobi's two.
+DOCUMENT_CRITICAL_OTHERS = 4
+DOCUMENT_HIGH_OTHERS = 25
+DOCUMENT_MODERATE_PASSPORTS = 14
+DOCUMENT_IN_PROGRESS = 19
+DOCUMENT_QUIET_MISSIONS = ("NBO", "PAR", "MNL")
+# DX-06: the Paris trip's first traveller's passport ends 150 days after the seed date,
+# under 180 days after the trip ends.
+DOCUMENT_TRIP_WARNING = ("TRP-8811", 150)
 
 # --- Assistance Partners (D-36, plan-pilot-ast §8): fictional partners, simulated -----------
 MISSION_COUNTRIES = sorted({cc for _code, _city, _name, cc, *_ in MISSIONS})

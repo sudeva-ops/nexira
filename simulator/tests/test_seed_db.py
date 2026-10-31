@@ -174,6 +174,7 @@ async def test_sources_playbook_agents_and_counters(seeded: Seeded) -> None:
         "RESPONSE_PLANNER": 2,
         "COMMUNICATIONS": 2,
         "TRAVEL_AIR": 2,  # D-34
+        "COMPLIANCE": 2,  # D-37
     }
     policies = {
         r["action_type"]: (r["min_autonomy_level"], r["approver_roles"], r["is_undoable"])
@@ -182,9 +183,11 @@ async def test_sources_playbook_agents_and_counters(seeded: Seeded) -> None:
     assert policies["NOTIFY_TRAVELLERS"] == (2, ["TRAVEL_DESK|SECURITY_OFFICER"], False)
     assert policies["CANCEL_TRIP"] == (2, ["SECURITY_OFFICER"], False)
     assert "ADVISE_REBOOKING" not in policies  # advice only (D-12)
+    assert policies["START_DOCUMENT_RENEWAL"] == (2, ["CONSULAR_OFFICER|DUTY_OFFICER"], False)
+    assert "ADVISE_EMERGENCY_DOCUMENTS" not in policies
     deadlines = await c.fetch(
         "SELECT decision_deadline_s FROM action_policy "
-        "WHERE action_type IN ('NOTIFY_TRAVELLERS', 'CANCEL_TRIP')"
+        "WHERE action_type IN ('NOTIFY_TRAVELLERS', 'CANCEL_TRIP', 'START_DOCUMENT_RENEWAL')"
     )
     assert {r["decision_deadline_s"] for r in deadlines} == {3600}
     assert policies["START_EVACUATION"] == (3, ["HEAD_OF_MISSION", "HQ_CRISIS_DIRECTOR"], False)
@@ -213,7 +216,7 @@ async def _snapshot(conn: asyncpg.Connection) -> dict[str, Any]:
         "mission", "site", "person", "location_observation", "person_location_current", "trip",
         "trip_traveller", "intel_source", "playbook", "playbook_step", "agent", "action_policy",
         "app_user", "role", "user_role", "reference_counter", "scenario", "scenario_event",
-        "message_template", "country_risk",
+        "message_template", "country_risk", "travel_document",
     ]  # fmt: skip
     snap: dict[str, Any] = {}
     for t in tables:
@@ -349,3 +352,90 @@ async def test_air_seed_airports_and_the_scenario_flight_only(seeded: Seeded) ->
         "WHERE t.reference = 'TRP-8818'"
     )
     assert travellers == 3
+
+
+async def test_documents_seed_the_design_kpis(seeded: Seeded) -> None:
+    """Plan-pilot-dx §8: one passport-type document each, 6 within 30 days and 31 within 90
+    of the seed date, Nairobi's two, and nobody else in Nairobi under 180 days."""
+    c = seeded.conn
+    holders = await c.fetch(
+        "SELECT p.person_type, count(d.id) FILTER (WHERE d.doc_type IN "
+        "('PASSPORT', 'DIPLOMATIC_PASSPORT')) AS passports, count(d.id) AS docs "
+        "FROM person p LEFT JOIN travel_document d ON d.person_id = p.id "
+        "WHERE p.is_active GROUP BY p.id, p.person_type"
+    )
+    for r in holders:
+        expected = 0 if r["person_type"] in ("CITIZEN", "DELEGATE") else 1
+        assert r["passports"] == expected, r
+        assert r["docs"] == len(data.DOCUMENTS_BY_TYPE.get(r["person_type"], ())), r
+    within = "SELECT count(*) FROM travel_document WHERE valid_until - $1::date < $2"
+    assert await c.fetchval(within, DAY, 30) == 6
+    assert await c.fetchval(within, DAY, 90) == 31
+    nairobi = await c.fetch(
+        "SELECT p.full_name, d.doc_type, d.valid_until - $1::date AS days, d.renewal_status "
+        "FROM travel_document d JOIN person p ON p.id = d.person_id "
+        "JOIN mission m ON m.id = p.mission_id "
+        "WHERE m.code = 'NBO' AND d.valid_until - $1::date < 180 ORDER BY days",
+        DAY,
+    )
+    assert [tuple(r) for r in nairobi] == [
+        ("Aiko Takeda", "PASSPORT", 12, "NONE"),
+        ("Hana Takeda", "DIPLOMATIC_PASSPORT", 21, "NONE"),
+    ]
+    in_progress = await c.fetchval(
+        "SELECT count(*) FROM travel_document "
+        "WHERE renewal_status = 'IN_PROGRESS' AND valid_until - $1::date < 90",
+        DAY,
+    )
+    assert in_progress == data.DOCUMENT_IN_PROGRESS
+    started_by = await c.fetch(
+        "SELECT DISTINCT renewal_started_by FROM travel_document "
+        "WHERE renewal_started_by IS NOT NULL"
+    )
+    assert [r["renewal_started_by"] for r in started_by] == ["system:seed"]
+    # The scenarios' other missions have none under 180 days: the agent finds only Nairobi's.
+    quiet = await c.fetchval(
+        "SELECT count(*) FROM travel_document d JOIN person p ON p.id = d.person_id "
+        "JOIN mission m ON m.id = p.mission_id "
+        "WHERE m.code IN ('PAR', 'MNL') AND d.valid_until - $1::date < 180",
+        DAY,
+    )
+    assert quiet == 0
+    actions = {
+        r["action"]: r["n"]
+        for r in await c.fetch(
+            "SELECT action, count(*) AS n FROM audit_log "
+            "WHERE action LIKE 'TRAVEL_DOCUMENT.%' OR action LIKE 'DOCUMENT.%' GROUP BY action"
+        )
+    }
+    assert actions == {"TRAVEL_DOCUMENT.BULK_LOAD": 1, "DOCUMENT.RENEWAL_STARTED": 19}
+
+
+async def test_the_paris_trip_has_a_document_warning(seeded: Seeded) -> None:
+    """DX-06: TRP-8811's first traveller's passport ends under 180 days after the trip."""
+    rows = await seeded.conn.fetch(
+        "SELECT p.full_name, max(d.valid_until) AS valid_until, t.ends_on FROM trip t "
+        "JOIN trip_traveller tt ON tt.trip_id = t.id JOIN person p ON p.id = tt.person_id "
+        "JOIN travel_document d ON d.person_id = p.id "
+        "AND d.doc_type IN ('PASSPORT', 'DIPLOMATIC_PASSPORT') "
+        "WHERE t.reference = 'TRP-8811' GROUP BY p.full_name, t.ends_on"
+    )
+    short = [r for r in rows if (r["valid_until"] - r["ends_on"]).days < 180]
+    assert len(rows) == 2
+    assert len(short) == 1
+    assert (short[0]["valid_until"] - DAY).days == 150
+
+
+async def test_aiko_takeda_is_in_nairobi_outside_the_zone(seeded: Seeded) -> None:
+    """Plan-pilot-dx G-2."""
+    row = await seeded.conn.fetchrow(
+        "SELECT p.person_type, m.code, ST_Distance(l.location, "
+        "ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography) / 1000 AS km "
+        "FROM person p JOIN mission m ON m.id = p.mission_id "
+        "JOIN person_location_current l ON l.person_id = p.id WHERE p.full_name = 'Aiko Takeda'",
+        data.EPICENTRE[1],
+        data.EPICENTRE[0],
+    )
+    assert row is not None
+    assert (row["person_type"], row["code"]) == ("DEPENDANT", "NBO")
+    assert 9 < float(row["km"]) < 10

@@ -72,3 +72,7 @@ class PermissionsOut(BaseModel):
     reject_trip: bool = False  # trip: may reject it with a reason
     check_trip: bool = False  # trip: may tick checklist items
     cancel_trip: bool = False  # trip: may cancel it
+    read_documents: bool = False  # documents: may read the list (DX-09)
+    act_documents: bool = False  # documents: may renew and send reminders
+    read_document_missions: list[uuid.UUID] | None = None  # None: every mission
+    act_document_missions: list[uuid.UUID] | None = None  # None: every mission

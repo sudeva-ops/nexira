@@ -2,8 +2,9 @@
 
 Each Phase 1 action type has a payload schema and an executor. Executors only
 call the service functions a logged-in user's request calls: incident notes,
-playbooks.start_run, notifications.create_campaign, and for the Travel & Air agent
-(D-34) the trip audience of create_campaign and trips.cancel_by_agent. Agents never
+playbooks.start_run, notifications.create_campaign, for the Travel & Air agent
+(D-34) the trip audience of create_campaign and trips.cancel_by_agent, and for the
+Compliance agent (D-37) documents.renew_by_agent. Agents never
 reach channels, external systems or tables directly (AGENTS.md).
 
 An action type with no entry here can still be proposed: the database makes it
@@ -21,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.events import Event
+from app.modules.documents import service as documents
 from app.modules.intel import service as intel
 from app.modules.intel.models import Incident
 from app.modules.notifications.channels import CHANNELS
@@ -81,6 +83,14 @@ class CancelTripPayload(_Payload):
     """CANCEL_TRIP (D-34): an approved trip that has not started."""
 
     trip_id: uuid.UUID
+
+
+class DocumentRenewalPayload(_Payload):
+    """START_DOCUMENT_RENEWAL (D-37): urgent renewal of documents at the incident's
+    mission, and one reminder to their holders. The reminder is the fixed text the
+    proposal quotes (documents.REMINDER), so it is not in the payload."""
+
+    document_ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
 
 
 @dataclass
@@ -243,6 +253,34 @@ async def _cancel_trip(
     return {"trip_id": str(outcome.trip.id), "reference": outcome.trip.reference}
 
 
+async def _start_document_renewal(
+    session: AsyncSession, payload: DocumentRenewalPayload, ctx: Context
+) -> dict[str, Any]:
+    incident = await _incident(session, ctx)
+    try:
+        # The same step, row update and audit as a person's renewal request, and the same
+        # reminders campaign (plan-pilot-dx §4).
+        done = await documents.renew_by_agent(
+            session,
+            payload.document_ids,
+            incident_id=incident.id,
+            mission_id=incident.mission_id,
+            actor=ctx.agent_actor,
+            approved_by=ctx.approved_by,
+            proposal_id=ctx.proposal_id,
+        )
+    except documents.DocumentError as e:
+        raise ActionError(str(e)) from None
+    ctx.events.extend(done.events)
+    return {
+        "requested": [str(d) for d in done.requested],
+        "skipped": [str(d) for d in done.skipped],  # already in renewal
+        "campaign_id": str(done.reminders.campaign.id),
+        "reference": done.reminders.campaign.reference,
+        "recipients": done.reminders.recipients,
+    }
+
+
 ACTIONS: dict[str, Action] = {
     "LOG_INFO": Action(NotePayload, _note, _retract_note),
     "POST_INTERNAL_NOTE": Action(NotePayload, _note, _retract_note),
@@ -253,6 +291,8 @@ ACTIONS: dict[str, Action] = {
     # Travel & Air agent (D-34). ADVISE_REBOOKING has no entry: advice only (level 4).
     "NOTIFY_TRAVELLERS": Action(NotifyTravellersPayload, _notify_travellers),
     "CANCEL_TRIP": Action(CancelTripPayload, _cancel_trip),
+    # Compliance agent (D-37). ADVISE_EMERGENCY_DOCUMENTS has no entry: advice only.
+    "START_DOCUMENT_RENEWAL": Action(DocumentRenewalPayload, _start_document_renewal),
 }
 
 

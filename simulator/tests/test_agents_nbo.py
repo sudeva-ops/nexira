@@ -33,6 +33,8 @@ from nexira_sim.scenarios import nbo_civil_unrest as nbo
 from nexira_sim.seed import world
 from tests.scene_helpers import DAY, seed
 
+PILOT_AGENTS = ("TRAVEL_AIR", "COMPLIANCE")  # D-34, D-37: checked on their own
+
 
 class Bus:
     """Delivers events in order to the worker's handlers, as the stream would."""
@@ -130,10 +132,26 @@ async def test_scenes_1_to_3_give_one_proposal_per_agent_per_trigger(db: DbUrls)
             ("Notify TRP-8818 travellers · risk now CRITICAL", "PENDING", 2),
             (f"Safety message to TRP-8812 travellers · INC-{year}-1042", "PENDING", 2),
         ]
+        # Compliance (pilot module 7, D-37; plan-pilot-dx G-5): one card in scene 2 for
+        # Nairobi's two documents, however often exposure ran. None for Paris.
+        async with tenant_session(tenant_id, engine) as session:
+            compliance = [
+                (p.title, p.status, p.effective_level, p.is_proactive, p.proposed_action)
+                for p in await session.scalars(
+                    select(AgentProposal)
+                    .join(Agent, Agent.id == AgentProposal.agent_id)
+                    .where(Agent.code == "COMPLIANCE")
+                )
+            ]
+        assert [c[:4] for c in compliance] == [
+            ("2 Nairobi travel documents could block an evacuation", "PENDING", 2, True)
+        ]
+        assert "H. Takeda's diplomatic passport" in compliance[0][4]
+        assert "A. Takeda's passport" in compliance[0][4]
         assert Counter(
             (agent, action, status, level)
             for agent, action, status, level in found
-            if agent != "TRAVEL_AIR"
+            if agent not in PILOT_AGENTS
         ) == {
             # Scene 1: the Watch Officer logs both incidents (Nairobi, Paris; plan G-12).
             ("WATCH_OFFICER", "LOG_INFO", "AUTO_EXECUTED", 0): 2,
@@ -185,8 +203,10 @@ async def test_scenes_1_to_3_give_one_proposal_per_agent_per_trigger(db: DbUrls)
         assert campaign is not None
         assert campaign.status == "SENT"  # through the simulated adapter only
         counted = Counter(
-            agent for agent, *_ in await all_proposals(engine, tenant_id) if agent != "TRAVEL_AIR"
-        )  # Travel & Air is checked above
+            agent
+            for agent, *_ in await all_proposals(engine, tenant_id)
+            if agent not in PILOT_AGENTS
+        )  # the pilot agents are checked above
         assert counted == {
             "WATCH_OFFICER": 2,
             "EXPOSURE": 2,

@@ -120,10 +120,19 @@ class TripOut(BaseModel):
     created_at: datetime
 
 
+class DocumentWarningOut(BaseModel):
+    """DX-06: no passport valid for 180 days after the trip ends. Never blocks approval."""
+
+    person_id: uuid.UUID
+    full_name: str
+    valid_until: date | None  # the latest passport-type date; None if they hold none
+
+
 class TripDetailOut(TripOut):
     travellers: list[TravellerOut]
     segments: list[SegmentOut]
     country_risk: CountryRiskOut | None
+    document_warnings: list[DocumentWarningOut]
 
 
 class FlightOut(BaseModel):

@@ -1,13 +1,14 @@
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.approvals import roles_of
 from app.core.security import CurrentUser, current_user, get_db
 from app.modules.agents import proposals
 from app.modules.agents.models import AgentProposal
+from app.modules.documents import service as documents
 from app.modules.notifications import compose
 from app.modules.notifications.models import NotificationCampaign
 from app.modules.playbooks import service as playbooks
@@ -37,15 +38,39 @@ async def me(
     )
 
 
+def _missions(scope: documents.Scope | None) -> list[uuid.UUID] | None:
+    """None: every mission (or, with the flag false, none at all)."""
+    if scope is None or scope.missions is None:
+        return None
+    return sorted(scope.missions, key=str)
+
+
 @router.get("/me/permissions")
 async def my_permissions(
-    entity_type: Literal["playbook_run", "agent_proposal", "notification_campaign", "trip"],
-    entity_id: uuid.UUID,
+    entity_type: Literal[
+        "playbook_run", "agent_proposal", "notification_campaign", "trip", "documents"
+    ],
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
+    entity_id: uuid.UUID | None = None,
 ) -> PermissionsOut:
     """Plan G-07: the actions the caller may take on an entity now, computed by
-    approvals.can_decide(), the same code that enforces them."""
+    approvals.can_decide(), the same code that enforces them. "documents" is the
+    register as a whole (no entity_id): read and act, and the missions each covers
+    (plan-pilot-dx §7)."""
+    if entity_type == "documents":
+        read = await documents.read_scope(session, user)
+        act = await documents.act_scope(session, user)
+        return PermissionsOut(
+            entity_type=entity_type,
+            entity_id="",
+            read_documents=read is not None,
+            act_documents=act is not None,
+            read_document_missions=_missions(read),
+            act_document_missions=_missions(act),
+        )
+    if entity_id is None:
+        raise HTTPException(422, f"{entity_type} needs an entity_id")
     if entity_type == "notification_campaign":
         campaign = await session.get(NotificationCampaign, entity_id)
         if campaign is None:

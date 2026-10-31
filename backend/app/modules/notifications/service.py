@@ -58,7 +58,12 @@ async def resolve_audience(
     - {"trip_id": id}: that trip's active travellers. Refused for a restricted trip (D-33)
       and if any traveller is a citizen (only DUTY_OFFICER|CONSULAR_OFFICER approve
       citizen messages, D-31; the agent's approvers are TRAVEL_DESK|SECURITY_OFFICER).
+    Spec used by Document Expiry (D-37, plan-pilot-dx §5), with or without an incident:
+    - {"document_ids": [ids]}: the active holders of those documents. Refused if the list
+      is empty, names an unknown document or a citizen's or delegate's (staff only).
     """
+    if "document_ids" in audience:
+        return await _document_holders(session, audience["document_ids"])
     if audience.get("trip_id"):
         return await _trip_travellers(session, str(audience["trip_id"]))
     if audience.get("missions"):
@@ -148,6 +153,36 @@ async def _trip_travellers(session: AsyncSession, trip_id: str) -> list[uuid.UUI
     if not rows:
         raise AudienceError("the trip has no active travellers")  # review, L4
     return [person_id for person_id, _ in rows]
+
+
+async def _document_holders(session: AsyncSession, document_ids: Any) -> list[uuid.UUID]:
+    try:
+        ids = sorted({uuid.UUID(str(i)) for i in document_ids})
+    except (TypeError, ValueError):
+        raise AudienceError("document_ids is a list of document ids") from None
+    if not ids:
+        raise AudienceError("the reminder names no documents")
+    rows = (
+        await session.execute(
+            text(
+                """
+                SELECT d.id, p.id AS person_id, p.person_type, p.is_active
+                  FROM travel_document d JOIN person p ON p.id = d.person_id
+                 WHERE d.id = ANY(:ids)
+                """
+            ),
+            {"ids": ids},
+        )
+    ).all()
+    if len(rows) != len(ids):
+        raise AudienceError("unknown document")
+    # The guard refuses such documents too (migration 0007): a backstop (§5).
+    if any(r.person_type in ("CITIZEN", "DELEGATE") for r in rows):
+        raise AudienceError("document reminders go to staff and dependants only")
+    holders = sorted({r.person_id for r in rows if r.is_active})
+    if not holders:
+        raise AudienceError("the documents have no active holders")
+    return holders
 
 
 @dataclass(frozen=True)

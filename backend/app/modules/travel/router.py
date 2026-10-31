@@ -19,6 +19,7 @@ from app.core.approvals import require_roles
 from app.core.config import Settings, get_settings
 from app.core.events import Event, Publisher, get_publisher
 from app.core.security import CurrentUser, get_db
+from app.modules.documents import service as documents
 from app.modules.people.models import Person
 from app.modules.tenancy.models import AppUser
 from app.modules.tenancy.service import ROLES
@@ -28,6 +29,7 @@ from app.modules.travel.schemas import (
     AirportOut,
     CheckIn,
     CountryRiskOut,
+    DocumentWarningOut,
     FlightDetailOut,
     FlightOut,
     RejectIn,
@@ -152,11 +154,19 @@ async def trip_detail(session: AsyncSession, trip: Trip, user: CurrentUser) -> T
             incidents=risk.incidents,
             simulated=True,
         )
+    people = travellers.all()
+    warnings = await documents.trip_warnings(session, [i for i, _, _ in people], trip.ends_on)
     return TripDetailOut(
         **summary.model_dump(),
-        travellers=[TravellerOut(id=i, full_name=n, person_type=p) for i, n, p in travellers],
+        travellers=[TravellerOut(id=i, full_name=n, person_type=p) for i, n, p in people],
         segments=[_segment_out(s, tracked, masked) for s in segments],
         country_risk=country_risk,
+        document_warnings=[
+            DocumentWarningOut(
+                person_id=w.person_id, full_name=w.full_name, valid_until=w.valid_until
+            )
+            for w in warnings
+        ],
     )
 
 
