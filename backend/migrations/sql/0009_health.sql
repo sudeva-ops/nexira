@@ -60,11 +60,13 @@ BEGIN
     NEW.updated_at := now();
     RETURN NEW;
   END IF;
-  -- INSERT: an advisory starts open; published no later than now.
+  -- INSERT: an advisory starts open; published no later than now, with 10 minutes for
+  -- clock drift between the feed and the database (as intel's FUTURE_TOLERANCE). The
+  -- statement's clock, not the transaction's (the lesson of Prompt 54, L2).
   IF NEW.status <> 'OPEN' THEN
     RAISE EXCEPTION 'health advisory: an advisory starts open';
   END IF;
-  IF NEW.published_at > now() + interval '10 minutes' THEN
+  IF NEW.published_at > clock_timestamp() + interval '10 minutes' THEN
     RAISE EXCEPTION 'health advisory: published in the future';
   END IF;
   NEW.updated_at := now();
@@ -87,7 +89,9 @@ CREATE TABLE medical_facility (
                   AND array_position(capabilities, NULL) IS NULL
                   AND capabilities <@ ARRAY['EMERGENCY','TRAUMA','ICU','SURGERY','HELIPAD',
                                             'PHARMACY','OUTPATIENT','MATERNITY','PAEDIATRIC']),
-  trauma_level  smallint CHECK (trauma_level BETWEEN 1 AND 3),
+  -- A trauma level only for a facility that takes trauma (review of Prompt 60, L3).
+  trauma_level  smallint CHECK (trauma_level IS NULL
+                                OR (trauma_level BETWEEN 1 AND 3 AND 'TRAUMA' = ANY(capabilities))),
   open_24_7     boolean NOT NULL,
   vetted_by     uuid REFERENCES partner(id),
   source        text NOT NULL DEFAULT 'Sample facility (simulated)'
@@ -103,9 +107,14 @@ CREATE POLICY tenant_isolation ON medical_facility
 GRANT SELECT, INSERT ON medical_facility TO nexira_app;
 
 -- Foreign keys ignore RLS, so the mission's and partner's tenant are checked here (the
--- lesson of Prompts 24 and 29). INSERT only, as the grants.
+-- lesson of Prompts 24 and 29). Seeded and never changed: an UPDATE is refused for every
+-- role, the owner included, so no row can be pointed at another tenant's mission or
+-- partner (review of Prompt 60, L1).
 CREATE FUNCTION medical_facility_guard() RETURNS trigger AS $$
 BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    RAISE EXCEPTION 'medical facility: seeded facilities are not changed';
+  END IF;
   PERFORM 1 FROM mission m WHERE m.id = NEW.mission_id AND m.tenant_id = NEW.tenant_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'medical facility: no such mission';
@@ -120,7 +129,7 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
-CREATE TRIGGER medical_facility_guard BEFORE INSERT ON medical_facility
+CREATE TRIGGER medical_facility_guard BEFORE INSERT OR UPDATE ON medical_facility
   FOR EACH ROW EXECUTE FUNCTION medical_facility_guard();
 
 -- PC-28 · entry and vaccination requirements per country (HL-03). Illustrative (D-19).
@@ -164,12 +173,16 @@ CREATE POLICY tenant_isolation ON mission_health_readiness
 GRANT SELECT, INSERT ON mission_health_readiness TO nexira_app;
 
 -- The mission's tenant (as above), and each vaccine count a whole number from 0 to staff,
--- keyed by a topic code (plan-pilot-hl.md §5, §12). INSERT only, as the grants.
+-- keyed by a topic code (plan-pilot-hl.md §5, §12). Seeded and never changed: an UPDATE
+-- is refused for every role, the owner included (review of Prompt 60, L1).
 CREATE FUNCTION mission_health_readiness_guard() RETURNS trigger AS $$
 DECLARE
   k  text;
   v  jsonb;
 BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    RAISE EXCEPTION 'health readiness: seeded counts are not changed';
+  END IF;
   PERFORM 1 FROM mission m WHERE m.id = NEW.mission_id AND m.tenant_id = NEW.tenant_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'health readiness: no such mission';
@@ -194,5 +207,5 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
-CREATE TRIGGER mission_health_readiness_guard BEFORE INSERT ON mission_health_readiness
+CREATE TRIGGER mission_health_readiness_guard BEFORE INSERT OR UPDATE ON mission_health_readiness
   FOR EACH ROW EXECUTE FUNCTION mission_health_readiness_guard();

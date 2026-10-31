@@ -37,8 +37,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Drops the health data: simulated and illustrative, reseeded (D-39). The HA reference
-    # counter rows stay, as other modules' counters do.
+    # Drops the health data: simulated and illustrative, reseeded (D-39). Rows that
+    # next_reference('HA') wrote at runtime stay in reference_counter, as other modules' do.
     _execute_script(
         """
         DROP TABLE mission_health_readiness;

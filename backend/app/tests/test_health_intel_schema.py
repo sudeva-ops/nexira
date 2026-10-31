@@ -197,6 +197,8 @@ async def test_an_advisory_starts_open_and_not_in_the_future(
         {"countries": []},
         {"countries": ["ke"]},
         {"countries": ["KE", None]},
+        {"countries": [["KE"], ["UG"]]},  # one dimension only (review of Prompt 44, M1)
+        {"countries": [f"{chr(65 + n // 26)}{chr(65 + n % 26)}" for n in range(61)]},
         {"reference": "HA-1"},
         {"guidance": ""},
         {"guidance": "x" * 501},
@@ -260,7 +262,10 @@ async def test_a_facility_belongs_to_a_mission_and_partner_of_its_tenant(
         {"capabilities": ["SPA"]},
         {"capabilities": []},
         {"capabilities": ["EMERGENCY", None]},
+        {"capabilities": [["EMERGENCY"], ["ICU"]]},
+        {"capabilities": ["EMERGENCY"] * 11},
         {"trauma_level": 4},
+        {"capabilities": ["EMERGENCY"], "trauma_level": 1},  # a level needs TRAUMA (review L3)
         {"name": ""},
     ],
 )
@@ -315,6 +320,7 @@ async def test_readiness_holds_counts_for_a_mission_of_its_tenant(
         {"insurance_active": -1},
         {"trauma_kits": -1},
         {"staff": -1, "vaccines_offered": "{}"},  # the guard reads vaccines before CHECKs
+        {"staff": 10_001, "vaccines_offered": "{}"},
     ],
 )
 async def test_readiness_counts_stay_within_the_staff(
@@ -334,6 +340,10 @@ async def test_readiness_counts_stay_within_the_staff(
         {"cholera": 9},
         {f"TOPIC_{n}": 1 for n in range(21)},
         ["CHOLERA"],  # not an object
+        {"CHOLERA": None},
+        {"": 1},
+        {"CHOLERA": 9.0},  # a count is written as a whole number
+        {"CHOLERA": 10**30},
     ],
 )
 async def test_each_vaccine_count_is_a_whole_number_up_to_the_staff(
@@ -357,3 +367,77 @@ async def test_seeded_tables_are_never_changed_or_deleted_by_the_app(
     for stmt in (f"UPDATE {table} SET source = source", f"DELETE FROM {table}"):
         with pytest.raises(DENIED):
             await api_tenant.execute(stmt)
+
+
+async def test_a_whole_number_in_exponent_form_is_a_count(api_tenant: asyncpg.Connection) -> None:
+    """jsonb stores 1e1 as 10: a whole number within the staff (review of Prompt 60, L4)."""
+    mission_id = await mission(api_tenant)
+    await readiness(api_tenant, mission_id, vaccines_offered='{"CHOLERA": 1e1}')
+    stored = await api_tenant.fetchval(
+        "SELECT vaccines_offered->>'CHOLERA' FROM mission_health_readiness WHERE mission_id = $1",
+        mission_id,
+    )
+    assert stored == "10"
+
+
+async def test_a_missing_vaccines_document_is_refused(api_tenant: asyncpg.Connection) -> None:
+    with pytest.raises(REFUSED, match="object of counts"):
+        await readiness(api_tenant, await mission(api_tenant), vaccines_offered=None)
+
+
+async def test_seeded_rows_are_not_changed_even_by_the_owner(
+    db: DbUrls, api_tenant: asyncpg.Connection, owner: asyncpg.Connection
+) -> None:
+    """No row can be pointed at another tenant's mission or partner (review L1)."""
+    mission_id = await mission(api_tenant)
+    await facility(api_tenant, mission_id)
+    await readiness(api_tenant, mission_id)
+    other = await create_tenant(db, "Elsewhere")
+    elsewhere = await asyncpg.connect(db.owner_plain)
+    try:
+        await set_tenant(elsewhere, other)
+        foreign = await mission(elsewhere, "ELS")
+    finally:
+        await elsewhere.close()
+    with pytest.raises(REFUSED, match="seeded facilities are not changed"):
+        await owner.execute("UPDATE medical_facility SET mission_id = $1", foreign)
+    with pytest.raises(REFUSED, match="seeded counts are not changed"):
+        await owner.execute("UPDATE mission_health_readiness SET trauma_kits = 7")
+
+
+async def test_an_open_advisory_update_is_dated_and_identity_is_fixed(
+    api_tenant: asyncpg.Connection, owner: asyncpg.Connection
+) -> None:
+    advisory_id = await advisory(api_tenant)
+    before = await api_tenant.fetchval(
+        "SELECT updated_at FROM health_advisory WHERE id = $1", advisory_id
+    )
+    await owner.execute("UPDATE health_advisory SET level = 'CRITICAL' WHERE id = $1", advisory_id)
+    await owner.execute("UPDATE health_advisory SET status = 'OPEN' WHERE id = $1", advisory_id)
+    after = await api_tenant.fetchval(
+        "SELECT updated_at FROM health_advisory WHERE id = $1", advisory_id
+    )
+    assert after >= before
+    with pytest.raises(REFUSED, match="what it is about is fixed"):
+        await owner.execute(
+            "UPDATE health_advisory SET id = gen_random_uuid() WHERE id = $1", advisory_id
+        )
+
+
+@pytest.mark.parametrize(("minutes", "allowed"), [(9, True), (11, False)])
+async def test_a_bulletin_may_be_dated_up_to_ten_minutes_ahead(
+    api_tenant: asyncpg.Connection, minutes: int, allowed: bool
+) -> None:
+    """Clock drift between the feed and the database, against the database's clock."""
+    insert = (
+        "INSERT INTO health_advisory (tenant_id, reference, external_id, topic, topic_code, "
+        "countries, region_label, level, guidance, source, published_at) VALUES "
+        "(current_tenant_id(), $1, $2, 'Cholera', 'CHOLERA', '{KE}', 'Kenya', 'LOW', 'g', 's', "
+        "now() + make_interval(mins => $3))"
+    )
+    args = (f"HA-{minutes:04d}", f"drift:{minutes}", minutes)
+    if allowed:
+        await api_tenant.execute(insert, *args)
+    else:
+        with pytest.raises(REFUSED, match="published in the future"):
+            await api_tenant.execute(insert, *args)
