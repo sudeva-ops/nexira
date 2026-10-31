@@ -123,6 +123,16 @@ ROWS: dict[str, str] = {
     "issuing_country, valid_until) VALUES ('{t}', '{person}', 'PASSPORT', 'KE', current_date)",
     "mission_climate_risk": "INSERT INTO mission_climate_risk (tenant_id, mission_id, hazards, "
     "score_today, score_2050, scenario) VALUES ('{t}', '{mission}', '{{FLOOD}}', 40, 60, 'x')",
+    "health_advisory": "INSERT INTO health_advisory (tenant_id, reference, external_id, topic, "
+    "topic_code, countries, region_label, level, guidance, source, published_at) VALUES ('{t}', "
+    "'HA-0001', 'x', 'Cholera', 'CHOLERA', '{{KE}}', 'Kenya', 'MODERATE', 'g', 's', now())",
+    "medical_facility": "INSERT INTO medical_facility (tenant_id, mission_id, name, location, "
+    "capabilities, open_24_7) VALUES ('{t}', '{mission}', 'F', " + PT + ", '{{EMERGENCY}}', true)",
+    "country_health_requirement": "INSERT INTO country_health_requirement (tenant_id, "
+    "country_code, mandatory, recommended) VALUES ('{t}', 'KE', 'm', 'r')",
+    "mission_health_readiness": "INSERT INTO mission_health_readiness (tenant_id, mission_id, "
+    "staff, blood_type_on_file, insurance_active, trauma_kits, as_of) VALUES ('{t}', "
+    "'{mission}', 10, 10, 10, 2, current_date)",
     "partner_request": "INSERT INTO partner_request (tenant_id, reference, partner_id, service, "
     "mission_id, created_by_type, created_by) VALUES ('{t}', 'REQ-1', '{partner}', 'MEDICAL', "
     "'{mission}', 'USER', 'u')",
@@ -156,6 +166,10 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "partner_request",  # UPDATE of status and ETA only, never DELETE (PC-22; review of Prompt 44)
     "travel_document",  # UPDATE of the renewal only, never DELETE (PC-23)
     "mission_climate_risk",  # seeded reference data; no UPDATE or DELETE in the pilot (PC-25)
+    "health_advisory",  # UPDATE of level, guidance, status and updated_at only, no DELETE (PC-26)
+    "medical_facility",  # seeded; no UPDATE or DELETE in the pilot (PC-27)
+    "country_health_requirement",  # seeded; no UPDATE or DELETE in the pilot (PC-28)
+    "mission_health_readiness",  # seeded counts; no UPDATE or DELETE in the pilot (PC-29)
 }
 NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELETE)
     "message_template",
@@ -299,6 +313,7 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
             r"row-level security|trip: no such trip|flight: no such flight"
             r"|weather: no such mission|partner request: no such partner"
             r"|travel document: no such person|climate risk: no such mission"
+            r"|medical facility: no such mission|health readiness: no such mission"
         ),
     ):
         await api.execute(sql_for(table, world.a))

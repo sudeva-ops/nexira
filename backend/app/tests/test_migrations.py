@@ -57,9 +57,9 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     upgraded = asyncio.run(_snapshot(admin))
     # The schema's 33 tables, message_template (0002), trip_segment and country_risk
     # (0003), airport, flight and flight_event (0004), weather_current (0005), partner and
-    # partner_request (0006), travel_document (0007), mission_climate_risk (0008), and
-    # alembic_version.
-    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 1
+    # partner_request (0006), travel_document (0007), mission_climate_risk (0008), the four
+    # health tables (0009), and alembic_version.
+    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 1
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
 
@@ -589,13 +589,99 @@ def test_downgrading_0008_refuses_while_a_run_is_armed(fresh: DbUrls) -> None:
         finally:
             await conn.close()
 
-    at_head = asyncio.run(_hazard_shape(admin))
+    # One transaction per migration (migrations/env.py): step down to 0008 first, so the
+    # refused step is the only one taken.
+    command.downgrade(cfg, "0008")
+    at_0008 = asyncio.run(_hazard_shape(admin))
     asyncio.run(arm())
     try:
         with pytest.raises(Exception, match="playbook_run_status_check"):
             command.downgrade(cfg, "0007")
-        assert asyncio.run(_hazard_shape(admin)) == at_head  # rolled back, nothing dropped
+        assert asyncio.run(_hazard_shape(admin)) == at_0008  # rolled back, nothing dropped
     finally:
         asyncio.run(clean())
     command.downgrade(cfg, "0007")
+    command.upgrade(cfg, "head")
+
+
+HEALTH_TABLES = (
+    "country_health_requirement",
+    "health_advisory",
+    "medical_facility",
+    "mission_health_readiness",
+)
+
+
+async def _health_shape(admin_url: str) -> dict[str, object]:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        tables = await conn.fetch(
+            "SELECT relname, relforcerowsecurity, relacl::text AS acl FROM pg_class "
+            "WHERE relname = ANY($1::text[]) AND relkind = 'r' ORDER BY relname",
+            list(HEALTH_TABLES),
+        )
+        columns = await conn.fetch(
+            "SELECT column_name, privilege_type FROM information_schema.column_privileges "
+            "WHERE table_name = 'health_advisory' AND grantee = 'nexira_app' "
+            "AND privilege_type = 'UPDATE' ORDER BY column_name"
+        )
+        search_paths = await conn.fetch(
+            "SELECT proname, proconfig::text AS config FROM pg_proc "
+            "WHERE proname LIKE '%health%guard' OR proname = 'medical_facility_guard' "
+            "ORDER BY proname"
+        )
+        policies = await conn.fetchval(
+            "SELECT count(*) FROM pg_policies WHERE tablename = ANY($1::text[])",
+            list(HEALTH_TABLES),
+        )
+        # Everything in public, so a leftover of 0009 shows (review of Prompt 49, L4).
+        public = await conn.fetchrow(
+            "SELECT (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "        WHERE n.nspname = 'public') AS relations, "
+            "       (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace "
+            "        WHERE n.nspname = 'public') AS functions, "
+            "       (SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal) AS triggers, "
+            "       (SELECT count(*) FROM pg_policy) AS policies"
+        )
+    finally:
+        await conn.close()
+    return {
+        "tables": [tuple(t) for t in tables],
+        "columns": [c["column_name"] for c in columns],
+        "search_paths": [tuple(f) for f in search_paths],
+        "policies": policies,
+        "public": tuple(public or ()),
+    }
+
+
+def test_downgrading_0009_restores_0008_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0008")
+    at_0008 = asyncio.run(_health_shape(admin))
+    at_0008_hazards = asyncio.run(_hazard_shape(admin))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_health_shape(admin))
+    command.downgrade(cfg, "0008")
+    assert asyncio.run(_health_shape(admin)) == at_0008
+    assert asyncio.run(_hazard_shape(admin)) == at_0008_hazards
+    assert at_0008["tables"] == []
+    # PC-26..29: FORCE RLS; read and added by the app; the backup role reads them.
+    seeded = (
+        "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+        "nexira_app=ar/nexira_owner}"
+    )
+    assert at_head["tables"] == [(table, True, seeded) for table in HEALTH_TABLES]
+    # PC-26: a newer bulletin moves only these columns.
+    assert at_head["columns"] == ["guidance", "level", "status", "updated_at"]
+    assert at_head["policies"] == 4
+    assert at_head["search_paths"] == [
+        (name, '{"search_path=pg_catalog, public, pg_temp"}')
+        for name in (
+            "health_advisory_guard",
+            "medical_facility_guard",
+            "mission_health_readiness_guard",
+        )
+    ]
     command.upgrade(cfg, "head")

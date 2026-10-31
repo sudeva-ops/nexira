@@ -6,6 +6,12 @@ from app.modules.audit.models import AuditLog
 from app.modules.checkin.models import CheckinResponse
 from app.modules.documents.models import TravelDocument
 from app.modules.hazards.models import MissionClimateRisk
+from app.modules.health_intel.models import (
+    CountryHealthRequirement,
+    HealthAdvisory,
+    MedicalFacility,
+    MissionHealthReadiness,
+)
 from app.modules.intel.models import (
     Incident,
     IncidentEvent,
@@ -37,14 +43,18 @@ __all__ = [
     "AuditLog",
     "Base",
     "CheckinResponse",
+    "CountryHealthRequirement",
+    "HealthAdvisory",
     "Incident",
     "IncidentEvent",
     "IncidentExposure",
     "IncidentSignal",
     "IntelSource",
     "LocationObservation",
+    "MedicalFacility",
     "Mission",
     "MissionClimateRisk",
+    "MissionHealthReadiness",
     "NotificationCampaign",
     "NotificationDelivery",
     "Partner",
