@@ -84,7 +84,8 @@ test("Weather acceptance: conditions, a Manila storm, PB-06 approved, the trip i
   const page = await signedIn(browser, "duty.officer", "/operations");
   const panel = page.getByRole("table", { name: "Weather at missions" });
   await expect(panel.getByRole("row")).toHaveCount(36);
-  await expect(page.getByText("xWeather (simulated)")).toBeVisible();
+  // The panel's own label; hazard incidents (hz-acceptance, run earlier) carry the same source chip.
+  await expect(page.locator(".nx-card-sub", { hasText: "xWeather (simulated)" })).toBeVisible();
   await expect(page.getByTestId("weather-marker-MNL")).toBeAttached();
 
   // --- 1. Building: Manila worsens, played from the presenter bar (WX-07) ------------------

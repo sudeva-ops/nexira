@@ -244,8 +244,8 @@ function ClimateCard({ rows, loading }: { rows: ClimateRisk[]; loading: boolean 
         </table>
       )}
       <div className="nx-bd nx-dim">
-        {rows[0]?.scenario ?? "Illustrative climate model (simulated)"}. For site selection, lease renewals and
-        continuity planning; shown, not acted on.
+        Illustrative climate model (simulated){rows[0] && ` · ${rows[0].scenario}`}. For site selection, lease
+        renewals and continuity planning; shown, not acted on.
       </div>
     </Card>
   );
