@@ -145,10 +145,10 @@ Only as approved in PC-24 and PC-25 (and G-2, G-8 if approved):
 - `mission_climate_risk` as PC-25: FORCE RLS, `tenant_isolation`, SELECT and INSERT for `nexira_app`, no UPDATE or DELETE; CHECKs on the scores and a non-empty `hazards`; a guard refusing a mission not visible in its own tenant (the lesson of Prompts 24 and 29).
 - `nexira_backup` reads the new table through the default privileges; the downgrade restores 0007 exactly (a SCHEDULED or DISARMED row blocks the downgrade with a clear error rather than being rewritten).
 
-## 12. Decisions needed from the product owner
+## 12. Decisions by the product owner (2026-10-31, PR #64: "approved")
 
-- **G-1:** arming uses the same roles as starting a playbook (Security Officer, Duty Officer), and HZ-10 / §43 Q5 are corrected; a Head of Mission does not arm.
-- **G-8:** PC-24 is amended so the live-run index covers SCHEDULED.
-- **G-9:** the demo clock (`DEMO_CLOCK`, hazard countdown and armed runs only), or the simpler `ARMED_RUNS_DUE`.
+- **G-1:** arming, starting an armed run and disarming use `START_ROLES` (Security Officer, Duty Officer); HZ-10 and §43 Q5 corrected. A Head of Mission does not arm.
+- **G-8:** PC-24 amended: `playbook_run_live_uq` covers SCHEDULED (with G-2, the guard sets `started_at`).
+- **G-9:** the demo clock (`DEMO_CLOCK`; the hazard countdown and armed runs only, while a demo runs).
 
-The rest follows from D-38 and the defaults in §43. G-3 (longer fusion windows for cyclones and air quality) and G-7 (a late approval starts the run at once) are worth a look.
+G-2..G-7 and G-10..G-12 as proposed.
