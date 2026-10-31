@@ -10,6 +10,7 @@ from app.core.db import get_engine, verify_connection_role
 from app.core.events import Publisher, RedisPublisher, StreamConsumer, get_redis
 from app.modules.agents.runner import agents_handler, observed_types
 from app.modules.checkin.consumer import clock_handler, response_handler
+from app.modules.hazards import consumer as hazards
 from app.modules.intel.consumer import exposure_handler, raw_signal_handler
 from app.modules.notifications.consumer import campaign_handler, tick
 from app.modules.partners import service as partners
@@ -23,6 +24,7 @@ TICK_EVERY_S = 2  # dispatch leftovers, delivery receipts, check-in escalation
 FLIGHTS_EVERY_S = 5  # the simulated flight tracker (D-33)
 WEATHER_EVERY_S = 15 * 60  # the simulated weather feed (WX §28 Q2)
 PARTNERS_EVERY_S = 2  # the simulated partners answer requests (AS-04, plan G-8)
+ARMED_EVERY_S = 30  # armed playbook runs that are due (HZ-05, plan-pilot-hz §4)
 
 log = logging.getLogger("app.workers")
 
@@ -89,6 +91,21 @@ async def partners_loop(
             except Exception:
                 log.exception("partner tick failed for %s", tenant_id)
         await asyncio.sleep(PARTNERS_EVERY_S)
+
+
+async def armed_loop(
+    engine: AsyncEngine, publisher: Publisher, tenant_ids: list[uuid.UUID]
+) -> None:
+    """From start, so a run that came due while the worker was down starts at once."""
+    while True:
+        for tenant_id in tenant_ids:
+            try:
+                started = await hazards.tick(engine, tenant_id, publisher)
+                if started:
+                    log.info("armed playbook runs started or disarmed: %d", started)
+            except Exception:
+                log.exception("armed runs tick failed for %s", tenant_id)
+        await asyncio.sleep(ARMED_EVERY_S)
 
 
 async def main() -> None:
@@ -159,10 +176,16 @@ async def main() -> None:
                 "CHECKIN_CLOCK": clock_handler(engine, publisher),
             },
         ),
+        StreamConsumer(
+            client,
+            group="hazards",
+            consumer=name,
+            handlers={"DEMO_CLOCK": hazards.clock_handler(engine, publisher)},
+        ),
     ]
     log.info(
         "consumers started: intel, exposure, playbooks, notifications, agents, flights, weather, "
-        "checkin"
+        "checkin, hazards"
     )
     try:
         async with asyncio.TaskGroup() as tasks:
@@ -175,6 +198,7 @@ async def main() -> None:
             tasks.create_task(flights_loop(engine, publisher, tenant_ids))
             tasks.create_task(weather_loop(engine, publisher, tenant_ids))
             tasks.create_task(partners_loop(engine, publisher, tenant_ids, partner_adapter))
+            tasks.create_task(armed_loop(engine, publisher, tenant_ids))
     finally:
         await client.aclose()
         await engine.dispose()

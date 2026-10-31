@@ -3,9 +3,9 @@ normalisation and fusion of raw signals (Prompt 6, INC-01..04)."""
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select
@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import audit
 from app.core.events import Event
+from app.modules.intel import hazards
 from app.modules.intel.fusion import Fused, fuse
 from app.modules.intel.models import Incident, IncidentEvent, IntelSource, RawSignal
 from app.modules.intel.normalise import normalise
@@ -93,6 +94,8 @@ class RawSignalIn(BaseModel):
     lon: float | None = Field(default=None, ge=-180, le=180)
     place_label: str | None = None
     occurred_at: datetime | None = None  # defaults to the event envelope's time
+    # D-38: a natural hazard's measure (hazards.MEASURED); validated by the normaliser.
+    hazard: dict[str, Any] | None = None
 
 
 Outcome = Literal["REJECTED", "DUPLICATE", "DISCARDED", "NORMALISED", "FUSED"]
@@ -150,8 +153,17 @@ async def ingest_signal(session: AsyncSession, event: Event, actor: Actor = FUSI
         provider_category=item.provider_category,
         provider_severity=item.provider_severity,
         has_location=has_location,
+        payload=event.payload,
     )
     reason = "source disabled" if not source.is_enabled else result.reason  # D-09
+    # The newest signal decides a hazard's details, so a future-dated one would fix them
+    # for good (review of Prompt 55, L8).
+    if (
+        reason is None
+        and result.category in hazards.HAZARD_CATEGORIES
+        and signal.occurred_at > datetime.now(UTC) + hazards.FUTURE_TOLERANCE
+    ):
+        reason = "occurred in the future"
     signal.norm_category = result.category
     signal.norm_severity = result.severity
     signal.norm_status = "DISCARDED" if reason else "NORMALISED"

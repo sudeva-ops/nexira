@@ -137,6 +137,10 @@ The background events arrive with scene 1, not with `make reset-demo`, so the Ph
 
 **G-12 · Cyclone weakening.** Severity never falls by itself in the pipeline today. **Proposal:** keep that; scene 5's weaker forecast updates the countdown and measure, and a person sets the incident to MONITORING.
 
+**G-13 · D-11 raises a cyclone over Dhaka to CRITICAL (found in Prompt 55, needs a decision).** A protected mission site (the chancery) inside a HIGH cyclone's 150 km makes it CRITICAL by D-11 step 3, as for any incident. §42 says the Dhaka forecast "becomes a HIGH TROPICAL_CYCLONE incident". **Proposal:** keep D-11 (one rule for every incident); §42 reads "HIGH (CRITICAL with the D-11 raise)". The arming rule takes HIGH or CRITICAL, so nothing else changes.
+
+**Review of Prompt 55 (fixed, with tests):** the ARM_PLAYBOOK payload carries the landfall the approvers read, and arming is refused if the forecast has moved by an hour or more (M1); DEMO_CLOCK events take a per-tenant lock (M2); the demo clock's advance counts only for runs armed during that demo, so a real armed run is never brought forward (M3); each due run starts in its own savepoint, so one failure does not stop the others (M4); roles are checked before the run is locked; a 5 s margin before "start at once"; arming after landfall is refused; a hazard signal dated more than 10 min ahead is discarded; lateness is real time only.
+
 ## 11. Migration 0008 (Prompt 54, 🔒)
 
 Only as approved in PC-24 and PC-25 (and G-2, G-8 if approved):

@@ -185,6 +185,7 @@ async def test_sources_playbook_agents_and_counters(seeded: Seeded) -> None:
     assert "ADVISE_REBOOKING" not in policies  # advice only (D-12)
     assert policies["START_DOCUMENT_RENEWAL"] == (2, ["CONSULAR_OFFICER|DUTY_OFFICER"], False)
     assert "ADVISE_EMERGENCY_DOCUMENTS" not in policies
+    assert policies["ARM_PLAYBOOK"] == (2, ["SECURITY_OFFICER|DUTY_OFFICER"], False)  # D-38
     deadlines = await c.fetch(
         "SELECT decision_deadline_s FROM action_policy "
         "WHERE action_type IN ('NOTIFY_TRAVELLERS', 'CANCEL_TRIP', 'START_DOCUMENT_RENEWAL')"

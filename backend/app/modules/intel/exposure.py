@@ -18,8 +18,9 @@ Then, on the same incident row:
   exposed (D-06: then only unscoped HQ roles can approve).
 - severity = signal_severity, raised one level (at most CRITICAL) when a
   protected site (EMBASSY, CONSULATE, RESIDENCE) is exposed and signal_severity
-  >= HIGH (D-11 step 3). An ESCALATED timeline event is written when the raise
-  first applies.
+  >= HIGH (D-11 step 3). A WILDFIRE (MODERATE) becomes HIGH when a mission site
+  (not a hotel) is inside its 20 km (plan-pilot-hz G-4). An ESCALATED timeline event is
+  written when a raise first applies.
 """
 
 import uuid
@@ -129,8 +130,12 @@ class Computed:
     escalated: bool  # the D-11 raise applied in this computation for the first time
 
 
-def escalated_severity(signal_severity: str, protected_site_exposed: bool) -> str:
-    """D-11 step 3."""
+def escalated_severity(
+    signal_severity: str, protected_site_exposed: bool, *, wildfire_near_mission: bool = False
+) -> str:
+    """D-11 step 3; and a wildfire near a mission is at least HIGH (plan-pilot-hz G-4)."""
+    if wildfire_near_mission and severity_rank(signal_severity) < severity_rank("HIGH"):
+        return "HIGH"
     if protected_site_exposed and severity_rank(signal_severity) >= severity_rank("HIGH"):
         return SEVERITIES[min(severity_rank(signal_severity), len(SEVERITIES) - 1)]
     return signal_severity
@@ -163,7 +168,10 @@ async def compute(
         {"incident_id": incident_id},
     )
     was_escalated = severity_rank(incident.severity) > severity_rank(incident.signal_severity)
-    incident.severity = escalated_severity(incident.signal_severity, counts.protected_sites > 0)
+    wildfire = incident.category == "WILDFIRE" and counts.mission_sites > 0
+    incident.severity = escalated_severity(
+        incident.signal_severity, counts.protected_sites > 0, wildfire_near_mission=wildfire
+    )
     escalated = incident.severity != incident.signal_severity and not was_escalated
 
     if counts != previous:
@@ -173,8 +181,12 @@ async def compute(
             session,
             incident,
             "ESCALATED",
-            f"Severity {incident.signal_severity} → {incident.severity}: protected mission "
-            "site in the impact zone (D-11).",
+            f"Severity {incident.signal_severity} → {incident.severity}: "
+            + (
+                "wildfire within 20 km of a mission site (plan-pilot-hz G-4)."
+                if wildfire
+                else "protected mission site in the impact zone (D-11)."
+            ),
             {"from": incident.signal_severity, "to": incident.severity},
         )
     await session.flush()

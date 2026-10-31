@@ -3,11 +3,13 @@
 A normalised signal joins an ACTIVE incident when all of these hold:
 - same norm_category;
 - within the category's fusion distance of incident.location (the first signal's
-  location; it never moves): FUSION_RADIUS_M, or WEATHER_SIZES for weather (WX-04);
-- occurred_at within FUSION_WINDOW of incident.last_signal_at, either side;
+  location; it never moves): 3 km, or the weather and hazard sizes (WX-04, HZ-02);
+- occurred_at within the category's fusion window of incident.last_signal_at, either
+  side: 60 minutes, longer for slow hazards (plan-pilot-hz G-3);
 - the source takes part in fusion (checked by the caller, see service.py).
-Otherwise it opens a new incident, with the category's impact radius (5 km, or
-WEATHER_SIZES). If several incidents match, it joins the nearest.
+Otherwise it opens a new incident, with the category's impact radius (5 km, or the
+sizes in hazards.py; an earthquake's from its magnitude). If several incidents match,
+it joins the nearest.
 
 Fusion runs under a per-tenant transaction advisory lock, so two signals
 handled at the same time cannot both open an incident for the same event.
@@ -17,12 +19,15 @@ import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Any
 
 from sqlalchemy import func, literal, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import audit
+from app.modules.intel import hazards
+from app.modules.intel.hazards import WEATHER_SIZES as WEATHER_SIZES  # used by the weather tests
 from app.modules.intel.models import (
     Incident,
     IncidentEvent,
@@ -33,15 +38,13 @@ from app.modules.intel.models import (
 from app.modules.intel.normalise import max_severity, severity_rank
 from app.modules.tenancy.service import Actor
 
-FUSION_RADIUS_M = 3_000
-IMPACT_RADIUS_M = 5_000  # the schema default (incident.impact_radius_m)
-# WX §28 Q4 (plan-pilot-wx.md §3): impact radius = fusion distance for weather. Every other
-# category (CIVIL_UNREST, TRANSPORT_STRIKE, ...) keeps 3 km / 5 km, so D-23 does not move.
-WEATHER_SIZES = {"STORM": 60_000, "FLOOD": 25_000, "DUST_STORM": 40_000, "EXTREME_HEAT": 30_000}
-FUSION_WINDOW_MIN = 60
 MAX_CONFIDENCE = 99
 
-CATEGORY_LABELS = {"CIVIL_UNREST": "Civil unrest", "TRANSPORT_STRIKE": "Transport strike"}
+CATEGORY_LABELS = {
+    "CIVIL_UNREST": "Civil unrest",
+    "TRANSPORT_STRIKE": "Transport strike",
+    **hazards.CATEGORY_LABELS,
+}
 
 
 def confidence(reliabilities: Iterable[Decimal]) -> int:
@@ -59,12 +62,12 @@ def confidence(reliabilities: Iterable[Decimal]) -> int:
     return min(int(value), MAX_CONFIDENCE)
 
 
-def fusion_radius_m(category: str) -> int:
-    return WEATHER_SIZES.get(category, FUSION_RADIUS_M)
+def fusion_radius_m(category: str, payload: dict[str, Any] | None = None) -> int:
+    return hazards.fusion_radius_m(category, payload)
 
 
-def impact_radius_m(category: str) -> int:
-    return WEATHER_SIZES.get(category, IMPACT_RADIUS_M)
+def impact_radius_m(category: str, payload: dict[str, Any] | None = None) -> int:
+    return hazards.impact_radius_m(category, payload)
 
 
 def incident_title(category: str, place_label: str | None) -> str:
@@ -101,9 +104,11 @@ async def fuse(
         .where(
             Incident.status == "ACTIVE",
             Incident.category == RawSignal.norm_category,
-            func.ST_DWithin(Incident.location, RawSignal.location, fusion_radius_m(category)),
+            func.ST_DWithin(
+                Incident.location, RawSignal.location, fusion_radius_m(category, signal.payload)
+            ),
             func.abs(func.extract("epoch", RawSignal.occurred_at - Incident.last_signal_at))
-            <= FUSION_WINDOW_MIN * 60,
+            <= hazards.fusion_window_min(category) * 60,
         )
         .order_by(func.ST_Distance(Incident.location, RawSignal.location), Incident.opened_at)
         .limit(1)
@@ -167,7 +172,7 @@ async def _open(session: AsyncSession, signal: RawSignal, source: IntelSource) -
                     RawSignal.place_label,
                     RawSignal.occurred_at,
                     RawSignal.occurred_at,
-                    literal(impact_radius_m(category)),
+                    literal(impact_radius_m(category, signal.payload)),
                 ).where(RawSignal.id == signal.id),
             )
             .returning(Incident.id, Incident.reference)

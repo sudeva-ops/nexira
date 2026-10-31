@@ -38,16 +38,26 @@ class RunOut(BaseModel):
     playbook_name: str
     incident_id: uuid.UUID | None
     incident_reference: str | None
-    status: str  # RUNNING, AWAITING_APPROVAL, COMPLETED, CANCELLED, FAILED
+    # SCHEDULED (armed, PC-24), RUNNING, AWAITING_APPROVAL, COMPLETED, CANCELLED, FAILED,
+    # DISARMED
+    status: str
     started_by_type: str
     started_by_name: str | None
     proposal_id: uuid.UUID | None
     started_at: datetime
     completed_at: datetime | None
+    scheduled_for: datetime | None = None  # an armed run's start, on the hazard clock (G-9)
     steps: list[RunStepOut]
 
 
 class StartRunIn(BaseModel):
+    playbook_code: str
+    incident_id: uuid.UUID
+
+
+class ArmRunIn(BaseModel):
+    """HZ-05: arm a playbook for a cyclone forecast, 36 h before landfall (§43 Q4)."""
+
     playbook_code: str
     incident_id: uuid.UUID
 
@@ -76,3 +86,6 @@ class PermissionsOut(BaseModel):
     act_documents: bool = False  # documents: may renew and send reminders
     read_document_missions: list[uuid.UUID] | None = None  # None: every mission
     act_document_missions: list[uuid.UUID] | None = None  # None: every mission
+    arm_playbook: bool = False  # hazards: may arm a playbook for this incident (HZ-10, G-1)
+    start_armed: bool = False  # hazards: may start its armed run now
+    disarm: bool = False  # hazards: may disarm it

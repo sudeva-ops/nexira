@@ -4,6 +4,8 @@
 - Starting a run: DUTY_OFFICER or SECURITY_OFFICER, unscoped or for the
   incident's mission (D-05).
 - Approving a gated step: approvals.decide() only (D-16); 403 or 409 otherwise.
+- Arming a run, starting an armed run now and disarming it (HZ-05): the same roles as
+  starting (plan-pilot-hz G-1).
 """
 
 import logging
@@ -17,7 +19,7 @@ from app.core.approvals import require_roles
 from app.core.events import Event, Publisher, get_publisher
 from app.core.security import CurrentUser, current_user, get_db
 from app.modules.playbooks import queries, service
-from app.modules.playbooks.schemas import PlaybookOut, RunOut, StartRunIn
+from app.modules.playbooks.schemas import ArmRunIn, PlaybookOut, RunOut, StartRunIn
 from app.modules.tenancy.service import ROLES, Actor
 
 log = logging.getLogger(__name__)
@@ -50,7 +52,9 @@ async def list_runs(
     _user: Reader,
     session: Db,
     incident_id: uuid.UUID | None = None,
-    status: Literal["RUNNING", "AWAITING_APPROVAL", "COMPLETED", "CANCELLED", "FAILED"]
+    status: Literal[
+        "SCHEDULED", "RUNNING", "AWAITING_APPROVAL", "COMPLETED", "CANCELLED", "FAILED", "DISARMED"
+    ]
     | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> list[RunOut]:
@@ -100,3 +104,63 @@ async def approve_step(
     out = await queries.get_run(session, run.id)
     assert out is not None
     return out
+
+
+async def _out(session: AsyncSession, run_id: uuid.UUID) -> RunOut:
+    out = await queries.get_run(session, run_id)
+    assert out is not None
+    return out
+
+
+@router.post("/playbook-runs/arm", status_code=status.HTTP_201_CREATED)
+async def arm_run(body: ArmRunIn, user: User, session: Db, publisher: Pub) -> RunOut:
+    if not await service.may_arm(session, user, body.incident_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden")
+    try:
+        armed = await service.arm_run(
+            session,
+            playbook_code=body.playbook_code,
+            incident_id=body.incident_id,
+            actor=Actor(type="USER", id=str(user.id)),
+            started_by=user.id,
+        )
+    except service.RunNotAllowedError as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from None
+    await session.commit()
+    event = (
+        service.run_started_event(armed.run)
+        if armed.started_now
+        else service.run_armed_event(armed.run)
+    )
+    await _publish_after_commit(publisher, event)
+    return await _out(session, armed.run.id)
+
+
+@router.post("/playbook-runs/{run_id}/start-now")
+async def start_armed_now(run_id: uuid.UUID, user: User, session: Db, publisher: Pub) -> RunOut:
+    try:
+        run = await service.start_armed_now(session, user, run_id)
+    except service.StepNotFoundError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from None
+    except PermissionError:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden") from None
+    except service.RunStateError as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from None
+    await session.commit()
+    await _publish_after_commit(publisher, service.run_started_event(run))
+    return await _out(session, run.id)
+
+
+@router.post("/playbook-runs/{run_id}/disarm")
+async def disarm(run_id: uuid.UUID, user: User, session: Db, publisher: Pub) -> RunOut:
+    try:
+        run = await service.disarm(session, user, run_id)
+    except service.StepNotFoundError as e:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from None
+    except PermissionError:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Forbidden") from None
+    except service.RunStateError as e:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from None
+    await session.commit()
+    await _publish_after_commit(publisher, service.run_disarmed_event(run))
+    return await _out(session, run.id)

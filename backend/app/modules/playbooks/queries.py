@@ -70,6 +70,7 @@ async def _run_out(session: AsyncSession, run: PlaybookRun) -> RunOut:
         proposal_id=run.proposal_id,
         started_at=run.started_at,
         completed_at=run.completed_at,
+        scheduled_for=run.scheduled_for,
         steps=[
             RunStepOut(
                 **_step(step).model_dump(),
