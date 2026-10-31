@@ -15,6 +15,10 @@ def test_every_undoable_action_can_be_undone() -> None:
 
 
 def test_every_seeded_action_type_can_execute() -> None:
-    seeded = data.POLICIES + data.TRAVEL_POLICIES + data.DOCUMENT_POLICIES
+    seeded = data.POLICIES + data.TRAVEL_POLICIES + data.DOCUMENT_POLICIES + data.HAZARD_POLICIES
     assert {action for action, *_ in seeded} <= set(ACTIONS)
     assert not any(undoable for _a, _f, _r, undoable, _d in data.DOCUMENT_POLICIES)
+    # D-38: arming is never undone by the agent (a person disarms) and never Auto (§43 Q5).
+    assert data.HAZARD_POLICIES == [
+        ("ARM_PLAYBOOK", 2, ["SECURITY_OFFICER|DUTY_OFFICER"], False, 12 * 3600)
+    ]

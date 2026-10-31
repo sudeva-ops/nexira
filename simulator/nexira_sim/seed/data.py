@@ -722,6 +722,12 @@ TRAVEL_POLICIES: list[tuple[str, int, list[str], bool, int]] = [
 DOCUMENT_POLICIES: list[tuple[str, int, list[str], bool, int]] = [
     ("START_DOCUMENT_RENEWAL", 2, ["CONSULAR_OFFICER|DUTY_OFFICER"], False, 3600),
 ]
+# Natural hazards (D-38, plan-pilot-hz §6): arming a playbook ahead of a cyclone landfall.
+# Floor 2, so it can never be set to Auto (§43 Q5); decided within 12 h or it expires, so a
+# stale forecast is not armed by accident.
+HAZARD_POLICIES: list[tuple[str, int, list[str], bool, int]] = [
+    ("ARM_PLAYBOOK", 2, ["SECURITY_OFFICER|DUTY_OFFICER"], False, 12 * 3600),
+]
 
 # --- Document Expiry (D-37, plan-pilot-dx §8): simulated, never a document number ---------
 # The fictional ministry's home state issues its staff's passports: the home time zone

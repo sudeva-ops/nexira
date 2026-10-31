@@ -48,7 +48,7 @@ def _missions(scope: documents.Scope | None) -> list[uuid.UUID] | None:
 @router.get("/me/permissions")
 async def my_permissions(
     entity_type: Literal[
-        "playbook_run", "agent_proposal", "notification_campaign", "trip", "documents"
+        "playbook_run", "agent_proposal", "notification_campaign", "trip", "documents", "hazards"
     ],
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -83,6 +83,16 @@ async def my_permissions(
             submit_campaign=allowed.submit,
             approve_campaign=allowed.approve,
             cancel_campaign=allowed.cancel,
+        )
+    if entity_type == "hazards":
+        # HZ-10, G-1: the incident's arming actions, by the same checks as the endpoints.
+        arming = await playbooks.arming_permissions(session, user, entity_id)
+        return PermissionsOut(
+            entity_type=entity_type,
+            entity_id=str(entity_id),
+            arm_playbook=arming.arm,
+            start_armed=arming.start,
+            disarm=arming.disarm,
         )
     if entity_type == "trip":
         trip = await session.get(Trip, entity_id)

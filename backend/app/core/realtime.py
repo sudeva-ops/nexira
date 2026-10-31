@@ -62,6 +62,9 @@ FORWARDED = frozenset(
         "PLAYBOOK_RUN_UPDATED",
         "PLAYBOOK_STEP",
         "PLAYBOOK_STEP_APPROVED",
+        "PLAYBOOK_RUN_ARMED",  # an armed run created (HZ-05)
+        "PLAYBOOK_RUN_DISARMED",
+        "HAZARD_CLOCK_ADVANCED",  # the demo clock moved on (plan-pilot-hz G-9)
         "CAMPAIGN_QUEUED",
         "CAMPAIGN_UPDATED",
         "CHECKIN_UPDATED",

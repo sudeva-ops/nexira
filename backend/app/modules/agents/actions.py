@@ -3,8 +3,9 @@
 Each Phase 1 action type has a payload schema and an executor. Executors only
 call the service functions a logged-in user's request calls: incident notes,
 playbooks.start_run, notifications.create_campaign, for the Travel & Air agent
-(D-34) the trip audience of create_campaign and trips.cancel_by_agent, and for the
-Compliance agent (D-37) documents.renew_by_agent. Agents never
+(D-34) the trip audience of create_campaign and trips.cancel_by_agent, for the
+Compliance agent (D-37) documents.renew_by_agent, and for arming ahead of a cyclone
+landfall (D-38) playbooks.arm_run. Agents never
 reach channels, external systems or tables directly (AGENTS.md).
 
 An action type with no entry here can still be proposed: the database makes it
@@ -15,9 +16,16 @@ executed.
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -46,6 +54,17 @@ class NotePayload(_Payload):
 
 class StartPlaybookPayload(_Payload):
     playbook_code: str = Field(min_length=1)
+
+
+class ArmPlaybookPayload(_Payload):
+    """ARM_PLAYBOOK (D-38, HZ-06): start the playbook by itself 36 h before the forecast
+    landfall (§43 Q4); fixed in the pilot, so the approvers read what runs."""
+
+    playbook_code: str = Field(min_length=1)
+    hours_before_landfall: Literal[36] = 36
+    # The forecast landfall the approvers read; arming is refused if it has moved since
+    # (review of Prompt 55, M1). Timezone-aware only (review of Prompt 54, L7).
+    landfall_at: AwareDatetime
 
 
 class MessagePayload(_Payload):
@@ -163,6 +182,39 @@ async def _start_playbook(
         raise ActionError(str(e)) from None
     ctx.events.append(playbooks.run_started_event(run))
     return {"run_id": str(run.id), "playbook_code": payload.playbook_code}
+
+
+async def _arm_playbook(
+    session: AsyncSession, payload: ArmPlaybookPayload, ctx: Context
+) -> dict[str, Any]:
+    if ctx.incident_id is None:
+        raise ActionError("ARM_PLAYBOOK needs an incident")
+    try:
+        # The same service as POST /api/playbook-runs/arm.
+        armed = await playbooks.arm_run(
+            session,
+            playbook_code=payload.playbook_code,
+            incident_id=ctx.incident_id,
+            actor=ctx.agent_actor,
+            started_by=ctx.approved_by,
+            started_by_type="AGENT",
+            proposal_id=ctx.proposal_id,
+            hours_before_landfall=payload.hours_before_landfall,
+            expected_landfall=payload.landfall_at,
+        )
+    except playbooks.RunNotAllowedError as e:
+        raise ActionError(str(e)) from None
+    run = armed.run
+    ctx.events.append(
+        playbooks.run_started_event(run) if armed.started_now else playbooks.run_armed_event(run)
+    )
+    return {
+        "run_id": str(run.id),
+        "playbook_code": payload.playbook_code,
+        "status": run.status,
+        "scheduled_for": run.scheduled_for.isoformat() if run.scheduled_for else None,
+        "started_now": armed.started_now,
+    }
 
 
 async def _send_message(
@@ -295,6 +347,8 @@ ACTIONS: dict[str, Action] = {
     "LOG_INFO": Action(NotePayload, _note, _retract_note),
     "POST_INTERNAL_NOTE": Action(NotePayload, _note, _retract_note),
     "START_PLAYBOOK": Action(StartPlaybookPayload, _start_playbook),
+    # Response Planner, natural hazards (D-38). Not undoable: disarming is a person's.
+    "ARM_PLAYBOOK": Action(ArmPlaybookPayload, _arm_playbook),
     "SEND_EXTERNAL_MESSAGE": Action(MessagePayload, _send_message),
     # Test only (scene 5, plan G-16): no Phase 1 agent proposes it.
     "START_EVACUATION": Action(EvacuationPayload, _start_evacuation),
@@ -318,7 +372,7 @@ def validate(action_type: str, payload: dict[str, Any]) -> _Payload | None:
 
 
 # Action types an approver may edit, and the payload field the edit changes. Others
-# (START_PLAYBOOK, START_EVACUATION, unknown types) cannot be edited: use an
+# (START_PLAYBOOK, ARM_PLAYBOOK, START_EVACUATION, unknown types) cannot be edited: use an
 # alternative instead, so what the approvers read is always what runs.
 EDITABLE_FIELD = {
     "LOG_INFO": "text",
