@@ -20,6 +20,7 @@ from app.core.config import Settings, get_settings
 from app.core.events import Event, Publisher, get_publisher
 from app.core.security import CurrentUser, get_db
 from app.modules.documents import service as documents
+from app.modules.health_intel import service as health
 from app.modules.people.models import Person
 from app.modules.tenancy.models import AppUser
 from app.modules.tenancy.service import ROLES
@@ -167,6 +168,7 @@ async def trip_detail(session: AsyncSession, trip: Trip, user: CurrentUser) -> T
         travellers=[TravellerOut(id=i, full_name=n, person_type=p) for i, n, p in people],
         segments=[_segment_out(s, tracked, masked) for s in segments],
         country_risk=country_risk,
+        health_requirement=await health.requirement_for(session, trip.destination_country),
         document_warnings=[
             DocumentWarningOut(
                 person_id=w.person_id, full_name=w.full_name, valid_until=w.valid_until

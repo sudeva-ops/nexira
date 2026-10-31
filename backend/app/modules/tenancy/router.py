@@ -9,6 +9,7 @@ from app.core.security import CurrentUser, current_user, get_db
 from app.modules.agents import proposals
 from app.modules.agents.models import AgentProposal
 from app.modules.documents import service as documents
+from app.modules.health_intel import service as health
 from app.modules.notifications import compose
 from app.modules.notifications.models import NotificationCampaign
 from app.modules.playbooks import service as playbooks
@@ -48,7 +49,13 @@ def _missions(scope: documents.Scope | None) -> list[uuid.UUID] | None:
 @router.get("/me/permissions")
 async def my_permissions(
     entity_type: Literal[
-        "playbook_run", "agent_proposal", "notification_campaign", "trip", "documents", "hazards"
+        "playbook_run",
+        "agent_proposal",
+        "notification_campaign",
+        "trip",
+        "documents",
+        "hazards",
+        "health",
     ],
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -93,6 +100,13 @@ async def my_permissions(
             arm_playbook=arming.arm,
             start_armed=arming.start,
             disarm=arming.disarm,
+        )
+    if entity_type == "health":
+        # HL-06, HL-09: entity_id is the mission; the same check as the endpoint.
+        return PermissionsOut(
+            entity_type=entity_type,
+            entity_id=str(entity_id),
+            send_advisory=await health.send_permission(session, user, entity_id),
         )
     if entity_type == "trip":
         trip = await session.get(Trip, entity_id)

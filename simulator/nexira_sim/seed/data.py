@@ -886,6 +886,12 @@ DOCUMENT_POLICIES: list[tuple[str, int, list[str], bool, int]] = [
 HAZARD_POLICIES: list[tuple[str, int, list[str], bool, int]] = [
     ("ARM_PLAYBOOK", 2, ["SECURITY_OFFICER|DUTY_OFFICER"], False, 12 * 3600),
 ]
+# Health (D-39, plan-pilot-hl §7): the Communications agent's health advisory. Floor 2, so
+# it can never be set to Auto (§48 Q6); decided within 1 h, as the design. Approving creates
+# the campaign; a second person approves it before it is sent (G-2).
+HEALTH_POLICIES: list[tuple[str, int, list[str], bool, int]] = [
+    ("PREPARE_HEALTH_ADVISORY", 2, ["DUTY_OFFICER|CONSULAR_OFFICER"], False, 3600),
+]
 
 # --- Document Expiry (D-37, plan-pilot-dx §8): simulated, never a document number ---------
 # The fictional ministry's home state issues its staff's passports: the home time zone
