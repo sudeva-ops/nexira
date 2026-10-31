@@ -477,3 +477,65 @@ Playwright on the real stack: the Natural Hazards screen shows the hazard events
 8. **Demo:** a new scenario `DAC-CYCLONE`. The background events come with its scene 1 rather than with `make reset-demo`, so the Phase 1 scenario still starts with no active incidents. Dhaka keeps its 15 seeded staff. Three of their homes are placed in flood-prone wards, as the design. No new people are added, so the seeded totals stay as they are.
 9. **Screen:** "Natural Hazards & Climate" under MONITOR, as the design.
 10. **🔒 prompts:** the migration (PC-24 changes playbook-run rules; PC-25 adds RLS and grants), the arming action's executor and its policy (D-29) need your named sign-off, as before.
+
+---
+
+# Pilot module 9 · Health Intelligence (approved 2026-10-31, PR #70)
+
+For the product owner, who approves this part; then for the coding agent (Prompts 59–64 in `docs/prompts-pilot.md`). Rules: D-30, and **D-39**. Everything runs on **simulated health advisories, sample medical facilities and illustrative entry requirements**: no WHO, ministry or health-intelligence provider is called (AGENTS.md: no external URLs at runtime). A real feed later replaces only the simulated feed, after its terms of use are checked (master HLT-05).
+
+## 44. Purpose and starting point
+
+Know which disease outbreaks and health advisories affect the countries where we have missions and travellers, which vetted hospitals are near each mission (and which to avoid because they are inside an incident's impact zone), what each destination requires for entry, and how ready each mission's staff are. Then send a health advisory in a few clicks. Master spec §5.22, HLT-01..05; the design's Health Intelligence screen ("Health · WHO advisories, outbreaks & medical facilities") and its proactive cholera proposal.
+
+| Exists today | Where |
+|---|---|
+| Missions and their countries; people and their locations; trips with a destination country | `mission`, location engine, Journey Management |
+| Active incidents with an impact radius (PostGIS) | intel, exposure |
+| Mass Notification campaigns from per-mission templates; a second person for citizens (D-31) | notifications |
+| The Communications agent proposes citizen advisories (SEND_EXTERNAL_MESSAGE), approved by a person | agents |
+| Kestrel Medical Assistance, a simulated MEDICAL partner | Assistance Partners (D-36) |
+| No health advisories, medical facilities, entry requirements or health readiness; no health screen | — |
+
+## 45. Requirements: Health Intelligence (HL)
+
+| ID | Requirement | Master | Pri. | Acceptance |
+|---|---|---|---|---|
+| HL-01 | **Outbreak and health advisories.** A simulated feed publishes advisories ("WHO Disease Outbreak News (simulated)", a ministry bulletin, the medical partner): disease or topic, countries and a region label, level (LOW, MODERATE, HIGH, CRITICAL), published and updated times, and guidance for staff. A newer bulletin for the same advisory updates it; an advisory can be closed. Advisories are **country-level reference intelligence, not incidents** (§48 Q1). | HLT-01 | M | The screen lists the six seeded advisories, labelled simulated. |
+| HL-02 | **Which missions are affected.** An advisory affects every mission in its countries. Each mission shows its highest open advisory level. | HLT-01 | M | Cholera in Kenya shows "Affects Nairobi mission". |
+| HL-03 | **Entry and vaccination requirements by country.** Per country: mandatory requirements and recommended vaccinations (illustrative, labelled simulated). Shown for every mission country and, on the trip, for its destination. | HLT-02 | M | Kenya shows "Yellow fever certificate if arriving from risk country". |
+| HL-04 | **Medical facilities near each mission.** Sample facilities (fictional names, "(sample)") with location, capabilities (emergency, trauma level, ICU, surgery, helipad, pharmacy), 24/7 or not, and vetted by a partner. Listed by distance from the mission. A facility inside the impact radius of an ACTIVE incident is flagged **Avoid · inside impact zone**, computed by PostGIS, never stored. | HLT-03 | M | In NBO-CIVIL-UNREST, Nairobi Central Medical Centre shows "Avoid" while INC-…-1042 is ACTIVE. |
+| HL-05 | **Staff health readiness, counts only.** Per mission: staff count; blood type on file; medical insurance active; vaccines offered for the open advisories; trauma kits at the mission. **Counts only, no person-level health data** is stored or shown (§48 Q4). | HLT-04 | M | Nairobi shows "Cholera vaccine offered 9 / 17". |
+| HL-06 | **Send a health advisory.** From an advisory and a mission, anyone who may compose a Mass Notification campaign (DUTY_OFFICER, SECURITY_OFFICER, CONSULAR_OFFICER) creates a Mass Notification campaign from the mission's HEALTH_ADVISORY template. It then follows D-31: DRAFT, then sent, with a second person when citizens are in the audience. | HLT-04 | M | "Send health advisory to Nairobi" opens a draft for staff and citizens. |
+| HL-07 | **The Communications agent proposes it.** When an advisory becomes HIGH or CRITICAL for a mission's country, the agent proposes "Health advisory recommended for <city> staff and citizens", with evidence (advisory, level, vaccines offered) and the template text. Level **Approve**; a Duty Officer or Consular Officer decides; approving creates the campaign, which still needs its second person. One open proposal per advisory and mission. | — | M | In NBO-CHOLERA the proposal appears; approving it creates the draft campaign. |
+| HL-08 | **Health Intelligence screen.** KPIs from data: open advisories (and how many affect mission countries), missions with an advisory (by level), staff vaccinations due (offered, not yet given, counts), and vetted facilities. The advisories table (event, location, level, published, guidance, affected missions), entry requirements, facilities and readiness for a chosen mission (default: the most affected), and the send button from `GET /api/me/permissions`. Blueprint dark, as the design, under MONITOR. | — | M | — |
+| HL-09 | **Who sees what.** Every role, Viewer included, reads advisories, requirements, facilities and readiness counts. Sending as in HL-06. | — | M | A Viewer sees the screen with no send button. |
+| HL-10 | **A demo scenario** `NBO-CHOLERA`: scene 1 raises the seeded Kenya cholera advisory from MODERATE to HIGH (a newer simulated WHO bulletin); the Communications agent proposes the Nairobi advisory; scene 2 closes the dengue advisory. | — | M | Played from the presenter bar. |
+
+### Not in this module
+Real WHO, ministry or provider feeds; person-level health data of any kind (medical records, blood type, vaccination records per person); outbreak maps or case counts; health advisories raising country travel risk (they show on the trip, they do not change its risk); booking hospital appointments; any use of health data by an agent other than the counts above.
+
+## 46. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-26 · `health_advisory`**: tenant, reference (`HA-<n>`), topic, countries (`char(2)[]`), region label, level, guidance, source, status (OPEN, CLOSED), published_at, updated_at, external id (for updates from the feed). FORCE RLS; SELECT, INSERT and UPDATE of level, guidance, status and updated_at for `nexira_app`; no DELETE; a closed advisory is final.
+- **PC-27 · `medical_facility`**: tenant, mission, name, location `geography(Point,4326)`, capabilities (`text[]`), trauma level, open 24/7, vetted by (partner), source. FORCE RLS; SELECT and INSERT (seeded through the service layer); no UPDATE or DELETE in the pilot.
+- **PC-28 · `country_health_requirement`**: tenant, country, mandatory, recommended, source. Primary key (tenant, country). FORCE RLS; SELECT and INSERT; no UPDATE or DELETE in the pilot.
+- **PC-29 · `mission_health_readiness`**: tenant, mission (primary key with the tenant), staff, blood_type_on_file, insurance_active, trauma_kits, vaccines offered (`jsonb`, `{"Cholera": 9}`), as_of. Counts only (CHECKs: 0 ≤ count ≤ staff). FORCE RLS; SELECT and INSERT; no UPDATE or DELETE in the pilot.
+- A HEALTH_ADVISORY template kind for Mass Notification templates and a policy row for the agent's proposal are data, not schema.
+
+## 47. Acceptance for the module
+
+Playwright on the real stack: the Health Intelligence screen shows the six seeded advisories, the entry requirements, Nairobi's facilities and readiness counts, labelled simulated. In NBO-CIVIL-UNREST, Nairobi Central Medical Centre is flagged "Avoid" while the incident is ACTIVE. In `NBO-CHOLERA`, the cholera advisory becomes HIGH and the Communications agent's proposal appears; a Duty Officer approves it; a draft campaign from the Nairobi health template exists, and a second person (Consular Officer) approves and sends it; deliveries are simulated. A Viewer sees the screen with no send button and no names. The audit chain verifies; `make acceptance` (all existing specs) still passes.
+
+## 48. Questions answered by the product owner (2026-10-31: "use the defaults")
+
+1. **Advisories are not incidents.** Outbreaks cover countries and last days or weeks; they are a reference list, not signals fused into incidents with a radius. So they start no playbooks and do not count as active incidents. *Default: yes, a separate `health_advisory` list.*
+2. **Seeded advisories:** the design's six (cholera in Kenya MODERATE, dengue in Bangladesh, mpox in central Africa, avian influenza in Southeast Asia, measles in Pakistan, a heat-health warning in Delhi), fictional and simulated, present after `make reset-demo`. They are not incidents, so the Phase 1 scenario still starts with no active incident and an empty Decision Queue.
+3. **Entry requirements:** illustrative, for the 36 mission countries, labelled simulated, not to be used for real travel.
+4. **Health readiness:** counts per mission only, seeded (illustrative), read-only in the pilot. No person-level health data, because it is special-category personal data. Recording it would need a privacy review and a lawful basis first.
+5. **Facilities:** about three sample facilities per mission city (fictional, "(sample)"); Nairobi's four as the design. "Avoid" is computed from ACTIVE incidents only.
+6. **Who sends:** the Mass Notification composers (DUTY_OFFICER, SECURITY_OFFICER, CONSULAR_OFFICER), as today; a Head of Mission cannot compose campaigns, so cannot send one either. The second person for citizens as D-31. The agent's proposal: policy floor 2 (never Auto), approvers DUTY_OFFICER or CONSULAR_OFFICER.
+7. **Template:** a HEALTH_ADVISORY template per mission with a generic fallback. English is reviewed; the other languages keep `REVIEW REQUIRED` (D-15, D-31).
+8. **Demo:** a new scenario `NBO-CHOLERA` (§45 HL-10). No new people are added; the readiness counts are illustrative figures for each mission's seeded staff.
+9. **Screen:** "Health Intelligence" under MONITOR, before Natural Hazards & Climate, as the design.
+10. **🔒 prompts:** the migration (PC-26..29 add RLS and grants), the agent's proposal and its policy (D-29) need your named sign-off, as before.

@@ -509,3 +509,62 @@ the countdown, arming by role and the Viewer view.
 Playwright, real stack (requirements-pilot.md §42). Report the real output; make
 acceptance (all specs) still passes.
 ```
+
+## Pilot module 9 · Health Intelligence (approved 2026-10-31, PR #70)
+
+Sources: D-39, `docs/requirements-pilot.md` §44–48 (HL-01..10), PC-26..29. Simulated advisories, sample facilities and illustrative requirements only.
+
+### Prompt 59 · Read and plan (no code)
+```
+Read D-05, D-12..D-17, D-19, D-29, D-30, D-31, D-36, D-39, requirements-pilot.md §1-6 and
+§44-48, Mass Notification (campaigns, templates, second person), the Communications agent,
+exposure and incidents, and Journey Management's trip detail. Write docs/plan-pilot-hl.md:
+requirement-to-code mapping, the advisory feed and its updates, the "affects a mission"
+rule, the Avoid flag query, readiness counts, the send flow and the agent proposal with its
+one-open-proposal rule, the NBO-CHOLERA scenes, gaps with proposed answers, and the
+migration for PC-26..29 (only after they are approved). No code.
+```
+
+### Prompt 60 · Health tables (migration) 🔒
+```
+PC-26..29, once approved. A new migration: health_advisory, medical_facility,
+country_health_requirement and mission_health_readiness with FORCE RLS, tenant_isolation
+and the grants as proposed; the advisory guard (closed is final; content frozen except
+level, guidance, status, updated_at); readiness CHECKs; pinned search_path. Tests (as
+nexira_api): isolation; every refusal; no DELETE; the backup role reads them; the
+downgrade restores the previous revision exactly.
+```
+
+### Prompt 61 · Advisories, facilities, readiness and the health proposal 🔒
+```
+HL-01..07, HL-09. Advisory ingest and update (audited); affected missions; facilities by
+distance with the Avoid flag from ACTIVE incidents (PostGIS); readiness counts; entry
+requirements, also on the trip detail; "send health advisory" creating a Mass Notification
+draft from the HEALTH_ADVISORY template (roles through app/core/approvals.py); the
+Communications agent's health proposal and its policy (floor 2, DUTY_OFFICER|
+CONSULAR_OFFICER); GET /api/health/* and /api/me/permissions. Tests against real PostgreSQL.
+```
+
+### Prompt 62 · Simulated feed, seed and NBO-CHOLERA
+```
+HL-01, HL-10. The simulated advisory feed; the six advisories, entry requirements for the
+36 mission countries, sample facilities and readiness counts in the seed; the
+HEALTH_ADVISORY templates; the NBO-CHOLERA scenario and its presenter bar entry. The Phase 1
+scenario still starts with no active incident and an empty Decision Queue. Tests in the
+simulator.
+```
+
+### Prompt 63 · Health Intelligence screen
+```
+HL-08, HL-09. The screen (as the design, Blueprint dark): the simulated-sources banner,
+KPIs, the advisories table with affected missions, entry requirements, facilities with the
+Avoid flag and readiness for a chosen mission, the send button from /api/me/permissions;
+the nav entry under MONITOR; rows flash on change (ui/motion); realtime refresh. Tests:
+Vitest for the list, the mission choice, the Avoid flag, sending by role and the Viewer view.
+```
+
+### Prompt 64 · Health Intelligence acceptance
+```
+Playwright, real stack (requirements-pilot.md §47). Report the real output; make
+acceptance (all specs) still passes.
+```
