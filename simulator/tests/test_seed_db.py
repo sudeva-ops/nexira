@@ -137,14 +137,23 @@ async def test_location_confidence_engine_values(seeded: Seeded) -> None:
 async def test_sources_playbook_agents_and_counters(seeded: Seeded) -> None:
     c = seeded.conn
     sources = {r["code"]: r for r in await c.fetch("SELECT * FROM intel_source")}
-    assert len(sources) == 9
+    assert len(sources) == 11  # with the seismic and air-quality networks (D-38)
     reliability = {k: float(v["reliability"]) for k, v in sources.items()}
     assert (reliability["DATAMINR"], reliability["MAX"], reliability["RISKLINE"]) == (
         0.6,
         0.55,
         0.55,
     )
-    assert {v for k, v in reliability.items() if k not in ("DATAMINR", "MAX", "RISKLINE")} == {0.5}
+    assert (reliability["SEISMIC"], reliability["AIRQ"]) == (0.7, 0.6)
+    assert {
+        v
+        for k, v in reliability.items()
+        if k not in ("DATAMINR", "MAX", "RISKLINE", "SEISMIC", "AIRQ")
+    } == {0.5}
+    # The measure decides a measured hazard's severity, so these have no severity map.
+    assert json.loads(sources["SEISMIC"]["severity_map"]) == {}
+    xweather = json.loads(sources["XWEATHER"]["category_map"])
+    assert (xweather["Tropical cyclone"], xweather["Wildfire"]) == ("TROPICAL_CYCLONE", "WILDFIRE")
     assert not sources["OSINT"]["is_enabled"]
     assert not sources["OSINT"]["takes_part_in_fusion"]
     assert all(s["connector_type"] == "SIMULATED" for s in sources.values())
@@ -249,7 +258,8 @@ async def test_bulk_loads_are_audited_once_per_batch(seeded: Seeded) -> None:
     assert actions["LOCATION_OBSERVATION.BULK_LOAD"] == 1
     assert actions["LOCATION.RECOMPUTE"] == 1
     assert actions["MISSION.CREATE"] == 36
-    assert sum(actions.values()) < 150  # not one row per person
+    assert actions["CLIMATE_RISK.SEED"] == 1  # one row for the 36 scores (D-38)
+    assert sum(actions.values()) < 175  # not one row per person
 
 
 async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> None:
@@ -266,6 +276,9 @@ async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> No
         ("CIVIL_UNREST_STAFF_ALERT", None, "ALERT"),
         ("CIVIL_UNREST_STAFF_ALERT", "NBO", "ALERT"),
         ("CIVIL_UNREST_STAFF_ALERT", "PAR", "ALERT"),
+        # PB-01 (D-38): English only, generic.
+        ("EARTHQUAKE_CITIZEN_ADVISORY", None, "ADVISORY"),
+        ("EARTHQUAKE_STAFF_ALERT", None, "ALERT"),
         # PB-06 (D-35): English only, generic and Manila.
         ("SEVERE_WEATHER_SHELTER", None, "ADVISORY"),
         ("SEVERE_WEATHER_SHELTER", "MNL", "ADVISORY"),
@@ -273,10 +286,11 @@ async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> No
         ("SEVERE_WEATHER_STAFF_ALERT", "MNL", "ALERT"),
     ]
     weather, rows = rows[6:], rows[:6]
-    assert [set(json.loads(r["texts"])) for r in weather] == [{"en"}] * 4
-    assert [json.loads(r["reviewed"]) for r in weather] == [{}] * 4
+    assert [set(json.loads(r["texts"])) for r in weather] == [{"en"}] * 6
+    assert [json.loads(r["reviewed"]) for r in weather] == [{}] * 6
     assert "{city}" in json.loads(weather[0]["texts"])["en"]
-    assert "Manila" in json.loads(weather[1]["texts"])["en"]
+    assert "{city}" in json.loads(weather[2]["texts"])["en"]
+    assert "Manila" in json.loads(weather[3]["texts"])["en"]
     texts = [json.loads(r["texts"]) for r in rows]
     assert "{city}" in texts[0]["en"]
     assert texts[1] == data.CITIZEN_ADVISORY
@@ -440,3 +454,44 @@ async def test_aiko_takeda_is_in_nairobi_outside_the_zone(seeded: Seeded) -> Non
     assert row is not None
     assert (row["person_type"], row["code"]) == ("DEPENDANT", "NBO")
     assert 9 < float(row["km"]) < 10
+
+
+async def test_climate_scores_for_every_mission_jakarta_highest(seeded: Seeded) -> None:
+    """HZ-08, §43 Q7: illustrative, all 36 missions, Jakarta highest in 2050."""
+    rows = await seeded.conn.fetch(
+        "SELECT m.code, c.score_today, c.score_2050, c.hazards, c.source "
+        "FROM mission_climate_risk c JOIN mission m ON m.id = c.mission_id "
+        "ORDER BY c.score_2050 DESC, m.code"
+    )
+    assert len(rows) == 36
+    assert (rows[0]["code"], rows[0]["score_2050"]) == ("JKT", 88)
+    assert {r["source"] for r in rows} == {"Illustrative climate model (simulated)"}
+    by_code = {r["code"]: (r["score_today"], r["score_2050"]) for r in rows}
+    assert by_code["DAC"] == (79, 86)  # the design's figures
+    assert by_code["LON"] == (22, 27)
+
+
+async def test_pb01_and_the_hazard_homes(seeded: Seeded) -> None:
+    """HZ-07, HZ-11: PB-01 seeded; three Dhaka and two Jakarta staff at home in flood-prone
+    wards; the seeded totals do not move."""
+    c = seeded.conn
+    steps = await c.fetch(
+        "SELECT s.seq, s.action_type FROM playbook_step s JOIN playbook p ON p.id = s.playbook_id "
+        "WHERE p.code = 'PB-01' ORDER BY s.seq"
+    )
+    assert [(r["seq"], r["action_type"]) for r in steps] == [
+        (1, "CHECKIN"),
+        (2, "NOTIFY"),
+        (3, "NOTIFY"),
+    ]
+    homes = await c.fetch(
+        "SELECT m.code, count(*) AS n FROM person_location_current l "
+        "JOIN person p ON p.id = l.person_id JOIN mission m ON m.id = p.mission_id "
+        "WHERE l.place_label LIKE 'Home · %flood-prone%' GROUP BY m.code ORDER BY m.code"
+    )
+    assert [(r["code"], r["n"]) for r in homes] == [("DAC", 3), ("JKT", 2)]
+    dhaka = await c.fetchval(
+        "SELECT count(*) FROM person p JOIN mission m ON m.id = p.mission_id "
+        "WHERE m.code = 'DAC' AND p.person_type IN ('DIPLOMAT', 'LOCAL_STAFF')"
+    )
+    assert dhaka == 15  # §43 Q8: no new people

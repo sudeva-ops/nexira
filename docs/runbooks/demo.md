@@ -91,6 +91,18 @@ XW 451 can land only once. To show it again, run `make reset-demo`.
 
 The storm's conditions hold for 6 hours. To show it again, run `make reset-demo`.
 
+## 6b2. Storyline · Natural hazards (about 4 minutes)
+
+Simulated hazard feeds and illustrative climate scores (D-38). The Natural Hazards & Climate screen arrives in Prompt 57; until then, follow the events on Global Operations, Incidents and the Decision Queue.
+
+1. Presenter bar: pick **Dhaka cyclone** and press →: six hazard events. They are an M5.2 earthquake 210 km from Ankara (LOW, outside its 100 km range), river flooding in Jakarta (two staff homes inside), extreme heat in Riyadh, air quality AQI 310 in New Delhi, a wildfire in Attica (no mission within 300 km), and a Category 1 cyclone forecast for Dhaka.
+2. →: the forecast is upgraded to **Category 2, landfall in 60 h**. It is HIGH, raised to **CRITICAL** because the Dhaka chancery is in its 150 km zone (D-11). **Decision Queue**: the Response Planner proposes **Arm PB-06 for Dhaka, start 36 h before landfall**. Approve it as the **Security Officer**; the run is armed (SCHEDULED).
+3. →: the demo clock moves on 24 h (**36 h to landfall**): the armed PB-06 starts by itself (staff alert, check-in, then the citizen advisory for a second person).
+4. →: landfall (the clock moves on 36 h more). A separate **Flood** incident in Dhaka, with the three staff homes in flood-prone wards.
+5. →: the cyclone weakens to Category 1. Set the incident to **Monitoring** when you are done.
+
+The demo clock counts only while the scenario runs, and only for runs armed during it. To show the scenario again, run `make reset-demo`.
+
 ## 6c. Storyline 6 · Assistance Partners (about 3 minutes, after Storyline 1)
 
 1. **Assistance Partners**: the five contracted partners (fictional, simulated) with services, coverage and response times; coverage 34 / 36, with Canberra and Buenos Aires named as gaps (no evacuation partner).
@@ -110,6 +122,7 @@ The partners are simulated: no partner is contacted (D-36). A request can be mad
 | A scenario does nothing, or XW 451 stays landed | The scenario was already played: `make reset-demo` and sign in again. |
 | Manila's weather stays stormy after the storm scenario | A scenario's conditions hold for 6 hours (plan-pilot-wx G-1); `make reset-demo` clears them. |
 | No weather incidents for dust storms or heat, or the storm stays separate from Dataminr's report | The database was seeded before the Weather module, and new source categories are added only to a fresh seed (plan-pilot-wx G-2): `make reset-demo`. |
+| No earthquake, cyclone, wildfire or air-quality events, or the Dhaka cyclone opens no incident | The database was seeded before Natural Hazards, and new sources and categories are added only to a fresh seed (plan-pilot-hz G-10): `make reset-demo`. |
 | Everything is slow or stuck after the laptop slept | `make up`, then `make reset-demo`; keep `caffeinate -dims` running. |
 | Logs | `make logs` (the worker shows signals, exposure, flights and agents). |
 
