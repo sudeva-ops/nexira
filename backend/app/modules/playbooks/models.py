@@ -67,6 +67,8 @@ class PlaybookRun(Base):
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # PC-24: an armed run (SCHEDULED) starts at this time; fixed once set (playbook_run_guard).
+    scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class PlaybookRunStep(Base):

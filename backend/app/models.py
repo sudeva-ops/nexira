@@ -5,6 +5,7 @@ from app.modules.agents.models import ActionPolicy, Agent, AgentProposal, Propos
 from app.modules.audit.models import AuditLog
 from app.modules.checkin.models import CheckinResponse
 from app.modules.documents.models import TravelDocument
+from app.modules.hazards.models import MissionClimateRisk
 from app.modules.intel.models import (
     Incident,
     IncidentEvent,
@@ -43,6 +44,7 @@ __all__ = [
     "IntelSource",
     "LocationObservation",
     "Mission",
+    "MissionClimateRisk",
     "NotificationCampaign",
     "NotificationDelivery",
     "Partner",
