@@ -42,4 +42,11 @@ export const SCENE_SCREEN: Record<DemoScenario, Record<number, string>> = {
     4: "/hazards",
     5: "/hazards",
   },
+  // D-39 (HL-10): the proposal in the Decision Queue, then Mass Notification, where the
+  // second person approves the campaign. Prompt 63 moves scenes 0 and 2 to the health screen.
+  "NBO-CHOLERA": {
+    0: "/",
+    1: "/",
+    2: "/notifications",
+  },
 };

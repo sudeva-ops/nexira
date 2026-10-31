@@ -839,6 +839,224 @@ HAZARD_HOMES: dict[str, list[tuple[str, float, float]]] = {
     ],
 }
 
+# --- Health Intelligence (D-39, plan-pilot-hl §2-5, §48): simulated and illustrative ----------
+# The design's six advisories, present after `make reset-demo` (§48 Q2). None is HIGH, so the
+# Communications agent proposes nothing until NBO-CHOLERA raises cholera (HL-10). Mpox's
+# countries have no mission. (feed id, topic, topic code, countries, region, level, guidance,
+# source, days since published)
+WHO = "WHO Disease Outbreak News (simulated)"
+HEALTH_ADVISORIES: list[tuple[str, str, str, list[str], str, str, str, str, int]] = [
+    (
+        "who-don:cholera-ke",
+        "Cholera",
+        "CHOLERA",
+        ["KE"],
+        "Kenya · Coast & Nairobi counties",
+        "MODERATE",
+        "Case increase in informal settlements; water-safety advice for staff.",
+        WHO,
+        2,
+    ),
+    (
+        "moh-bd:dengue-dhaka",
+        "Dengue fever",
+        "DENGUE",
+        ["BD"],
+        "Bangladesh · Dhaka division",
+        "MODERATE",
+        "Seasonal rise; mosquito-bite prevention recommended.",
+        "Ministry of Health bulletin (simulated)",
+        4,
+    ),
+    (
+        "who-don:mpox-central-africa",
+        "Mpox (clade I)",
+        "MPOX",
+        ["CD", "CF", "CG", "BI", "RW", "UG"],
+        "Central Africa · regional",
+        "MODERATE",
+        "Ongoing transmission; no travel restrictions advised.",
+        WHO,
+        6,
+    ),
+    (
+        "who-don:h5n1-sea",
+        "Avian influenza A(H5N1)",
+        "AVIAN_INFLUENZA",
+        ["ID", "KH", "PH", "VN"],
+        "Southeast Asia · poultry outbreaks",
+        "LOW",
+        "Low risk to travellers; avoid live-bird markets.",
+        WHO,
+        9,
+    ),
+    (
+        "moh-pk:measles-punjab",
+        "Measles",
+        "MEASLES",
+        ["PK"],
+        "Pakistan · Punjab",
+        "MODERATE",
+        "Check MMR vaccination status before travel.",
+        "Ministry of Health bulletin (simulated)",
+        11,
+    ),
+    (
+        "partner:heat-delhi",
+        "Heat-health warning",
+        "HEAT_HEALTH",
+        ["IN"],
+        "India · Delhi NCR",
+        "MODERATE",
+        "Temperatures above 44 °C; adjust working hours.",
+        "Kestrel Medical Assistance intel (simulated)",
+        1,
+    ),
+]
+
+# Entry and vaccination requirements for every mission country (§48 Q3): illustrative, not
+# for real travel. The design's five, then plausible ones. (mandatory, recommended)
+NO_MANDATORY = "No mandatory vaccinations"
+ROUTINE = "Routine vaccinations up to date"
+YELLOW_FEVER_RISK = "Yellow fever certificate if arriving from risk country"
+HEALTH_REQUIREMENTS: dict[str, tuple[str, str]] = {
+    "KE": (YELLOW_FEVER_RISK, "Hep A · Typhoid · Cholera (optional)"),
+    "ET": (YELLOW_FEVER_RISK, "Hep A · Typhoid · Meningitis"),
+    "NG": ("Yellow fever certificate required", "Hep A · Typhoid · Meningitis"),
+    "SA": ("Meningococcal ACWY for pilgrims", "Hep A · Flu"),
+    "BD": (YELLOW_FEVER_RISK, "Hep A · Typhoid · Japanese encephalitis"),
+    "ZA": (YELLOW_FEVER_RISK, "Hep A · Typhoid"),
+    "EG": (YELLOW_FEVER_RISK, "Hep A · Typhoid"),
+    "MA": (NO_MANDATORY, "Hep A · Typhoid"),
+    "JO": (NO_MANDATORY, "Hep A · Typhoid"),
+    "IQ": (NO_MANDATORY, "Hep A · Typhoid · Rabies"),
+    "OM": (YELLOW_FEVER_RISK, "Hep A · Typhoid"),
+    "PK": ("Polio vaccination certificate on departure for long stays", "Hep A · Typhoid · MMR"),
+    "IN": (YELLOW_FEVER_RISK, "Hep A · Typhoid · Japanese encephalitis"),
+    "CN": (YELLOW_FEVER_RISK, "Hep A · Japanese encephalitis"),
+    "PH": (YELLOW_FEVER_RISK, "Hep A · Typhoid · Dengue precautions"),
+    "MY": (YELLOW_FEVER_RISK, "Hep A · Typhoid"),
+    "SG": (YELLOW_FEVER_RISK, ROUTINE),
+    "ID": (YELLOW_FEVER_RISK, "Hep A · Typhoid · Japanese encephalitis"),
+    "AU": (YELLOW_FEVER_RISK, ROUTINE),
+    "MX": (NO_MANDATORY, "Hep A · Typhoid"),
+    "BR": (NO_MANDATORY, "Yellow fever (some regions) · Hep A · Typhoid"),
+    "AR": (NO_MANDATORY, "Yellow fever (northern provinces) · Hep A"),
+    **{
+        cc: (NO_MANDATORY, ROUTINE)
+        for cc in ("GB", "FR", "DE", "BE", "CH", "IT", "ES", "RU", "TR", "KR", "JP", "US", "CA")
+    },
+}
+
+# Sample facilities (§48 Q5, fictional, "(sample)"). Nairobi's four as the design; Nairobi
+# Central sits inside INC-…-1042's 5 km zone, the other three more than 5 km from every
+# Nairobi unrest signal (plan-pilot-hl §4). (name, lat, lon, capabilities, trauma level,
+# open 24/7, vetted by Kestrel)
+NAIROBI_FACILITIES: list[tuple[str, float, float, list[str], int | None, bool, bool]] = [
+    ("Nairobi Central Medical Centre (sample)", -1.2830, 36.8125, ["EMERGENCY"], None, True, False),
+    (
+        "Highland Private Hospital (sample)",
+        -1.2580,
+        36.7680,
+        ["EMERGENCY", "TRAUMA", "ICU"],
+        1,
+        True,
+        True,
+    ),
+    ("Westlands Clinic (sample)", -1.2400, 36.7780, ["OUTPATIENT", "PHARMACY"], None, False, True),
+    (
+        "Karen Specialist Hospital (sample)",
+        -1.3200,
+        36.7200,
+        ["SURGERY", "ICU", "HELIPAD"],
+        None,
+        True,
+        True,
+    ),
+]
+# Every other mission: three sample facilities north-east, west and south of the mission
+# (offsets in degrees, about 3, 5 and 8 km), the first two vetted by Kestrel.
+FACILITY_PATTERN: list[tuple[str, float, float, list[str], int | None, bool, bool]] = [
+    (
+        "{city} General Hospital (sample)",
+        0.020,
+        0.020,
+        ["EMERGENCY", "TRAUMA", "ICU"],
+        2,
+        True,
+        True,
+    ),
+    (
+        "{city} International Clinic (sample)",
+        0.0,
+        -0.045,
+        ["OUTPATIENT", "PHARMACY"],
+        None,
+        False,
+        True,
+    ),
+    ("{city} Medical Centre (sample)", -0.072, 0.0, ["EMERGENCY", "MATERNITY"], None, True, False),
+]
+
+# Staff health readiness, counts only (D-39, §48 Q4): illustrative, per mission's seeded
+# staff. Vaccines offered for the open advisories' topics; Nairobi as the design (9 of its 14
+# staff offered the cholera vaccine, plan-pilot-hl G-4).
+VACCINES_OFFERED: dict[str, dict[str, int]] = {
+    "NBO": {"CHOLERA": 9},
+    "DAC": {"DENGUE": 0},
+    "ISB": {"MEASLES": 18},
+    "JKT": {"AVIAN_INFLUENZA": 4},
+    "MNL": {"AVIAN_INFLUENZA": 6},
+}
+READINESS_AS_OF_DAYS = 14  # counts as of two weeks before the scenario date
+
+# HL-06, HL-07 (plan-pilot-hl G-1): health advisory templates, kind ADVISORY, one per topic
+# with the generic HEALTH_GENERAL fallback. Nairobi's cholera text is the design's; AR/FR/SW
+# keep the REVIEW REQUIRED marker until a native speaker checks them (D-15).
+HEALTH_CHOLERA_NBO = {
+    "en": "Health advisory: Cholera cases are rising in Nairobi. Drink bottled or boiled water "
+    "only, avoid street food, and seek care quickly if symptoms appear.",
+    "ar": REVIEW_REQUIRED + "تنبيه صحي: حالات الكوليرا في ازدياد في نيروبي. اشربوا المياه "
+    "المعبأة أو المغلية فقط، وتجنبوا طعام الشارع، واطلبوا الرعاية سريعاً عند ظهور الأعراض.",
+    "fr": REVIEW_REQUIRED + "Alerte santé : les cas de choléra augmentent à Nairobi. Ne buvez que "
+    "de l'eau en bouteille ou bouillie, évitez la nourriture de rue et consultez rapidement en "
+    "cas de symptômes.",
+    "sw": REVIEW_REQUIRED
+    + "Tahadhari ya afya: visa vya kipindupindu vinaongezeka Nairobi. Kunyweni "
+    "maji ya chupa au yaliyochemshwa tu, epukeni chakula cha mitaani, na tafuteni matibabu "
+    "haraka dalili zikitokea.",
+}
+HEALTH_TEMPLATES: list[tuple[str, str, str | None, str, dict[str, str]]] = [
+    (
+        "HEALTH_GENERAL",
+        "ADVISORY",
+        None,
+        "Health advisory",
+        {
+            "en": "Health advisory for {city}: a disease outbreak or health warning is in force. "
+            "Follow the mission's guidance and seek care quickly if you feel unwell.",
+            "ar": REVIEW_REQUIRED + "تنبيه صحي في {city}: يوجد تفشٍ لمرض أو تحذير صحي. اتبعوا "
+            "إرشادات البعثة واطلبوا الرعاية سريعاً إذا شعرتم بتوعك.",
+            "fr": REVIEW_REQUIRED + "Alerte santé à {city} : une épidémie ou une alerte sanitaire "
+            "est en cours. Suivez les consignes de la mission et consultez rapidement en cas de "
+            "malaise.",
+            "sw": REVIEW_REQUIRED + "Tahadhari ya afya {city}: kuna mlipuko wa ugonjwa au onyo la "
+            "afya. Fuateni maelekezo ya ubalozi na tafuteni matibabu haraka mkijisikia vibaya.",
+        },
+    ),
+    (
+        "HEALTH_CHOLERA",
+        "ADVISORY",
+        None,
+        "Cholera advisory",
+        {
+            "en": "Health advisory: Cholera cases are rising in {city}. Drink bottled or boiled "
+            "water only, avoid street food, and seek care quickly if symptoms appear.",
+        },
+    ),
+    ("HEALTH_CHOLERA", "ADVISORY", "NBO", "Cholera advisory (Nairobi)", HEALTH_CHOLERA_NBO),
+]
+
 # --- agents and policies (D-17 seed table) --------------------------------------------------------
 AGENTS: list[tuple[str, str, str, int]] = [
     ("WATCH_OFFICER", "Watch Officer", "Watches intel feeds and new incidents.", 0),

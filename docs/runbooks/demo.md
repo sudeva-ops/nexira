@@ -103,6 +103,16 @@ Simulated hazard feeds and illustrative climate scores (D-38). The presenter bar
 
 The demo clock counts only while the scenario runs, and only for runs armed during it. To show the scenario again, run `make reset-demo`.
 
+## 6b3. Storyline · Health Intelligence (about 3 minutes)
+
+Simulated advisories, sample facilities and illustrative entry requirements (D-39). The six advisories are seeded, so they are there from `make reset-demo`, and none is HIGH, so the Decision Queue stays empty until this storyline. Readiness is counts per mission only; nobody's health data is stored.
+
+1. Presenter bar: pick **Nairobi cholera** and press →: a newer simulated WHO bulletin raises **cholera in Kenya** from MODERATE to **HIGH**. **Decision Queue**: the Communications agent proposes **Health advisory recommended for Nairobi staff and citizens**, with "9 of 14 staff offered the cholera vaccine" as evidence. Approve it as the **Duty Officer**: this creates the campaign, it sends nothing.
+2. **Mass Notification**: the campaign waits for a second person. The Duty Officer who approved the proposal cannot approve it; sign in as the **Consular Officer** and approve it, and it is delivered (simulated).
+3. →: the dengue advisory in Bangladesh is closed.
+
+A closed advisory stays closed and cholera stays HIGH, so to show the storyline again run `make reset-demo`.
+
 ## 6c. Storyline 6 · Assistance Partners (about 3 minutes, after Storyline 1)
 
 1. **Assistance Partners**: the five contracted partners (fictional, simulated) with services, coverage and response times; coverage 34 / 36, with Canberra and Buenos Aires named as gaps (no evacuation partner).
@@ -123,6 +133,7 @@ The partners are simulated: no partner is contacted (D-36). A request can be mad
 | Manila's weather stays stormy after the storm scenario | A scenario's conditions hold for 6 hours (plan-pilot-wx G-1); `make reset-demo` clears them. |
 | No weather incidents for dust storms or heat, or the storm stays separate from Dataminr's report | The database was seeded before the Weather module, and new source categories are added only to a fresh seed (plan-pilot-wx G-2): `make reset-demo`. |
 | No earthquake, cyclone, wildfire or air-quality events, or the Dhaka cyclone opens no incident | The database was seeded before Natural Hazards, and new sources and categories are added only to a fresh seed (plan-pilot-hz G-10): `make reset-demo`. |
+| No health advisories, or Nairobi cholera proposes nothing | The database was seeded before Health Intelligence: `make reset-demo`. If cholera is already HIGH from an earlier run, a new rise is needed; reset the demo. |
 | Everything is slow or stuck after the laptop slept | `make up`, then `make reset-demo`; keep `caffeinate -dims` running. |
 | Logs | `make logs` (the worker shows signals, exposure, flights and agents). |
 
