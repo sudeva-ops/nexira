@@ -40,7 +40,15 @@ def test_people_counts_match_d23_and_d27() -> None:
     w = world.build(DAY, TENANT)
     nbo = next(m for m in w.missions if m.code == "NBO")
     nairobi = Counter(p.person_type for p in w.persons if p.mission_id == nbo.id)
-    assert nairobi == {"DIPLOMAT": 12, "LOCAL_STAFF": 2, "DELEGATE": 3, "CITIZEN": 212}
+    # Plan-pilot-dx G-2: Hana Takeda's child, moved from another mission, lives outside the
+    # zone (test_seed_db checks D-23 there).
+    assert nairobi == {
+        "DIPLOMAT": 12,
+        "LOCAL_STAFF": 2,
+        "DELEGATE": 3,
+        "CITIZEN": 212,
+        "DEPENDANT": 1,
+    }
     personnel = [p for p in w.persons if p.person_type != "CITIZEN"]
     assert len(personnel) == 926 + 412 == 1338  # demo KPI "Personnel" (plan G-10)
     staff = [p for p in w.persons if p.person_type in ("DIPLOMAT", "LOCAL_STAFF")]

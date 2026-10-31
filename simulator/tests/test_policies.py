@@ -15,4 +15,6 @@ def test_every_undoable_action_can_be_undone() -> None:
 
 
 def test_every_seeded_action_type_can_execute() -> None:
-    assert {action for action, *_ in data.POLICIES} <= set(ACTIONS)
+    seeded = data.POLICIES + data.TRAVEL_POLICIES + data.DOCUMENT_POLICIES
+    assert {action for action, *_ in seeded} <= set(ACTIONS)
+    assert not any(undoable for _a, _f, _r, undoable, _d in data.DOCUMENT_POLICIES)

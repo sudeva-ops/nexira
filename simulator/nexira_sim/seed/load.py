@@ -11,6 +11,7 @@ from typing import Any
 
 from app.core.db import tenant_session
 from app.modules.agents.service import AgentIn, PolicyIn, ensure_agents, ensure_policies
+from app.modules.documents.service import ensure_documents, start_renewals
 from app.modules.intel.service import SourceIn, ensure_sources
 from app.modules.notifications.templates import TemplateIn, ensure_templates
 from app.modules.partners.service import PartnerIn, ensure_partners
@@ -35,6 +36,7 @@ from nexira_sim.scenarios import mnl_tropical_storm as mnl
 from nexira_sim.scenarios import nbo_air_diversion as air
 from nexira_sim.scenarios import nbo_civil_unrest as nbo
 from nexira_sim.seed import data, world
+from nexira_sim.seed import documents as seed_documents
 from nexira_sim.seed.identities import bootstrap_tenant, demo_user_id, seed_identities
 from nexira_sim.seed.ids import seed_id
 
@@ -103,10 +105,7 @@ async def seed_all(
         missions_by_code = {m.code: m for m in w.missions}
         report["extra_trips"] = 0
         for ref, purpose, home, count, dest, cc, offset, days, status, risk in data.EXTRA_TRIPS:
-            home_id = missions_by_code[home].id
-            travellers = [
-                p.id for p in w.persons if p.mission_id == home_id and p.person_type == "DIPLOMAT"
-            ][:count]
+            travellers = world.trip_travellers(w, missions_by_code[home].id, count)
             report["extra_trips"] += await ensure_trip(
                 session,
                 trip_id=seed_id(tenant_id, "trip", ref),
@@ -224,7 +223,17 @@ async def seed_all(
         report["policies"] = await ensure_policies(
             session,
             [PolicyIn(action, floor, roles, undo) for action, floor, roles, undo in data.POLICIES]
-            + [PolicyIn(*policy) for policy in data.TRAVEL_POLICIES],
+            + [PolicyIn(*policy) for policy in data.TRAVEL_POLICIES]
+            + [PolicyIn(*policy) for policy in data.DOCUMENT_POLICIES],
+        )
+
+        # Document Expiry (D-37, plan §8): new documents only (G-8); the renewals already
+        # under way are moved through the service, for new documents only.
+        docs, in_progress = seed_documents.build(w, tenant_id)
+        created = set(await ensure_documents(session, docs))
+        report["documents"] = len(created)
+        report["renewals_started"] = await start_renewals(
+            session, [d for d in in_progress if d in created]
         )
 
         report["counters"] = [

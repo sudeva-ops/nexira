@@ -7,7 +7,7 @@ Loading happens in nexira_sim.seed.load through the backend service layer.
 import math
 import random
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, time, timedelta
 
 from app.modules.people.service import ObservationIn, PersonIn, SiteIn
@@ -280,15 +280,43 @@ def build(scenario_date: date, tenant_id: uuid.UUID) -> World:
     # else is where they were.
     _ref, _purpose, home, count, *_rest, (hotel_lat, hotel_lon), hotel = data.MANILA_TRIP
     home_id = next(m.id for m in w.missions if m.code == home)
-    w.manila_trip_ids = [
-        p.id for p in w.persons if p.mission_id == home_id and p.person_type == "DIPLOMAT"
-    ][:count]
+    w.manila_trip_ids = trip_travellers(w, home_id, count)
     for n, o in enumerate(w.observations):
         if o.person_id in w.manila_trip_ids:
             w.observations[n] = _observation_for(
                 o.person_id, "TRAVEL_BOOKING", 89, hotel_lat, hotel_lon, hotel, as_of
             )
+
+    # Plan G-2 (Document Expiry): Hana Takeda's child is the last generated dependant,
+    # moved to Nairobi and placed at home outside the zone. Nothing is drawn from rng and
+    # nobody is added, so the personnel count and D-23 stay where they are.
+    n, child = next(
+        (n, p) for n, p in reversed(list(enumerate(w.persons))) if p.person_type == "DEPENDANT"
+    )
+    w.persons[n] = replace(
+        child,
+        mission_id=nbo.id,
+        full_name=data.DEPENDANT_CHILD,
+        email=_email(data.DEPENDANT_CHILD, n + 1),
+    )
+    for k, o in enumerate(w.observations):
+        if o.person_id == child.id:
+            w.observations[k] = _observation_for(
+                child.id,
+                "MANUAL",
+                60,
+                *data.DEPENDANT_CHILD_HOME,
+                data.DEPENDANT_CHILD_PLACE,
+                as_of,
+            )
     return w
+
+
+def trip_travellers(w: World, mission_id: uuid.UUID, count: int) -> list[uuid.UUID]:
+    """A seeded trip's travellers: the first diplomats of their mission."""
+    return [p.id for p in w.persons if p.mission_id == mission_id and p.person_type == "DIPLOMAT"][
+        :count
+    ]
 
 
 def _name(rng: random.Random) -> str:
