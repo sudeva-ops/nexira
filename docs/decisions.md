@@ -184,6 +184,7 @@ Record each sign-off in the PR.
 | 5. **Assistance Partners** (AST): asked for by the pilot customer (D-36) | |
 | 6. **Weather** (WX), simulated: current conditions and severe-weather warnings (D-35) | |
 | 7. **Document Expiry** (DX), simulated (D-37) | |
+| 8. **Natural Hazards & Climate** (HZ), simulated (D-38) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -236,6 +237,11 @@ Rules:
 - **No document numbers.** The platform stores the type, issuing country and valid-until date of a document, never its number, a scan or a photo (DX-01).
 - **People decide.** The Compliance agent only proposes, at level Approve or higher; renewals and reminders are started by a person or by a proposal a person approved (D-12, D-16).
 - **Further modules.** On 2026-10-30 the product owner asked for these modules after the UI work, in this order: Document Expiry, Natural Hazards, Health Intelligence, Evacuation Management, Fleet, VIP Protection, Site Twin, Supply Chain, Wellbeing, Exercises, After-Action Review, Predictive Risk, Executive Overview, AI Risk Copilot chat. Each still needs its own requirements approved before code (D-30). The AI Risk Copilot needs the local model server (D-30, AGR-08).
+
+**D-38 · Natural Hazards & Climate (simulated).** Approved by the product owner on 2026-10-31 (PR #63), with the defaults in `docs/requirements-pilot.md` §43. Requirements HZ-01 to HZ-11 in `docs/requirements-pilot.md` §39–43, with the defaults in §43. Amends D-30 by adding Natural Hazards & Climate to the pilot.
+- **Hazards are intelligence.** Earthquakes, cyclone forecasts, wildfire and air quality are signals and incidents through the existing pipeline, as Weather's warnings are (D-35). There is no separate hazard store.
+- **Arming is a scheduled playbook run.** An armed playbook starts by itself at the time a person or an approved proposal chose, and stays a normal run (gates, second person for citizens). Agents only propose arming, at level Approve or higher (D-12, D-16).
+- **Climate scores are illustrative.** They are labelled simulated, shown for planning, and used by no rule or agent.
 
 ---
 

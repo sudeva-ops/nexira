@@ -451,3 +451,61 @@ the list, filters, actions by role and the Viewer view.
 Playwright, real stack (requirements-pilot.md §37). Report the real output; make
 acceptance (all specs) still passes.
 ```
+
+## Pilot module 8 · Natural Hazards & Climate (Prompts 53–58)
+
+Sources: D-38, `docs/requirements-pilot.md` §39–43 (HZ-01..11), PC-24, PC-25. Simulated hazard feeds and illustrative climate scores only.
+
+### Prompt 53 · Read and plan (no code)
+```
+Read D-05, D-12..D-17, D-19, D-29, D-30, D-35, D-38, requirements-pilot.md §24-28 and
+§39-43, Weather (feed, categories, sizing in intel/fusion.py, PB-06), the playbook engine
+and run statuses, and the Response Planner. Write docs/plan-pilot-hz.md: requirement-to-code
+mapping, severity and radius rules per hazard (§43 Q3), where hazard details live (the
+latest signal payload), the scheduled-run design (who starts it, at what time, restarts
+and missed times), the arming proposal and its one-open-proposal-per-incident rule, PB-01,
+the DAC-CYCLONE scenes, gaps with proposed answers, and the migration for PC-24 and PC-25
+(only after they are approved). No code.
+```
+
+### Prompt 54 · Armed runs and climate table (migration) 🔒
+```
+PC-24 and PC-25, once approved. A new migration: playbook_run scheduled_for and the
+SCHEDULED/DISARMED statuses with their guard; mission_climate_risk with FORCE RLS,
+tenant_isolation and the grants as proposed; pinned search_path. Tests (as nexira_api):
+isolation; every refusal of the guards; no UPDATE/DELETE on the climate table; the backup
+role reads it; the downgrade restores the previous revision exactly.
+```
+
+### Prompt 55 · Hazard events, arming and PB-01 🔒
+```
+HZ-01..07, HZ-10. The new categories with their severity and radius rules; hazard details
+from the signal payload; nearest mission and distance; arm, start-now and disarm through
+the playbook service (roles through app/core/approvals.py, audited); the worker starts
+SCHEDULED runs when due; the ARM_PLAYBOOK action, its executor and policy (floor 2,
+SECURITY_OFFICER|DUTY_OFFICER); the Response Planner's arming proposal and PB-01 proposal;
+GET /api/hazards and /api/me/permissions for arming. Tests against real PostgreSQL.
+```
+
+### Prompt 56 · Simulated feeds, climate seed and DAC-CYCLONE
+```
+HZ-08, HZ-11. Simulated seismic, air-quality and xWeather hazard signals; the illustrative
+climate scores for all 36 missions (§43 Q7); PB-01 in the seed; the DAC-CYCLONE scenario
+(§43 Q8) with Dhaka homes in flood-prone wards; the presenter bar entry. The Phase 1 scenario
+still starts with no active incident. Tests in the simulator.
+```
+
+### Prompt 57 · Natural Hazards & Climate screen
+```
+HZ-03, HZ-04, HZ-09, HZ-10. The screen (as the design, Blueprint dark): KPIs, live events
+with type tabs and mission exposure, the countdown, the arming banner and its actions from
+/api/me/permissions, the climate table; hazard icons on the Global Operations map; the nav
+entry under MONITOR; rows flash on change (ui/motion). Tests: Vitest for the list, tabs,
+the countdown, arming by role and the Viewer view.
+```
+
+### Prompt 58 · Natural Hazards acceptance
+```
+Playwright, real stack (requirements-pilot.md §42). Report the real output; make
+acceptance (all specs) still passes.
+```
