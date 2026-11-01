@@ -58,8 +58,8 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     # The schema's 33 tables, message_template (0002), trip_segment and country_risk
     # (0003), airport, flight and flight_event (0004), weather_current (0005), partner and
     # partner_request (0006), travel_document (0007), mission_climate_risk (0008), the four
-    # health tables (0009), and alembic_version.
-    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 1
+    # health tables (0009), the three evacuation tables (0010), and alembic_version.
+    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 1
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
 
@@ -683,5 +683,98 @@ def test_downgrading_0009_restores_0008_exactly(fresh: DbUrls) -> None:
             "medical_facility_guard",
             "mission_health_readiness_guard",
         )
+    ]
+    command.upgrade(cfg, "head")
+
+
+EVACUATION_TABLES = ("evacuation", "evacuation_manifest", "evacuation_plan")
+
+
+async def _evacuation_shape(admin_url: str) -> dict[str, object]:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        tables = await conn.fetch(
+            "SELECT relname, relforcerowsecurity, relacl::text AS acl FROM pg_class "
+            "WHERE relname = ANY($1::text[]) AND relkind = 'r' ORDER BY relname",
+            list(EVACUATION_TABLES),
+        )
+        columns = await conn.fetch(
+            "SELECT table_name, column_name FROM information_schema.column_privileges "
+            "WHERE table_name = ANY($1::text[]) AND grantee = 'nexira_app' "
+            "AND privilege_type = 'UPDATE' ORDER BY table_name, column_name",
+            list(EVACUATION_TABLES),
+        )
+        search_paths = await conn.fetch(
+            "SELECT proname, proconfig::text AS config FROM pg_proc "
+            "WHERE proname LIKE 'evacuation%guard' ORDER BY proname"
+        )
+        live = await conn.fetchval(
+            "SELECT indexdef FROM pg_indexes WHERE indexname = 'evacuation_live_uq'"
+        )
+        policies = await conn.fetchval(
+            "SELECT count(*) FROM pg_policies WHERE tablename = ANY($1::text[])",
+            list(EVACUATION_TABLES),
+        )
+        # Everything in public, so a leftover of 0010 shows (review of Prompt 49, L4).
+        public = await conn.fetchrow(
+            "SELECT (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "        WHERE n.nspname = 'public') AS relations, "
+            "       (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace "
+            "        WHERE n.nspname = 'public') AS functions, "
+            "       (SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal) AS triggers, "
+            "       (SELECT count(*) FROM pg_policy) AS policies"
+        )
+    finally:
+        await conn.close()
+    return {
+        "tables": [tuple(t) for t in tables],
+        "columns": [tuple(c) for c in columns],
+        "search_paths": [tuple(f) for f in search_paths],
+        "live": live,
+        "policies": policies,
+        "public": tuple(public or ()),
+    }
+
+
+def test_downgrading_0010_restores_0009_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0009")
+    at_0009 = asyncio.run(_evacuation_shape(admin))
+    at_0009_health = asyncio.run(_health_shape(admin))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_evacuation_shape(admin))
+    command.downgrade(cfg, "0009")
+    assert asyncio.run(_evacuation_shape(admin)) == at_0009
+    assert asyncio.run(_health_shape(admin)) == at_0009_health
+    assert at_0009["tables"] == []
+    # PC-30..32: FORCE RLS; read and added by the app; the backup role reads them. The app
+    # updates evacuations and manifests through column grants only.
+    seeded = (
+        "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+        "nexira_app=ar/nexira_owner}"
+    )
+    assert at_head["tables"] == [(table, True, seeded) for table in EVACUATION_TABLES]
+    assert at_head["columns"] == [
+        ("evacuation", "activated_by"),
+        ("evacuation", "status"),
+        ("evacuation", "step"),
+        ("evacuation", "stood_down_by"),
+        ("evacuation", "stood_down_reason"),
+        ("evacuation_manifest", "checked_in_by"),
+        ("evacuation_manifest", "checked_in_by_type"),
+        ("evacuation_manifest", "seat"),
+        ("evacuation_manifest", "status"),
+    ]
+    assert at_head["live"] == (
+        "CREATE UNIQUE INDEX evacuation_live_uq ON public.evacuation USING btree "
+        "(tenant_id, mission_id) WHERE (status = ANY (ARRAY['PENDING_ACTIVATION'::text, "
+        "'ACTIVE'::text]))"
+    )
+    assert at_head["policies"] == 3
+    assert at_head["search_paths"] == [
+        (name, '{"search_path=pg_catalog, public, pg_temp"}')
+        for name in ("evacuation_guard", "evacuation_manifest_guard", "evacuation_plan_guard")
     ]
     command.upgrade(cfg, "head")
