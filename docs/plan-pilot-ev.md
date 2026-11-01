@@ -121,8 +121,8 @@ The simulated progress events act as `SIMULATOR` (labelled simulated) and only m
 
 | # | Gap | Proposed answer |
 |---|---|---|
-| G-1 | **Who asked first.** EV-02(b) lets either role press Activate; the confirmer must hold the *other* role. PC-31 records `requested_by` but not the role used, and a requester may hold both roles (the `dual.role` test identity). | **Amend PC-31: add `requested_role` (`HEAD_OF_MISSION` or `HQ_CRISIS_DIRECTOR`, frozen).** The confirm gate requires the other role. From a proposal it is `HEAD_OF_MISSION` (policy step 1). **Needs a decision** (a schema amendment, as plan-pilot-hl G-1). |
-| G-2 | **Sequence and the simulated partner.** EV-05 says steps 4–6 "follow the simulated partners' requests". But the adapter moves a request to EN_ROUTE about 20 s after it is made, whatever happens, and only a person completes a request. So the convoy would "depart" before anyone mustered. | Steps 4–6 are **marked by a person or by the scenario's simulated progress events** (§6), not by partner status. The partner's status is shown next to its option, and arrival completes the requests. The partner adapter is unchanged (no 🔒 change there). **Needs a decision** (rewords EV-05). |
+| G-1 | **Who asked first.** EV-02(b) lets either role press Activate; the confirmer must hold the *other* role. PC-31 records `requested_by` but not the role used, and a requester may hold both roles (the `dual.role` test identity). | **Amend PC-31: add `requested_role` (`HEAD_OF_MISSION` or `HQ_CRISIS_DIRECTOR`, frozen).** The confirm gate requires the other role. From a proposal it is `HEAD_OF_MISSION` (policy step 1). *Decided 2026-11-01: as proposed.* |
+| G-2 | **Sequence and the simulated partner.** EV-05 says steps 4–6 "follow the simulated partners' requests". But the adapter moves a request to EN_ROUTE about 20 s after it is made, whatever happens, and only a person completes a request. So the convoy would "depart" before anyone mustered. | Steps 4–6 are **marked by a person or by the scenario's simulated progress events** (§6), not by partner status. The partner's status is shown next to its option, and arrival completes the requests. The partner adapter is unchanged (no 🔒 change there). *Decided 2026-11-01: as proposed.* |
 | G-3 | **A second START_EVACUATION while one is live** (the scene 5 fixture run twice, `scene5-decisions.spec.ts`). Failing would mark the proposal FAILED after two people approved it. | The executor writes the note and returns the live evacuation (`already_active: true`) instead of failing. With no mission on the incident, it fails as before (`ActionError`). |
 | G-4 | **Who requests the partners.** `partner_request.created_by_type` allows USER and PLAYBOOK, and `REQUESTERS` excludes the HQ Crisis Director. | The requests are inserted with `_insert` as USER, by the activator, without the `REQUESTERS` check: two people decided (D-36: "a person with the right role, or … a person approved"). The audit details name the evacuation. No schema change. |
 | G-5 | **Existing specs.** Scene 5 now activates EVP-NBO. That adds two partner requests (USER) and a PENDING campaign. | The partners spec looks for the PLAYBOOK standby and the Mass Notification spec looks for its own campaign, so both are unaffected. `test_proposals.py` keeps its note check. The Phase 1 spec gains a check that EVP-NBO is ACTIVE after scene 5. decisions.md §7 scene 5 is updated (D-40 already amends it). |
@@ -162,3 +162,9 @@ Only after PC-30..32 (and G-1, if accepted) are approved:
 | 68 | Plans and templates in the seed; the scanner and progress consumer; NBO-EVACUATION | no |
 | 69 | The screen | no |
 | 70 | Playwright acceptance (§52) and `make acceptance` | no |
+
+## 15. Decisions by the product owner (2026-11-01, PR #78: "approved")
+
+- G-1: PC-31 gains `requested_role` (`HEAD_OF_MISSION` or `HQ_CRISIS_DIRECTOR`, frozen); the confirmer holds the other role.
+- G-2: sequence steps 4–6 are marked by a person or by the scenario's simulated progress events, not by partner status; arrival completes the partner requests. EV-05 reads accordingly.
+- G-3..G-11: as proposed.
