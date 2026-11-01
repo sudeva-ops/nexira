@@ -67,6 +67,7 @@ FORWARDED = frozenset(
         "HAZARD_CLOCK_ADVANCED",  # the demo clock moved on (plan-pilot-hz G-9)
         "HEALTH_ADVISORY_UPDATED",  # a health bulletin created, moved or closed (D-39)
         "EVACUATION_UPDATED",  # requested, activated, a check-in, a step, stood down (D-40)
+        "FLEET_UPDATED",  # a position, a status or a maintenance item (D-41)
         "CAMPAIGN_QUEUED",
         "CAMPAIGN_UPDATED",
         "CHECKIN_UPDATED",

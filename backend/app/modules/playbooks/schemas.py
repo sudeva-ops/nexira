@@ -96,3 +96,6 @@ class PermissionsOut(BaseModel):
     check_in_evacuee: bool = False
     advance_evacuation: bool = False
     stand_down_evacuation: bool = False
+    # fleet (entity_id = the mission; D-41, plan-pilot-flt §7)
+    set_asset_status: bool = False
+    complete_maintenance: bool = False

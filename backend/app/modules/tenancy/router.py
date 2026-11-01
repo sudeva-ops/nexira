@@ -10,6 +10,7 @@ from app.modules.agents import proposals
 from app.modules.agents.models import AgentProposal
 from app.modules.documents import service as documents
 from app.modules.evacuations import service as evacuations
+from app.modules.fleet import service as fleet
 from app.modules.health_intel import service as health
 from app.modules.notifications import compose
 from app.modules.notifications.models import NotificationCampaign
@@ -58,6 +59,7 @@ async def my_permissions(
         "hazards",
         "health",
         "evacuation",
+        "fleet",
     ],
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -121,6 +123,15 @@ async def my_permissions(
             check_in_evacuee=evacuating.check_in,
             advance_evacuation=evacuating.advance,
             stand_down_evacuation=evacuating.stand_down,
+        )
+    if entity_type == "fleet":
+        # FLT-04: entity_id is the mission; the endpoints' own check (plan-pilot-flt §7).
+        acting = await fleet.permissions(session, user, entity_id)
+        return PermissionsOut(
+            entity_type=entity_type,
+            entity_id=str(entity_id),
+            set_asset_status=acting.set_status,
+            complete_maintenance=acting.complete,
         )
     if entity_type == "trip":
         trip = await session.get(Trip, entity_id)
