@@ -1268,3 +1268,89 @@ EVACUATION_TEMPLATES: list[tuple[str, str, str | None, str, dict[str, str]]] = [
         },
     ),
 ]
+
+# --- Fleet & Assets (D-41, plan-pilot-flt §2) -------------------------------------------------
+# Illustrative and simulated. Passenger seats (the driver not counted, G-6).
+SUV, SEDAN, MINIBUS, PICKUP = (
+    ("Armoured SUV (B6)", 4),
+    ("Sedan (official)", 3),
+    ("Minibus 14-seat", 13),
+    ("Pickup 4x4", 3),
+)
+NAIROBI_DRIVER = "Peter Mwangi"  # VH-02's driver; answers NEED HELP in scene 4 (G-2)
+# (code, (type, seats), armoured, place, label, fuel %, status, reason, maintenance items)
+NAIROBI_FLEET: list[
+    tuple[str, tuple[str, int], bool, str, str, int, str, str | None, list[tuple[str, int]]]
+] = [
+    (
+        "VH-01",
+        SUV,
+        True,
+        "EMBASSY",
+        "Embassy garage",
+        82,
+        "AVAILABLE",
+        None,
+        [("Routine service", 45)],
+    ),
+    (
+        "VH-02",
+        SUV,
+        True,
+        "PETER",
+        "Haile Selassie Ave",
+        46,
+        "IN_USE",
+        None,
+        [("Routine service", 60)],
+    ),
+    (
+        "VH-03",
+        MINIBUS,
+        False,
+        "EMBASSY",
+        "Embassy garage",
+        90,
+        "AVAILABLE",
+        None,
+        [("Routine service", 75)],
+    ),
+    (
+        "VH-04",
+        PICKUP,
+        False,
+        "RESIDENCE",
+        "Residence",
+        64,
+        "AVAILABLE",
+        None,
+        [("Routine service", 50)],
+    ),
+    (
+        "VH-05",
+        SEDAN,
+        False,
+        "EMBASSY",
+        "Workshop",
+        30,
+        "MAINTENANCE",
+        "Brake service overdue",
+        [("Brake service", -3)],
+    ),
+]
+# A second vehicle, both armoured, at the eight higher-risk missions; one more armoured first
+# vehicle at Ankara: 48 vehicles, 19 armoured, as the design's KPI (G-6).
+FLEET_HIGH_RISK = ["ADD", "BGW", "ABV", "ISB", "CAI", "AMM", "PRY", "JKT"]
+FLEET_ARMOURED_FIRST = ["ANK"]
+FLEET_CODES = {"ADD": 11, "BGW": 21}  # as the design; the others from VH-31 in mission order
+FLEET_NEXT_CODE = 31
+# Maintenance items as the design (code: [(task, days from the seed date)]); routine items
+# 30-90 days out elsewhere.
+FLEET_ITEMS: dict[str, list[tuple[str, int]]] = {
+    "VH-21": [("Tyre replacement (run-flat)", 5)],
+    "GEN-ISB": [("Load test", 10)],
+    "VH-11": [("Armour inspection", 30)],
+}
+GENERATOR = "Generator 250 kVA"
+SATELLITE = "Satellite terminal"
+GENERATOR_FUEL = {"NBO": 72}

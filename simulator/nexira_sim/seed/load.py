@@ -13,6 +13,7 @@ from app.core.db import tenant_session
 from app.modules.agents.service import AgentIn, PolicyIn, ensure_agents, ensure_policies
 from app.modules.documents.service import ensure_documents, start_renewals
 from app.modules.evacuations import service as evacuations
+from app.modules.fleet import service as fleet
 from app.modules.hazards.service import ensure_climate
 from app.modules.health_intel import service as health
 from app.modules.intel.service import SourceIn, ensure_sources
@@ -43,6 +44,7 @@ from nexira_sim.scenarios import nbo_air_diversion as air
 from nexira_sim.scenarios import nbo_cholera as cholera
 from nexira_sim.scenarios import nbo_civil_unrest as nbo
 from nexira_sim.scenarios import nbo_evacuation as evacuation
+from nexira_sim.scenarios import nbo_fleet
 from nexira_sim.seed import data, world
 from nexira_sim.seed import documents as seed_documents
 from nexira_sim.seed.identities import bootstrap_tenant, demo_user_id, seed_identities
@@ -310,6 +312,11 @@ async def seed_all(
             session, _plans(w, mission_ids, partner_ids)
         )
 
+        # Fleet & Assets (D-41, plan-pilot-flt §2): every mission's vehicles and equipment.
+        report["fleet_assets"] = await fleet.ensure_assets(
+            session, _fleet(w, mission_ids), scenario_date
+        )
+
         report["counters"] = [
             await ensure_reference_counter(
                 session, prefix="INC", with_year=True, last_value=data.INC_START
@@ -382,6 +389,14 @@ async def seed_all(
             name=dac.NAME,
             description=dac.DESCRIPTION,
             events=dac.build_events(w, tenant_id),
+        )
+        report["scenario_fleet"] = await ensure_scenario(
+            session,
+            scenario_id=seed_id(tenant_id, "scenario", nbo_fleet.CODE),
+            code=nbo_fleet.CODE,
+            name=nbo_fleet.NAME,
+            description=nbo_fleet.DESCRIPTION,
+            events=nbo_fleet.build_events(w, tenant_id),
         )
         await session.commit()
     return report
@@ -567,3 +582,86 @@ async def _air_trips(
         if scenario:
             await ensure_scenario_flight(session, trip_id)
     return created
+
+
+def _fleet(w: world.World, mission_ids: dict[str, uuid.UUID]) -> list[fleet.AssetIn]:
+    """Nairobi as the design; one vehicle at every other mission and a second at the higher-
+    risk ones; a generator and a satellite terminal everywhere (plan §2, G-6)."""
+    driver = next(p.id for p in w.persons if p.full_name == data.NAIROBI_DRIVER)
+    places = {"EMBASSY": data.EMBASSY, "RESIDENCE": data.RESIDENCE, "PETER": data.PETER}
+
+    def items(code: str, default: list[tuple[str, int]]) -> tuple[fleet.ItemIn, ...]:
+        return tuple(fleet.ItemIn(t, d) for t, d in data.FLEET_ITEMS.get(code, default))
+
+    out: list[fleet.AssetIn] = []
+    following = data.FLEET_NEXT_CODE
+    for i, m in enumerate(w.missions):
+        mission_id = mission_ids[m.code]
+        garage = data.EMBASSY if m.code == "NBO" else (m.lat, m.lon)
+        if m.code == "NBO":
+            for code, (
+                label,
+                seats,
+            ), armoured, place, where, fuel, status, reason, todo in data.NAIROBI_FLEET:
+                lat, lon = places[place]
+                out.append(
+                    fleet.AssetIn(
+                        mission_id,
+                        code,
+                        "VEHICLE",
+                        label,
+                        lat,
+                        lon,
+                        where,
+                        fuel,
+                        armoured=armoured,
+                        seats=seats,
+                        driver_id=driver if place == "PETER" else None,
+                        status=status,
+                        status_reason=reason,
+                        items=items(code, todo),
+                    )
+                )
+        else:
+            count = 2 if m.code in data.FLEET_HIGH_RISK else 1
+            if m.code in data.FLEET_CODES:
+                numbers = [data.FLEET_CODES[m.code] + k for k in range(count)]
+            else:
+                numbers = list(range(following, following + count))
+                following += count
+            for k, n in enumerate(numbers):
+                armoured = m.code in data.FLEET_HIGH_RISK or (
+                    k == 0 and m.code in data.FLEET_ARMOURED_FIRST
+                )
+                label, seats = data.SUV if armoured else data.SEDAN
+                code = f"VH-{n:02d}"
+                out.append(
+                    fleet.AssetIn(
+                        mission_id,
+                        code,
+                        "VEHICLE",
+                        label,
+                        *garage,
+                        "Embassy garage",
+                        55 + (i * 7 + k * 13) % 41,
+                        armoured=armoured,
+                        seats=seats,
+                        items=items(code, [("Routine service", 30 + (i * 11 + k * 17) % 61)]),
+                    )
+                )
+        for prefix, label in (("GEN", data.GENERATOR), ("SAT", data.SATELLITE)):
+            code = f"{prefix}-{m.code}"
+            fuel = 100 if prefix == "SAT" else data.GENERATOR_FUEL.get(m.code, 60 + (i * 9) % 36)
+            out.append(
+                fleet.AssetIn(
+                    mission_id,
+                    code,
+                    "EQUIPMENT",
+                    label,
+                    *garage,
+                    "Embassy",
+                    fuel,
+                    items=items(code, []),
+                )
+            )
+    return out
