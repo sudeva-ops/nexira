@@ -35,6 +35,7 @@ from app.modules.playbooks.models import Playbook, PlaybookRun, PlaybookRunStep,
 from app.modules.scenarios.models import Scenario, ScenarioEvent, ScenarioRun
 from app.modules.tenancy.models import AppUser, ReferenceCounter, Role, Tenant, UserRole
 from app.modules.travel.models import Trip, TripTraveller
+from app.modules.vip.models import VipChecklistItem, VipSegment, VipSegmentChange, VipVisit
 from app.modules.weather.models import WeatherCurrent
 
 __all__ = [
@@ -85,5 +86,9 @@ __all__ = [
     "Trip",
     "TripTraveller",
     "UserRole",
+    "VipChecklistItem",
+    "VipSegment",
+    "VipSegmentChange",
+    "VipVisit",
     "WeatherCurrent",
 ]
