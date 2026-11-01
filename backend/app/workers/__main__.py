@@ -11,6 +11,7 @@ from app.core.events import Publisher, RedisPublisher, StreamConsumer, get_redis
 from app.modules.agents.runner import agents_handler, observed_types
 from app.modules.checkin.consumer import clock_handler, response_handler
 from app.modules.evacuations import consumer as evacuation
+from app.modules.fleet import consumer as fleet
 from app.modules.hazards import consumer as hazards
 from app.modules.health_intel.consumer import advisory_handler
 from app.modules.intel.consumer import exposure_handler, raw_signal_handler
@@ -199,10 +200,19 @@ async def main() -> None:
                 "EVACUATION_PROGRESS": evacuation.progress_handler(engine, publisher),
             },
         ),
+        StreamConsumer(
+            client,
+            group="fleet",
+            consumer=name,
+            handlers={
+                "VEHICLE_POSITION": fleet.position_handler(engine, publisher),
+                "WORKSHOP_DONE": fleet.workshop_handler(engine, publisher),
+            },
+        ),
     ]
     log.info(
         "consumers started: intel, exposure, playbooks, notifications, agents, flights, weather, "
-        "checkin, hazards, health, evacuation"
+        "checkin, hazards, health, evacuation, fleet"
     )
     try:
         async with asyncio.TaskGroup() as tasks:
