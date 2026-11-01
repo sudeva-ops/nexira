@@ -569,7 +569,7 @@ Playwright, real stack (requirements-pilot.md §47). Report the real output; mak
 acceptance (all specs) still passes.
 ```
 
-## Pilot module 10 · Evacuation Management (proposed, for approval)
+## Pilot module 10 · Evacuation Management (approved 2026-11-01, PR #77)
 
 Sources: D-40, `docs/requirements-pilot.md` §49–53 (EV-01..10), PC-30..32. Simulated plans, scanner and partners only.
 

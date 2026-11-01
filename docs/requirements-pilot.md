@@ -542,9 +542,9 @@ Playwright on the real stack: the Health Intelligence screen shows the six seede
 
 ---
 
-# Pilot module 10 · Evacuation Management (proposed, for approval)
+# Pilot module 10 · Evacuation Management (approved 2026-11-01, PR #77)
 
-For the product owner, who approves this part; then for the coding agent (Prompts 65–70 in `docs/prompts-pilot.md`). Rules: D-30, and **D-40 (proposed)**. Everything runs on **simulated plans, a simulated muster-point scanner and the simulated partners** (D-36): no charter operator, airline, convoy provider or scanner is contacted (AGENTS.md: no external URLs at runtime), and no real movement order is sent.
+For the product owner, who approves this part; then for the coding agent (Prompts 65–70 in `docs/prompts-pilot.md`). Rules: D-30, and **D-40**. Everything runs on **simulated plans, a simulated muster-point scanner and the simulated partners** (D-36): no charter operator, airline, convoy provider or scanner is contacted (AGENTS.md: no external URLs at runtime), and no real movement order is sent.
 
 ## 49. Purpose and starting point
 
@@ -589,7 +589,7 @@ Editing plans in the app; adding or removing people from a manifest by hand; rea
 
 Playwright on the real stack: after NBO-CIVIL-UNREST scenes 1–4, the screen shows EVP-NBO ready, not activated, labelled simulated. The scene 5 proposal: the Nairobi Head of Mission's approval activates nothing; the HQ Crisis Director's activates EVP-NBO with a manifest of 60 (16 mission, 44 citizens) and Hana and Aiko Takeda's documents flagged; two partner requests with no names; the movement message waits for a second person, refused to both activators and sent by the Consular Officer (deliveries simulated). `NBO-EVACUATION`: all 60 checked in with seats; the sequence completes in order; the evacuation is COMPLETED. A Viewer sees counts and no names; the Cairo Head of Mission sees no Nairobi names. Every step is audited and the chain verifies; `make acceptance` (all existing specs) still passes.
 
-## 53. Questions for the product owner (proposed defaults)
+## 53. Questions answered by the product owner (2026-11-01: "use the defaults")
 
 1. **Plans:** seeded for every mission, illustrative, read-only in the pilot; EVP-NBO as the design. Editing plans (and approving a new route) comes later. *Default: yes.*
 2. **Activation:** only with the two-person rule (Head of Mission + HQ Crisis Director, two different people), either from a `START_EVACUATION` proposal or the screen's Activate button. The Phase 1 stub executor is replaced by the real activation (🔒, D-29); Phase 1 scene 5 then activates EVP-NBO. *Default: yes.*
