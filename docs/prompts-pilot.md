@@ -685,7 +685,7 @@ Playwright, real stack (requirements-pilot.md §57). Report the real output; mak
 acceptance (all specs) still passes.
 ```
 
-## Pilot module 12 · VIP & Delegation Protection (proposed, for approval)
+## Pilot module 12 · VIP & Delegation Protection (approved 2026-11-01, PR #91)
 
 Sources: D-42, `docs/requirements-pilot.md` §59–63 (VIP-01..08), PC-35..38. Simulated visits only; never a position.
 

@@ -708,7 +708,7 @@ Playwright on the real stack:
 - **Audit:** every change is audited and the chain verifies.
 - `make acceptance` (all existing specs) still passes.
 
-## 63. Questions for the product owner (proposed defaults)
+## 63. Questions answered by the product owner (2026-11-01: "use the defaults")
 
 1. **Visits:** seeded in the pilot, as the design (VV-2026-031, Addis Ababa, linked to the restricted TRP-8834); adding and editing visits in the app comes later. *Default: yes.*
 2. **Who sees visits:** Security Officer, HQ Crisis Director, Duty Officer and the host mission's Head of Mission; for everyone else, a visit does not exist (404, no counts). There is no Protocol Officer role in the pilot (it would change roles and grants). *Default: yes.*
