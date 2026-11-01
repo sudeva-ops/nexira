@@ -131,7 +131,7 @@ describe("realtime client (PLT-05)", () => {
     // D-35: every 15 minutes and on a scenario override.
     expect(staleKeys(event("WEATHER_UPDATED", { missions: 36 }))).toEqual([["weather"]]);
     // D-36: a request made or moved (by a person, a playbook or the simulated partner).
-    expect(staleKeys(event("PARTNER_REQUEST_UPDATED", { request_id: "r1" }))).toEqual([["partners"]]);
+    expect(staleKeys(event("PARTNER_REQUEST_UPDATED", { request_id: "r1" }))).toEqual([["partners"], ["evacuations"]]);
     // D-38: arming, disarming and the demo clock refresh the hazards screen (HZ-04, HZ-05).
     expect(staleKeys(event("PLAYBOOK_RUN_ARMED", { run_id: "r1", incident_id: "i1" }))).toEqual([
       ["hazards"],
@@ -148,6 +148,10 @@ describe("realtime client (PLT-05)", () => {
     expect(staleKeys(event("HEALTH_ADVISORY_UPDATED", { advisory_id: "a1" }))).toEqual([["health"]]);
     expect(staleKeys(event("INCIDENT_CREATED", { incident_id: "i1" }))).toContainEqual(["health"]);
     expect(staleKeys(event("INCIDENT_UPDATED", { incident_id: "i1" }))).toContainEqual(["health"]);
+    // D-40: the evacuation, its partners, its message and the incident behind it.
+    expect(staleKeys(event("EVACUATION_UPDATED", { evacuation_id: "e1" }))).toEqual([["evacuations"]]);
+    expect(staleKeys(event("CAMPAIGN_UPDATED", { campaign_id: "c1" }))).toContainEqual(["evacuations"]);
+    expect(staleKeys(event("INCIDENT_UPDATED", { incident_id: "i1" }))).toContainEqual(["evacuations"]);
     expect(staleKeys(event("SOMETHING_ELSE"))).toEqual([]);
   });
 });

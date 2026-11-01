@@ -24,6 +24,8 @@ export const SCREENS: readonly Screen[] = [
   { path: "/health", title: "Health Intelligence", subtitle: "Health · WHO advisories, outbreaks & medical facilities", icon: "heart", group: "MONITOR", builtIn: "Prompt 63" },
   { path: "/hazards", title: "Natural Hazards & Climate", subtitle: "Hazards · Live events & long-term site exposure", icon: "globe-network", group: "MONITOR", builtIn: "Prompt 57" },
   { path: "/playbooks", title: "Response Playbooks", subtitle: "Workflows · Automated response", icon: "flash", group: "RESPOND", builtIn: "Prompt 11" },
+  // D-40: under RESPOND, after Response Playbooks (§53 Q9).
+  { path: "/evacuation", title: "Evacuation Management", subtitle: "Response · Manifests, seats & routes", icon: "log-out", group: "RESPOND", builtIn: "Prompt 69" },
   { path: "/notifications", title: "Mass Notification", subtitle: "Comms · Multi-channel delivery", icon: "send-message", group: "RESPOND", builtIn: "Prompt 21" },
   { path: "/partners", title: "Assistance Partners", subtitle: "Response · Medical, evacuation & secure transport", icon: "heart", group: "RESPOND", builtIn: "Prompt 46" },
   { path: "/checkin", title: "Safety Check-in", subtitle: "Workflows · Personnel accountability", icon: "tick-circle", group: "RESPOND", builtIn: "Prompt 11" },

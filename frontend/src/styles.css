@@ -2003,6 +2003,41 @@ body {
   font-size: 11px;
 }
 
+/* --- Evacuation Management (EV-08, D-40) -------------------------------------------- */
+.nx-ev-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .nx-ev-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nx-ev-picker {
+  gap: 8px;
+  font-size: 12px;
+}
+
+.nx-ev-table td {
+  font-size: 11.5px;
+}
+
+.nx-ev-table td.nx-nowrap {
+  white-space: nowrap;
+}
+
+.nx-ev-right {
+  text-align: right;
+}
+
+.nx-ev-standdown {
+  gap: 6px;
+}
+
 /* --- Document Expiry (DX-02..09, D-37) ------------------------------------------- */
 .nx-docs {
   margin-top: 8px;
