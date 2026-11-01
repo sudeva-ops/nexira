@@ -19,11 +19,15 @@ from app.core.db import tenant_session
 from app.core.events import get_publisher
 from app.main import app
 from app.modules.agents import proposals
+from app.modules.agents.actions import MessagePayload
 from app.modules.agents.service import AgentIn, PolicyIn, ensure_agents, ensure_policies
 from app.modules.audit.models import AuditLog
 from app.modules.evacuations import service as evacuations
+from app.modules.notifications import compose
+from app.modules.notifications.models import NotificationCampaign
+from app.modules.notifications.service import CampaignIn, create_campaign
 from app.modules.notifications.templates import TemplateIn, ensure_templates
-from app.modules.tenancy.service import ensure_reference_counter
+from app.modules.tenancy.service import SYSTEM, ensure_reference_counter
 from app.tests.auth_helpers import Idp
 from app.tests.fakes import ListPublisher
 
@@ -125,6 +129,10 @@ async def world(client: AsyncClient, idp: Idp) -> World:
         "hom.nbo": [("HEAD_OF_MISSION", nbo)],
         "hom.cai": [("HEAD_OF_MISSION", cai)],
         "dual": [("HEAD_OF_MISSION", nbo), ("HQ_CRISIS_DIRECTOR", None)],
+        # Activators who can also approve citizen messages (review of Prompt 67, M2).
+        "hom.consul": [("HEAD_OF_MISSION", nbo), ("CONSULAR_OFFICER", None)],
+        "hq.consul": [("HQ_CRISIS_DIRECTOR", None), ("CONSULAR_OFFICER", None)],
+        "security.cai": [("SECURITY_OFFICER", cai)],
         "viewer": [("VIEWER", None)],
     }
     for sub, roles in grants.items():
@@ -697,3 +705,142 @@ async def test_every_step_is_audited(world: World) -> None:
         await world.sql("SELECT details FROM audit_log WHERE action LIKE 'EVACUATION.%'")
     ).all()
     assert "Fictional" not in json.dumps([d.details for d in details])
+
+
+# --- review of Prompt 67 -------------------------------------------------------------------------
+
+
+async def _message(world: World, evacuation: dict[str, Any]) -> uuid.UUID:
+    found: uuid.UUID = (
+        await world.sql(
+            "SELECT id FROM notification_campaign WHERE reference = :r",
+            r=evacuation["message_reference"],
+        )
+    ).scalar_one()
+    return found
+
+
+async def test_activators_who_may_approve_messages_still_cannot_send_this_one(
+    world: World,
+) -> None:
+    """M2: the requester and the activator are excluded as people, not only by role."""
+    evacuation = await world.requested("hom.consul")
+    await world.post("hq.consul", f"/api/evacuations/{evacuation['id']}/confirm")
+    evacuation = await world.detail("hq", evacuation["id"])
+    url = f"/api/campaigns/{await _message(world, evacuation)}/approve"
+    for who in ("hom.consul", "hq.consul"):
+        refused = await world.post(who, url)
+        assert refused.status_code == 403, who
+    assert (await world.post("consular", url)).status_code == 200
+
+
+async def test_a_rejected_movement_message_keeps_both_activators_out(
+    world: World,
+) -> None:
+    evacuation = await world.requested("hom.consul")
+    await world.post("hq.consul", f"/api/evacuations/{evacuation['id']}/confirm")
+    campaign = await _message(world, await world.detail("hq", evacuation["id"]))
+    rejected = await world.post(
+        "consular", f"/api/campaigns/{campaign}/reject", {"reason": "Wrong muster point"}
+    )
+    assert rejected.status_code == 200, rejected.text
+    # The database keeps the first submitter (PC-10), so the requester cannot re-submit it
+    # as their own; the gate excludes both activators anyway (review of Prompt 67, M2).
+    resubmitted = await world.post("hom.consul", f"/api/campaigns/{campaign}/submit")
+    assert resubmitted.status_code == 409
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        row = await session.get_one(NotificationCampaign, campaign)
+        gate = await compose.gate(session, row)
+    assert gate.deciders_of_other_steps >= {
+        await world.user_id("hom.consul"),
+        await world.user_id("hq.consul"),
+    }
+
+
+async def test_no_agent_or_playbook_message_names_a_manifest(world: World) -> None:
+    """M1: SEND_EXTERNAL_MESSAGE, and the service behind it, refuse the audience."""
+    evacuation = await world.active()
+    audience = {"evacuation_id": evacuation["id"]}
+    with pytest.raises(ValueError, match="cannot name a trip, documents or an evacuation"):
+        MessagePayload.model_validate({"message": "m", "channels": ["SMS"], "audience": audience})
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        with pytest.raises(ValueError, match="only by Evacuation Management"):
+            await create_campaign(
+                session,
+                incident_id=world.incident,
+                campaign=CampaignIn(
+                    campaign_type="ADVISORY", message="m", channels=["SMS"], audience=audience
+                ),
+                created_by_type="PLAYBOOK",
+                created_by="x",
+                actor=SYSTEM,
+            )
+
+
+async def test_a_request_with_a_look_alike_note_is_not_the_evacuations(world: World) -> None:
+    """M3: matched by the activator and the activating transaction, not the note alone."""
+    evacuation = await world.active()
+    atlas = (await world.sql("SELECT id FROM partner WHERE code = 'ATL'")).scalar_one()
+    crafted = await world.post(
+        "duty",
+        "/api/partner-requests",
+        {
+            "partner_id": str(atlas),
+            "service": "EVACUATION",
+            "mission_id": str(world.nbo),
+            "note": f"{evacuation['reference']} · not the evacuation's",
+        },
+    )
+    assert crafted.status_code == 201, crafted.text
+    shown = (await world.detail("viewer", evacuation["id"]))["partner_requests"]
+    assert len(shown) == 2
+    await world.post("hq", f"/api/evacuations/{evacuation['id']}/stand-down", {"reason": "Eased"})
+    still = (
+        await world.sql("SELECT status FROM partner_request WHERE id = :i", i=crafted.json()["id"])
+    ).scalar_one()
+    assert still == "REQUESTED"
+
+
+async def test_a_draft_checkin_does_not_empty_the_citizens(world: World) -> None:
+    """L4: only a check-in that was sent counts."""
+    await world.sql(
+        "INSERT INTO notification_campaign (tenant_id, reference, incident_id, campaign_type, "
+        "message, channels, created_by_type, created_by, status) VALUES (current_tenant_id(), "
+        "'NTF-3002', :i, 'CHECKIN', 'Are you safe?', '{APP}', 'USER', 'x', 'DRAFT')",
+        i=world.incident,
+    )
+    assert (await world.active())["counts"]["CITIZEN"] == 2
+
+
+async def test_arrival_withdraws_a_movement_message_never_sent(world: World) -> None:
+    """L5."""
+    evacuation = await world.active()
+    for step in (3, 4, 5, 6):
+        await world.post("security", f"/api/evacuations/{evacuation['id']}/advance", {"step": step})
+    done = await world.detail("viewer", evacuation["id"])
+    assert (done["status"], done["message_status"]) == ("COMPLETED", "CANCELLED")
+
+
+async def test_a_proposal_cannot_evacuate_for_an_incident_no_longer_active(world: World) -> None:
+    """L6 (G-6)."""
+    proposal_id = await _propose(world)
+    await world.post("hom.nbo", f"/api/proposals/{proposal_id}/approve")
+    await world.sql("UPDATE incident SET status = 'MONITORING'")
+    second = await world.post("hq", f"/api/proposals/{proposal_id}/approve")
+    assert second.json()["status"] == "FAILED"
+    assert (await world.sql("SELECT count(*) FROM evacuation")).scalar_one() == 0
+
+
+async def test_another_missions_responder_cannot_check_in_or_move_the_sequence(
+    world: World,
+) -> None:
+    evacuation = await world.active()
+    entry = (await world.detail("hq", evacuation["id"]))["manifest"][0]
+    base = f"/api/evacuations/{evacuation['id']}"
+    check_in = await world.post("security.cai", f"{base}/manifest/{entry['id']}/check-in")
+    assert check_in.status_code == 403
+    assert (await world.post("security.cai", f"{base}/advance", {"step": 3})).status_code == 403
+    for field in ("category", "seat", "name"):
+        assert {
+            e[field] for e in (await world.detail("security.cai", evacuation["id"]))["manifest"]
+        } == {None}, field

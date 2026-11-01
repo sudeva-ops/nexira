@@ -260,6 +260,8 @@ async def activate_from_proposal(
     incident = await session.get(Incident, incident_id)
     if incident is None or incident.mission_id is None:
         raise EvacuationError(409, "the incident has no mission to evacuate")
+    if incident.status != "ACTIVE":
+        raise EvacuationError(409, f"{incident.reference} is no longer active (G-6)")
     first = await session.scalar(
         select(ProposalApproval.decided_by).where(
             ProposalApproval.proposal_id == proposal_id, ProposalApproval.step_no == 1
@@ -267,6 +269,15 @@ async def activate_from_proposal(
     )
     if first is None or approved_by is None or first == approved_by:
         raise EvacuationError(409, "an evacuation needs two people's approval (D-40)")
+    # The policy names the roles; check them here too, whatever a tenant's policy says
+    # (review of Prompt 67, L6).
+    if not (
+        await approvals.user_has_role(session, first, HOM, incident.mission_id)
+        and await approvals.user_has_role(session, approved_by, HQ, None)
+    ):
+        raise EvacuationError(
+            403, "an evacuation needs a Head of Mission and an HQ Crisis Director (D-40)"
+        )
     plan = await plan_for(session, incident.mission_id)
     if plan is None:
         raise EvacuationError(409, "the mission has no evacuation plan")
@@ -339,11 +350,13 @@ async def _citizens(session: AsyncSession, evacuation: Evacuation) -> list[uuid.
     check-in, the citizens exposed to the incident (§4, G-6)."""
     if evacuation.incident_id is None:
         return []
+    # A check-in that was sent: a draft or cancelled one asked no one (review of Prompt 67, L4).
     checkin = await session.scalar(
         select(NotificationCampaign.id)
         .where(
             NotificationCampaign.incident_id == evacuation.incident_id,
             NotificationCampaign.campaign_type == "CHECKIN",
+            NotificationCampaign.status.in_(("SENDING", "SENT")),
         )
         .order_by(NotificationCampaign.created_at.desc())
         .limit(1)
@@ -653,6 +666,24 @@ async def _move_step(
             moved = await partners.move_for_evacuation(session, request, "COMPLETED", actor)
             if moved is not None:
                 events.extend(moved.events)
+        # A movement message still unsent after arrival has nothing left to say (L5).
+        events.extend(await _withdraw_messages(session, evacuation, actor))
+    return events
+
+
+async def _withdraw_messages(
+    session: AsyncSession, evacuation: Evacuation, actor: Actor
+) -> list[Event]:
+    events: list[Event] = []
+    campaigns = await session.scalars(
+        select(NotificationCampaign.id).where(
+            NotificationCampaign.audience_filter["evacuation_id"].astext == str(evacuation.id)
+        )
+    )
+    for campaign_id in list(campaigns):
+        withdrawn = await compose.withdraw(session, campaign_id, actor)
+        if withdrawn is not None:
+            events.extend(withdrawn.events)
     return events
 
 
@@ -696,16 +727,26 @@ async def progress(session: AsyncSession, mission_code: str, step: int) -> Outco
 # --- stand down (EV-07) ------------------------------------------------------------------------
 
 
+def _made_by_activation(evacuation: Evacuation) -> Any:
+    """The partner requests the activation made: the activator's, written in the activating
+    transaction (the database's requested_at equals activated_at there), naming the
+    evacuation. A person cannot write those times, so a crafted note is not enough (review
+    of Prompt 67, M3)."""
+    return (
+        (PartnerRequest.mission_id == evacuation.mission_id)
+        & (PartnerRequest.created_by_type == "USER")
+        & (PartnerRequest.created_by == str(evacuation.activated_by))
+        & (PartnerRequest.requested_at == evacuation.activated_at)
+        & PartnerRequest.note.startswith(f"{evacuation.reference} · ")
+    )
+
+
 async def _requests(session: AsyncSession, evacuation: Evacuation) -> list[PartnerRequest]:
-    """The partner requests the activation made: their note names the evacuation."""
+    if evacuation.activated_at is None:
+        return []
     return list(
         await session.scalars(
-            select(PartnerRequest)
-            .where(
-                PartnerRequest.mission_id == evacuation.mission_id,
-                PartnerRequest.note.startswith(f"{evacuation.reference} · "),
-            )
-            .with_for_update()
+            select(PartnerRequest).where(_made_by_activation(evacuation)).with_for_update()
         )
     )
 
@@ -750,15 +791,7 @@ async def stand_down(
         moved = await partners.move_for_evacuation(session, request, "CANCELLED", actor)
         if moved is not None:
             events.extend(moved.events)
-    campaigns = await session.scalars(
-        select(NotificationCampaign.id).where(
-            NotificationCampaign.audience_filter["evacuation_id"].astext == str(evacuation.id)
-        )
-    )
-    for campaign_id in list(campaigns):
-        withdrawn = await compose.withdraw(session, campaign_id, actor)
-        if withdrawn is not None:
-            events.extend(withdrawn.events)
+    events.extend(await _withdraw_messages(session, evacuation, actor))
     await _audit(session, actor, "STAND_DOWN", evacuation, {"reason": reason})
     return Outcome(evacuation, [evacuation_event(evacuation), *events])
 
@@ -769,7 +802,7 @@ async def stand_down(
 @dataclass(frozen=True)
 class EntryView:
     id: uuid.UUID
-    category: str
+    category: str | None  # with the name and seat, only within the name scope (G-8, plan §9)
     seat: str | None
     status: str
     checked_in_at: Any
@@ -813,8 +846,8 @@ async def manifest(
     return [
         EntryView(
             id=e.id,
-            category=e.category,
-            seat=e.seat,
+            category=e.category if names else None,
+            seat=e.seat if names else None,
             status=e.status,
             checked_in_at=e.checked_in_at,
             name=full_name if names else None,
@@ -936,13 +969,14 @@ async def describe(
             service=r.service,
             status=r.status,
         )
-        for r in await session.scalars(
-            select(PartnerRequest)
-            .where(
-                PartnerRequest.mission_id == evacuation.mission_id,
-                PartnerRequest.note.startswith(f"{evacuation.reference} · "),
+        for r in (
+            await session.scalars(
+                select(PartnerRequest)
+                .where(_made_by_activation(evacuation))
+                .order_by(PartnerRequest.reference)
             )
-            .order_by(PartnerRequest.reference)
+            if evacuation.activated_at is not None
+            else []
         )
     ]
     message = await session.scalar(

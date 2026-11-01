@@ -444,6 +444,23 @@ async def _check_translations(
             )
 
 
+async def _evacuation_deciders(
+    session: AsyncSession, campaign: NotificationCampaign
+) -> set[uuid.UUID]:
+    """The two people who activated the evacuation behind a movement message: neither
+    sends it, even after a rejection and a re-submit by one of them (D-31, D-40; review of
+    Prompt 67, M2)."""
+    if not campaign.audience_filter.get("evacuation_id"):
+        return set()
+    row = (
+        await session.execute(
+            text("SELECT requested_by, activated_by FROM evacuation WHERE id = CAST(:e AS uuid)"),
+            {"e": campaign.audience_filter["evacuation_id"]},
+        )
+    ).first()
+    return {u for u in (row or ()) if u is not None}
+
+
 async def _proposal_deciders(
     session: AsyncSession, campaign: NotificationCampaign
 ) -> set[uuid.UUID]:
@@ -472,6 +489,7 @@ async def gate(session: AsyncSession, campaign: NotificationCampaign) -> approva
     if campaign.submitted_by is not None:
         others.add(campaign.submitted_by)
     others |= await _proposal_deciders(session, campaign)
+    others |= await _evacuation_deciders(session, campaign)
     return approvals.Gate(
         subject=f"Campaign {campaign.reference}",
         required_role=APPROVERS,

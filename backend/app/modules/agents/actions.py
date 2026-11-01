@@ -82,10 +82,10 @@ class MessagePayload(_Payload):
     @field_validator("audience")
     @classmethod
     def _incident_audiences(cls, audience: dict[str, Any]) -> dict[str, Any]:
-        """The trip and document audiences have their own actions, approvers and scope
-        (review of Prompt 50, L1)."""
-        if "trip_id" in audience or "document_ids" in audience:
-            raise ValueError("an advisory cannot name a trip or documents")
+        """The trip, document and evacuation audiences have their own actions, approvers
+        and scope (review of Prompt 50, L1; review of Prompt 67, M1)."""
+        if "trip_id" in audience or "document_ids" in audience or "evacuation_id" in audience:
+            raise ValueError("an advisory cannot name a trip, documents or an evacuation")
         return audience
 
 

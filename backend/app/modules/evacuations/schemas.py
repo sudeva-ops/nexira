@@ -36,10 +36,11 @@ class StepOut(BaseModel):
 
 
 class EntryOut(BaseModel):
-    """A manifest entry. name and document_flag are None outside the caller's scope (G-8)."""
+    """A manifest entry. Category, seat, name and document flag are None outside the
+    caller's scope (G-8, plan §9); counts by category are for everyone."""
 
     id: uuid.UUID
-    category: str
+    category: str | None
     seat: str | None
     status: str  # EXPECTED, CHECKED_IN
     checked_in_at: datetime | None

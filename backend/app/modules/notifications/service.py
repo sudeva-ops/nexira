@@ -293,6 +293,10 @@ async def create_campaign(
         raise ValueError(f"unknown channels {campaign.channels}")
     if len(set(campaign.channels)) != len(campaign.channels):
         raise ValueError("each channel once")  # review of Prompt 34, L1
+    if "evacuation_id" in campaign.audience:
+        # Only Evacuation Management messages a manifest, and never straight to SENDING:
+        # its message waits for a third person (D-31, D-40; review of Prompt 67, M1).
+        raise ValueError("an evacuation's manifest is messaged only by Evacuation Management")
     recipients = await resolve_audience(session, incident_id, campaign.audience)
     escalate_after_s = campaign.escalate_after_s
     if campaign.campaign_type == "CHECKIN":
