@@ -26,6 +26,7 @@ const TIMELINE_COLOUR: Record<string, string> = {
   ESCALATED: "#CD4246",
   STATUS: "#32A467",
   NOTE: "#9D7FDB",
+  FLEET: "#EC9A3C", // a vehicle crossing the impact zone (D-41, plan-pilot-flt G-10)
 };
 
 function errorText(error: unknown): string {

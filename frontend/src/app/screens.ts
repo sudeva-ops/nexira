@@ -26,6 +26,8 @@ export const SCREENS: readonly Screen[] = [
   { path: "/playbooks", title: "Response Playbooks", subtitle: "Workflows · Automated response", icon: "flash", group: "RESPOND", builtIn: "Prompt 11" },
   // D-40: under RESPOND, after Response Playbooks (§53 Q9).
   { path: "/evacuation", title: "Evacuation Management", subtitle: "Response · Manifests, seats & routes", icon: "log-out", group: "RESPOND", builtIn: "Prompt 69" },
+  // D-41: under RESPOND, after Evacuation Management (§58 Q9).
+  { path: "/fleet", title: "Fleet & Assets", subtitle: "Assets · Vehicles, fuel & availability", icon: "truck", group: "RESPOND", builtIn: "Prompt 75" },
   { path: "/notifications", title: "Mass Notification", subtitle: "Comms · Multi-channel delivery", icon: "send-message", group: "RESPOND", builtIn: "Prompt 21" },
   { path: "/partners", title: "Assistance Partners", subtitle: "Response · Medical, evacuation & secure transport", icon: "heart", group: "RESPOND", builtIn: "Prompt 46" },
   { path: "/checkin", title: "Safety Check-in", subtitle: "Workflows · Personnel accountability", icon: "tick-circle", group: "RESPOND", builtIn: "Prompt 11" },
