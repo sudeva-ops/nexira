@@ -41,6 +41,7 @@ class Ids:
     activator: uuid.UUID
     plan: uuid.UUID
     evacuation: uuid.UUID
+    asset: uuid.UUID
 
 
 PT = "'SRID=4326;POINT(36.8245 -1.2838)'"
@@ -150,6 +151,11 @@ ROWS: dict[str, str] = {
     "evacuation_manifest": "UPDATE evacuation SET status = 'ACTIVE', activated_by = '{activator}', "
     "step = 2 WHERE id = '{evacuation}'; INSERT INTO evacuation_manifest (tenant_id, "
     "evacuation_id, person_id, category) VALUES ('{t}', '{evacuation}', '{person}', 'STAFF')",
+    "fleet_asset": "INSERT INTO fleet_asset (id, tenant_id, mission_id, code, kind, type_label, "
+    "seats, location, location_label, fuel_pct) VALUES ('{asset}', '{t}', '{mission}', 'VH-01', "
+    "'VEHICLE', 'Armoured SUV (B6)', 4, " + PT + ", 'Embassy garage', 82)",
+    "fleet_maintenance": "INSERT INTO fleet_maintenance (tenant_id, asset_id, task, due_on) "
+    "VALUES ('{t}', '{asset}', 'Brake service', current_date)",
     "partner_request": "INSERT INTO partner_request (tenant_id, reference, partner_id, service, "
     "mission_id, created_by_type, created_by) VALUES ('{t}', 'REQ-1', '{partner}', 'MEDICAL', "
     "'{mission}', 'USER', 'u')",
@@ -190,6 +196,8 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "evacuation_plan",  # seeded; no UPDATE or DELETE in the pilot (PC-30)
     "evacuation",  # UPDATE of status, activation, step and stand-down only, no DELETE (PC-31)
     "evacuation_manifest",  # UPDATE of the check-in only, no DELETE (PC-32)
+    "fleet_asset",  # UPDATE of position, fuel and status only, no DELETE (PC-33)
+    "fleet_maintenance",  # UPDATE of the done columns only, no DELETE (PC-34)
 }
 NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELETE)
     "message_template",
@@ -335,6 +343,7 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
             r"|travel document: no such person|climate risk: no such mission"
             r"|medical facility: no such mission|health readiness: no such mission"
             r"|evacuation plan: no such mission|evacuation manifest: no such evacuation"
+            r"|fleet asset: no such mission|fleet maintenance: no such asset"
         ),
     ):
         await api.execute(sql_for(table, world.a))
