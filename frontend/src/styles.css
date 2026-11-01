@@ -1938,6 +1938,71 @@ body {
   color: #fa999c;
 }
 
+/* --- Health Intelligence (HL-02..08, D-39) ------------------------------------------ */
+.nx-hl-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .nx-hl-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nx-hl-table td {
+  font-size: 11.5px;
+}
+
+.nx-hl-table td.nx-nowrap,
+.nx-hl-stamp {
+  white-space: nowrap;
+}
+
+.nx-hl-stamp {
+  font-size: 11px;
+}
+
+.nx-hl-guidance {
+  max-width: 280px;
+}
+
+.nx-hl-affects {
+  font-size: 10.5px;
+  color: #fa999c;
+}
+
+.nx-hl-scroll {
+  max-height: 320px;
+  overflow: auto;
+}
+
+.nx-hl-tick {
+  gap: 8px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--nx-panel2);
+}
+
+.nx-hl-done {
+  color: #72ca9b;
+}
+
+.nx-hl-due {
+  color: #fbb360;
+}
+
+.nx-hl-asof {
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.nx-trip-health {
+  margin: 6px 0;
+  font-size: 11px;
+}
+
 /* --- Document Expiry (DX-02..09, D-37) ------------------------------------------- */
 .nx-docs {
   margin-top: 8px;

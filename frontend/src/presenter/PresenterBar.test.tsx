@@ -134,5 +134,7 @@ describe("Presenter bar", () => {
       4: "/hazards",
       5: "/hazards",
     });
+    // D-39: the cholera advisory rising and dengue closing, on the Health Intelligence screen.
+    expect(SCENE_SCREEN["NBO-CHOLERA"]).toEqual({ 0: "/health", 1: "/health", 2: "/health" });
   });
 });

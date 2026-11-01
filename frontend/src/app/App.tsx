@@ -9,6 +9,7 @@ import { AuditScreen } from "../screens/audit/AuditScreen";
 import { CheckinScreen } from "../screens/checkin/CheckinScreen";
 import { DocumentsScreen } from "../screens/documents/DocumentsScreen";
 import { HazardsScreen } from "../screens/hazards/HazardsScreen";
+import { HealthScreen } from "../screens/health/HealthScreen";
 import { IncidentsScreen } from "../screens/incidents/IncidentsScreen";
 import { JourneysScreen } from "../screens/journeys/JourneysScreen";
 import { NotifyScreen } from "../screens/notify/NotifyScreen";
@@ -27,6 +28,7 @@ const BUILT: Record<string, ReactElement> = {
   "/operations": <OperationsScreen />,
   "/incidents": <IncidentsScreen />,
   "/people": <PeopleScreen />,
+  "/health": <HealthScreen />,
   "/hazards": <HazardsScreen />,
   "/journeys": <JourneysScreen />,
   "/air": <AirScreen />,

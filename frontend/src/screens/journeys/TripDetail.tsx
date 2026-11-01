@@ -132,6 +132,12 @@ export function TripDetail({ trip, onEdit }: { trip: Detail; onEdit: (trip: Deta
               ))}
               <Checkbox label="Security approval" checked={trip.checklist.security_approval} disabled />
             </div>
+            {trip.health_requirement && (
+              <div className="nx-dim nx-trip-health" role="note">
+                Entry: {trip.health_requirement.mandatory} · Recommended: {trip.health_requirement.recommended}{" "}
+                (simulated, HL-03)
+              </div>
+            )}
             {trip.document_warnings.map((w) => (
               <div key={w.person_id} className="nx-doc-warning" role="note">
                 Travel document: {w.full_name} has no passport valid 180 days after the trip

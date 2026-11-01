@@ -87,6 +87,7 @@ const PENDING: TripDetail = {
     simulated: true,
   },
   document_warnings: [],
+  health_requirement: null,
 };
 const IMPACTED: TripDetail = {
   ...PENDING,
@@ -188,6 +189,27 @@ describe("Journey Management", () => {
       "Travel document: Fictional Diplomat B has no passport valid 180 days after the trip (valid until 2027-03-30).",
     );
     expect(await screen.findByRole("button", { name: "Approve trip" })).toBeEnabled();
+  });
+
+  it("shows the destination's entry requirements on the trip (HL-03, plan-pilot-hl G-9)", async () => {
+    server(SECURITY, NONE, {
+      "GET /api/trips/t-1": {
+        body: {
+          ...PENDING,
+          health_requirement: {
+            country_code: "IQ",
+            mandatory: "None",
+            recommended: "Hepatitis A, typhoid",
+            source: "Illustrative (simulated)",
+            simulated: true,
+          },
+        },
+      },
+    });
+    renderApp("/journeys?trip=t-1");
+    expect(await screen.findByRole("note")).toHaveTextContent(
+      "Entry: None · Recommended: Hepatitis A, typhoid (simulated, HL-03)",
+    );
   });
 
   it("flags a risk that rose since approval", async () => {
