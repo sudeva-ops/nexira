@@ -107,9 +107,9 @@ The demo clock counts only while the scenario runs, and only for runs armed duri
 
 Simulated advisories, sample facilities and illustrative entry requirements (D-39). The six advisories are seeded, so they are there from `make reset-demo`, and none is HIGH, so the Decision Queue stays empty until this storyline. Readiness is counts per mission only; nobody's health data is stored.
 
-1. Presenter bar: pick **Nairobi cholera** and press →: a newer simulated WHO bulletin raises **cholera in Kenya** from MODERATE to **HIGH**. **Decision Queue**: the Communications agent proposes **Health advisory recommended for Nairobi staff and citizens**, with "9 of 14 staff offered the cholera vaccine" as evidence. Approve it as the **Duty Officer**: this creates the campaign, it sends nothing.
+1. Presenter bar: pick **Nairobi cholera**; it opens **Health Intelligence**, with the six advisories, the entry requirements, and each mission's facilities and readiness counts (pick **NBO · Nairobi**: 9 / 14 offered the cholera vaccine). While the Nairobi unrest is ACTIVE, Nairobi Central Medical Centre shows **AVOID**. Press →: a newer simulated WHO bulletin raises **cholera in Kenya** from MODERATE to **HIGH**, and the screen opens on Nairobi. **Decision Queue**: the Communications agent proposes **Health advisory recommended for Nairobi staff and citizens**, with "9 of 14 staff offered the cholera vaccine" as evidence. Approve it as the **Duty Officer**: this creates the campaign, it sends nothing.
 2. **Mass Notification**: the campaign waits for a second person. The Duty Officer who approved the proposal cannot approve it; sign in as the **Consular Officer** and approve it, and it is delivered (simulated).
-3. →: the dengue advisory in Bangladesh is closed.
+3. →: back on Health Intelligence, the dengue advisory in Bangladesh is closed. A Viewer sees the same screen with no send button.
 
 A closed advisory stays closed and cholera stays HIGH, so to show the storyline again run `make reset-demo`.
 

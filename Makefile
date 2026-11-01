@@ -53,7 +53,7 @@ acceptance: env reset-demo up
 	set -a && . ./.env && set +a && cd frontend && npx playwright test e2e/acceptance.spec.ts \
 	  e2e/ntf-acceptance.spec.ts e2e/jrn-acceptance.spec.ts e2e/air-acceptance.spec.ts \
 	  e2e/ta-acceptance.spec.ts e2e/wx-acceptance.spec.ts e2e/ast-acceptance.spec.ts \
-	  e2e/dx-acceptance.spec.ts e2e/hz-acceptance.spec.ts
+	  e2e/dx-acceptance.spec.ts e2e/hl-acceptance.spec.ts e2e/hz-acceptance.spec.ts
 
 lint: lint-backend lint-simulator lint-frontend
 
