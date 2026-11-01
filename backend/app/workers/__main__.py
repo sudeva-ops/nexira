@@ -10,6 +10,7 @@ from app.core.db import get_engine, verify_connection_role
 from app.core.events import Publisher, RedisPublisher, StreamConsumer, get_redis
 from app.modules.agents.runner import agents_handler, observed_types
 from app.modules.checkin.consumer import clock_handler, response_handler
+from app.modules.evacuations import consumer as evacuation
 from app.modules.hazards import consumer as hazards
 from app.modules.health_intel.consumer import advisory_handler
 from app.modules.intel.consumer import exposure_handler, raw_signal_handler
@@ -189,10 +190,19 @@ async def main() -> None:
             consumer=name,
             handlers={"HEALTH_ADVISORY": advisory_handler(engine, publisher)},
         ),
+        StreamConsumer(
+            client,
+            group="evacuation",
+            consumer=name,
+            handlers={
+                "MUSTER_SCAN": evacuation.scan_handler(engine, publisher),
+                "EVACUATION_PROGRESS": evacuation.progress_handler(engine, publisher),
+            },
+        ),
     ]
     log.info(
         "consumers started: intel, exposure, playbooks, notifications, agents, flights, weather, "
-        "checkin, hazards, health"
+        "checkin, hazards, health, evacuation"
     )
     try:
         async with asyncio.TaskGroup() as tasks:

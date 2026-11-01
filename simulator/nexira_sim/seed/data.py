@@ -1206,3 +1206,65 @@ DIPLOMAT_TITLES = [
     "Economic Officer", "Consular Officer", "Administration Officer", "Press Attaché",
 ]  # fmt: skip
 LOCAL_TITLES = ["Driver", "Receptionist", "IT Support", "Interpreter", "Facilities", "Guard"]
+
+
+EVN_START = 1000  # EVN-1001 is the first evacuation
+
+# --- Evacuation Management (D-40, plan-pilot-ev §2) --------------------------------------------
+# Illustrative plans, one per mission (EV-01, §53 Q1). EVP-NBO as the design; every other
+# mission: a charter to a regional safe haven (Atlas where it covers the country), held
+# commercial seats, and an overland route (Sentinel in EMEA, else Meridian). Simulated.
+SAFE_HAVEN = {  # mission country -> destination
+    **dict.fromkeys(["GB", "FR", "DE", "BE", "IT", "ES", "RU", "TR"], "Geneva"),
+    "CH": "Vienna",
+    **dict.fromkeys(["EG", "MA", "NG", "KE", "ET", "ZA", "JO", "IQ", "SA", "OM"], "Dubai"),
+    **dict.fromkeys(["PK", "IN", "BD", "CN", "KR", "JP", "PH", "MY", "ID", "AU"], "Singapore"),
+    "SG": "Tokyo",
+    **dict.fromkeys(["US", "CA", "MX", "BR", "AR"], "Panama City"),
+}
+NAIROBI_MUSTER, NAIROBI_ROUTE, NAIROBI_DESTINATION = "Embassy courtyard", "Route B", "Dubai"
+EvacuationOption = tuple[str, str, str, int | None, str | None]  # role, kind, label, seats, partner
+NAIROBI_OPTIONS: list[EvacuationOption] = [
+    ("PRIMARY", "CHARTER", "Charter · Wilson Airport → Dubai", 72, "ATL"),
+    ("BACKUP", "COMMERCIAL", "Commercial · JKIA (seats held: 30)", 30, None),
+    ("CONTINGENCY", "ROAD", "Road · Namanga border → Arusha", None, "SEN"),
+]
+EVACUATION_MOVE = "EVACUATION_MOVE"
+EVACUATION_TEMPLATES: list[tuple[str, str, str | None, str, dict[str, str]]] = [
+    (
+        EVACUATION_MOVE,
+        "ALERT",
+        None,
+        "Evacuation · movement order",
+        {
+            "en": "Evacuation of {city} is under way. Go to the mission's muster point now with "
+            "your passport and one bag, and follow the instructions of mission staff.",
+            "ar": REVIEW_REQUIRED + "بدأ إجلاء {city}. توجهوا الآن إلى نقطة التجمع التابعة "
+            "للبعثة ومعكم جواز السفر وحقيبة واحدة، واتبعوا تعليمات موظفي البعثة.",
+            "fr": REVIEW_REQUIRED + "L'évacuation de {city} est en cours. Rendez-vous maintenant "
+            "au point de rassemblement de la mission avec votre passeport et un sac, et suivez "
+            "les consignes du personnel de la mission.",
+            "sw": REVIEW_REQUIRED + "Uhamishaji wa {city} unaendelea. Nendeni sasa kwenye eneo "
+            "la mkusanyiko la ubalozi mkiwa na pasipoti na begi moja, na fuateni maelekezo ya "
+            "wafanyakazi.",
+        },
+    ),
+    (
+        EVACUATION_MOVE,
+        "ALERT",
+        "NBO",
+        "Evacuation · movement order (Nairobi)",
+        {
+            "en": "Evacuation of Nairobi is under way. Go to the Embassy courtyard now with your "
+            "passport and one bag. Convoy via Route B to Wilson Airport; follow mission staff.",
+            "ar": REVIEW_REQUIRED + "بدأ إجلاء نيروبي. توجهوا الآن إلى فناء السفارة ومعكم جواز "
+            "السفر وحقيبة واحدة. القافلة عبر الطريق B إلى مطار ويلسون.",
+            "fr": REVIEW_REQUIRED + "L'évacuation de Nairobi est en cours. Rendez-vous maintenant "
+            "dans la cour de l'ambassade avec votre passeport et un sac. Convoi par la route B "
+            "vers l'aéroport Wilson.",
+            "sw": REVIEW_REQUIRED + "Uhamishaji wa Nairobi unaendelea. Nendeni sasa uwanja wa "
+            "ubalozi mkiwa na pasipoti na begi moja. Msafara kupitia Njia B hadi Uwanja wa Ndege "
+            "wa Wilson.",
+        },
+    ),
+]

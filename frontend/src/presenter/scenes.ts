@@ -49,4 +49,13 @@ export const SCENE_SCREEN: Record<DemoScenario, Record<number, string>> = {
     1: "/health",
     2: "/health",
   },
+  // D-40 (EV-10): after NBO-CIVIL-UNREST scene 5. Prompt 69 moves every scene to the
+  // Evacuation Management screen; until then the Decision Queue.
+  "NBO-EVACUATION": {
+    0: "/",
+    1: "/",
+    2: "/",
+    3: "/",
+    4: "/",
+  },
 };

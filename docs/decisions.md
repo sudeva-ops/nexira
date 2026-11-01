@@ -286,7 +286,7 @@ The master spec's scenario covers all four phases. This is the **Phase 1 subset*
 | 3 Playbook | Duty Officer approves the proposal; PB-07 runs | Steps 1–6 DONE in order with timestamps; step 5 creates the CHECKIN campaign (229 recipients); step 7 AWAITING_APPROVAL; Duty Officer approving step 7 → **403**; Nairobi Head of Mission approves → step 7 DONE; step 8 (BRIEFING) writes an incident event only |
 | 3b Advisory | Step 4 (shelter-in-place) finishes, so Communications proposes `SEND_EXTERNAL_MESSAGE` to citizens | Proposal PENDING with EN/AR/FR/SW templates; Duty Officer approves → ADVISORY campaign through the simulated adapter; nothing leaves the system |
 | 4 Check-in | Simulator sends responses | Personnel: **15 safe, 1 need help (Peter Mwangi), 1 pending (Hana Takeda) → escalated after 20 s**. Citizens: 168 safe, 4 need help, 40 pending |
-| 5 Decisions (test fixture) | A `START_EVACUATION` proposal is injected by the test, not by an agent | Nairobi Head of Mission approves → not executed; the same person trying step 2 → rejected; HQ Crisis Director approves → executed through the service layer (stub action in Phase 1) |
+| 5 Decisions (test fixture) | A `START_EVACUATION` proposal is injected by the test, not by an agent | Nairobi Head of Mission approves → not executed; the same person trying step 2 → rejected; HQ Crisis Director approves → executed through the service layer: it activates EVP-NBO (D-40; in Phase 1 a stub, kept for a mission with no plan) |
 | 6 Review | Incident set to MONITORING by a user | Timeline shows every step; `audit_verify_chain()` returns NULL; every decision has a logged-in user with the right role |
 
 ---
