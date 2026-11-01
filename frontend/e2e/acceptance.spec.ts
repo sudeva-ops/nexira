@@ -166,6 +166,16 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
     return pending.find((p) => p.full_name === "Hana Takeda" && p.escalated);
   }, "Hana Takeda escalated");
   expect(hana.escalated).toBe(true);
+  // EV-02 (Prompt 70): after scenes 1-4, EVP-NBO is ready, not activated, labelled simulated.
+  // Only here in `make acceptance` is that so; ev-acceptance.spec.ts takes it on from scene 5.
+  const nboEvacuations = () => duty.get<{ status: string }[]>(`/api/evacuations?mission_id=${nbo?.id}`);
+  expect(await nboEvacuations()).toEqual([]);
+  await dutyPage.getByRole("link", { name: /Evacuation Management/ }).click();
+  await dutyPage.getByRole("combobox", { name: "Mission" }).selectOption(nbo?.id ?? "");
+  await expect(dutyPage.getByTestId("evacuation-banner")).toContainText(
+    "Evacuation plan EVP-NBO is ready but not activated.",
+  );
+  await expect(dutyPage.getByText("Illustrative evacuation plan (simulated)")).toBeVisible();
 
   // --- Scene 5 · Decisions: the two-person rule (plan G-16 fixture) --------------------------
   await presenter.getByRole("button", { name: "Next scene" }).click();
@@ -174,6 +184,7 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
   await card(hom, evacuation).getByRole("button", { name: "Approve as Head of Mission (1/2)" }).click();
   await expect(card(hom, evacuation).getByTestId("approver-1")).toContainText("✓ Head of Mission");
   expect((await proposals()).find((p) => p.id === evacuation)?.status).toBe("PENDING"); // not executed
+  expect(await nboEvacuations()).toEqual([]); // EV-02: one approval activates nothing
   const homApi = await as(request, "hom.nairobi");
   expect((await homApi.post(`/api/proposals/${evacuation}/approve`)).status()).toBe(403); // step 2: rejected
   const hq = await signedIn(browser, "hq.director");
@@ -182,6 +193,7 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
     async () => ((await proposals()).find((p) => p.id === evacuation)?.status === "APPROVED" ? true : undefined),
     "the evacuation executed",
   );
+  expect((await nboEvacuations()).map((e) => e.status)).toEqual(["ACTIVE"]); // EV-02: the second activates
 
   // --- Scene 6 · Review: a user sets MONITORING; the audit chain verifies ---------------------
   await presenter.getByRole("button", { name: "Next scene" }).click();
