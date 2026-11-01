@@ -51,16 +51,19 @@ def test_vh04_leaves_the_residence_site_on_the_second_position_and_returns() -> 
     positions = {
         n: [e.payload for e in sorted(EVENTS, key=lambda e: e.offset_ms) if e.scene_no == n
             and e.event_type == "VEHICLE_POSITION"]
-        for n in (0, 1, 2)
+        for n in (1, 2)
     }  # fmt: skip
     for scene in positions.values():
         for p in scene:
             consumer.PositionIn.model_validate(p)
             assert p["asset_code"] == "VH-04"
-    at = [metres((p["lat"], p["lon"]), data.RESIDENCE) for p in positions[1]]
-    assert at[0] < fleet.AT_SITE_M < at[1]  # G-1: the second point leaves the site
+    # Scene 0 plays only on Play, not on Next: scene 1 starts by putting VH-04 at the residence.
+    assert [e.event_type for e in EVENTS if e.scene_no == 0] == ["SCENE_START"]
+    assert (positions[1][0]["lat"], positions[1][0]["lon"]) == data.RESIDENCE
+    at = [metres((p["lat"], p["lon"]), data.RESIDENCE) for p in positions[1][1:]]
+    assert at[0] < fleet.AT_SITE_M < at[1]  # G-1: the second move leaves the site
     assert all(metres((p["lat"], p["lon"]), data.EPICENTRE) < 5_000 for p in positions[1])
-    assert (positions[0][0]["lat"], positions[0][0]["lon"]) == data.RESIDENCE
+    assert len(positions[1]) + len(positions[2]) == 10
     assert (positions[2][-1]["lat"], positions[2][-1]["lon"]) == data.RESIDENCE
     fuel = [p["fuel_pct"] for p in positions[1] + positions[2]]
     assert fuel == sorted(fuel, reverse=True)
