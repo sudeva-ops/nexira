@@ -442,6 +442,47 @@ async def complete(session: AsyncSession, user: CurrentUser, request_id: uuid.UU
     return Outcome(request, [request_event(request)])
 
 
+# --- Evacuation Management (D-40, plan-pilot-ev §7, G-4) ----------------------------------------
+
+
+async def request_for_evacuation(
+    session: AsyncSession,
+    *,
+    partner: Partner,
+    service: str,
+    mission_id: uuid.UUID,
+    incident_id: uuid.UUID | None,
+    note: str,
+    activator: uuid.UUID,
+    actor: Actor,
+) -> Outcome:
+    """A request made by an evacuation's activation: two people decided (D-36, plan-pilot-ev
+    G-4), so no REQUESTERS check. It is recorded as the activator's; the note names the
+    evacuation, and no person is shared (AS-08)."""
+    _service(service)
+    request = await _insert(
+        session,
+        RequestIn(partner_id=partner.id, service=service, incident_id=incident_id, note=note),
+        mission_id,
+        "USER",
+        str(activator),
+        actor,
+    )
+    return Outcome(request, [request_event(request)])
+
+
+async def move_for_evacuation(
+    session: AsyncSession, request: PartnerRequest, status: str, actor: Actor
+) -> Outcome | None:
+    """Arrival completes an en-route request; a stand-down cancels an open one. None if the
+    request cannot move there now (already final, or not yet en route)."""
+    allowed = {"COMPLETED": ("EN_ROUTE",), "CANCELLED": ("REQUESTED", "ACCEPTED", "EN_ROUTE")}
+    if request.status not in allowed[status]:
+        return None
+    await _move(session, request, status, actor)
+    return Outcome(request, [request_event(request)])
+
+
 # --- the partner's side (AS-04; worker) ----------------------------------------------------------
 
 

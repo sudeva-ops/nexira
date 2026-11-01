@@ -9,6 +9,7 @@ from app.core.security import CurrentUser, current_user, get_db
 from app.modules.agents import proposals
 from app.modules.agents.models import AgentProposal
 from app.modules.documents import service as documents
+from app.modules.evacuations import service as evacuations
 from app.modules.health_intel import service as health
 from app.modules.notifications import compose
 from app.modules.notifications.models import NotificationCampaign
@@ -56,6 +57,7 @@ async def my_permissions(
         "documents",
         "hazards",
         "health",
+        "evacuation",
     ],
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -107,6 +109,18 @@ async def my_permissions(
             entity_type=entity_type,
             entity_id=str(entity_id),
             send_advisory=await health.send_permission(session, user, entity_id),
+        )
+    if entity_type == "evacuation":
+        # EV-02, EV-04, EV-05, EV-07: entity_id is the mission; the endpoints' own checks.
+        evacuating = await evacuations.permissions(session, user, entity_id)
+        return PermissionsOut(
+            entity_type=entity_type,
+            entity_id=str(entity_id),
+            activate_evacuation=evacuating.activate,
+            confirm_evacuation=evacuating.confirm,
+            check_in_evacuee=evacuating.check_in,
+            advance_evacuation=evacuating.advance,
+            stand_down_evacuation=evacuating.stand_down,
         )
     if entity_type == "trip":
         trip = await session.get(Trip, entity_id)

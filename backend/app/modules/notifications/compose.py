@@ -74,6 +74,8 @@ class Content:
     incident_id: uuid.UUID | None = None
     translations: dict[str, str] = field(default_factory=dict)
     template_id: uuid.UUID | None = None
+    # The people on an evacuation's manifest (D-40); set by Evacuation Management only.
+    evacuation_id: uuid.UUID | None = None
 
 
 @dataclass
@@ -147,6 +149,15 @@ async def _validate(session: AsyncSession, content: Content) -> dict[str, Any]:
         template = await session.get(MessageTemplate, content.template_id)
         if template is None or not template.is_active:
             raise CampaignError(422, "unknown template")
+    if content.evacuation_id is not None:
+        if content.exposed_to_incident or content.missions or content.person_types is not None:
+            raise CampaignError(422, "an evacuation message goes to its manifest only")
+        found = await session.scalar(
+            text("SELECT id FROM evacuation WHERE id = :e"), {"e": content.evacuation_id}
+        )
+        if found is None:
+            raise CampaignError(422, "unknown evacuation")
+        return {"evacuation_id": str(content.evacuation_id)}
     if content.exposed_to_incident == bool(content.missions):
         raise CampaignError(422, "choose either missions or the people exposed to an incident")
     if content.exposed_to_incident:
@@ -177,6 +188,12 @@ async def _mission(session: AsyncSession, campaign: NotificationCampaign) -> uui
             .with_for_update(read=True)  # exposure cannot move it mid-decision
         )
         return mission
+    if campaign.audience_filter.get("evacuation_id"):
+        evacuated: uuid.UUID | None = await session.scalar(
+            text("SELECT mission_id FROM evacuation WHERE id = CAST(:e AS uuid)"),
+            {"e": campaign.audience_filter["evacuation_id"]},
+        )
+        return evacuated
     missions = campaign.audience_filter.get("missions") or []
     return uuid.UUID(missions[0]) if len(missions) == 1 else None
 
@@ -249,6 +266,31 @@ async def prepare_for_approval(
     """An approved agent proposal's campaign, waiting for a second person (D-31; plan-
     pilot-hl G-2): the agent is the author, the proposal's approver submitted it, and the
     gate lets neither decide. Nothing is queued until someone else approves it."""
+    return await _prepared(session, content, "AGENT", str(proposal_id), submitted_by, actor)
+
+
+async def prepare_for_second_person(
+    session: AsyncSession,
+    content: Content,
+    *,
+    author: uuid.UUID,
+    submitted_by: uuid.UUID,
+    actor: Actor,
+) -> Outcome:
+    """A campaign two people have already decided on (an evacuation's requester and its
+    activator, D-40, plan-pilot-ev §7), waiting for a third: the gate lets neither the
+    author nor the submitter approve it (D-31). Nothing is queued until then."""
+    return await _prepared(session, content, "USER", str(author), submitted_by, actor)
+
+
+async def _prepared(
+    session: AsyncSession,
+    content: Content,
+    created_by_type: str,
+    created_by: str,
+    submitted_by: uuid.UUID,
+    actor: Actor,
+) -> Outcome:
     spec = await _validate(session, content)
     reference = await session.scalar(text("SELECT next_reference('NTF', false)"))
     campaign = NotificationCampaign(
@@ -260,8 +302,8 @@ async def prepare_for_approval(
         translations=content.translations,
         channels=content.channels,
         audience_filter=spec,
-        created_by_type="AGENT",
-        created_by=str(proposal_id),
+        created_by_type=created_by_type,
+        created_by=created_by,
         status="PENDING_APPROVAL",
         submitted_by=submitted_by,
         template_id=content.template_id,
@@ -540,6 +582,26 @@ async def cancel(session: AsyncSession, user: CurrentUser, campaign_id: uuid.UUI
     campaign.status = "CANCELLED"
     await session.flush()
     await _audit(session, user, "CANCEL", campaign)
+    return Outcome(campaign, [_event(campaign)])
+
+
+async def withdraw(session: AsyncSession, campaign_id: uuid.UUID, actor: Actor) -> Outcome | None:
+    """Cancel a campaign whose reason is gone (a stood-down evacuation, D-40), if it has
+    not been sent; None if it already was."""
+    campaign = await _locked(session, campaign_id)
+    if campaign.status not in ("DRAFT", "PENDING_APPROVAL"):
+        return None
+    campaign.status = "CANCELLED"
+    await session.flush()
+    await audit.write(
+        session,
+        actor_type=actor.type,
+        actor_id=actor.id,
+        action="CAMPAIGN.CANCEL",
+        entity_type="notification_campaign",
+        entity_id=campaign.reference,
+        details={"reason": "withdrawn"},
+    )
     return Outcome(campaign, [_event(campaign)])
 
 

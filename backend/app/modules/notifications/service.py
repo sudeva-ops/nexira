@@ -61,9 +61,13 @@ async def resolve_audience(
     Spec used by Document Expiry (D-37, plan-pilot-dx §5), with or without an incident:
     - {"document_ids": [ids]}: the active holders of those documents. Refused if the list
       is empty, names an unknown document or a citizen's or delegate's (staff only).
+    Spec used by Evacuation Management (D-40, plan-pilot-ev §7):
+    - {"evacuation_id": id}: the active people on that evacuation's manifest.
     """
     if "document_ids" in audience:
         return await _document_holders(session, audience["document_ids"])
+    if audience.get("evacuation_id"):
+        return await _manifest(session, str(audience["evacuation_id"]))
     if audience.get("trip_id"):
         return await _trip_travellers(session, str(audience["trip_id"]))
     if audience.get("missions"):
@@ -111,6 +115,24 @@ async def resolve_audience(
         )
         return list(rows)
     raise AudienceError(f"unsupported audience {audience!r}")
+
+
+async def _manifest(session: AsyncSession, evacuation_id: str) -> list[uuid.UUID]:
+    try:
+        evacuation_uuid = uuid.UUID(evacuation_id)
+    except ValueError:
+        raise AudienceError("unknown evacuation") from None
+    rows = await session.scalars(
+        text(
+            """
+            SELECT m.person_id FROM evacuation_manifest m JOIN person p ON p.id = m.person_id
+             WHERE m.evacuation_id = :evacuation AND p.is_active
+             ORDER BY m.person_id
+            """
+        ),
+        {"evacuation": evacuation_uuid},
+    )
+    return list(rows)
 
 
 async def _trip_travellers(session: AsyncSession, trip_id: str) -> list[uuid.UUID]:
