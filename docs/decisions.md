@@ -187,7 +187,7 @@ Record each sign-off in the PR.
 | 8. **Natural Hazards & Climate** (HZ), simulated (D-38) | |
 | 9. **Health Intelligence** (HL), simulated (D-39) | |
 | 10. **Evacuation Management** (EV), simulated (D-40) | |
-| 11. **Fleet & Assets** (FLT), simulated (D-41, proposed) | |
+| 11. **Fleet & Assets** (FLT), simulated (D-41) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -256,7 +256,7 @@ Rules:
 - **The manifest is locked at activation** from who is there and who has not confirmed safe; nobody is added or removed by hand in the pilot.
 - **Simulated movement.** Plans, the muster-point scanner, the charter and the convoy are simulated (D-19); partners are requested through the Assistance Partners service and get no names (D-36). The movement message is a Mass Notification campaign with its own second person (D-31).
 
-**D-41 · Fleet & Assets (simulated). Proposed, not yet approved.** Requirements FLT-01 to FLT-08 in `docs/requirements-pilot.md` §54–58, with the proposed defaults in §58. Amends D-30 by adding Fleet & Assets to the pilot.
+**D-41 · Fleet & Assets (simulated).** Approved by the product owner on 2026-11-01 (PR #84). Requirements FLT-01 to FLT-08 in `docs/requirements-pilot.md` §54–58, with the defaults in §58. Amends D-30 by adding Fleet & Assets to the pilot.
 - **Simulated telematics.** Assets, positions, fuel and the workshop are simulated (D-19); no real provider is called.
 - **Derived states are not stored.** Blocked (driver SOS), in an impact zone and assigned to an evacuation are worked out from the check-in, incidents and evacuations, so they clear by themselves.
 - **People decide.** Status and maintenance are changed by people with a responder role, through `app/core/approvals.py`; a capacity shortfall only suggests a partner. No agent acts on vehicles.

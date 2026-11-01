@@ -641,7 +641,7 @@ Real telematics or fuel-card feeds; fuel stock and supplier delays (Supply Chain
 
 Playwright on the real stack: before NBO-CIVIL-UNREST, the Nairobi register is as FLT-01, 4 of 5 vehicles available, VH-05 in maintenance, labelled simulated. After scene 4, VH-02 is BLOCKED · DRIVER SOS and IN IMPACT ZONE, 3 of 5 available, capacity 20 against 16. After scene 5, the available vehicles show ASSIGNED · EVAC. `NBO-FLEET`: VH-04's entry into the zone raises the alert and a FLEET timeline entry, its exit a second; VH-05's service done removes its alert and makes it available. A Security Officer sets a vehicle to MAINTENANCE with a reason; a Viewer cannot, and sees no driver names; the Cairo Head of Mission sees no Nairobi driver names. Every change is audited and the chain verifies; `make acceptance` (all existing specs) still passes.
 
-## 58. Questions for the product owner (proposed defaults)
+## 58. Questions answered by the product owner (2026-11-01: "use the defaults")
 
 1. **Register:** seeded for every mission (about 48 vehicles, 19 armoured, as the design's KPI, plus generators and satellite terminals), illustrative and read-only apart from status and maintenance; adding or editing assets comes later. *Default: yes.*
 2. **Telematics:** simulated only: seeded positions and fuel, moved by scenario events (`VEHICLE_POSITION`) through the worker. No real provider. *Default: yes.*

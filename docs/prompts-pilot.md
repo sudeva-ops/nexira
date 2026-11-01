@@ -630,7 +630,7 @@ Playwright, real stack (requirements-pilot.md §52). Report the real output; mak
 acceptance (all specs) still passes.
 ```
 
-## Pilot module 11 · Fleet & Assets (proposed, for approval)
+## Pilot module 11 · Fleet & Assets (approved 2026-11-01, PR #84)
 
 Sources: D-41, `docs/requirements-pilot.md` §54–58 (FLT-01..08), PC-33..34. Simulated assets and telematics only.
 
