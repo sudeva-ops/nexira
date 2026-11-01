@@ -2,6 +2,7 @@ import type { QueryKey } from "@tanstack/react-query";
 
 import { checkinKeys } from "./checkin";
 import { documentKeys } from "./documents";
+import { evacuationKeys } from "./evacuations";
 import { partnerKeys } from "./partners";
 import { flightKeys } from "./flights";
 import { hazardKeys } from "./hazards";
@@ -43,6 +44,7 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
         peopleKeys.missions,
         hazardKeys.all,
         healthKeys.all, // a facility's Avoid flag follows ACTIVE incidents (plan-pilot-hl G-8)
+        evacuationKeys.all, // "plan ready" needs an ACTIVE incident (plan-pilot-ev G-6)
         ...incident,
       ];
     case "EXPOSURE_COMPUTED":
@@ -83,7 +85,8 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
     case "CHECKIN_ESCALATED": {
       const campaignId =
         typeof event.data.campaign_id === "string" ? [checkinKeys.checkin(event.data.campaign_id)] : [];
-      return [checkinKeys.campaigns, ...campaignId, ...incident];
+      // An evacuation's movement message shows its status there too (plan-pilot-ev §10).
+      return [checkinKeys.campaigns, ...campaignId, evacuationKeys.all, ...incident];
     }
     case "TRIP_UPDATED":
       return [tripKeys.all];
@@ -91,8 +94,10 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
       return [flightKeys.all, tripKeys.all];
     case "FLIGHT_POSITIONS": // the list and the open flight's altitude and speed
       return [flightKeys.all];
-    case "PARTNER_REQUEST_UPDATED": // the requests list and their status (AS-03)
-      return [partnerKeys.all];
+    case "PARTNER_REQUEST_UPDATED": // the requests list, and an evacuation's options (AS-03)
+      return [partnerKeys.all, evacuationKeys.all];
+    case "EVACUATION_UPDATED": // requested, activated, a check-in, a step, stood down (D-40)
+      return [evacuationKeys.all];
     case "WEATHER_UPDATED": // the panel, the map layer and the mission popup (WX-02)
       return [weatherKeys.all];
     case "DOCUMENT_UPDATED": // the register, its KPIs, and the trip warnings (DX-04, DX-06)

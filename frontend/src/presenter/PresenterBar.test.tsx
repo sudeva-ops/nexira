@@ -137,5 +137,7 @@ describe("Presenter bar", () => {
     });
     // D-39: the cholera advisory rising and dengue closing, on the Health Intelligence screen.
     expect(SCENE_SCREEN["NBO-CHOLERA"]).toEqual({ 0: "/health", 1: "/health", 2: "/health" });
+    // D-40: the evacuation plays on its own screen.
+    expect(Object.values(SCENE_SCREEN["NBO-EVACUATION"])).toEqual(Array(5).fill("/evacuation"));
   });
 });

@@ -121,7 +121,7 @@ Simulated plans, scanner, charter and convoy (D-40). In Storyline 1 scene 5 the 
 2. Presenter bar: pick **Nairobi evacuation** and press →: the simulated muster-point scanner checks everyone in over 30 seconds, with seats 1A to 15D of the charter's 72.
 3. → convoy departed, → charter departed (from now on it can no longer be stood down), → arrival: the evacuation is complete.
 
-Until the Evacuation Management screen arrives (Prompt 69) the presenter bar stays on the Decision Queue. If no evacuation is live, the scenes change nothing: play Storyline 1 to scene 5 first. To show it again, run `make reset-demo`.
+Every scene opens **Evacuation Management** (under RESPOND): the banner, the manifest with seats and document flags, the sequence with its times, and the plan's options with each partner's status. A Viewer sees the counts and the sequence, no names. If no evacuation is live, the scenes change nothing: play Storyline 1 to scene 5 first. To show it again, run `make reset-demo`.
 
 ## 6c. Storyline 6 · Assistance Partners (about 3 minutes, after Storyline 1)
 

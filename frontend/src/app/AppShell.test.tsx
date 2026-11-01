@@ -31,13 +31,14 @@ describe("app shell", () => {
       "Health Intelligence", // pilot module 9 (D-30, D-39), before Natural Hazards (§48 Q9)
       "Natural Hazards & Climate", // pilot module 8 (D-30, D-38), last under MONITOR as the design
       "Response Playbooks",
+      "Evacuation Management", // pilot module 10 (D-30, D-40), after Response Playbooks
       "Mass Notification", // pilot module 1 (D-30)
       "Assistance Partners", // pilot module 5 (D-30, D-36)
       "Safety Check-in",
       "Document Expiry", // pilot module 7 (D-30, D-37), under PLAN & INSIGHT (plan-pilot-dx G-9)
       "Audit",
     ]);
-    for (const outOfScope of ["Evacuation", "Copilot", "Executive", "Integrations", "OSINT"]) {
+    for (const outOfScope of ["Copilot", "Executive", "Integrations", "OSINT"]) {
       expect(within(nav).queryByText(new RegExp(outOfScope, "i"))).toBeNull();
     }
   });
