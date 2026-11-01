@@ -602,3 +602,55 @@ Playwright on the real stack: after NBO-CIVIL-UNREST scenes 1–4, the screen sh
 9. **Screen:** "Evacuation Management" under RESPOND, after Response Playbooks, as the design. *Default: yes.*
 10. **Demo:** `NBO-EVACUATION` continues from NBO-CIVIL-UNREST scene 5, where two people activate EVP-NBO; the scenario itself approves nothing. If no evacuation is live, the presenter bar says to play NBO-CIVIL-UNREST to scene 5 first. *Default: yes.*
 11. **🔒 prompts:** the migration (PC-30..32: RLS, grants, guards), the `START_EVACUATION` executor, the activation approvals and the partner requests (D-29) need your named sign-off, as before.
+
+## 54. Purpose and starting point
+
+Know which vehicles and critical equipment each mission has, where they are, whether they can be used now, and whether they can move the mission's people if it must leave. Master spec §5.20 (Fleet & Assets, FLT-01..04); the design's Fleet & Assets screen ("Assets · Vehicles, fuel & availability"), under RESPOND.
+
+| Exists today | Where |
+|---|---|
+| Peter Mwangi, Nairobi driver (local staff), last seen "In transit · Haile Selassie Ave", inside INC-1042's impact zone; he answers NEED HELP in the scene 4 check-in | seed, NBO-CIVIL-UNREST |
+| Incidents with a location and impact radius; "inside impact zone" tests (Health Intelligence's Avoid, HL-04) | intel, health_intel |
+| Evacuation plans and live evacuations per mission; the mission part of the manifest (Nairobi: 16) | Evacuation Management (D-40) |
+| Sentinel Secure Transport (SECURE_TRANSPORT), a simulated partner | Assistance Partners (D-36) |
+| No vehicles, equipment, telematics, maintenance or Fleet screen | — |
+
+## 55. Requirements: Fleet & Assets (FLT)
+
+| ID | Requirement | Master | Pri. | Acceptance |
+|---|---|---|---|---|
+| FLT-01 | **An asset register per mission.** Each asset: code (`VH-nn` for vehicles, `<KIND>-<mission code>` for equipment), kind (VEHICLE or EQUIPMENT), type label (e.g. "Armoured SUV (B6)", "Minibus 14-seat", "Generator 250 kVA", "Satellite terminal"), armoured or not, passenger seats (vehicles), location (`geography(Point,4326)` and a label), fuel or charge %, the time of the last position, a stored status (AVAILABLE, IN USE, MAINTENANCE) and, for vehicles, the assigned driver. Seeded for every mission, illustrative and labelled simulated; positions and fuel come from simulated telematics (§58 Q2). | FLT-01 | M | Nairobi as the design: VH-01 armoured SUV (embassy garage, 82%), VH-02 armoured SUV (Haile Selassie Ave, 46%, driver Peter Mwangi), VH-03 minibus (garage, 90%), VH-04 pickup 4×4 (residence, 64%), VH-05 sedan (workshop, 30%, MAINTENANCE), GEN-NBO generator (72%), SAT-NBO satellite terminal (100%). |
+| FLT-02 | **What a vehicle can do now** is shown from data, not stored: **MAINTENANCE** (stored); **BLOCKED · DRIVER SOS** when its driver's latest check-in answer in an ACTIVE incident is NEED HELP; **IN IMPACT ZONE** when its last position is inside an ACTIVE incident's impact zone; **ASSIGNED · EVAC** when the mission has an ACTIVE evacuation and the vehicle is otherwise available; else AVAILABLE or IN USE. A vehicle counts as available unless it is in maintenance, blocked or in an impact zone. | FLT-01, FLT-04 | M | Nairobi before scene 1: 4 of 5 available. After scene 4: VH-02 BLOCKED · DRIVER SOS and IN IMPACT ZONE; 3 of 5 available. After scene 5: VH-01, VH-03, VH-04 ASSIGNED · EVAC. |
+| FLT-03 | **Evacuation capacity by road.** Per mission: passenger seats in available vehicles against the seats needed, which is the mission part of a live evacuation's manifest (staff, delegates and dependants) or, with none, the mission's diplomats, delegates and dependants. A shortfall names the nearest Assistance Partner with SECURE_TRANSPORT for the mission's country as a suggestion; nothing is requested automatically. | FLT-02, EVC-06 | M | Nairobi: 24 seats available before scene 1 and 20 after scene 4, against 16 needed: "Capacity sufficient". A mission with fewer seats shows the shortfall and Sentinel Secure Transport where it covers the country. |
+| FLT-04 | **Maintenance.** Each asset has maintenance items (task, due date). Items overdue or due within 14 days are maintenance alerts. A Security Officer, a Duty Officer or the mission's Head of Mission can mark an item done (once, audited) and set a vehicle's stored status between AVAILABLE, IN USE and MAINTENANCE (audited, with a reason for MAINTENANCE). | FLT-03 | M | VH-05 "Brake service overdue"; VH-21 "Tyre replacement (run-flat)"; GEN-ISB "Load test due"; VH-11 "Armour inspection" due in 30 days is not yet an alert. Marking VH-05's brake service done removes the alert; the status change is in the audit log. |
+| FLT-05 | **Geofence alert.** When a vehicle's position (from telematics) enters an ACTIVE incident's impact zone, the Fleet screen raises a live alert and the incident timeline gets a FLEET entry ("VH-04 entered the impact zone of INC-…"); leaving the zone is noted too. No agent proposes anything (§58 Q7). | FLT-04 | S | In NBO-FLEET, VH-04 enters the zone: alert and timeline entry within 5 s; it leaves: a second entry. |
+| FLT-06 | **Fleet & Assets screen.** As the design, Blueprint dark, under RESPOND after Evacuation Management (§58 Q9): KPIs from data (vehicles and how many armoured, available now at the selected mission, average fuel or charge, maintenance due within 14 days); the vehicles and critical assets table (code, asset, mission, location, fuel bar, status); the evacuation capacity card for the selected mission; the maintenance alerts. A mission filter (default: a mission with an ACTIVE incident, else all). Every button from `GET /api/me/permissions`. Rows flash on change. | — | M | — |
+| FLT-07 | **Who sees what.** Every role sees assets, statuses, fuel, positions as labels, capacity and maintenance. A driver's name only for those who may read the mission's people (as EV-09); others see "Driver assigned". | — | M | A Viewer sees VH-02 BLOCKED · DRIVER SOS with no driver name; the Cairo Head of Mission sees no Nairobi driver names. |
+| FLT-08 | **A demo scenario** `NBO-FLEET`, played while INC-1042 is ACTIVE (after NBO-CIVIL-UNREST scene 2): scene 1 VH-04's simulated telematics drive it from the residence into the impact zone; scene 2 it turns back out of the zone; scene 3 VH-05's brake service is reported done by the workshop (simulated) and it becomes available. | — | M | Played from the presenter bar. |
+
+### Not in this module
+Real telematics or fuel-card feeds; fuel stock and supplier delays (Supply Chain); assigning a vehicle to a trip (Journey Management) or to a VIP motorcade; route planning or turn-by-turn tracking; booking or requesting partner vehicles automatically; a Fleet/Logistics Officer role (§58 Q4); an agent proposing vehicle moves (§58 Q7); adding or editing assets in the app.
+
+## 56. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-33 · `fleet_asset`**: tenant, mission, code (unique per tenant), kind (`VEHICLE`, `EQUIPMENT`), type label, armoured, seats (vehicles), driver (nullable person, same tenant and mission), location `geography(Point,4326)` and label, fuel or charge %, position time, status (`AVAILABLE`, `IN_USE`, `MAINTENANCE`), status reason, source. FORCE RLS; SELECT, INSERT (seeded through the service layer) and UPDATE of location, label, fuel, status and reason only; no DELETE. The derived states (blocked, in zone, assigned) are not stored.
+- **PC-34 · `fleet_maintenance`**: tenant, asset, task, due date, done at and by (user or the simulated workshop). FORCE RLS; SELECT, INSERT and UPDATE of the done columns only, once; no DELETE. Guard: done is final; the time is written by the database.
+- The FLEET timeline entry uses the existing incident timeline; no new event table.
+
+## 57. Acceptance for the module
+
+Playwright on the real stack: before NBO-CIVIL-UNREST, the Nairobi register is as FLT-01, 4 of 5 vehicles available, VH-05 in maintenance, labelled simulated. After scene 4, VH-02 is BLOCKED · DRIVER SOS and IN IMPACT ZONE, 3 of 5 available, capacity 20 against 16. After scene 5, the available vehicles show ASSIGNED · EVAC. `NBO-FLEET`: VH-04's entry into the zone raises the alert and a FLEET timeline entry, its exit a second; VH-05's service done removes its alert and makes it available. A Security Officer sets a vehicle to MAINTENANCE with a reason; a Viewer cannot, and sees no driver names; the Cairo Head of Mission sees no Nairobi driver names. Every change is audited and the chain verifies; `make acceptance` (all existing specs) still passes.
+
+## 58. Questions for the product owner (proposed defaults)
+
+1. **Register:** seeded for every mission (about 48 vehicles, 19 armoured, as the design's KPI, plus generators and satellite terminals), illustrative and read-only apart from status and maintenance; adding or editing assets comes later. *Default: yes.*
+2. **Telematics:** simulated only: seeded positions and fuel, moved by scenario events (`VEHICLE_POSITION`) through the worker. No real provider. *Default: yes.*
+3. **Blocked, in zone, assigned:** worked out from the check-in, incidents and evacuations each time, not stored, so they clear by themselves (as HL-04's Avoid). *Default: yes.*
+4. **Who changes status and maintenance:** Security Officer, Duty Officer and the mission's Head of Mission, through `app/core/approvals.py`. No new Fleet/Logistics Officer role in the pilot (it would change roles and grants). *Default: yes.*
+5. **Capacity:** passenger seats in available vehicles against the mission part of the evacuation (16 in Nairobi). A shortfall suggests Sentinel Secure Transport where it covers the country; it requests nothing. *Default: yes.*
+6. **Maintenance alerts:** overdue or due within 14 days. *Default: yes.*
+7. **Agent proposal:** none in this module (moving or reassigning vehicles stays with people). *Default: not now.*
+8. **Driver names:** only for those who may read the mission's people; others see "Driver assigned". *Default: yes.*
+9. **Screen:** "Fleet & Assets" under RESPOND, after Evacuation Management. *Default: yes.*
+10. **Demo:** `NBO-FLEET` during NBO-CIVIL-UNREST (from scene 2): VH-04 into and out of the impact zone, then VH-05 back from the workshop. Phase 1 scenes are unchanged; the Fleet screen just reflects them. *Default: yes.*
+11. **🔒 prompts:** the migration (PC-33..34: RLS, grants, guards) and the status and maintenance actions (approvals) need your named sign-off, as before (D-29).
