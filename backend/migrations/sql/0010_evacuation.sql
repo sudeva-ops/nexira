@@ -30,13 +30,16 @@ GRANT SELECT, INSERT ON evacuation_plan TO nexira_app;
 
 -- Foreign keys ignore RLS, so the mission's and every partner's tenant are checked here (the
 -- lesson of Prompts 24 and 29). BEFORE triggers run before CHECK constraints, so the guard
--- checks each option's types before reading them (the lesson of Prompt 60). An UPDATE is
--- refused for every role, the owner included.
+-- checks each option's types before reading them (the lesson of Prompt 60). An UPDATE or a
+-- DELETE is refused for every role, the owner included (review of Prompt 66, L2).
 CREATE FUNCTION evacuation_plan_guard() RETURNS trigger AS $$
 DECLARE
   option jsonb;
   roles text[] := '{}';
 BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'evacuation plan: plans are kept';
+  END IF;
   IF TG_OP = 'UPDATE' THEN
     RAISE EXCEPTION 'evacuation plan: seeded plans are not changed';
   END IF;
@@ -92,7 +95,7 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
-CREATE TRIGGER evacuation_plan_guard BEFORE INSERT OR UPDATE ON evacuation_plan
+CREATE TRIGGER evacuation_plan_guard BEFORE INSERT OR UPDATE OR DELETE ON evacuation_plan
   FOR EACH ROW EXECUTE FUNCTION evacuation_plan_guard();
 
 -- PC-31 · an evacuation: requested by one person, activated by another (EV-02, D-40), then
@@ -134,6 +137,8 @@ CREATE TABLE evacuation (
 -- One live evacuation per mission.
 CREATE UNIQUE INDEX evacuation_live_uq ON evacuation (tenant_id, mission_id)
   WHERE status IN ('PENDING_ACTIVATION','ACTIVE');
+-- One evacuation per proposal (review of Prompt 66, L3).
+CREATE UNIQUE INDEX evacuation_proposal_uq ON evacuation (proposal_id) WHERE proposal_id IS NOT NULL;
 CREATE INDEX evacuation_mission_idx ON evacuation (tenant_id, mission_id, created_at);
 ALTER TABLE evacuation ENABLE ROW LEVEL SECURITY;
 ALTER TABLE evacuation FORCE ROW LEVEL SECURITY;
@@ -166,10 +171,13 @@ BEGIN
         RAISE EXCEPTION 'evacuation: no such incident at this mission';
       END IF;
     END IF;
+    -- Only an evacuation proposal activates an evacuation (review of Prompt 66, L3).
     IF NEW.proposal_id IS NOT NULL THEN
-      PERFORM 1 FROM agent_proposal a WHERE a.id = NEW.proposal_id AND a.tenant_id = NEW.tenant_id;
+      PERFORM 1 FROM agent_proposal a
+       WHERE a.id = NEW.proposal_id AND a.tenant_id = NEW.tenant_id
+         AND a.action_type = 'START_EVACUATION';
       IF NOT FOUND THEN
-        RAISE EXCEPTION 'evacuation: no such proposal';
+        RAISE EXCEPTION 'evacuation: no such evacuation proposal';
       END IF;
     END IF;
     PERFORM 1 FROM app_user u WHERE u.id = NEW.requested_by AND u.tenant_id = NEW.tenant_id;
@@ -309,8 +317,11 @@ BEGIN
   IF TG_OP = 'DELETE' THEN
     RAISE EXCEPTION 'evacuation manifest: the manifest is kept';
   END IF;
+  -- FOR SHARE: a check-in waits for a concurrent stand-down or completion and then sees it,
+  -- so nothing is checked in once the evacuation is final (review of Prompt 66, M1).
   SELECT * INTO evac FROM evacuation e
-   WHERE e.id = NEW.evacuation_id AND e.tenant_id = NEW.tenant_id;
+   WHERE e.id = NEW.evacuation_id AND e.tenant_id = NEW.tenant_id
+   FOR SHARE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'evacuation manifest: no such evacuation';
   END IF;

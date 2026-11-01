@@ -4,6 +4,7 @@ its sequence moves forward one step at a time, and complete or stood down is fin
 manifest is built only in the activating transaction and changes only by one check-in
 (docs/plan-pilot-ev.md §3-§8, §13)."""
 
+import asyncio
 import json
 import uuid
 from typing import Any
@@ -230,6 +231,23 @@ async def test_a_plan_is_one_per_mission_and_never_changed_or_deleted(
             await world.conn.execute(stmt)
     with pytest.raises(REFUSED, match="seeded plans are not changed"):
         await owner.execute("UPDATE evacuation_plan SET route_label = 'x'")
+    with pytest.raises(REFUSED, match="plans are kept"):  # review of Prompt 66, L2
+        await owner.execute("DELETE FROM evacuation_plan")
+
+
+async def test_seats_in_exponent_form_are_a_whole_number(api_tenant: asyncpg.Connection) -> None:
+    plan_id = await api_tenant.fetchval(
+        "INSERT INTO evacuation_plan (tenant_id, mission_id, reference, muster_name, "
+        f"muster_location, route_label, destination, options) VALUES (current_tenant_id(), $1, "
+        f"'EVP-NBO', 'Courtyard', {PT}, 'Route B', 'Dubai', "
+        '\'[{"role": "PRIMARY", "kind": "CHARTER", "label": "C", '
+        '"seats": 1e3}]\'::jsonb) RETURNING id',
+        await mission(api_tenant),
+    )
+    options = json.loads(
+        await api_tenant.fetchval("SELECT options FROM evacuation_plan WHERE id = $1", plan_id)
+    )
+    assert options[0]["seats"] == 1000
 
 
 # --- PC-31 · evacuations -----------------------------------------------------------------------
@@ -551,3 +569,133 @@ async def test_who_is_on_the_manifest_is_fixed_for_the_owner_too(
             "WHERE evacuation_id = $1 AND category = 'STAFF'",
             evacuation_id,
         )
+
+
+# --- review of Prompt 66 -------------------------------------------------------------------------
+
+
+async def other_tenant_user(db: DbUrls) -> uuid.UUID:
+    conn = await asyncpg.connect(db.api_plain)
+    try:
+        await set_tenant(conn, await create_tenant(db, "Other"))
+        return await user(conn)
+    finally:
+        await conn.close()
+
+
+async def test_activators_and_stand_downs_are_this_tenants_users(db: DbUrls, world: World) -> None:
+    stranger = await other_tenant_user(db)
+    evacuation_id = await world.request()
+    with pytest.raises(REFUSED, match="no such user"):
+        await world.conn.execute(ACTIVATE, evacuation_id, stranger)
+    with pytest.raises(REFUSED, match="no such user"):
+        await world.conn.execute(ACTIVATE, evacuation_id, uuid.uuid4())
+    with pytest.raises(REFUSED, match="no such user"):
+        await world.conn.execute(
+            "UPDATE evacuation SET status = 'STOOD_DOWN', stood_down_by = $2, "
+            "stood_down_reason = 'x' WHERE id = $1",
+            evacuation_id,
+            stranger,
+        )
+    await world.conn.execute(
+        "UPDATE evacuation SET status = 'STOOD_DOWN', stood_down_by = $2, "
+        "stood_down_reason = 'x' WHERE id = $1",
+        evacuation_id,
+        world.hom,
+    )
+    checked = await world.active()
+    with pytest.raises(REFUSED, match="no such user"):
+        await world.conn.execute(
+            "UPDATE evacuation_manifest SET status = 'CHECKED_IN', checked_in_by_type = 'USER', "
+            "checked_in_by = $2 WHERE evacuation_id = $1 AND category = 'STAFF'",
+            checked,
+            str(stranger),
+        )
+
+
+async def test_only_an_evacuation_proposal_activates_once(world: World) -> None:
+    agent = await world.conn.fetchval(
+        "INSERT INTO agent (tenant_id, code, name) VALUES (current_tenant_id(), 'RP', 'R') "
+        "RETURNING id"
+    )
+
+    async def proposal(action_type: str) -> uuid.UUID:
+        proposal_id: uuid.UUID = await world.conn.fetchval(
+            "INSERT INTO agent_proposal (tenant_id, agent_id, proposal_key, action_type, title, "
+            "proposed_action) VALUES (current_tenant_id(), $1, $2, $3, 't', 'p') RETURNING id",
+            agent,
+            str(uuid.uuid4()),
+            action_type,
+        )
+        return proposal_id
+
+    with pytest.raises(REFUSED, match="no such evacuation proposal"):
+        await world.request(proposal_id=await proposal("START_PLAYBOOK"))
+    evacuation = await proposal("START_EVACUATION")
+    first = await world.request(proposal_id=evacuation)
+    await world.conn.execute(
+        "UPDATE evacuation SET status = 'STOOD_DOWN', stood_down_by = $2, "
+        "stood_down_reason = 'x' WHERE id = $1",
+        first,
+        world.hom,
+    )
+    with pytest.raises(UNIQUE):
+        await world.request(proposal_id=evacuation)
+
+
+async def test_a_check_in_after_completion_is_refused_and_times_cannot_be_forged(
+    world: World, owner: asyncpg.Connection
+) -> None:
+    evacuation_id = await world.active()
+    activated_at = (await world.row(evacuation_id))["activated_at"]
+    await owner.execute(
+        "UPDATE evacuation SET activated_at = '2000-01-01', step = 3 WHERE id = $1", evacuation_id
+    )
+    assert (await world.row(evacuation_id))["activated_at"] == activated_at
+    for step in (4, 5):
+        await world.conn.execute(
+            "UPDATE evacuation SET step = $2 WHERE id = $1", evacuation_id, step
+        )
+    await world.conn.execute(
+        "UPDATE evacuation SET step = 6, status = 'COMPLETED' WHERE id = $1", evacuation_id
+    )
+    with pytest.raises(REFUSED, match="the evacuation is not active"):
+        await world.conn.execute(
+            "UPDATE evacuation_manifest SET status = 'CHECKED_IN', checked_in_by_type = 'SCANNER', "
+            "checked_in_by = 'muster-scanner (simulated)' WHERE evacuation_id = $1",
+            evacuation_id,
+        )
+
+
+async def test_a_check_in_waits_for_a_concurrent_stand_down_and_is_then_refused(
+    db: DbUrls, world: World
+) -> None:
+    """Review of Prompt 66, M1: the manifest guard locks the evacuation FOR SHARE."""
+    evacuation_id = await world.active()
+    tenant = await world.conn.fetchval("SELECT current_tenant_id()")
+    other = await asyncpg.connect(db.api_plain)
+    try:
+        await set_tenant(other, tenant)
+        stand_down = other.transaction()
+        await stand_down.start()
+        await other.execute(
+            "UPDATE evacuation SET status = 'STOOD_DOWN', stood_down_by = $2, "
+            "stood_down_reason = 'Routes closed' WHERE id = $1",
+            evacuation_id,
+            world.hq,
+        )
+        check_in = asyncio.ensure_future(
+            world.conn.execute(
+                "UPDATE evacuation_manifest SET status = 'CHECKED_IN', "
+                "checked_in_by_type = 'SCANNER', checked_in_by = 'muster-scanner (simulated)' "
+                "WHERE evacuation_id = $1 AND category = 'STAFF'",
+                evacuation_id,
+            )
+        )
+        await asyncio.sleep(0.3)
+        assert not check_in.done()  # waiting for the stand-down's lock
+        await stand_down.commit()
+        with pytest.raises(REFUSED, match="the evacuation is not active"):
+            await check_in
+    finally:
+        await other.close()
