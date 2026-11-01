@@ -629,3 +629,58 @@ by role, check-in, the sequence, stand-down and the Viewer view.
 Playwright, real stack (requirements-pilot.md §52). Report the real output; make
 acceptance (all specs) still passes.
 ```
+
+## Pilot module 11 · Fleet & Assets (approved 2026-11-01, PR #84)
+
+Sources: D-41, `docs/requirements-pilot.md` §54–58 (FLT-01..08), PC-33..34. Simulated assets and telematics only.
+
+### Prompt 71 · Read and plan (no code)
+```
+Read D-05, D-12, D-19, D-29, D-30, D-36, D-40, D-41, requirements-pilot.md §1-6 and §54-58,
+the check-in, incidents and impact zones (HL-04's Avoid), evacuations and the manifest,
+Assistance Partners coverage and approvals.py. Write docs/plan-pilot-flt.md:
+requirement-to-code mapping, the derived states and how they clear, capacity, maintenance,
+telematics events and the geofence alert with its timeline entry, who sees driver names, the
+NBO-FLEET scenes, what changes in the acceptance specs, gaps with proposed answers, and the
+migration for PC-33..34 (only after they are approved). No code.
+```
+
+### Prompt 72 · Fleet tables (migration) 🔒
+```
+PC-33..34, once approved. A new migration: fleet_asset and fleet_maintenance with FORCE RLS,
+tenant_isolation and the grants as proposed; the guards (frozen columns, the MAINTENANCE
+reason, done once); pinned search_path. Tests (as nexira_api): isolation; every refusal; no
+DELETE; the backup role reads them; the downgrade restores the previous revision exactly.
+```
+
+### Prompt 73 · Register, states, capacity and maintenance 🔒
+```
+FLT-01..05, FLT-07. The service: derived states (blocked, in zone, assigned), capacity with
+the partner suggestion, maintenance alerts; status and maintenance actions through
+app/core/approvals.py; telematics positions from the worker with the geofence alert and
+the FLEET timeline entry; driver names by people scope; GET /api/fleet/* and
+/api/me/permissions. Every change audited. Tests against real PostgreSQL.
+```
+
+### Prompt 74 · Seed, telematics and NBO-FLEET
+```
+FLT-01, FLT-08. The register and maintenance items for every mission in the seed (Nairobi as
+the design); the VEHICLE_POSITION and workshop events in the worker; the NBO-FLEET scenario
+and its presenter bar entry. The Phase 1 scenario still starts with no active incident and
+an empty Decision Queue. Tests in the simulator.
+```
+
+### Prompt 75 · Fleet & Assets screen
+```
+FLT-06, FLT-07. The screen (as the design, Blueprint dark): KPIs, the assets table with
+fuel bars and statuses, the capacity card, the maintenance alerts, the geofence alert; the
+mission filter; every button from /api/me/permissions; the nav entry under RESPOND after
+Evacuation Management; rows flash on change; realtime refresh. Tests: Vitest for statuses,
+capacity, maintenance, the alert and the Viewer view.
+```
+
+### Prompt 76 · Fleet & Assets acceptance
+```
+Playwright, real stack (requirements-pilot.md §57). Report the real output; make
+acceptance (all specs) still passes.
+```
