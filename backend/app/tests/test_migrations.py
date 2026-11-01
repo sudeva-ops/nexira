@@ -58,8 +58,11 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     # The schema's 33 tables, message_template (0002), trip_segment and country_risk
     # (0003), airport, flight and flight_event (0004), weather_current (0005), partner and
     # partner_request (0006), travel_document (0007), mission_climate_risk (0008), the four
-    # health tables (0009), the three evacuation tables (0010), and alembic_version.
-    assert len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 1
+    # health tables (0009), the three evacuation tables (0010), the two fleet tables (0011),
+    # and alembic_version.
+    assert (
+        len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 2 + 1
+    )
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
 
@@ -776,5 +779,88 @@ def test_downgrading_0010_restores_0009_exactly(fresh: DbUrls) -> None:
     assert at_head["search_paths"] == [
         (name, '{"search_path=pg_catalog, public, pg_temp"}')
         for name in ("evacuation_guard", "evacuation_manifest_guard", "evacuation_plan_guard")
+    ]
+    command.upgrade(cfg, "head")
+
+
+FLEET_TABLES = ("fleet_asset", "fleet_maintenance")
+
+
+async def _fleet_shape(admin_url: str) -> dict[str, object]:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        tables = await conn.fetch(
+            "SELECT relname, relforcerowsecurity, relacl::text AS acl FROM pg_class "
+            "WHERE relname = ANY($1::text[]) AND relkind = 'r' ORDER BY relname",
+            list(FLEET_TABLES),
+        )
+        columns = await conn.fetch(
+            "SELECT table_name, column_name FROM information_schema.column_privileges "
+            "WHERE table_name = ANY($1::text[]) AND grantee = 'nexira_app' "
+            "AND privilege_type = 'UPDATE' ORDER BY table_name, column_name",
+            list(FLEET_TABLES),
+        )
+        search_paths = await conn.fetch(
+            "SELECT proname, proconfig::text AS config FROM pg_proc "
+            "WHERE proname LIKE 'fleet%guard' ORDER BY proname"
+        )
+        policies = await conn.fetchval(
+            "SELECT count(*) FROM pg_policies WHERE tablename = ANY($1::text[])",
+            list(FLEET_TABLES),
+        )
+        # Everything in public, so a leftover of 0011 shows (review of Prompt 49, L4).
+        public = await conn.fetchrow(
+            "SELECT (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "        WHERE n.nspname = 'public') AS relations, "
+            "       (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace "
+            "        WHERE n.nspname = 'public') AS functions, "
+            "       (SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal) AS triggers, "
+            "       (SELECT count(*) FROM pg_policy) AS policies"
+        )
+    finally:
+        await conn.close()
+    return {
+        "tables": [tuple(t) for t in tables],
+        "columns": [tuple(c) for c in columns],
+        "search_paths": [tuple(f) for f in search_paths],
+        "policies": policies,
+        "public": tuple(public or ()),
+    }
+
+
+def test_downgrading_0011_restores_0010_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0010")
+    at_0010 = asyncio.run(_fleet_shape(admin))
+    at_0010_evacuation = asyncio.run(_evacuation_shape(admin))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_fleet_shape(admin))
+    command.downgrade(cfg, "0010")
+    assert asyncio.run(_fleet_shape(admin)) == at_0010
+    assert asyncio.run(_evacuation_shape(admin)) == at_0010_evacuation
+    assert at_0010["tables"] == []
+    # PC-33..34: FORCE RLS; read and added by the app; the backup role reads them. The app
+    # updates them through column grants only.
+    seeded = (
+        "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+        "nexira_app=ar/nexira_owner}"
+    )
+    assert at_head["tables"] == [(table, True, seeded) for table in FLEET_TABLES]
+    assert at_head["columns"] == [
+        ("fleet_asset", "fuel_pct"),
+        ("fleet_asset", "location"),
+        ("fleet_asset", "location_label"),
+        ("fleet_asset", "position_at"),
+        ("fleet_asset", "status"),
+        ("fleet_asset", "status_reason"),
+        ("fleet_maintenance", "done_by"),
+        ("fleet_maintenance", "done_by_type"),
+    ]
+    assert at_head["policies"] == 2
+    assert at_head["search_paths"] == [
+        (name, '{"search_path=pg_catalog, public, pg_temp"}')
+        for name in ("fleet_asset_guard", "fleet_maintenance_guard")
     ]
     command.upgrade(cfg, "head")

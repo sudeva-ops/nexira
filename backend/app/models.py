@@ -6,6 +6,7 @@ from app.modules.audit.models import AuditLog
 from app.modules.checkin.models import CheckinResponse
 from app.modules.documents.models import TravelDocument
 from app.modules.evacuations.models import Evacuation, EvacuationManifestEntry, EvacuationPlan
+from app.modules.fleet.models import FleetAsset, FleetMaintenance
 from app.modules.hazards.models import MissionClimateRisk
 from app.modules.health_intel.models import (
     CountryHealthRequirement,
@@ -48,6 +49,8 @@ __all__ = [
     "Evacuation",
     "EvacuationManifestEntry",
     "EvacuationPlan",
+    "FleetAsset",
+    "FleetMaintenance",
     "HealthAdvisory",
     "Incident",
     "IncidentEvent",
