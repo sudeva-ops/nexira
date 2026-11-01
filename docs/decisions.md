@@ -186,6 +186,7 @@ Record each sign-off in the PR.
 | 7. **Document Expiry** (DX), simulated (D-37) | |
 | 8. **Natural Hazards & Climate** (HZ), simulated (D-38) | |
 | 9. **Health Intelligence** (HL), simulated (D-39) | |
+| 10. **Evacuation Management** (EV), simulated (D-40) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -248,6 +249,11 @@ Rules:
 - **Advisories are reference intelligence, not incidents.** Outbreaks and health advisories are a country-level list with their own updates; they are not fused into incidents and start no playbook.
 - **No person-level health data.** Staff health readiness is counts per mission only. Medical records, blood types and per-person vaccination records are out of the pilot; recording them needs a privacy review and a lawful basis first.
 - **People decide.** A health advisory is a Mass Notification campaign under D-31 (a second person for citizens). The Communications agent only proposes it, at level Approve or higher (D-12, D-16).
+
+**D-40 · Evacuation Management (simulated).** Approved by the product owner on 2026-11-01 (PR #77). Requirements EV-01 to EV-10 in `docs/requirements-pilot.md` §49–53, with the defaults in §53. Amends D-30 by adding Evacuation Management to the pilot, and amends §7 scene 5: the `START_EVACUATION` executor activates the mission's plan instead of the Phase 1 stub.
+- **Two people activate.** An evacuation is activated only by a Head of Mission and an HQ Crisis Director, two different people, through `app/core/approvals.py` (AGT-04, D-05). The database refuses an activator who is also the requester.
+- **The manifest is locked at activation** from who is there and who has not confirmed safe; nobody is added or removed by hand in the pilot.
+- **Simulated movement.** Plans, the muster-point scanner, the charter and the convoy are simulated (D-19); partners are requested through the Assistance Partners service and get no names (D-36). The movement message is a Mass Notification campaign with its own second person (D-31).
 
 ---
 
