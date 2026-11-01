@@ -568,3 +568,64 @@ Vitest for the list, the mission choice, the Avoid flag, sending by role and the
 Playwright, real stack (requirements-pilot.md §47). Report the real output; make
 acceptance (all specs) still passes.
 ```
+
+## Pilot module 10 · Evacuation Management (proposed, for approval)
+
+Sources: D-40, `docs/requirements-pilot.md` §49–53 (EV-01..10), PC-30..32. Simulated plans, scanner and partners only.
+
+### Prompt 65 · Read and plan (no code)
+```
+Read D-05, D-06, D-12..D-17, D-19, D-29, D-30, D-31, D-36, D-37, D-40, decisions.md §7,
+requirements-pilot.md §1-6 and §49-53, the START_EVACUATION action and its Phase 1 stub,
+approvals.py, check-in, Assistance Partners requests, Document Expiry's evacuation flag and
+Mass Notification. Write docs/plan-pilot-ev.md: requirement-to-code mapping, the two ways to
+activate and how both stay two-person, building the manifest, check-in and seats, the
+sequence and the partner requests it follows, the movement message and its second person,
+stand-down, who sees names, the NBO-EVACUATION scenes, what changes in the Phase 1 and pilot
+acceptance specs, gaps with proposed answers, and the migration for PC-30..32 (only after
+they are approved). No code.
+```
+
+### Prompt 66 · Evacuation tables (migration) 🔒
+```
+PC-30..32, once approved. A new migration: evacuation_plan, evacuation and
+evacuation_manifest with FORCE RLS, tenant_isolation and the grants as proposed; the guards
+(forward-only status and step, final states, activator ≠ requester, one live evacuation per
+mission, manifest inserted only at activation, check-in final); pinned search_path. Tests
+(as nexira_api): isolation; every refusal; no DELETE; the backup role reads them; the
+downgrade restores the previous revision exactly.
+```
+
+### Prompt 67 · Activation, manifest, check-in and sequence 🔒
+```
+EV-02..07, EV-09. Activation through app/core/approvals.py, from the screen (request and
+confirm) and from START_EVACUATION's executor (replacing the Phase 1 stub, still writing the
+note); the manifest at activation; check-in by hand and by the simulated scanner, with
+seats; the sequence following the partner requests or a person; the partner requests and
+the movement-message campaign at activation (PENDING_APPROVAL, neither activator may send
+it); stand-down; names by people scope; GET /api/evacuations/* and /api/me/permissions.
+Every step audited. Tests against real PostgreSQL; Phase 1 scene 5 still passes.
+```
+
+### Prompt 68 · Plans, scanner, seed and NBO-EVACUATION
+```
+EV-01, EV-10. Plans for every mission in the seed (EVP-NBO as the design); the EVACUATION
+templates; the simulated muster-point scanner in the worker; the NBO-EVACUATION scenario
+and its presenter bar entry. The Phase 1 scenario still starts with no active incident and
+an empty Decision Queue. Tests in the simulator.
+```
+
+### Prompt 69 · Evacuation Management screen
+```
+EV-08, EV-09. The screen (as the design, Blueprint dark): the banner with Activate when
+allowed, KPIs, the manifest with document flags, seats and status, the sequence with times,
+the options; the mission picker; every button from /api/me/permissions; the nav entry under
+RESPOND; rows flash on change; realtime refresh. Tests: Vitest for the manifest, activation
+by role, check-in, the sequence, stand-down and the Viewer view.
+```
+
+### Prompt 70 · Evacuation Management acceptance
+```
+Playwright, real stack (requirements-pilot.md §52). Report the real output; make
+acceptance (all specs) still passes.
+```

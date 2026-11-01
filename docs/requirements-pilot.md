@@ -539,3 +539,66 @@ Playwright on the real stack: the Health Intelligence screen shows the six seede
 8. **Demo:** a new scenario `NBO-CHOLERA` (§45 HL-10). No new people are added; the readiness counts are illustrative figures for each mission's seeded staff.
 9. **Screen:** "Health Intelligence" under MONITOR, before Natural Hazards & Climate, as the design.
 10. **🔒 prompts:** the migration (PC-26..29 add RLS and grants), the agent's proposal and its policy (D-29) need your named sign-off, as before.
+
+---
+
+# Pilot module 10 · Evacuation Management (proposed, for approval)
+
+For the product owner, who approves this part; then for the coding agent (Prompts 65–70 in `docs/prompts-pilot.md`). Rules: D-30, and **D-40 (proposed)**. Everything runs on **simulated plans, a simulated muster-point scanner and the simulated partners** (D-36): no charter operator, airline, convoy provider or scanner is contacted (AGENTS.md: no external URLs at runtime), and no real movement order is sent.
+
+## 49. Purpose and starting point
+
+Turn the decision to evacuate a mission into a locked manifest, a check-in at the muster point, a sequence everyone can follow (assembly, convoy, flight, arrival), and the right partners and messages, with the two-person rule kept. Master spec §5.9 (Evacuation Management, EVC-01..05); the design's Evacuation Management screen ("Response · Manifests, seats & routes") and its evacuation proposal.
+
+| Exists today | Where |
+|---|---|
+| `START_EVACUATION`: level 3, Head of Mission **and** HQ Crisis Director (two-person rule, AGT-04). Its executor is a **Phase 1 stub** that only writes an incident note. Phase 1 scene 5 approves one injected by a test fixture | agents, decisions.md §7 |
+| PB-07 step 7: the Head of Mission approves the evacuation route | playbooks |
+| People by mission and type (diplomat, local staff, delegate, dependant, citizen); the incident's check-in (safe, need help, no reply) | people, check-in |
+| Atlas Air Evacuation (EVACUATION) and Sentinel Secure Transport (SECURE_TRANSPORT), simulated partners whose requests move ACCEPTED → IN_PROGRESS → COMPLETED | Assistance Partners (D-36) |
+| "Could block evacuation": a traveller whose passport is not valid long enough | Document Expiry (DX-03) |
+| Mass Notification campaigns; a second person for citizens (D-31) | notifications |
+| No evacuation plans, manifests, muster check-in or evacuation screen | — |
+
+## 50. Requirements: Evacuation Management (EV)
+
+| ID | Requirement | Master | Pri. | Acceptance |
+|---|---|---|---|---|
+| EV-01 | **An evacuation plan per mission.** `EVP-<mission code>`: the muster point (name and location), the approved route label, the destination (safe haven), and up to three transport options, each with a role (PRIMARY, BACKUP, CONTINGENCY), a kind (CHARTER, COMMERCIAL, ROAD), a label, seats where known, and a partner. Seeded for every mission, illustrative and labelled simulated; read-only in the pilot (§53 Q1). | EVC-01 | M | EVP-NBO: muster at the embassy courtyard; charter Wilson Airport → Dubai, 72 seats, Atlas Air Evacuation (primary); 30 held commercial seats at JKIA (backup); road via Namanga to Arusha (contingency). |
+| EV-02 | **Activation keeps the two-person rule.** An evacuation is activated only when a Head of Mission (for that mission, or unscoped) **and** an HQ Crisis Director, two different people, have both approved it, through `app/core/approvals.py`. Two ways: (a) a `START_EVACUATION` proposal reaches its second approval; its executor now activates the mission's plan instead of the Phase 1 stub (it still writes the incident note); (b) on the screen, one of them presses **Activate evacuation** (the request, counted as their approval) and the other confirms. One live evacuation per mission. | EVC-02, AGT-04 | M | One approval activates nothing; the same person cannot give both; the second approval activates EVP-NBO. Phase 1 scene 5 still passes. |
+| EV-03 | **The manifest is built and locked at activation.** From the mission's people: diplomats, delegates and dependants, and the citizens who have **not confirmed safe** in the incident's check-in (need help or no reply). Local staff are not added (§53 Q3). Each entry: name, category, travel-document flag (DX-03 "could block evacuation"), seat, status. Nobody is added or removed by hand in the pilot. | EVC-03 | M | After NBO-CIVIL-UNREST scenes 1–4: 16 mission (12 diplomats, 3 delegates, 1 dependant) + 44 citizens = **60**; Hana Takeda and her child Aiko flagged "Could block evacuation" (DX-03). |
+| EV-04 | **Check-in at the muster point.** Each person is checked in once, by the simulated muster-point scanner or by hand (Security Officer, Consular Officer, Duty Officer, or the mission's Head of Mission), and gets the next free seat of the primary option. Status: ON STANDBY (before activation), EXPECTED, CHECKED IN. Checked-in counts update live. | EVC-03 | M | The scanner checks in all 60; seats 1A… are assigned in order; 60 of 72 seats used. |
+| EV-05 | **The sequence.** Six steps, each with a time: decision to evacuate; manifest confirmed (both at activation); assembly at the muster point (when everyone on the manifest is checked in, or a person closes it); convoy departed; flight departed; arrival and reception. The last three follow the simulated partners' requests (Sentinel's in progress → convoy departed; Atlas's in progress → flight departed; Atlas's completed → arrival), or a person with a responder role marks them. Arrival completes the evacuation. | EVC-04 | M | In NBO-EVACUATION, each step turns green in order with its time. |
+| EV-06 | **Partners and messages at activation.** Activation, being two people's decision, (a) requests Atlas Air Evacuation (EVACUATION) and Sentinel Secure Transport (SECURE_TRANSPORT) through the Assistance Partners service, sharing only what they need (AS-08: headcount, muster point, route, times; no names); (b) drafts the movement message to everyone on the manifest as a Mass Notification campaign from the mission's EVACUATION template, PENDING_APPROVAL. It is sent under D-31: a second person who did not activate the evacuation (plan-pilot-hl G-2, as the health advisory). | EVC-05 | M | Two partner requests exist with no names; the campaign waits for a Duty Officer or Consular Officer, and neither activator can send it. |
+| EV-07 | **Stand down.** Before the flight departs, an HQ Crisis Director can stand the evacuation down, with a reason. Standing down is final; the manifest is kept for the record; the partner requests are cancelled. | — | M | Stood down: no more check-ins; the reason is in the audit log. |
+| EV-08 | **Evacuation Management screen.** As the design, Blueprint dark, under RESPOND (§53 Q9): the banner (no active evacuation · plan ready, with Activate when allowed · in progress · complete); KPIs from data (evacuees on manifest by category, checked in, seats available on the primary option, documents flagged); the manifest; the sequence with times; the plan's options. A mission picker (default: the mission with a live evacuation, else one with an ACTIVE incident). Every button from `GET /api/me/permissions`. | — | M | — |
+| EV-09 | **Who sees what.** Names on the manifest only for those who may read the mission's people (as People & Sites; a mission-scoped role sees only its own mission). Everyone else, Viewer included, sees counts, the sequence and the plan, and no names. | — | M | A Viewer sees "60 on manifest · 42 checked in" and no names; the Cairo Head of Mission sees none of Nairobi's names. |
+| EV-10 | **A demo scenario** `NBO-EVACUATION`, after NBO-CIVIL-UNREST scene 5 (which activates EVP-NBO): scene 1 the scanner checks people in over about 30 seconds; scene 2 the convoy departs; scene 3 the charter departs; scene 4 arrival. | — | M | Played from the presenter bar. |
+
+### Not in this module
+Editing plans in the app; adding or removing people from a manifest by hand; real charter, airline or convoy bookings; tracking the charter on Air Travel; vehicles and drivers (the Fleet module); an agent proposing an evacuation by itself (§53 Q7); evacuating several missions in one operation; real movement orders or any channel other than the simulated ones.
+
+## 51. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-30 · `evacuation_plan`**: tenant, mission (one plan per mission), reference (`EVP-<code>`), muster point name and location `geography(Point,4326)`, route label, destination, options (`jsonb`, at most 3, each role, kind, label, seats, partner), source. FORCE RLS; SELECT and INSERT (seeded through the service layer); no UPDATE or DELETE in the pilot.
+- **PC-31 · `evacuation`**: tenant, plan, mission, incident (nullable), the proposal (nullable), status (`PENDING_ACTIVATION`, `ACTIVE`, `COMPLETED`, `STOOD_DOWN`), requested by and at, activated by and at (a different person; checked by the database too), the step (1..6) with each step's time, stand-down reason. FORCE RLS; SELECT, INSERT and UPDATE of status, activation, step and stand-down columns; no DELETE. Guard: forward-only status and step; `COMPLETED` and `STOOD_DOWN` final; activator ≠ requester; one live evacuation per mission.
+- **PC-32 · `evacuation_manifest`**: tenant, evacuation, person (same tenant, same mission), category (`STAFF`, `DELEGATE`, `DEPENDANT`, `CITIZEN`), seat, status (`EXPECTED`, `CHECKED_IN`), checked in at and by (user or scanner). Unique (evacuation, person) and (evacuation, seat). FORCE RLS; SELECT, INSERT (at activation only) and UPDATE of status, seat and check-in columns; no DELETE. Guard: CHECKED_IN is final; nothing changes once the evacuation is final; no insert after activation.
+- The EVACUATION message templates and the plans are data, not schema. `START_EVACUATION`'s policy row is unchanged.
+
+## 52. Acceptance for the module
+
+Playwright on the real stack: after NBO-CIVIL-UNREST scenes 1–4, the screen shows EVP-NBO ready, not activated, labelled simulated. The scene 5 proposal: the Nairobi Head of Mission's approval activates nothing; the HQ Crisis Director's activates EVP-NBO with a manifest of 60 (16 mission, 44 citizens) and Hana and Aiko Takeda's documents flagged; two partner requests with no names; the movement message waits for a second person, refused to both activators and sent by the Consular Officer (deliveries simulated). `NBO-EVACUATION`: all 60 checked in with seats; the sequence completes in order; the evacuation is COMPLETED. A Viewer sees counts and no names; the Cairo Head of Mission sees no Nairobi names. Every step is audited and the chain verifies; `make acceptance` (all existing specs) still passes.
+
+## 53. Questions for the product owner (proposed defaults)
+
+1. **Plans:** seeded for every mission, illustrative, read-only in the pilot; EVP-NBO as the design. Editing plans (and approving a new route) comes later. *Default: yes.*
+2. **Activation:** only with the two-person rule (Head of Mission + HQ Crisis Director, two different people), either from a `START_EVACUATION` proposal or the screen's Activate button. The Phase 1 stub executor is replaced by the real activation (🔒, D-29); Phase 1 scene 5 then activates EVP-NBO. *Default: yes.*
+3. **Who is evacuated:** diplomats, delegates and dependants always; citizens who have not confirmed safe in the incident's check-in. Local staff are nationals and stay, as is usual (they keep their check-in and welfare follow-up). *Default: yes; Nairobi 60 = 16 + 44.*
+4. **Manifest changes:** locked at activation; no adding or removing by hand in the pilot. *Default: yes.*
+5. **Muster check-in:** a simulated scanner in the scenario, plus a "Check in" button for Security Officer, Consular Officer, Duty Officer and the mission's Head of Mission. Seats are the primary option's, in check-in order. *Default: yes.*
+6. **Partners and the movement message:** requested and drafted at activation, because two people decided; the message still needs its D-31 second person, who is neither activator. Partners get headcount, muster point, route and times only. *Default: yes.*
+7. **Agent proposal:** none in this module. The design's evacuation proposal relies on Predictive Risk and Fleet, which come later; until then the scene 5 fixture and the Activate button are the two ways. *Default: not now.*
+8. **Names:** only for those who may read the mission's people; others see counts. *Default: yes.*
+9. **Screen:** "Evacuation Management" under RESPOND, after Response Playbooks, as the design. *Default: yes.*
+10. **Demo:** `NBO-EVACUATION` continues from NBO-CIVIL-UNREST scene 5, where two people activate EVP-NBO; the scenario itself approves nothing. If no evacuation is live, the presenter bar says to play NBO-CIVIL-UNREST to scene 5 first. *Default: yes.*
+11. **🔒 prompts:** the migration (PC-30..32: RLS, grants, guards), the `START_EVACUATION` executor, the activation approvals and the partner requests (D-29) need your named sign-off, as before.
