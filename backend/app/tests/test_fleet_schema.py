@@ -4,6 +4,7 @@ and a maintenance item is done once (docs/plan-pilot-flt.md §2, §5, §6, §12)
 
 import asyncio
 import uuid
+from datetime import datetime
 from typing import Any
 
 import asyncpg
@@ -145,6 +146,7 @@ async def test_an_asset_is_added_with_the_database_writing_its_times(
         {"status": "BLOCKED"},  # blocked, in zone and assigned are derived (§58 Q3)
         {"status": "MAINTENANCE"},  # needs a reason
         {"status": "AVAILABLE", "status_reason": ""},
+        {"status": "IN_USE", "status_reason": "On an errand"},  # a reason only for MAINTENANCE
     ],
 )
 async def test_an_asset_refuses_bad_values(
@@ -230,6 +232,8 @@ async def test_the_app_moves_position_fuel_and_status_only(api_tenant: asyncpg.C
         "UPDATE fleet_asset SET armoured = false",
         "UPDATE fleet_asset SET type_label = 'Sedan'",
         "UPDATE fleet_asset SET source = 'real'",
+        "UPDATE fleet_asset SET driver_id = gen_random_uuid()",
+        "UPDATE fleet_asset SET mission_id = gen_random_uuid()",
     ],
 )
 async def test_what_an_asset_is_stays_fixed_for_the_owner_too(
@@ -246,23 +250,34 @@ async def test_assets_are_kept(api_tenant: asyncpg.Connection, owner: asyncpg.Co
         await owner.execute("DELETE FROM fleet_asset")
 
 
-async def test_positions_move_forward_in_time(api_tenant: asyncpg.Connection) -> None:
+async def test_the_database_writes_the_position_time(api_tenant: asyncpg.Connection) -> None:
     conn = api_tenant
     vehicle = await asset(conn, await mission(conn))
-    with pytest.raises(REFUSED, match="newer than the last"):
-        await conn.execute(
-            f"UPDATE fleet_asset SET location = {MOVED}, position_at = position_at - "
-            "interval '1 min' WHERE id = $1",
-            vehicle,
-        )
-    with pytest.raises(REFUSED, match="not in the future"):
-        await conn.execute(
-            f"UPDATE fleet_asset SET location = {MOVED}, position_at = now() + "
-            "interval '1 min' WHERE id = $1",
-            vehicle,
-        )
-    with pytest.raises(REFUSED, match="a new position has a new time"):
-        await conn.execute(f"UPDATE fleet_asset SET location = {MOVED} WHERE id = $1", vehicle)
+    seeded = await conn.fetchval("SELECT position_at FROM fleet_asset WHERE id = $1", vehicle)
+    # Two moves in one transaction, with a caller's time in the past and one in the future:
+    # each move gets the database's own, later time (review of Prompt 72, M1).
+    async with conn.transaction():
+        times: list[datetime] = []
+        for when in ("now() - interval '1 h'", "now() + interval '1 h'"):
+            await conn.execute(
+                f"UPDATE fleet_asset SET location = ST_Project({PT}::geography, "
+                f"{len(times) + 1} * 100, 0), position_at = {when} WHERE id = $1",
+                vehicle,
+            )
+            times.append(
+                await conn.fetchval("SELECT position_at FROM fleet_asset WHERE id = $1", vehicle)
+            )
+        assert seeded < times[0] < times[1]
+        assert times[1] <= await conn.fetchval("SELECT clock_timestamp()")
+    # Fuel alone keeps the time; a caller cannot set it without moving.
+    await conn.execute(
+        "UPDATE fleet_asset SET fuel_pct = 40, position_at = now() - interval '1 d' WHERE id = $1",
+        vehicle,
+    )
+    assert (
+        await conn.fetchval("SELECT position_at FROM fleet_asset WHERE id = $1", vehicle)
+        == times[1]
+    )
 
 
 async def test_maintenance_needs_a_reason(api_tenant: asyncpg.Connection) -> None:
@@ -281,6 +296,14 @@ async def test_maintenance_needs_a_reason(api_tenant: asyncpg.Connection) -> Non
     assert await conn.fetchval("SELECT status FROM fleet_asset WHERE id = $1", vehicle) == (
         "AVAILABLE"
     )
+    # A reason only while in maintenance: leaving it clears the reason (review of Prompt 72, L3).
+    await conn.execute(
+        "UPDATE fleet_asset SET status = 'MAINTENANCE', status_reason = 'Brake service overdue' "
+        "WHERE id = $1",
+        vehicle,
+    )
+    with pytest.raises(CHECK):
+        await conn.execute("UPDATE fleet_asset SET status = 'IN_USE' WHERE id = $1", vehicle)
 
 
 # --- PC-34 · maintenance items ----------------------------------------------------------------

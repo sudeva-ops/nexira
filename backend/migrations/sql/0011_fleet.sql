@@ -32,7 +32,8 @@ CREATE TABLE fleet_asset (
   CHECK ((kind = 'VEHICLE') = (seats IS NOT NULL)),
   CHECK (kind = 'VEHICLE' OR (driver_id IS NULL AND NOT armoured)),
   CHECK ((kind = 'VEHICLE') = (code LIKE 'VH-%')),
-  CHECK (status <> 'MAINTENANCE' OR status_reason IS NOT NULL),
+  -- A reason only while in maintenance, so none goes stale (review of Prompt 72, L3).
+  CHECK ((status = 'MAINTENANCE') = (status_reason IS NOT NULL)),
   CHECK (kind = 'VEHICLE' OR status <> 'IN_USE')
 );
 CREATE INDEX fleet_asset_mission_idx ON fleet_asset (tenant_id, mission_id);
@@ -64,7 +65,7 @@ BEGIN
         RAISE EXCEPTION 'fleet asset: the driver is a person of this mission';
       END IF;
     END IF;
-    IF NEW.position_at > now() THEN
+    IF NEW.position_at > clock_timestamp() THEN
       RAISE EXCEPTION 'fleet asset: a position is not in the future';
     END IF;
     NEW.created_at := now();
@@ -80,13 +81,13 @@ BEGIN
       OLD.seats, OLD.driver_id, OLD.source, OLD.created_at) THEN
     RAISE EXCEPTION 'fleet asset: what the asset is, its mission and its driver are fixed';
   END IF;
-  -- Telematics move forward in time: a late or replayed position never overwrites a newer one.
-  IF NEW.position_at IS DISTINCT FROM OLD.position_at
-     AND (NEW.position_at < OLD.position_at OR NEW.position_at > now()) THEN
-    RAISE EXCEPTION 'fleet asset: a position is newer than the last and not in the future';
-  END IF;
-  IF NEW.location IS DISTINCT FROM OLD.location AND NEW.position_at IS NOT DISTINCT FROM OLD.position_at THEN
-    RAISE EXCEPTION 'fleet asset: a new position has a new time';
+  -- The database writes the position time: the moment a new location is stored, so positions
+  -- move forward in time whatever the caller's clock, also for two moves in one transaction
+  -- (review of Prompt 72, M1). Without a new location the time stays.
+  IF NEW.location IS DISTINCT FROM OLD.location THEN
+    NEW.position_at := clock_timestamp();
+  ELSE
+    NEW.position_at := OLD.position_at;
   END IF;
   IF NEW.status = 'MAINTENANCE' AND NEW.status_reason IS NULL THEN
     RAISE EXCEPTION 'fleet asset: maintenance needs a reason';
