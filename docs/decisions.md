@@ -188,6 +188,7 @@ Record each sign-off in the PR.
 | 9. **Health Intelligence** (HL), simulated (D-39) | |
 | 10. **Evacuation Management** (EV), simulated (D-40) | |
 | 11. **Fleet & Assets** (FLT), simulated (D-41) | |
+| 12. **VIP & Delegation Protection** (VIP), simulated (D-42, proposed) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -260,6 +261,11 @@ Rules:
 - **Simulated telematics.** Assets, positions, fuel and the workshop are simulated (D-19); no real provider is called.
 - **Derived states are not stored.** Blocked (driver SOS), in an impact zone and assigned to an evacuation are worked out from the check-in, incidents and evacuations, so they clear by themselves.
 - **People decide.** Status and maintenance are changed by people with a responder role, through `app/core/approvals.py`; a capacity shortfall only suggests a partner. No agent acts on vehicles.
+
+**D-42 · VIP & Delegation Protection (simulated). Proposed, not yet approved.** Requirements VIP-01 to VIP-08 in `docs/requirements-pilot.md` §59–63, with the proposed defaults in §63. Amends D-30 by adding VIP & Delegation Protection to the pilot.
+- **Restricted by default.** A visit exists only for the protection roles and the host mission's Head of Mission; for everyone else it does not exist (D-33's principle for restricted trips).
+- **Never a position.** No live location of a principal, protection team or motorcade is stored or shown (AIR-06); "live" means programme status only.
+- **People decide.** Segment risk is worked out from data; a programme change needs two people through `app/core/approvals.py` (D-05). No agent acts on visits.
 
 ---
 

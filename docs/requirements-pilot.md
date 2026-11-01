@@ -654,3 +654,69 @@ Playwright on the real stack: before NBO-CIVIL-UNREST, the Nairobi register is a
 9. **Screen:** "Fleet & Assets" under RESPOND, after Evacuation Management. *Default: yes.*
 10. **Demo:** `NBO-FLEET` during NBO-CIVIL-UNREST (from scene 2): VH-04 into and out of the impact zone, then VH-05 back from the workshop. Phase 1 scenes are unchanged; the Fleet screen just reflects them. *Default: yes.*
 11. **🔒 prompts:** the migration (PC-33..34: RLS, grants, guards) and the status and maintenance actions (approvals) need your named sign-off, as before (D-29).
+
+## 59. Purpose and starting point
+
+Plan and protect a senior visit or delegation: the programme with its venues, times and routes, a risk rating for each segment from live data, the protection detail and safe havens, the pre-visit checklist, and, during the visit, the programme's progress. All of this stays restricted to the people protecting it. Master spec §5.19 (VIP & Delegation Protection, VIP-01..04); the design's VIP Protection screen ("Visit VV-2026-031 · Minister's visit to Addis Ababa").
+
+| Exists today | Where |
+|---|---|
+| Restricted (VIP or ministerial) trips: their flights are never tracked, shown, published or audited, no agent proposes anything about them, and no partner hears of their travellers | D-33, AT-05, TA-07, AS-08 |
+| Incidents with location, impact radius and severity; country risk; severe-weather warnings; health advisories | intel, travel, weather, health_intel |
+| Fleet assets per mission (Addis Ababa: VH-11 and VH-12, armoured); medical facilities; Kestrel Medical Assistance; sites (embassy, residence) | fleet, health_intel, partners, people |
+| Two-person decisions through `app/core/approvals.py` | core |
+| No visits, programmes, protection details, checklists or VIP screen | — |
+
+## 60. Requirements: VIP & Delegation Protection (VIP)
+
+| ID | Requirement | Master | Pri. | Acceptance |
+|---|---|---|---|---|
+| VIP-01 | **A visit programme.** A visit `VV-<year>-<n>`: a title, the host mission, the principal's **role** only (for example "Minister of Foreign Affairs"; never a name, §63 Q3), start and end dates, the linked restricted trip, and a status (PLANNED, LIVE, COMPLETED, CANCELLED). Its segments are ordered. Each has a kind (ARRIVAL, MOTORCADE, MEETING, EVENT, SITE_VISIT, DEPARTURE), a title, a venue with a location, a start (and an end or duration), expected attendees where known, and a status (PLANNED, IN_PROGRESS, COMPLETED). Seeded and illustrative (simulated). The programme is changed only through VIP-05. | VIP-01 | M | VV-2026-031, Minister's visit to Addis Ababa, three days from scenario day +4, linked to the restricted TRP-8834, with six segments as the design: arrival (Bole VIP terminal), motorcade to the hotel, bilateral meeting at the Ministry, business forum (600 attendees), site visit to the industrial park, departure. |
+| VIP-02 | **Segment risk from data.** Each segment's risk (LOW, MODERATE, HIGH) is worked out on every read, with its reasons:<br>· an ACTIVE incident whose impact zone reaches within 2 km of the venue: HIGH;<br>· one within 5 km: MODERATE;<br>· a severe-weather warning at the mission: MODERATE;<br>· 500 or more attendees: MODERATE;<br>· a motorcade (exposed movement): at least MODERATE.<br>The visit's risk is the highest segment risk, or the destination's country risk if that is higher. A HIGH segment gets a recommendation: move it out of the window, or replace it with a virtual alternative. | VIP-02 | M | Before the demo: motorcade and forum MODERATE, the rest LOW; visit MODERATE. Once a rally signal opens an incident 1.2 km from the industrial park: the site visit HIGH ("unrest 1.2 km away · INC-…"), with the recommendation. |
+| VIP-03 | **Protection detail, safe havens and the pre-visit checklist.** The detail:<br>· team lead and advance team, given as roles and counts (sample labels, no real names);<br>· vehicles: the host mission's armoured vehicles, from Fleet & Assets (with their live state);<br>· medical: the nearest medical facility, from Health Intelligence, and the standby partner covering the country (Kestrel);<br>· safe havens: the embassy site, the hotel's safe floor (a venue), and the hospital.<br>The checklist items (threat assessment, host-nation liaison, hospital and evacuation plan, each venue survey) have due dates. A Security Officer or the mission's Head of Mission ticks them, once, audited. | VIP-03 | M | Three of four items done; "Industrial park venue survey" open, due the day before the visit. Ticking it is audited and cannot be undone. |
+| VIP-04 | **During the visit: programme status, never positions.** A Security Officer or the mission's Head of Mission starts the visit (PLANNED → LIVE). Segments then move PLANNED → IN_PROGRESS → COMPLETED, by a person or by the scenario's simulated progress events; the visit is COMPLETED after departure, or CANCELLED by the HQ Crisis Director with a reason. **No live location of the principal, team or motorcade is stored or shown** (D-33, AIR-06). The master spec's live tracking for the protection team (VIP-04, priority S) waits for real team devices (§63 Q4). | VIP-04 | M | Starting the visit sets LIVE; the arrival is COMPLETED and the motorcade IN PROGRESS; no position appears in any API, screen or event. |
+| VIP-05 | **Programme changes with two people.** For a segment, a Security Officer proposes a change (a new start time, or a virtual alternative) with a reason. The mission's Head of Mission or the HQ Crisis Director, a different person, approves or rejects it, through `app/core/approvals.py`. On approval the segment changes and its risk is worked out again. Everything is audited. | VIP-02 | M | The site visit moved to 08:00 on the Security Officer's proposal, approved by the Addis Ababa Head of Mission; the proposer cannot approve it; a rejection keeps the segment. |
+| VIP-06 | **Restricted to the protection roles.** Visits, segments, venues, times, the detail and the checklist are visible only to the Security Officer, the HQ Crisis Director, the Duty Officer and the host mission's Head of Mission (§63 Q2). For everyone else, the Viewer included, a visit does not exist: no API row, no count, no map marker, no notification or realtime payload. Realtime events carry only the visit id. Audit details give references, never venues or times. | AIR-06 | M | A Viewer, a Travel Desk user and the Cairo Head of Mission get 404 for the visit, an empty list, and a screen that says the page is restricted. |
+| VIP-07 | **VIP Protection screen.** As the design, Blueprint dark, under RESPOND after Fleet & Assets (§63 Q8):<br>· the visit banner, with Start visit when allowed;<br>· KPIs from data: programme segments and how many HIGH; protection team size, vehicles and medic; venues surveyed; visit risk;<br>· "Programme & route risk", with each segment's time, risk with its reasons, status, and the HIGH recommendation with **Propose change**;<br>· "Protection detail";<br>· "Pre-visit checklist".<br>A visit picker if there are several. Every button comes from `GET /api/me/permissions`. | — | M | — |
+| VIP-08 | **A demo scenario** `ADD-VISIT`:<br>· scene 1: the visit is LIVE (simulated progress: arrival completed, motorcade in progress);<br>· scene 2: a simulated planned-rally signal near the industrial park opens an Addis Ababa incident, and the site visit turns HIGH with its recommendation;<br>· scene 3: the forum completes.<br>The change itself is proposed and approved by people in the browser; the scenario approves nothing. | — | M | Played from the presenter bar. |
+
+### Not in this module
+- Live tracking of the principal, the team or the motorcade (VIP-04 S; it needs real devices and a privacy review), and any VIP movement on the map;
+- editing the programme other than through VIP-05;
+- adding visits in the app (they are seeded in the pilot);
+- real names of principals or protection officers;
+- host-nation liaison messages, or any channel to people outside the platform;
+- an agent proposing programme changes (§63 Q6);
+- motorcade routing or vehicle assignment beyond showing the mission's armoured vehicles.
+
+## 61. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-35 · `vip_visit`**: tenant, reference (`VV-<year>-<n>`), title, mission, principal role, starts on and ends on, the linked trip (nullable; must be restricted), status (`PLANNED`, `LIVE`, `COMPLETED`, `CANCELLED`), the detail (`jsonb`: team lead and advance team as labels and counts, vehicle codes, medic, safe havens), started by and at, cancelled by and reason, source. FORCE RLS; SELECT, INSERT (seeded) and UPDATE of status, start and cancel columns only; no DELETE. Guard: forward-only status; COMPLETED and CANCELLED final; the trip restricted and in the same tenant.
+- **PC-36 · `vip_segment`**: tenant, visit, sequence, kind, title, venue name and location `geography(Point,4326)`, starts at, ends at, attendees, virtual (boolean), status (`PLANNED`, `IN_PROGRESS`, `COMPLETED`). FORCE RLS; SELECT, INSERT (seeded) and UPDATE of status, starts at, ends at and virtual only; no DELETE. Guard: forward-only status, only while the visit is LIVE; time and virtual change only through an approved change (PC-38). Risk is not stored (VIP-02).
+- **PC-37 · `vip_checklist_item`**: tenant, visit, label, due on, done at and by. FORCE RLS; SELECT, INSERT and UPDATE of the done columns, once; no DELETE.
+- **PC-38 · `vip_segment_change`**: tenant, segment, the proposed start and end or virtual, reason, proposed by and at, status (`PENDING`, `APPROVED`, `REJECTED`), decided by (≠ the proposer; checked by the database too) and at, decision note. FORCE RLS; SELECT, INSERT and UPDATE of the decision columns, once; no DELETE. One pending change per segment.
+- Backups include the VIP tables like every other table (D-21). The restriction is enforced by the app and the API, not by hiding rows from the database's backup role.
+
+## 62. Acceptance for the module
+
+Playwright on the real stack:
+- **The seeded visit:** VV-2026-031 shows with six segments; the motorcade and the forum are MODERATE; three of four checklist items are done; the vehicles VH-11 and VH-12 come from Fleet; labelled simulated.
+- **`ADD-VISIT` from the presenter bar:** the visit goes LIVE, and the arrival is COMPLETED. The rally signal turns the site visit HIGH with its recommendation.
+- **The programme change:** the Security Officer proposes moving it to 08:00. The proposer is refused the approval. The Addis Ababa Head of Mission approves, and the segment moves and its risk is recalculated.
+- **The checklist:** the venue survey is ticked.
+- **Restriction:** a Viewer, the Travel Desk and the Cairo Head of Mission get 404 and see no visit anywhere: list, map or events. No position of the principal or the team appears anywhere.
+- **Audit:** every change is audited and the chain verifies.
+- `make acceptance` (all existing specs) still passes.
+
+## 63. Questions for the product owner (proposed defaults)
+
+1. **Visits:** seeded in the pilot, as the design (VV-2026-031, Addis Ababa, linked to the restricted TRP-8834); adding and editing visits in the app comes later. *Default: yes.*
+2. **Who sees visits:** Security Officer, HQ Crisis Director, Duty Officer and the host mission's Head of Mission; for everyone else, a visit does not exist (404, no counts). There is no Protocol Officer role in the pilot (it would change roles and grants). *Default: yes.*
+3. **Names:** the principal by role only; the protection team by role, count and sample labels; no real or invented personal names are stored for VIPs. *Default: yes.*
+4. **Live tracking:** programme status only (segments in progress or completed); never a position of the principal, team or motorcade, consistent with D-33 and AIR-06. Real live tracking waits for real devices and a privacy review. *Default: not now.*
+5. **Risk rules:** as VIP-02 (2 km gives HIGH, 5 km MODERATE, severe weather, 500 or more attendees, motorcades at least MODERATE), worked out on every read and not stored. *Default: yes.*
+6. **Agent proposal:** none in this module. Predictive Risk comes later; until then changes are proposed by a Security Officer. *Default: not now.*
+7. **Programme changes:** the Security Officer proposes; the mission's Head of Mission or the HQ Crisis Director, a different person, decides (two people, as for evacuations). *Default: yes.*
+8. **Screen:** "VIP Protection" under RESPOND, after Fleet & Assets; the nav entry shows only to the roles that may see visits. *Default: yes.*
+9. **Demo:** `ADD-VISIT` from the presenter bar (live, then the rally, then the forum completes); people make the change in the browser. *Default: yes.*
+10. **🔒 prompts:** the migration (PC-35..38: RLS, grants, guards) and the visibility and change approvals (`approvals.py`) need your named sign-off, as before (D-29).

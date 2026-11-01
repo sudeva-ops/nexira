@@ -684,3 +684,62 @@ capacity, maintenance, the alert and the Viewer view.
 Playwright, real stack (requirements-pilot.md §57). Report the real output; make
 acceptance (all specs) still passes.
 ```
+
+## Pilot module 12 · VIP & Delegation Protection (proposed, for approval)
+
+Sources: D-42, `docs/requirements-pilot.md` §59–63 (VIP-01..08), PC-35..38. Simulated visits only; never a position.
+
+### Prompt 77 · Read and plan (no code)
+```
+Read D-05, D-12, D-16, D-19, D-29, D-30, D-33, D-36, D-41, D-42, requirements-pilot.md §1-6
+and §59-63, restricted trips, incidents and impact zones, weather warnings, country risk,
+Fleet, medical facilities and approvals.py. Write docs/plan-pilot-vip.md: requirement-to-code
+mapping, who sees a visit and how it stays invisible to everyone else (API, screen, map,
+events, audit), the risk rules, the detail and safe havens, the checklist, live status
+without positions, two-person changes, the ADD-VISIT scenes, what changes in the acceptance
+specs, gaps with proposed answers, and the migration for PC-35..38 (only after approval).
+No code.
+```
+
+### Prompt 78 · VIP tables (migration) 🔒
+```
+PC-35..38, once approved. A new migration: vip_visit, vip_segment, vip_checklist_item and
+vip_segment_change with FORCE RLS, tenant_isolation and the grants as proposed; the guards
+(forward-only status, final states, the restricted trip, segment times only through an
+approved change, decided once by another person, done once); pinned search_path. Tests (as
+nexira_api): isolation; every refusal; no DELETE; the backup role reads them; the downgrade
+restores the previous revision exactly.
+```
+
+### Prompt 79 · Visits, risk, checklist and changes 🔒
+```
+VIP-01..06. The service: visibility (only the protection roles and the host Head of Mission;
+404 for everyone else); segment risk from incidents, weather and attendees with reasons and
+the recommendation; the detail from Fleet, Health and Partners; checklist ticks; start,
+progress and cancel; two-person changes through app/core/approvals.py; GET /api/vip/* and
+/api/me/permissions; realtime with ids only; audit without venues or times. Tests against
+real PostgreSQL, including that no other role learns a visit exists.
+```
+
+### Prompt 80 · Seed and ADD-VISIT
+```
+VIP-01, VIP-08. VV-2026-031 with its six segments, detail and checklist, linked to a new
+restricted TRP-8834; the VIP_PROGRESS events in the worker; the rally signal near the
+industrial park; the ADD-VISIT scenario and its presenter bar entry. The Phase 1 scenario
+still starts with no active incident and an empty Decision Queue. Tests in the simulator.
+```
+
+### Prompt 81 · VIP Protection screen
+```
+VIP-07. The screen (as the design, Blueprint dark): the banner with Start visit, KPIs, the
+programme with risk, reasons and Propose change, the change decision, the protection detail,
+the checklist; the nav entry under RESPOND after Fleet & Assets, shown only to roles that may
+see visits; every button from /api/me/permissions; realtime refresh. Tests: Vitest for risk,
+the change flow, the checklist, live status and the restricted view.
+```
+
+### Prompt 82 · VIP Protection acceptance
+```
+Playwright, real stack (requirements-pilot.md §62). Report the real output; make
+acceptance (all specs) still passes.
+```
