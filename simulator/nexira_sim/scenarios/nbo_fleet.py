@@ -1,14 +1,15 @@
 """NBO-FLEET: Nairobi's vehicles during the unrest (Fleet & Assets, D-41, FLT-08;
 docs/plan-pilot-flt.md §9).
 
-Played while INC-<year>-1042 is ACTIVE (after NBO-CIVIL-UNREST scene 2). Scene 0 puts VH-04
-back at the Ambassador's Residence, so a replay starts from the same place. Scene 1: its
-simulated telematics drive it off the residence site along Waiyaki Way to Uhuru Highway, into
-the impact zone (a FLEET timeline entry). Scene 2: it turns back to the residence and leaves
-the zone (a second entry). Scene 3: the simulated workshop reports VH-05's brake service done
-and VH-05 is available again; that is final, as a real repair (G-9). Without an ACTIVE
-incident the positions still move and no entry is written. Everything is simulated; nobody
-real is named. Every scene starts with a SCENE_START marker.
+Played while INC-<year>-1042 is ACTIVE (after NBO-CIVIL-UNREST scene 2). Scene 1 first puts
+VH-04 at the Ambassador's Residence, so a replay starts from the same place (scene 0 plays
+only on Play, not on Next), then its simulated telematics drive it off the residence site
+along Waiyaki Way to Uhuru Highway, into the impact zone (a FLEET timeline entry). Scene 2:
+it turns back to the residence and leaves the zone (a second entry). Scene 3: the simulated
+workshop reports VH-05's brake service done and VH-05 is available again; that is final, as
+a real repair (G-9). Without an ACTIVE incident the positions still move and no entry is
+written. Everything is simulated; nobody real is named. Every scene starts with a
+SCENE_START marker.
 """
 
 import uuid
@@ -28,7 +29,7 @@ DESCRIPTION = (
 VEHICLE = "VH-04"
 SCENES = [
     (0, "Ready", "VH-04 at the Ambassador's Residence (play NBO-CIVIL-UNREST to scene 2 first)"),
-    (1, "Into the zone", "VH-04 drives off the residence into the impact zone"),
+    (1, "Into the zone", "VH-04 leaves the residence and drives into the impact zone"),
     (2, "Back out", "VH-04 turns back to the residence and leaves the zone"),
     (3, "Workshop", "VH-05's brake service is done; it is available again"),
 ]
@@ -78,7 +79,7 @@ def build_events(_w: World, tenant_id: uuid.UUID) -> list[EventIn]:
         )
         for n, name, expect in SCENES
     ]
-    events.append(_position(tenant_id, 0, 1, RESIDENCE, FUEL_START))
+    events.append(_position(tenant_id, 1, 0, RESIDENCE, FUEL_START))
     route = [(1, n, p) for n, p in enumerate(OUT, start=1)] + [
         (2, n, p) for n, p in enumerate(BACK, start=1)
     ]

@@ -34,6 +34,17 @@ interface Run {
   status: string;
   steps: { seq: number; id: string; status: string; result: Record<string, unknown> }[];
 }
+interface FleetAsset {
+  code: string;
+  status: string;
+  simulated: boolean;
+  tags: { code: string; reference: string | null }[];
+}
+interface MissionFleet {
+  vehicles: number;
+  available: number;
+  capacity: { seats_available: number; seats_needed: number };
+}
 interface Tally {
   safe: number;
   need_help: number;
@@ -61,6 +72,19 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
   expect(nbo?.display_risk).toBe("LOW");
   const presenter = dutyPage.getByRole("toolbar", { name: "Presenter" });
   await expect(presenter).toContainText("Calm");
+  // FLT-02 (Prompt 76): Nairobi's fleet before the unrest: 4 of 5 vehicles, VH-05 in the workshop.
+  const fleet = () => duty.get<MissionFleet>(`/api/fleet/missions/${nbo?.id}`);
+  const vehicles = async () =>
+    Object.fromEntries(
+      (await duty.get<FleetAsset[]>(`/api/fleet/assets?mission_id=${nbo?.id}`))
+        .filter((a) => a.code.startsWith("VH-"))
+        .map((a) => [a.code, a]),
+    );
+  const tags = async () =>
+    Object.fromEntries(Object.entries(await vehicles()).map(([c, a]) => [c, a.tags.map((t) => t.code)]));
+  expect([(await fleet()).available, (await fleet()).vehicles]).toEqual([4, 5]);
+  expect((await vehicles())["VH-05"]?.status).toBe("MAINTENANCE");
+  expect(Object.values(await vehicles()).every((a) => a.simulated)).toBe(true);
 
   // --- Scene 1 · Signals fused ---------------------------------------------------------
   await presenter.getByRole("button", { name: "Next scene" }).click();
@@ -166,6 +190,12 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
     return pending.find((p) => p.full_name === "Hana Takeda" && p.escalated);
   }, "Hana Takeda escalated");
   expect(hana.escalated).toBe(true);
+  // FLT-02, FLT-03 (Prompt 76): Peter Mwangi needs help, so VH-02 is blocked as well as on the
+  // road in the zone; the garage and residence vehicles are at site (plan-pilot-flt G-1).
+  expect((await tags())["VH-02"]).toEqual(["BLOCKED", "IN_ZONE"]);
+  expect((await tags())["VH-01"]).toEqual([]);
+  const during = await fleet();
+  expect([during.available, during.capacity.seats_available, during.capacity.seats_needed]).toEqual([3, 20, 16]);
   // EV-02 (Prompt 70): after scenes 1-4, EVP-NBO is ready, not activated, labelled simulated.
   // Only here in `make acceptance` is that so; ev-acceptance.spec.ts takes it on from scene 5.
   const nboEvacuations = () => duty.get<{ status: string }[]>(`/api/evacuations?mission_id=${nbo?.id}`);
@@ -194,6 +224,9 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
     "the evacuation executed",
   );
   expect((await nboEvacuations()).map((e) => e.status)).toEqual(["ACTIVE"]); // EV-02: the second activates
+  // FLT-02 (Prompt 76): the available vehicles are assigned to the evacuation.
+  const assigned = Object.entries(await tags()).filter(([, t]) => t.includes("ASSIGNED")).map(([c]) => c);
+  expect(assigned).toEqual(["VH-01", "VH-03", "VH-04"]);
 
   // --- Scene 6 · Review: a user sets MONITORING; the audit chain verifies ---------------------
   await presenter.getByRole("button", { name: "Next scene" }).click();

@@ -107,8 +107,8 @@ Played while INC-1042 is ACTIVE; without an ACTIVE incident the positions still 
 
 | Scene | Events |
 |---|---|
-| 0 Ready | VH-04 position at the residence (so a replay starts from the same place) |
-| 1 Into the zone | five VH-04 positions 2 s apart, from the residence along Waiyaki Way to Uhuru Highway near the CBD, fuel falling 64 → 61%. The second one leaves the residence site: "entered the impact zone" |
+| 0 Ready | the scene marker only (scene 0 plays on Play, not on Next; Prompt 76) |
+| 1 Into the zone | VH-04 first placed at the residence, then five positions 2 s apart, from the residence along Waiyaki Way to Uhuru Highway near the CBD, fuel falling 64 → 61%. The second one leaves the residence site: "entered the impact zone" |
 | 2 Back out | four positions back to the residence: "left the impact zone" on arrival |
 | 3 Workshop | `WORKSHOP_DONE` VH-05 "Brake service": the alert clears; VH-05 AVAILABLE, so Nairobi has one more vehicle and 3 more seats |
 
@@ -139,7 +139,7 @@ Scene 3 is final, as a real repair: replaying it from the presenter bar changes 
 | G-6 | Seed numbers | 48 vehicles, 19 armoured, as §2; a generator and a satellite terminal at each of the 36 missions. Seats: armoured SUV 4, minibus 13, pickup 3, sedan 3. |
 | G-7 | Does "done" change the status? | Not for a person: they set the status separately, so finishing one item never hides another. The simulated workshop does both, as a real workshop returning the car. |
 | G-8 | Name scope | Reuse `evacuations.service.name_scope()` (NAME_READERS), so drivers and evacuees follow the same rule. |
-| G-9 | Replaying NBO-FLEET | Scene 0 puts VH-04 back at the residence; scene 3 is final (the item is done); `make reset-demo` restores everything. |
+| G-9 | Replaying NBO-FLEET | Scene 1 first puts VH-04 back at the residence (Prompt 76: scene 0 is not played on Next); scene 3 is final (the item is done); `make reset-demo` restores everything. |
 | G-10 | FLEET on the incident timeline | `incident_event.event_type` is free text, so this needs no schema change; the Incidents screen gets a label. |
 | G-11 | 🔒 scope | The migration (Prompt 72) and the service's approvals checks (Prompt 73) are 🔒 under D-29. The seed, the scenario, the screen and the specs are not. |
 
