@@ -13,8 +13,10 @@ from app.core.db import tenant_session
 from app.modules.agents.service import AgentIn, PolicyIn, ensure_agents, ensure_policies
 from app.modules.documents.service import ensure_documents, start_renewals
 from app.modules.hazards.service import ensure_climate
+from app.modules.health_intel import service as health
 from app.modules.intel.service import SourceIn, ensure_sources
 from app.modules.notifications.templates import TemplateIn, ensure_templates
+from app.modules.partners.models import Partner
 from app.modules.partners.service import PartnerIn, ensure_partners
 from app.modules.people import location
 from app.modules.people.service import add_observations, ensure_mission, load_persons, load_sites
@@ -30,12 +32,14 @@ from app.modules.travel.service import (
     ensure_scenario_flight,
     ensure_trip,
 )
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from nexira_sim.scenarios import dac_cyclone as dac
 from nexira_sim.scenarios import fra_national_protests as fra
 from nexira_sim.scenarios import mnl_tropical_storm as mnl
 from nexira_sim.scenarios import nbo_air_diversion as air
+from nexira_sim.scenarios import nbo_cholera as cholera
 from nexira_sim.scenarios import nbo_civil_unrest as nbo
 from nexira_sim.seed import data, world
 from nexira_sim.seed import documents as seed_documents
@@ -228,7 +232,10 @@ async def seed_all(
                     texts,
                     {lang: False for lang in texts if lang != "en"},
                 )
-                for code, kind, mission, name, texts in data.MESSAGE_TEMPLATES
+                for code, kind, mission, name, texts in [
+                    *data.MESSAGE_TEMPLATES,
+                    *data.HEALTH_TEMPLATES,
+                ]
             ],
         )
 
@@ -267,6 +274,30 @@ async def seed_all(
                     "scenario": data.CLIMATE_SCENARIO,
                 }
                 for code, (hazards, today, in_2050) in data.CLIMATE.items()
+            ],
+        )
+
+        # Health Intelligence (D-39, plan-pilot-hl §2-5): the six advisories (no events, so
+        # no agent reacts), entry requirements, sample facilities and readiness counts.
+        report["health_advisories"] = await health.ensure_advisories(
+            session, _advisories(scenario_date)
+        )
+        kestrel = await session.scalar(select(Partner.id).where(Partner.code == "KES"))
+        report["health"] = await health.ensure_reference_data(
+            session,
+            facilities=_facilities(w, mission_ids, kestrel),
+            requirements=[(cc, m, r) for cc, (m, r) in data.HEALTH_REQUIREMENTS.items()],
+            readiness=[
+                health.ReadinessIn(
+                    mission_id=mission_ids[m.code],
+                    staff=m.staff,
+                    blood_type_on_file=m.staff,
+                    insurance_active=m.staff,
+                    trauma_kits=6 if m.code == "NBO" else max(2, m.staff // 4),
+                    vaccines_offered=data.VACCINES_OFFERED.get(m.code, {}),
+                    as_of=scenario_date - timedelta(days=data.READINESS_AS_OF_DAYS),
+                )
+                for m in w.missions
             ],
         )
 
@@ -316,6 +347,14 @@ async def seed_all(
             description=mnl.DESCRIPTION,
             events=mnl.build_events(w, tenant_id),
         )
+        report["scenario_cholera"] = await ensure_scenario(
+            session,
+            scenario_id=seed_id(tenant_id, "scenario", cholera.CODE),
+            code=cholera.CODE,
+            name=cholera.NAME,
+            description=cholera.DESCRIPTION,
+            events=cholera.build_events(w, tenant_id),
+        )
         report["scenario_dac"] = await ensure_scenario(
             session,
             scenario_id=seed_id(tenant_id, "scenario", dac.CODE),
@@ -329,6 +368,59 @@ async def seed_all(
 
 
 GST = timezone(timedelta(hours=4))  # the home zone (plan Q2)
+
+
+def _advisories(scenario_date: date) -> list[health.AdvisoryIn]:
+    """Published some days before 06:00 UTC on the scenario date, never in the future."""
+    base = min(datetime.combine(scenario_date, time(6), UTC), datetime.now(UTC))
+    return [
+        health.AdvisoryIn.model_validate(
+            {
+                "external_id": feed_id,
+                "topic": topic,
+                "topic_code": code,
+                "countries": countries,
+                "region_label": region,
+                "level": level,  # validated: LOW, MODERATE, HIGH or CRITICAL
+                "guidance": guidance,
+                "source": source,
+                "published_at": base - timedelta(days=days),
+            }
+        )
+        for feed_id, topic, code, countries, region, level, guidance, source, days in (
+            data.HEALTH_ADVISORIES
+        )
+    ]
+
+
+def _facilities(
+    w: world.World, mission_ids: dict[str, uuid.UUID], kestrel: uuid.UUID | None
+) -> list[health.FacilityIn]:
+    """Nairobi's four as the design; three by pattern for every other mission (§48 Q5)."""
+    out: list[health.FacilityIn] = []
+    for m in w.missions:
+        rows = (
+            data.NAIROBI_FACILITIES
+            if m.code == "NBO"
+            else [
+                (name.format(city=m.city), m.lat + dlat, m.lon + dlon, caps, trauma, open_, vet)
+                for name, dlat, dlon, caps, trauma, open_, vet in data.FACILITY_PATTERN
+            ]
+        )
+        out.extend(
+            health.FacilityIn(
+                mission_id=mission_ids[m.code],
+                name=name,
+                lat=lat,
+                lon=lon,
+                capabilities=caps,
+                open_24_7=open_,
+                trauma_level=trauma,
+                vetted_by=kestrel if vet else None,
+            )
+            for name, lat, lon, caps, trauma, open_, vet in rows
+        )
+    return out
 
 
 async def _air_trips(

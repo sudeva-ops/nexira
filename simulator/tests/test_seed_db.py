@@ -195,6 +195,11 @@ async def test_sources_playbook_agents_and_counters(seeded: Seeded) -> None:
     assert policies["START_DOCUMENT_RENEWAL"] == (2, ["CONSULAR_OFFICER|DUTY_OFFICER"], False)
     assert "ADVISE_EMERGENCY_DOCUMENTS" not in policies
     assert policies["ARM_PLAYBOOK"] == (2, ["SECURITY_OFFICER|DUTY_OFFICER"], False)  # D-38
+    assert policies["PREPARE_HEALTH_ADVISORY"] == (  # D-39, plan-pilot-hl §7
+        2,
+        ["DUTY_OFFICER|CONSULAR_OFFICER"],
+        False,
+    )
     deadlines = await c.fetch(
         "SELECT decision_deadline_s FROM action_policy "
         "WHERE action_type IN ('NOTIFY_TRAVELLERS', 'CANCEL_TRIP', 'START_DOCUMENT_RENEWAL')"
@@ -279,13 +284,27 @@ async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> No
         # PB-01 (D-38): English only, generic.
         ("EARTHQUAKE_CITIZEN_ADVISORY", None, "ADVISORY"),
         ("EARTHQUAKE_STAFF_ALERT", None, "ALERT"),
+        # Health (D-39, plan-pilot-hl G-1): per topic, with the generic fallback.
+        ("HEALTH_CHOLERA", None, "ADVISORY"),
+        ("HEALTH_CHOLERA", "NBO", "ADVISORY"),
+        ("HEALTH_GENERAL", None, "ADVISORY"),
         # PB-06 (D-35): English only, generic and Manila.
         ("SEVERE_WEATHER_SHELTER", None, "ADVISORY"),
         ("SEVERE_WEATHER_SHELTER", "MNL", "ADVISORY"),
         ("SEVERE_WEATHER_STAFF_ALERT", None, "ALERT"),
         ("SEVERE_WEATHER_STAFF_ALERT", "MNL", "ALERT"),
     ]
+    health = [r for r in rows if r["code"].startswith("HEALTH_")]
+    rows = [r for r in rows if not r["code"].startswith("HEALTH_")]
     weather, rows = rows[6:], rows[:6]
+    assert json.loads(health[1]["texts"]) == data.HEALTH_CHOLERA_NBO
+    assert "{city}" in json.loads(health[0]["texts"])["en"]
+    assert set(json.loads(health[2]["texts"])) == {"en", "ar", "fr", "sw"}
+    assert [json.loads(r["reviewed"]) for r in health] == [
+        {},
+        {"ar": False, "fr": False, "sw": False},
+        {"ar": False, "fr": False, "sw": False},
+    ]
     assert [set(json.loads(r["texts"])) for r in weather] == [{"en"}] * 6
     assert [json.loads(r["reviewed"]) for r in weather] == [{}] * 6
     assert "{city}" in json.loads(weather[0]["texts"])["en"]
@@ -495,3 +514,49 @@ async def test_pb01_and_the_hazard_homes(seeded: Seeded) -> None:
         "WHERE m.code = 'DAC' AND p.person_type IN ('DIPLOMAT', 'LOCAL_STAFF')"
     )
     assert dhaka == 15  # §43 Q8: no new people
+
+
+async def test_health_reference_data_is_seeded_counts_only(seeded: Seeded) -> None:
+    """D-39, §48 Q2-Q5: six advisories, none HIGH (so no proposal at reset-demo), entry
+    requirements for every mission country, about three facilities per mission (Nairobi's
+    four), and readiness counts equal to each mission's seeded staff."""
+    conn = seeded.conn
+    advisories = await conn.fetch(
+        "SELECT topic_code, level, status, published_at <= now() AS past FROM health_advisory "
+        "ORDER BY reference"
+    )
+    assert [a["topic_code"] for a in advisories] == [
+        "CHOLERA", "DENGUE", "MPOX", "AVIAN_INFLUENZA", "MEASLES", "HEAT_HEALTH",
+    ]  # fmt: skip
+    assert {a["level"] for a in advisories} <= {"LOW", "MODERATE"}
+    assert all(a["status"] == "OPEN" and a["past"] for a in advisories)
+    assert (
+        await conn.fetchval(
+            "SELECT count(*) FROM agent_proposal WHERE action_type = 'PREPARE_HEALTH_ADVISORY'"
+        )
+        == 0
+    )
+    countries = await conn.fetchval("SELECT count(DISTINCT country_code) FROM mission")
+    assert await conn.fetchval("SELECT count(*) FROM country_health_requirement") == countries
+    per_mission = await conn.fetch(
+        "SELECT m.code, count(f.id) AS n FROM mission m LEFT JOIN medical_facility f "
+        "ON f.mission_id = m.id GROUP BY m.code"
+    )
+    assert {r["code"]: r["n"] for r in per_mission} == {
+        m[0]: 4 if m[0] == "NBO" else 3 for m in data.MISSIONS
+    }
+    staff = await conn.fetch(
+        "SELECT m.code, r.staff, r.vaccines_offered, "
+        "(SELECT count(*) FROM person p WHERE p.mission_id = m.id AND p.is_active "
+        "  AND p.person_type IN ('DIPLOMAT', 'LOCAL_STAFF')) AS seeded "
+        "FROM mission m JOIN mission_health_readiness r ON r.mission_id = m.id"
+    )
+    assert len(staff) == len(data.MISSIONS)
+    assert all(r["staff"] == r["seeded"] for r in staff)
+    nairobi = next(r for r in staff if r["code"] == "NBO")
+    assert (nairobi["staff"], json.loads(nairobi["vaccines_offered"])) == (14, {"CHOLERA": 9})
+    vetted = await conn.fetchval(
+        "SELECT count(*) FROM medical_facility f JOIN partner p ON p.id = f.vetted_by "
+        "WHERE p.code = 'KES'"
+    )
+    assert vetted == 3 + 2 * (len(data.MISSIONS) - 1)

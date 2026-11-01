@@ -29,6 +29,7 @@ export const DEMO_SCENARIOS = [
   { code: "NBO-AIR-DIVERSION", label: "Inbound flight diversion" },
   { code: "MNL-TROPICAL-STORM", label: "Manila tropical storm" },
   { code: "DAC-CYCLONE", label: "Dhaka cyclone" },
+  { code: "NBO-CHOLERA", label: "Nairobi cholera" },
 ] as const;
 export type DemoScenario = (typeof DEMO_SCENARIOS)[number]["code"];
 export const DEMO_SCENARIO: DemoScenario = DEMO_SCENARIOS[0].code;

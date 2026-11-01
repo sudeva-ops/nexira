@@ -117,6 +117,7 @@ describe("Presenter bar", () => {
       "Inbound flight diversion",
       "Manila tropical storm",
       "Dhaka cyclone",
+      "Nairobi cholera",
     ]);
     expect(SCENE_SCREEN["MNL-TROPICAL-STORM"]).toEqual({
       0: "/operations",
