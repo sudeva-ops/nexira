@@ -167,3 +167,8 @@ Scene 3 is final, as a real repair: replaying it from the presenter bar changes 
 ## 13. Prompts
 
 As `docs/prompts-pilot.md` Prompts 72–76: the migration (🔒); the service (🔒); the seed, telematics and NBO-FLEET; the screen; the acceptance. Each ships with its tests, and `make acceptance` passes at the end.
+
+## 14. Decisions by the product owner (2026-11-01, PR #85: "approved")
+
+- G-1: a vehicle within 150 m of one of its mission's sites is at site, not in an impact zone; the zone and the geofence apply to vehicles on the road. FLT-02 reads accordingly.
+- G-2..G-11: as proposed.
