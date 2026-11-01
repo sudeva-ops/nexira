@@ -123,7 +123,8 @@ _ASSETS = text(
                         WHERE st.mission_id = a.mission_id
                           AND ST_DWithin(st.location, a.location, :at_site_m)) AS at_site) s
      WHERE (CAST(:mission_id AS uuid) IS NULL OR a.mission_id = CAST(:mission_id AS uuid))
-     ORDER BY m.code = 'NBO' DESC, a.kind DESC, a.code
+       AND (CAST(:asset_id AS uuid) IS NULL OR a.id = CAST(:asset_id AS uuid))
+     ORDER BY m.code, a.kind DESC, a.code
     """
 )
 
@@ -145,10 +146,15 @@ def _states(row: Any) -> tuple[schemas.StateOut, list[schemas.StateOut], bool]:
 
 
 async def list_assets(
-    session: AsyncSession, user: CurrentUser, mission_id: uuid.UUID | None = None
+    session: AsyncSession,
+    user: CurrentUser,
+    mission_id: uuid.UUID | None = None,
+    asset_id: uuid.UUID | None = None,
 ) -> list[schemas.AssetOut]:
     scope = await evacuations.name_scope(session, user)
-    rows = await session.execute(_ASSETS, {"mission_id": mission_id, "at_site_m": AT_SITE_M})
+    rows = await session.execute(
+        _ASSETS, {"mission_id": mission_id, "asset_id": asset_id, "at_site_m": AT_SITE_M}
+    )
     out = []
     for row in rows:
         state, tags, available = _states(row)
@@ -329,6 +335,15 @@ async def _require(session: AsyncSession, user: CurrentUser, mission_id: uuid.UU
         )
 
 
+async def _mission_of(session: AsyncSession, asset_id: uuid.UUID) -> uuid.UUID:
+    mission_id = await session.scalar(
+        select(FleetAsset.mission_id).where(FleetAsset.id == asset_id)
+    )
+    if mission_id is None:
+        raise FleetError(404, "Asset not found")
+    return mission_id
+
+
 async def _locked(session: AsyncSession, asset_id: uuid.UUID) -> FleetAsset:
     asset = await session.scalar(
         select(FleetAsset).where(FleetAsset.id == asset_id).with_for_update()
@@ -345,8 +360,10 @@ async def set_status(
     status: str,
     reason: str | None,
 ) -> Outcome:
+    # The role first, so a refused caller never holds the row lock (review of Prompt 73, L3);
+    # the mission is frozen (PC-33), so the check holds after the lock.
+    await _require(session, user, await _mission_of(session, asset_id))
     asset = await _locked(session, asset_id)
-    await _require(session, user, asset.mission_id)
     if status not in STATUSES:
         raise FleetError(422, "Status is AVAILABLE, IN_USE or MAINTENANCE")
     if status == "MAINTENANCE" and not reason:
@@ -387,13 +404,18 @@ async def _done(
 
 
 async def complete(session: AsyncSession, user: CurrentUser, item_id: uuid.UUID) -> Outcome:
+    asset_id = await session.scalar(
+        select(FleetMaintenance.asset_id).where(FleetMaintenance.id == item_id)
+    )
+    if asset_id is None:
+        raise FleetError(404, "Maintenance item not found")
+    await _require(session, user, await _mission_of(session, asset_id))  # before the lock (L3)
     item = await session.scalar(
         select(FleetMaintenance).where(FleetMaintenance.id == item_id).with_for_update()
     )
     if item is None:
         raise FleetError(404, "Maintenance item not found")
-    asset = await session.get_one(FleetAsset, item.asset_id)
-    await _require(session, user, asset.mission_id)
+    asset = await session.get_one(FleetAsset, asset_id)
     if item.done_at is not None:
         raise FleetError(409, f"{item.task} on {asset.code} is already done")
     # Done by the caller, never on someone's behalf (review of Prompt 72, L4). The status
@@ -492,9 +514,10 @@ async def position(
     return Outcome([fleet_event(asset, "position", [str(i) for i, _, _ in crossings])])
 
 
-async def workshop_done(session: AsyncSession, code: str, task: str) -> Outcome | None:
-    """The simulated workshop (G-7): the open item done and, if the vehicle was in
-    maintenance, AVAILABLE again. None if there is no such asset or open item."""
+async def workshop_done(session: AsyncSession, code: str, task: str, today: date) -> Outcome | None:
+    """The simulated workshop (G-7): the open item done and, if the vehicle was in maintenance
+    and has no other overdue item, AVAILABLE again (review of Prompt 73, M1). None if there is
+    no such asset or open item."""
     asset_id = await session.scalar(select(FleetAsset.id).where(FleetAsset.code == code))
     if asset_id is None:
         return None
@@ -511,7 +534,16 @@ async def workshop_done(session: AsyncSession, code: str, task: str) -> Outcome 
     if item is None:
         return None
     await _done(session, item, asset, "WORKSHOP", WORKSHOP)
-    if asset.status == "MAINTENANCE":
+    overdue = await session.scalar(
+        select(FleetMaintenance.id)
+        .where(
+            FleetMaintenance.asset_id == asset.id,
+            FleetMaintenance.done_at.is_(None),
+            FleetMaintenance.due_on < today,
+        )
+        .limit(1)
+    )
+    if asset.status == "MAINTENANCE" and overdue is None:
         asset.status = "AVAILABLE"
         asset.status_reason = None
         await session.flush()

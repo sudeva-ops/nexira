@@ -79,7 +79,7 @@ async def set_status(
         outcome = await service.set_status(session, user, asset_id, body.status, body.reason)
     except service.FleetError as e:
         raise _http(e) from None
-    out = next(a for a in await service.list_assets(session, user) if a.id == asset_id)
+    out = (await service.list_assets(session, user, asset_id=asset_id))[0]
     await _done(session, publisher, outcome.events)
     return out
 

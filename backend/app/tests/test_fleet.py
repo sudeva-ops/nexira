@@ -332,7 +332,8 @@ async def test_the_register_is_seeded_once_and_labelled_simulated(world: World) 
         await session.commit()
     assert await world.actions("FLEET.SEED") == ["FLEET.SEED"]
     assets = await world.assets()
-    assert list(assets) == ["VH-01", "VH-02", "VH-03", "VH-04", "VH-05", "GEN-NBO", "VH-31"]
+    # By mission code, vehicles first; no mission is put first (review of Prompt 73, L7).
+    assert list(assets) == ["VH-31", "VH-01", "VH-02", "VH-03", "VH-04", "VH-05", "GEN-NBO"]
     vh02 = assets["VH-02"]
     assert (vh02["type_label"], vh02["seats"], vh02["armoured"], vh02["fuel_pct"]) == (
         "Armoured SUV (B6)",
@@ -594,9 +595,15 @@ async def test_positions_without_an_active_incident_make_no_entries(world: World
 
 async def test_the_simulated_workshop_returns_a_vehicle(world: World) -> None:
     async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
-        assert await fleet.workshop_done(session, "VH-05", "Brake service") is not None
-        assert await fleet.workshop_done(session, "VH-05", "Brake service") is None  # done
-        assert await fleet.workshop_done(session, "VH-05", "Respray") is None  # no such item
+        assert (
+            await fleet.workshop_done(session, "VH-05", "Brake service", date.today()) is not None
+        )
+        assert (
+            await fleet.workshop_done(session, "VH-05", "Brake service", date.today()) is None
+        )  # done
+        assert (
+            await fleet.workshop_done(session, "VH-05", "Respray", date.today()) is None
+        )  # no such item
         await session.commit()
     vh05 = (await world.assets())["VH-05"]
     assert (vh05["state"]["code"], vh05["status_reason"], vh05["available"]) == (
@@ -642,3 +649,78 @@ async def test_the_worker_handlers_validate_and_publish(world: World) -> None:
         ("FLEET_UPDATED", "maintenance"),
     ]
     assert (await world.assets())["VH-04"]["fuel_pct"] == 62
+
+
+async def test_the_workshop_keeps_a_vehicle_with_another_overdue_item_in_maintenance(
+    world: World,
+) -> None:
+    """Review of Prompt 73, M1: one job done does not release a vehicle with another overdue."""
+    vh05 = (await world.assets())["VH-05"]["id"]
+    await world.sql(
+        "INSERT INTO fleet_maintenance (tenant_id, asset_id, task, due_on) "
+        "VALUES (current_tenant_id(), :a, 'Tyre replacement', current_date - 1)",
+        a=vh05,
+    )
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        assert await fleet.workshop_done(session, "VH-05", "Brake service", date.today())
+        await session.commit()
+    assert (await world.assets())["VH-05"]["state"]["code"] == "MAINTENANCE"
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        assert await fleet.workshop_done(session, "VH-05", "Tyre replacement", date.today())
+        await session.commit()
+    assert (await world.assets())["VH-05"]["state"]["code"] == "AVAILABLE"
+
+
+async def test_overlapping_incidents(world: World) -> None:
+    """Two ACTIVE zones: the earlier incident is the state, and a crossing is written for each
+    (an incident always has a location: incident.location is NOT NULL)."""
+    await world.sql(
+        "INSERT INTO incident (tenant_id, reference, title, category, severity, "
+        "signal_severity, location, mission_id, status) VALUES (current_tenant_id(), "
+        "'INC-2026-1050', 'Unrest', 'CIVIL_UNREST', 'HIGH', 'HIGH', :pt, :m, 'ACTIVE')",
+        pt=pt(CBD),
+        m=world.nbo,
+    )
+    assert (await world.assets())["VH-02"]["state"]["reference"] == "INC-2026-1042"
+    await world.position("VH-04", CBD, "Uhuru Highway")
+    assert await world.timeline() == [
+        "VH-04 entered the impact zone of INC-2026-1042 · Uhuru Highway.",
+        "VH-04 entered the impact zone of INC-2026-1050 · Uhuru Highway.",
+    ]
+
+
+async def test_no_driver_name_in_events_audit_or_the_timeline(world: World) -> None:
+    await _checkin(world, "NEED_HELP")
+    vh02 = (await world.assets())["VH-02"]["id"]
+    await world.send("duty", "PATCH", f"/api/fleet/assets/{vh02}/status", {"status": "AVAILABLE"})
+    await world.position("VH-02", RESIDENCE, "Ambassador's Residence")
+    details = await world.sql("SELECT details::text FROM audit_log WHERE action LIKE 'FLEET.%'")
+    timeline = await world.timeline()
+    published = [str(e.payload) for e in world.publisher.events]
+    assert timeline  # VH-02 left the zone
+    for text_ in [*(r[0] for r in details), *timeline, *published]:
+        assert "Fictional Driver" not in text_
+
+
+async def test_capacity_while_an_evacuation_waits_for_its_second_person(world: World) -> None:
+    """Deviation (b): no manifest before activation, so the mission's people are counted."""
+    hom = await world.user_id("hom.nbo")
+    await world.sql(
+        "INSERT INTO evacuation_plan (tenant_id, mission_id, reference, muster_name, "
+        "muster_location, route_label, destination, options) VALUES (current_tenant_id(), :m, "
+        "'EVP-NBO', 'Courtyard', :pt, 'Route B', 'Dubai', "
+        '\'[{"role": "PRIMARY", "kind": "CHARTER", "label": "C"}]\')',
+        m=world.nbo,
+        pt=pt(EMBASSY),
+    )
+    await world.sql(
+        "INSERT INTO evacuation (tenant_id, reference, plan_id, mission_id, incident_id, "
+        "requested_by, requested_role) SELECT current_tenant_id(), 'EVN-1001', id, :m, :i, :u, "
+        "'HEAD_OF_MISSION' FROM evacuation_plan",
+        m=world.nbo,
+        i=world.incident,
+        u=hom,
+    )
+    capacity = (await world.mission())["capacity"]
+    assert (capacity["seats_needed"], capacity["needed_from"]) == (4, "PEOPLE")
+    assert (await world.states())["VH-01"] == []  # not assigned until it is ACTIVE

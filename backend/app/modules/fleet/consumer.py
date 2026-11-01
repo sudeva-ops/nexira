@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from app.core.db import tenant_session
 from app.core.events import Event, Handler, Publisher
+from app.modules.documents.service import today_utc
 from app.modules.fleet import service
 
 log = logging.getLogger(__name__)
@@ -52,8 +53,10 @@ def position_handler(engine: AsyncEngine, publisher: Publisher) -> Handler:
                 session, p.asset_code, p.lat, p.lon, p.label, p.fuel_pct
             )
             await session.commit()
-        if outcome is not None:
-            await _publish(publisher, outcome.events)
+        if outcome is None:  # a miscoded simulator shows in the log (review of Prompt 73, L4)
+            log.warning("vehicle position for unknown asset %s", p.asset_code)
+            return
+        await _publish(publisher, outcome.events)
 
     return handle
 
@@ -66,9 +69,11 @@ def workshop_handler(engine: AsyncEngine, publisher: Publisher) -> Handler:
             log.warning("workshop event refused: %s errors", e.error_count())
             return
         async with tenant_session(event.tenant_id, engine) as session:
-            outcome = await service.workshop_done(session, w.asset_code, w.task)
+            outcome = await service.workshop_done(session, w.asset_code, w.task, today_utc())
             await session.commit()
-        if outcome is not None:
-            await _publish(publisher, outcome.events)
+        if outcome is None:
+            log.warning("workshop event for %s %r matched no open item", w.asset_code, w.task)
+            return
+        await _publish(publisher, outcome.events)
 
     return handle
