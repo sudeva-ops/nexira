@@ -57,4 +57,11 @@ export const SCENE_SCREEN: Record<DemoScenario, Record<number, string>> = {
     3: "/evacuation",
     4: "/evacuation",
   },
+  // D-41 (FLT-08): during NBO-CIVIL-UNREST, every scene on Fleet & Assets (Prompt 75).
+  "NBO-FLEET": {
+    0: "/fleet",
+    1: "/fleet",
+    2: "/fleet",
+    3: "/fleet",
+  },
 };
