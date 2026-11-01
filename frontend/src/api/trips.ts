@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiGet, apiSend } from "./client";
+import type { Requirement } from "./health";
 import type { Severity } from "./intel";
 
 // Journey Management (Prompts 25-26; JR-01..09, D-32). The backend decides every
@@ -99,6 +100,7 @@ export interface TripDetail extends Trip {
   segments: Segment[];
   country_risk: CountryRisk | null;
   document_warnings: DocumentWarning[]; // DX-06: within the caller's document read scope
+  health_requirement: Requirement | null; // HL-03, plan-pilot-hl G-9: the destination's, simulated
 }
 
 export interface TripPlan {

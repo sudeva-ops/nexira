@@ -144,6 +144,10 @@ describe("realtime client (PLT-05)", () => {
     expect(staleKeys(event("PLAYBOOK_RUN_STARTED", { run_id: "r1" }))).toContainEqual(["hazards"]);
     expect(staleKeys(event("INCIDENT_UPDATED", { incident_id: "i1" }))).toContainEqual(["hazards"]);
     expect(staleKeys(event("EXPOSURE_COMPUTED", { incident_id: "i1" }))).toContainEqual(["hazards"]);
+    // D-39: an advisory's level or status, and an incident for the Avoid flag (plan-pilot-hl G-8).
+    expect(staleKeys(event("HEALTH_ADVISORY_UPDATED", { advisory_id: "a1" }))).toEqual([["health"]]);
+    expect(staleKeys(event("INCIDENT_CREATED", { incident_id: "i1" }))).toContainEqual(["health"]);
+    expect(staleKeys(event("INCIDENT_UPDATED", { incident_id: "i1" }))).toContainEqual(["health"]);
     expect(staleKeys(event("SOMETHING_ELSE"))).toEqual([]);
   });
 });

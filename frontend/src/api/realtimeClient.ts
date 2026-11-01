@@ -5,6 +5,7 @@ import { documentKeys } from "./documents";
 import { partnerKeys } from "./partners";
 import { flightKeys } from "./flights";
 import { hazardKeys } from "./hazards";
+import { healthKeys } from "./health";
 import { keys } from "./intel";
 import { peopleKeys } from "./people";
 import { playbookKeys } from "./playbooks";
@@ -35,7 +36,15 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
       return [keys.signals, keys.summary];
     case "INCIDENT_CREATED":
     case "INCIDENT_UPDATED":
-      return [keys.incidents, keys.signals, keys.summary, peopleKeys.missions, hazardKeys.all, ...incident];
+      return [
+        keys.incidents,
+        keys.signals,
+        keys.summary,
+        peopleKeys.missions,
+        hazardKeys.all,
+        healthKeys.all, // a facility's Avoid flag follows ACTIVE incidents (plan-pilot-hl G-8)
+        ...incident,
+      ];
     case "EXPOSURE_COMPUTED":
       return [
         keys.incidents,
@@ -62,6 +71,8 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
     }
     case "HAZARD_CLOCK_ADVANCED": // countdowns read the hazard clock (plan-pilot-hz G-9)
       return [hazardKeys.all];
+    case "HEALTH_ADVISORY_UPDATED": // the advisories, the KPIs and the mission's readiness (HL-08)
+      return [healthKeys.all];
     case "PROPOSAL_CREATED":
     case "PROPOSAL_UPDATED":
     case "PROPOSAL_EXPIRED":
