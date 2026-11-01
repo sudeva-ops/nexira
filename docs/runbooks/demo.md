@@ -50,7 +50,7 @@ Scenario **Nairobi civil unrest** (NBO-CIVIL-UNREST, decisions.md §7). In windo
 | 2 Impact | → | Click the incident marker: 229 people (14 staff, 3 delegates, 212 citizens), 3 sites, 1 trip; severity CRITICAL because the embassy is in the zone. Journey Management: TRP-8812 shows "Impacted · INC-…-1042". Decision Queue: the **Travel & Air** agent proposes a safety message to TRP-8812's travellers and a notice for TRP-8818 ("risk now CRITICAL"); window E (Travel Desk) can approve them. |
 | 3 Playbook | → | Decision Queue: the Response Planner proposes PB-07. Approve as Duty Officer. The playbook runs to step 7 and waits. In **window B** (Head of Mission) open Response Playbooks and approve step 7. Back in A: the Communications agent proposes the citizen advisory; approve it. |
 | 4 Check-in | → | Safety Check-in: answers arrive live: personnel 15 safe, 1 needs help, 1 pending; citizens 168 / 4 / 40. Hana Takeda, who did not answer, is escalated after 20 seconds. |
-| 5 Decisions | → | Two-person rule. In a terminal: `cd simulator && APP_ENV=local uv run python -m nexira_sim.fixtures.evacuation` (adds an evacuation proposal). Window B approves step 1 of 2; she cannot approve step 2. **Window C** (HQ Crisis Director) approves step 2. |
+| 5 Decisions | → | Two-person rule. In a terminal: `cd simulator && APP_ENV=local uv run python -m nexira_sim.fixtures.evacuation` (adds an evacuation proposal). Window B approves step 1 of 2; she cannot approve step 2. **Window C** (HQ Crisis Director) approves step 2: EVP-NBO is activated (D-40; see Storyline 6b4). |
 | 6 Review | → | Incidents: set INC-…-1042 to MONITORING. Audit (admin): the chain verifies. |
 
 ## 4. Storyline 2 · Mass Notification and France (about 5 minutes)
@@ -113,6 +113,16 @@ Simulated advisories, sample facilities and illustrative entry requirements (D-3
 
 A closed advisory stays closed and cholera stays HIGH, so to show the storyline again run `make reset-demo`.
 
+## 6b4. Storyline · Evacuation (about 4 minutes, after Storyline 1 scene 5)
+
+Simulated plans, scanner, charter and convoy (D-40). In Storyline 1 scene 5 the Nairobi Head of Mission and the HQ Crisis Director approve the evacuation proposal: that activates **EVP-NBO**, locks a manifest of **60** (12 diplomats, 3 delegates, 1 dependant, and the 44 citizens who did not confirm safe), asks Atlas Air Evacuation and Sentinel Secure Transport (no names shared), and prepares the movement message.
+
+1. **Mass Notification**: the movement message waits for a third person; neither the Head of Mission nor the HQ Crisis Director can approve it. Sign in as the **Consular Officer** and approve it (deliveries simulated).
+2. Presenter bar: pick **Nairobi evacuation** and press →: the simulated muster-point scanner checks everyone in over 30 seconds, with seats 1A to 15D of the charter's 72.
+3. → convoy departed, → charter departed (from now on it can no longer be stood down), → arrival: the evacuation is complete.
+
+Until the Evacuation Management screen arrives (Prompt 69) the presenter bar stays on the Decision Queue. If no evacuation is live, the scenes change nothing: play Storyline 1 to scene 5 first. To show it again, run `make reset-demo`.
+
 ## 6c. Storyline 6 · Assistance Partners (about 3 minutes, after Storyline 1)
 
 1. **Assistance Partners**: the five contracted partners (fictional, simulated) with services, coverage and response times; coverage 34 / 36, with Canberra and Buenos Aires named as gaps (no evacuation partner).
@@ -133,6 +143,7 @@ The partners are simulated: no partner is contacted (D-36). A request can be mad
 | Manila's weather stays stormy after the storm scenario | A scenario's conditions hold for 6 hours (plan-pilot-wx G-1); `make reset-demo` clears them. |
 | No weather incidents for dust storms or heat, or the storm stays separate from Dataminr's report | The database was seeded before the Weather module, and new source categories are added only to a fresh seed (plan-pilot-wx G-2): `make reset-demo`. |
 | No earthquake, cyclone, wildfire or air-quality events, or the Dhaka cyclone opens no incident | The database was seeded before Natural Hazards, and new sources and categories are added only to a fresh seed (plan-pilot-hz G-10): `make reset-demo`. |
+| Nairobi evacuation changes nothing | No evacuation is live at Nairobi: play Storyline 1 to scene 5 (both approvals) first, or `make reset-demo` if an earlier one is already complete. |
 | No health advisories, or Nairobi cholera proposes nothing | The database was seeded before Health Intelligence: `make reset-demo`. If cholera is already HIGH from an earlier run, a new rise is needed; reset the demo. |
 | Everything is slow or stuck after the laptop slept | `make up`, then `make reset-demo`; keep `caffeinate -dims` running. |
 | Logs | `make logs` (the worker shows signals, exposure, flights and agents). |

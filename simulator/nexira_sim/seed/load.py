@@ -12,6 +12,7 @@ from typing import Any
 from app.core.db import tenant_session
 from app.modules.agents.service import AgentIn, PolicyIn, ensure_agents, ensure_policies
 from app.modules.documents.service import ensure_documents, start_renewals
+from app.modules.evacuations import service as evacuations
 from app.modules.hazards.service import ensure_climate
 from app.modules.health_intel import service as health
 from app.modules.intel.service import SourceIn, ensure_sources
@@ -41,6 +42,7 @@ from nexira_sim.scenarios import mnl_tropical_storm as mnl
 from nexira_sim.scenarios import nbo_air_diversion as air
 from nexira_sim.scenarios import nbo_cholera as cholera
 from nexira_sim.scenarios import nbo_civil_unrest as nbo
+from nexira_sim.scenarios import nbo_evacuation as evacuation
 from nexira_sim.seed import data, world
 from nexira_sim.seed import documents as seed_documents
 from nexira_sim.seed.identities import bootstrap_tenant, demo_user_id, seed_identities
@@ -235,6 +237,7 @@ async def seed_all(
                 for code, kind, mission, name, texts in [
                     *data.MESSAGE_TEMPLATES,
                     *data.HEALTH_TEMPLATES,
+                    *data.EVACUATION_TEMPLATES,
                 ]
             ],
         )
@@ -301,6 +304,12 @@ async def seed_all(
             ],
         )
 
+        # Evacuation Management (D-40, plan-pilot-ev §2): a plan for every mission.
+        partner_ids = dict((await session.execute(select(Partner.code, Partner.id))).all())
+        report["evacuation_plans"] = await evacuations.ensure_plans(
+            session, _plans(w, mission_ids, partner_ids)
+        )
+
         report["counters"] = [
             await ensure_reference_counter(
                 session, prefix="INC", with_year=True, last_value=data.INC_START
@@ -313,6 +322,9 @@ async def seed_all(
             ),
             await ensure_reference_counter(
                 session, prefix="REQ", with_year=False, last_value=data.REQ_START
+            ),
+            await ensure_reference_counter(
+                session, prefix="EVN", with_year=False, last_value=data.EVN_START
             ),
         ]
         report["scenario"] = await ensure_scenario(
@@ -355,6 +367,14 @@ async def seed_all(
             description=cholera.DESCRIPTION,
             events=cholera.build_events(w, tenant_id),
         )
+        report["scenario_evacuation"] = await ensure_scenario(
+            session,
+            scenario_id=seed_id(tenant_id, "scenario", evacuation.CODE),
+            code=evacuation.CODE,
+            name=evacuation.NAME,
+            description=evacuation.DESCRIPTION,
+            events=evacuation.build_events(w, tenant_id),
+        )
         report["scenario_dac"] = await ensure_scenario(
             session,
             scenario_id=seed_id(tenant_id, "scenario", dac.CODE),
@@ -391,6 +411,62 @@ def _advisories(scenario_date: date) -> list[health.AdvisoryIn]:
             data.HEALTH_ADVISORIES
         )
     ]
+
+
+def _plans(
+    w: world.World, mission_ids: dict[str, uuid.UUID], partners: dict[str, uuid.UUID]
+) -> list[evacuations.PlanIn]:
+    """EVP-NBO as the design; one by pattern for every other mission (plan §2)."""
+    covers = {code: set(cov) for code, _n, _s, cov, *_ in data.PARTNERS}
+
+    def partner(code: str | None, country: str) -> str | None:
+        if code is None or code not in partners or country not in covers[code]:
+            return None
+        return str(partners[code])
+
+    out: list[evacuations.PlanIn] = []
+    for m in w.missions:
+        options: list[data.EvacuationOption]
+        if m.code == "NBO":
+            muster, route, destination = (
+                data.NAIROBI_MUSTER,
+                data.NAIROBI_ROUTE,
+                data.NAIROBI_DESTINATION,
+            )
+            lat, lon = data.EMBASSY
+            options = data.NAIROBI_OPTIONS
+        else:
+            destination = data.SAFE_HAVEN[m.country_code]
+            muster, route, lat, lon = f"{m.city} chancery courtyard", "Primary route", m.lat, m.lon
+            road = "SEN" if m.country_code in data.EMEA else "MER"
+            seats = max(40, 4 * m.staff)
+            options = [
+                ("PRIMARY", "CHARTER", f"Charter · {m.city} → {destination}", seats, "ATL"),
+                ("BACKUP", "COMMERCIAL", f"Commercial · {m.city} (seats held: 20)", 20, None),
+                ("CONTINGENCY", "ROAD", f"Road · overland from {m.city}", None, road),
+            ]
+        out.append(
+            evacuations.PlanIn(
+                mission_id=mission_ids[m.code],
+                mission_code=m.code,
+                muster_name=muster,
+                lat=lat,
+                lon=lon,
+                route_label=route,
+                destination=destination,
+                options=[
+                    {
+                        "role": role,
+                        "kind": kind,
+                        "label": label,
+                        "seats": seats,
+                        "partner_id": partner(code, m.country_code),
+                    }
+                    for role, kind, label, seats, code in options
+                ],
+            )
+        )
+    return out
 
 
 def _facilities(

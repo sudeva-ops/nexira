@@ -284,6 +284,9 @@ async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> No
         # PB-01 (D-38): English only, generic.
         ("EARTHQUAKE_CITIZEN_ADVISORY", None, "ADVISORY"),
         ("EARTHQUAKE_STAFF_ALERT", None, "ALERT"),
+        # The evacuation movement order (D-40, plan-pilot-ev G-7): generic and Nairobi.
+        ("EVACUATION_MOVE", None, "ALERT"),
+        ("EVACUATION_MOVE", "NBO", "ALERT"),
         # Health (D-39, plan-pilot-hl G-1): per topic, with the generic fallback.
         ("HEALTH_CHOLERA", None, "ADVISORY"),
         ("HEALTH_CHOLERA", "NBO", "ADVISORY"),
@@ -294,6 +297,13 @@ async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> No
         ("SEVERE_WEATHER_STAFF_ALERT", None, "ALERT"),
         ("SEVERE_WEATHER_STAFF_ALERT", "MNL", "ALERT"),
     ]
+    evacuation = [r for r in rows if r["code"] == "EVACUATION_MOVE"]
+    assert "{city}" in json.loads(evacuation[0]["texts"])["en"]
+    assert "Embassy courtyard" in json.loads(evacuation[1]["texts"])["en"]
+    assert [json.loads(r["reviewed"]) for r in evacuation] == [
+        {"ar": False, "fr": False, "sw": False}
+    ] * 2
+    rows = [r for r in rows if r["code"] != "EVACUATION_MOVE"]
     health = [r for r in rows if r["code"].startswith("HEALTH_")]
     rows = [r for r in rows if not r["code"].startswith("HEALTH_")]
     weather, rows = rows[6:], rows[:6]

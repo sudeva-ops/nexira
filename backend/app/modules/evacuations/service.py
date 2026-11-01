@@ -11,6 +11,7 @@
 - Names are shown only within NAME_READERS' mission scope (G-8); everyone else sees counts.
 """
 
+import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import date
@@ -32,7 +33,7 @@ from app.modules.notifications.models import NotificationCampaign
 from app.modules.partners import service as partners
 from app.modules.partners.models import Partner, PartnerRequest
 from app.modules.people.models import Mission, Person
-from app.modules.tenancy.service import Actor
+from app.modules.tenancy.service import SYSTEM, Actor
 
 HOM = "HEAD_OF_MISSION"
 HQ = "HQ_CRISIS_DIRECTOR"
@@ -1037,3 +1038,55 @@ async def detail(
         manifest=[schemas.EntryOut(**vars(e)) for e in entries],
         names_shown=sees_names(await name_scope(session, user), evacuation.mission_id),
     )
+
+
+# --- seeding (Prompt 68), through the service layer as nexira_api ----------------------------
+
+
+@dataclass(frozen=True)
+class PlanIn:
+    mission_id: uuid.UUID
+    mission_code: str
+    muster_name: str
+    lat: float
+    lon: float
+    route_label: str
+    destination: str
+    options: list[dict[str, Any]]  # PRIMARY first; partner_id as a string or None
+
+
+async def ensure_plans(session: AsyncSession, plans: list[PlanIn], actor: Actor = SYSTEM) -> int:
+    """Seed a plan for each mission that has none (EV-01). Existing plans are never changed
+    (PC-30). Audited once."""
+    has = set(await session.scalars(select(EvacuationPlan.mission_id)))
+    new = [p for p in plans if p.mission_id not in has]
+    for p in new:
+        await session.execute(
+            text(
+                "INSERT INTO evacuation_plan (tenant_id, mission_id, reference, muster_name, "
+                "muster_location, route_label, destination, options) VALUES "
+                "(current_tenant_id(), :mission_id, :reference, :muster_name, "
+                "ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :route_label, "
+                ":destination, CAST(:options AS jsonb))"
+            ),
+            {
+                "mission_id": p.mission_id,
+                "reference": f"EVP-{p.mission_code}",
+                "muster_name": p.muster_name,
+                "lat": p.lat,
+                "lon": p.lon,
+                "route_label": p.route_label,
+                "destination": p.destination,
+                "options": json.dumps(p.options),
+            },
+        )
+    if new:
+        await audit.write(
+            session,
+            actor_type=actor.type,
+            actor_id=actor.id,
+            action="EVACUATION_PLAN.SEED",
+            entity_type="evacuation_plan",
+            details={"plans": len(new)},
+        )
+    return len(new)
