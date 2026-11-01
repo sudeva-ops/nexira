@@ -242,8 +242,7 @@ BEGIN
     -- Only as a change approved in this transaction (VIP-05): two people decided it.
     SELECT * INTO change FROM vip_segment_change c
      WHERE c.segment_id = NEW.id AND c.tenant_id = NEW.tenant_id AND c.status = 'APPROVED'
-       AND c.decided_at = now()
-     ORDER BY c.decided_at DESC LIMIT 1;
+       AND c.decided_at = now();
     IF NOT FOUND THEN
       RAISE EXCEPTION 'vip segment: the time or virtual changes only with an approved change';
     END IF;
@@ -266,11 +265,13 @@ CREATE TRIGGER vip_segment_guard BEFORE INSERT OR UPDATE OR DELETE ON vip_segmen
 CREATE FUNCTION vip_segment_change_guard() RETURNS trigger AS $$
 DECLARE
   visit_status text;
+  segment_status text;
+  segment_virtual boolean;
 BEGIN
   IF TG_OP = 'DELETE' THEN
     RAISE EXCEPTION 'vip change: changes are kept';
   END IF;
-  SELECT v.status INTO visit_status
+  SELECT v.status, s.status, s.virtual INTO visit_status, segment_status, segment_virtual
     FROM vip_segment s JOIN vip_visit v ON v.id = s.visit_id
    WHERE s.id = NEW.segment_id AND s.tenant_id = NEW.tenant_id;
   IF NOT FOUND THEN
@@ -282,6 +283,13 @@ BEGIN
   IF TG_OP = 'INSERT' THEN
     IF NEW.status <> 'PENDING' OR NEW.decided_by IS NOT NULL OR NEW.decision_note IS NOT NULL THEN
       RAISE EXCEPTION 'vip change: a change starts pending';
+    END IF;
+    -- Only a planned segment changes, so a change can always be applied (review of Prompt 78, L3).
+    IF segment_status <> 'PLANNED' THEN
+      RAISE EXCEPTION 'vip change: only a planned segment changes';
+    END IF;
+    IF NEW.make_virtual AND segment_virtual THEN
+      RAISE EXCEPTION 'vip change: the segment is already virtual';
     END IF;
     PERFORM 1 FROM app_user u WHERE u.id = NEW.proposed_by AND u.tenant_id = NEW.tenant_id;
     IF NOT FOUND THEN
@@ -312,6 +320,16 @@ BEGIN
   PERFORM 1 FROM app_user u WHERE u.id = NEW.decided_by AND u.tenant_id = NEW.tenant_id;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'vip change: decided by someone of this tenant';
+  END IF;
+  -- One approval per segment per transaction, so the segment guard's "approved in this
+  -- transaction" names exactly one change (review of Prompt 78, M2).
+  IF NEW.status = 'APPROVED' THEN
+    PERFORM 1 FROM vip_segment_change c
+     WHERE c.segment_id = NEW.segment_id AND c.id <> NEW.id AND c.status = 'APPROVED'
+       AND c.decided_at = now();
+    IF FOUND THEN
+      RAISE EXCEPTION 'vip change: one approved change per segment at a time';
+    END IF;
   END IF;
   NEW.decided_at := now();
   RETURN NEW;
@@ -367,6 +385,9 @@ BEGIN
       RAISE EXCEPTION 'vip checklist: the visit is final';
     END IF;
   ELSE
+    IF visit_status IN ('COMPLETED', 'CANCELLED') THEN
+      RAISE EXCEPTION 'vip checklist: the visit is final';  -- review of Prompt 78, M1
+    END IF;
     NEW.created_at := now();
   END IF;
   -- An item may be seeded already done (plan-pilot-vip G-7); either way by a user of the tenant.

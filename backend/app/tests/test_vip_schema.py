@@ -143,7 +143,8 @@ class World:
                 by or self.hq,
             )
             await self.conn.execute(
-                "UPDATE vip_segment s SET starts_at = c.new_starts_at, ends_at = c.new_ends_at, "
+                "UPDATE vip_segment s SET starts_at = coalesce(c.new_starts_at, s.starts_at), "
+                "ends_at = CASE WHEN c.make_virtual THEN s.ends_at ELSE c.new_ends_at END, "
                 "virtual = c.make_virtual OR s.virtual FROM vip_segment_change c "
                 "WHERE c.id = $1 AND s.id = c.segment_id",
                 change_id,
@@ -619,3 +620,66 @@ async def test_the_backup_role_reads_the_vip_tables(db: DbUrls) -> None:
         ("vip_segment_change", True, False),
         ("vip_visit", True, False),
     ]
+
+
+# --- review of Prompt 78 ----------------------------------------------------------------------
+
+
+async def test_no_checklist_item_is_added_to_a_final_visit(world: World) -> None:
+    """M1."""
+    await world.conn.execute(
+        "UPDATE vip_visit SET status = 'CANCELLED', cancelled_by = $2, cancel_reason = 'x' "
+        "WHERE id = $1",
+        world.visit,
+        world.hq,
+    )
+    with pytest.raises(REFUSED, match="the visit is final"):
+        await world.conn.execute(
+            "INSERT INTO vip_checklist_item (tenant_id, visit_id, label, due_on, done_by) "
+            "VALUES (current_tenant_id(), $1, 'Late item', current_date, $2)",
+            world.visit,
+            world.security,
+        )
+
+
+async def test_one_approval_per_segment_per_transaction(world: World) -> None:
+    """M2: a second approval in the same transaction would let the segment take either."""
+    first = await world.propose()
+    async with world.conn.transaction():
+        await world.conn.execute(
+            "UPDATE vip_segment_change SET status = 'APPROVED', decided_by = $2 WHERE id = $1",
+            first,
+            world.hq,
+        )
+        await world.conn.execute(
+            "UPDATE vip_segment s SET starts_at = c.new_starts_at FROM vip_segment_change c "
+            "WHERE c.id = $1 AND s.id = c.segment_id",
+            first,
+        )
+        second = await world.conn.fetchval(
+            "INSERT INTO vip_segment_change (tenant_id, segment_id, make_virtual, reason, "
+            "proposed_by) VALUES (current_tenant_id(), $1, true, 'Go virtual', $2) RETURNING id",
+            world.segment,
+            world.security,
+        )
+        with pytest.raises(REFUSED, match="one approved change per segment at a time"):
+            await world.conn.execute(
+                "UPDATE vip_segment_change SET status = 'APPROVED', decided_by = $2 WHERE id = $1",
+                second,
+                world.hq,
+            )
+
+
+async def test_a_change_is_proposed_only_for_a_planned_segment_not_yet_virtual(
+    world: World,
+) -> None:
+    """L3 and L5: a change that could never be applied is refused when proposed."""
+    await world.approve(await world.propose(make_virtual=True))
+    with pytest.raises(REFUSED, match="already virtual"):
+        await world.propose(make_virtual=True)
+    await world.start()
+    await world.conn.execute(
+        "UPDATE vip_segment SET status = 'IN_PROGRESS' WHERE id = $1", world.segment
+    )
+    with pytest.raises(REFUSED, match="only a planned segment changes"):
+        await world.propose()
