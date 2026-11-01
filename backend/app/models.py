@@ -5,6 +5,7 @@ from app.modules.agents.models import ActionPolicy, Agent, AgentProposal, Propos
 from app.modules.audit.models import AuditLog
 from app.modules.checkin.models import CheckinResponse
 from app.modules.documents.models import TravelDocument
+from app.modules.evacuations.models import Evacuation, EvacuationManifestEntry, EvacuationPlan
 from app.modules.hazards.models import MissionClimateRisk
 from app.modules.health_intel.models import (
     CountryHealthRequirement,
@@ -44,6 +45,9 @@ __all__ = [
     "Base",
     "CheckinResponse",
     "CountryHealthRequirement",
+    "Evacuation",
+    "EvacuationManifestEntry",
+    "EvacuationPlan",
     "HealthAdvisory",
     "Incident",
     "IncidentEvent",

@@ -38,6 +38,9 @@ class Ids:
     segment: uuid.UUID
     flight: uuid.UUID
     partner: uuid.UUID
+    activator: uuid.UUID
+    plan: uuid.UUID
+    evacuation: uuid.UUID
 
 
 PT = "'SRID=4326;POINT(36.8245 -1.2838)'"
@@ -133,6 +136,20 @@ ROWS: dict[str, str] = {
     "mission_health_readiness": "INSERT INTO mission_health_readiness (tenant_id, mission_id, "
     "staff, blood_type_on_file, insurance_active, trauma_kits, as_of) VALUES ('{t}', "
     "'{mission}', 10, 10, 10, 2, current_date)",
+    "evacuation_plan": "INSERT INTO evacuation_plan (id, tenant_id, mission_id, reference, "
+    "muster_name, muster_location, route_label, destination, options) VALUES ('{plan}', '{t}', "
+    "'{mission}', 'EVP-NBO', 'Courtyard', " + PT + ", 'Route B', 'Dubai', "
+    '\'[{{"role": "PRIMARY", "kind": "CHARTER", "label": "C", "seats": 72}}]\')',
+    # The activator is a second user: the requester cannot activate (D-40).
+    "evacuation": "INSERT INTO app_user (id, tenant_id, external_id, email, display_name) "
+    "VALUES ('{activator}', '{t}', 'sub-{activator}', '{activator}@x', 'A'); "
+    "INSERT INTO evacuation (id, tenant_id, reference, plan_id, mission_id, requested_by, "
+    "requested_role) VALUES ('{evacuation}', '{t}', 'EVN-0001', '{plan}', '{mission}', '{user}', "
+    "'HEAD_OF_MISSION')",
+    # The manifest is built in the transaction that activates the evacuation (PC-32).
+    "evacuation_manifest": "UPDATE evacuation SET status = 'ACTIVE', activated_by = '{activator}', "
+    "step = 2 WHERE id = '{evacuation}'; INSERT INTO evacuation_manifest (tenant_id, "
+    "evacuation_id, person_id, category) VALUES ('{t}', '{evacuation}', '{person}', 'STAFF')",
     "partner_request": "INSERT INTO partner_request (tenant_id, reference, partner_id, service, "
     "mission_id, created_by_type, created_by) VALUES ('{t}', 'REQ-1', '{partner}', 'MEDICAL', "
     "'{mission}', 'USER', 'u')",
@@ -170,6 +187,9 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "medical_facility",  # seeded; no UPDATE or DELETE in the pilot (PC-27)
     "country_health_requirement",  # seeded; no UPDATE or DELETE in the pilot (PC-28)
     "mission_health_readiness",  # seeded counts; no UPDATE or DELETE in the pilot (PC-29)
+    "evacuation_plan",  # seeded; no UPDATE or DELETE in the pilot (PC-30)
+    "evacuation",  # UPDATE of status, activation, step and stand-down only, no DELETE (PC-31)
+    "evacuation_manifest",  # UPDATE of the check-in only, no DELETE (PC-32)
 }
 NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELETE)
     "message_template",
@@ -314,6 +334,7 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
             r"|weather: no such mission|partner request: no such partner"
             r"|travel document: no such person|climate risk: no such mission"
             r"|medical facility: no such mission|health readiness: no such mission"
+            r"|evacuation plan: no such mission|evacuation manifest: no such evacuation"
         ),
     ):
         await api.execute(sql_for(table, world.a))
