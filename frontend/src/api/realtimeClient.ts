@@ -3,6 +3,7 @@ import type { QueryKey } from "@tanstack/react-query";
 import { checkinKeys } from "./checkin";
 import { documentKeys } from "./documents";
 import { evacuationKeys } from "./evacuations";
+import { fleetKeys } from "./fleet";
 import { partnerKeys } from "./partners";
 import { flightKeys } from "./flights";
 import { hazardKeys } from "./hazards";
@@ -45,6 +46,7 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
         hazardKeys.all,
         healthKeys.all, // a facility's Avoid flag follows ACTIVE incidents (plan-pilot-hl G-8)
         evacuationKeys.all, // "plan ready" needs an ACTIVE incident (plan-pilot-ev G-6)
+        fleetKeys.all, // "in the impact zone" follows ACTIVE incidents (plan-pilot-flt §3)
         ...incident,
       ];
     case "EXPOSURE_COMPUTED":
@@ -86,7 +88,8 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
       const campaignId =
         typeof event.data.campaign_id === "string" ? [checkinKeys.checkin(event.data.campaign_id)] : [];
       // An evacuation's movement message shows its status there too (plan-pilot-ev §10).
-      return [checkinKeys.campaigns, ...campaignId, evacuationKeys.all, ...incident];
+      // A driver's check-in answer blocks or frees their vehicle (plan-pilot-flt G-2).
+      return [checkinKeys.campaigns, ...campaignId, evacuationKeys.all, fleetKeys.all, ...incident];
     }
     case "TRIP_UPDATED":
       return [tripKeys.all];
@@ -97,7 +100,15 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
     case "PARTNER_REQUEST_UPDATED": // the requests list, and an evacuation's options (AS-03)
       return [partnerKeys.all, evacuationKeys.all];
     case "EVACUATION_UPDATED": // requested, activated, a check-in, a step, stood down (D-40)
-      return [evacuationKeys.all];
+      return [evacuationKeys.all, fleetKeys.all]; // vehicles are assigned while it is ACTIVE
+    case "FLEET_UPDATED": {
+      // A position, a status or a maintenance item (D-41). A zone crossing names its incidents,
+      // whose timelines gain a FLEET entry: the event is not INCIDENT_UPDATED, which would make
+      // the worker recompute exposure (plan-pilot-flt §6, review of Prompt 73).
+      const ids = Array.isArray(event.data.incident_ids) ? event.data.incident_ids : [];
+      const crossed = ids.filter((id): id is string => typeof id === "string").map((id) => keys.incident(id));
+      return [fleetKeys.all, ...crossed];
+    }
     case "WEATHER_UPDATED": // the panel, the map layer and the mission popup (WX-02)
       return [weatherKeys.all];
     case "DOCUMENT_UPDATED": // the register, its KPIs, and the trip warnings (DX-04, DX-06)

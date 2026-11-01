@@ -32,6 +32,7 @@ describe("app shell", () => {
       "Natural Hazards & Climate", // pilot module 8 (D-30, D-38), last under MONITOR as the design
       "Response Playbooks",
       "Evacuation Management", // pilot module 10 (D-30, D-40), after Response Playbooks
+      "Fleet & Assets", // pilot module 11 (D-30, D-41), after Evacuation Management
       "Mass Notification", // pilot module 1 (D-30)
       "Assistance Partners", // pilot module 5 (D-30, D-36)
       "Safety Check-in",
