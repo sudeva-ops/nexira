@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.events import Event
 from app.modules.documents import service as documents
+from app.modules.evacuations import service as evacuations
 from app.modules.health_intel import service as health
 from app.modules.intel import service as intel
 from app.modules.intel.models import Incident
@@ -81,10 +82,10 @@ class MessagePayload(_Payload):
     @field_validator("audience")
     @classmethod
     def _incident_audiences(cls, audience: dict[str, Any]) -> dict[str, Any]:
-        """The trip and document audiences have their own actions, approvers and scope
-        (review of Prompt 50, L1)."""
-        if "trip_id" in audience or "document_ids" in audience:
-            raise ValueError("an advisory cannot name a trip or documents")
+        """The trip, document and evacuation audiences have their own actions, approvers
+        and scope (review of Prompt 50, L1; review of Prompt 67, M1)."""
+        if "trip_id" in audience or "document_ids" in audience or "evacuation_id" in audience:
+            raise ValueError("an advisory cannot name a trip, documents or an evacuation")
         return audience
 
 
@@ -265,13 +266,42 @@ async def _send_message(
 async def _start_evacuation(
     session: AsyncSession, payload: EvacuationPayload, ctx: Context
 ) -> dict[str, Any]:
-    """Phase 1 stub: writes an incident event only. No movement order is sent."""
+    """D-40 (plan-pilot-ev §3): activates the mission's evacuation plan, its two approvers
+    being the requester and the activator, and still writes the incident note. A mission
+    with no plan keeps the Phase 1 behaviour, the note only (as PB-07's partner step does
+    with no partner); an evacuation already ACTIVE is returned as it is (G-3)."""
     incident = await _incident(session, ctx)
-    text = f"Evacuation ordered via {payload.route} (Phase 1 stub: no message sent)."
+    plan = await evacuations.plan_for(session, incident.mission_id) if incident.mission_id else None
+    if plan is None:
+        text = f"Evacuation ordered via {payload.route} (no evacuation plan: no message sent)."
+        if payload.note:
+            text += f" {payload.note}"
+        event = await intel.add_note(session, incident, text, ctx.agent_actor)
+        return {"incident_event_id": event.id, "route": payload.route, "stub": True}
+    try:
+        outcome = await evacuations.activate_from_proposal(
+            session,
+            proposal_id=ctx.proposal_id,
+            incident_id=incident.id,
+            approved_by=ctx.approved_by,
+            actor=ctx.agent_actor,
+        )
+    except evacuations.EvacuationError as e:
+        raise ActionError(str(e)) from None
+    ctx.events.extend(outcome.events)
+    evacuation = outcome.evacuation
+    done = "was already active" if outcome.already_active else "activated"
+    text = f"Evacuation {evacuation.reference} ({plan.reference}) {done}, via {payload.route}."
     if payload.note:
         text += f" {payload.note}"
     event = await intel.add_note(session, incident, text, ctx.agent_actor)
-    return {"incident_event_id": event.id, "route": payload.route, "stub": True}
+    return {
+        "incident_event_id": event.id,
+        "route": payload.route,
+        "evacuation_id": str(evacuation.id),
+        "evacuation": evacuation.reference,
+        "already_active": outcome.already_active,
+    }
 
 
 @dataclass(frozen=True)

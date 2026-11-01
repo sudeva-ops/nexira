@@ -90,3 +90,9 @@ class PermissionsOut(BaseModel):
     start_armed: bool = False  # hazards: may start its armed run now
     disarm: bool = False  # hazards: may disarm it
     send_advisory: bool = False  # health: may send a health advisory to this mission (HL-06)
+    # evacuation (entity_id = the mission; D-40, plan-pilot-ev §9)
+    activate_evacuation: bool = False
+    confirm_evacuation: bool = False
+    check_in_evacuee: bool = False
+    advance_evacuation: bool = False
+    stand_down_evacuation: bool = False
