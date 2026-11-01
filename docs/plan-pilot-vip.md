@@ -157,3 +157,8 @@ The Phase 1 spec is unchanged.
 ## 13. Prompts
 
 As `docs/prompts-pilot.md` Prompts 78–82: the migration (🔒); the service (🔒); the seed and ADD-VISIT; the screen; the acceptance. Each ships with its tests, and `make acceptance` passes at the end.
+
+## 14. Decisions by the product owner (2026-11-01, PR #92: "approved")
+
+- G-1: the HQ Crisis Director decides the programme change in the demo and the acceptance; no Addis Ababa Head of Mission demo user. §62 reads accordingly.
+- G-2..G-10: as proposed.

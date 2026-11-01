@@ -702,7 +702,7 @@ Plan and protect a senior visit or delegation: the programme with its venues, ti
 Playwright on the real stack:
 - **The seeded visit:** VV-2026-031 shows with six segments; the motorcade and the forum are MODERATE; three of four checklist items are done; the vehicles VH-11 and VH-12 come from Fleet; labelled simulated.
 - **`ADD-VISIT` from the presenter bar:** the visit goes LIVE, and the arrival is COMPLETED. The rally signal turns the site visit HIGH with its recommendation.
-- **The programme change:** the Security Officer proposes moving it to 08:00. The proposer is refused the approval. The Addis Ababa Head of Mission approves, and the segment moves and its risk is recalculated.
+- **The programme change:** the Security Officer proposes moving it to 08:00. The proposer is refused the approval. The HQ Crisis Director approves (plan-pilot-vip G-1), and the segment moves and its risk is recalculated.
 - **The checklist:** the venue survey is ticked.
 - **Restriction:** a Viewer, the Travel Desk and the Cairo Head of Mission get 404 and see no visit anywhere: list, map or events. No position of the principal or the team appears anywhere.
 - **Audit:** every change is audited and the chain verifies.
