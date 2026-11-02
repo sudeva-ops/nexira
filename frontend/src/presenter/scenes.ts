@@ -64,4 +64,11 @@ export const SCENE_SCREEN: Record<DemoScenario, Record<number, string>> = {
     2: "/fleet",
     3: "/fleet",
   },
+  // D-42 (VIP-08): the visit plays on VIP Protection (Prompt 81).
+  "ADD-VISIT": {
+    0: "/vip",
+    1: "/vip",
+    2: "/vip",
+    3: "/vip",
+  },
 };

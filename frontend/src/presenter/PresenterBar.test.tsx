@@ -120,6 +120,7 @@ describe("Presenter bar", () => {
       "Nairobi cholera",
       "Nairobi evacuation",
       "Nairobi fleet",
+      "Addis Ababa visit",
     ]);
     expect(SCENE_SCREEN["MNL-TROPICAL-STORM"]).toEqual({
       0: "/operations",
@@ -141,5 +142,6 @@ describe("Presenter bar", () => {
     // D-40: the evacuation plays on its own screen.
     expect(Object.values(SCENE_SCREEN["NBO-EVACUATION"])).toEqual(Array(5).fill("/evacuation"));
     expect(Object.values(SCENE_SCREEN["NBO-FLEET"])).toEqual(Array(4).fill("/fleet"));
+    expect(Object.values(SCENE_SCREEN["ADD-VISIT"])).toEqual(Array(4).fill("/vip"));
   });
 });

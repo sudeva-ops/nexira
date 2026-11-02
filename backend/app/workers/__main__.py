@@ -20,6 +20,7 @@ from app.modules.partners import service as partners
 from app.modules.partners.adapter import PartnerAdapter, adapter_for
 from app.modules.playbooks.consumer import resume_runs, run_handler
 from app.modules.travel import tracker
+from app.modules.vip import consumer as vip
 from app.modules.weather import feed as weather
 
 RESUME_EVERY_S = 60
@@ -209,10 +210,16 @@ async def main() -> None:
                 "WORKSHOP_DONE": fleet.workshop_handler(engine, publisher),
             },
         ),
+        StreamConsumer(
+            client,
+            group="vip",
+            consumer=name,
+            handlers={"VIP_PROGRESS": vip.progress_handler(engine)},
+        ),
     ]
     log.info(
         "consumers started: intel, exposure, playbooks, notifications, agents, flights, weather, "
-        "checkin, hazards, health, evacuation, fleet"
+        "checkin, hazards, health, evacuation, fleet, vip"
     )
     try:
         async with asyncio.TaskGroup() as tasks:

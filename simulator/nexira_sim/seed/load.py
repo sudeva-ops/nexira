@@ -34,9 +34,11 @@ from app.modules.travel.service import (
     ensure_scenario_flight,
     ensure_trip,
 )
+from app.modules.vip import service as vip
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
+from nexira_sim.scenarios import add_visit, nbo_fleet
 from nexira_sim.scenarios import dac_cyclone as dac
 from nexira_sim.scenarios import fra_national_protests as fra
 from nexira_sim.scenarios import mnl_tropical_storm as mnl
@@ -44,7 +46,6 @@ from nexira_sim.scenarios import nbo_air_diversion as air
 from nexira_sim.scenarios import nbo_cholera as cholera
 from nexira_sim.scenarios import nbo_civil_unrest as nbo
 from nexira_sim.scenarios import nbo_evacuation as evacuation
-from nexira_sim.scenarios import nbo_fleet
 from nexira_sim.seed import data, world
 from nexira_sim.seed import documents as seed_documents
 from nexira_sim.seed.identities import bootstrap_tenant, demo_user_id, seed_identities
@@ -317,6 +318,42 @@ async def seed_all(
             session, _fleet(w, mission_ids), scenario_date
         )
 
+        # VIP & Delegation Protection (D-42, plan-pilot-vip §2): the restricted TRP-8834 and
+        # VV-<year>-031, after the identities (G-7).
+        ref, purpose, home, skip, count, origin, cc = data.VIP_TRIP
+        first = scenario_date + timedelta(days=data.VIP_FIRST_DAY)
+        trip_id = seed_id(tenant_id, "trip", ref)
+        report["vip_trip"] = await ensure_trip(
+            session,
+            trip_id=trip_id,
+            reference=ref,
+            purpose=purpose,
+            origin=origin,
+            destination=missions_by_code[data.VIP_MISSION].city,
+            destination_country=cc,
+            starts_on=first,
+            ends_on=first + timedelta(days=data.VIP_DAYS - 1),
+            traveller_ids=[
+                p.id
+                for p in w.persons
+                if p.mission_id == missions_by_code[home].id and p.person_type == "DIPLOMAT"
+            ][skip : skip + count],
+            risk_level="MODERATE",
+            approval_status="APPROVED",
+            restricted=True,
+        )
+        report["vip_visits"] = await vip.ensure_visits(
+            session,
+            [
+                _visit(
+                    w,
+                    mission_ids[data.VIP_MISSION],
+                    trip_id,
+                    await demo_user_id(session, "security.officer"),
+                )
+            ],
+        )
+
         report["counters"] = [
             await ensure_reference_counter(
                 session, prefix="INC", with_year=True, last_value=data.INC_START
@@ -390,6 +427,14 @@ async def seed_all(
             description=dac.DESCRIPTION,
             events=dac.build_events(w, tenant_id),
         )
+        report["scenario_visit"] = await ensure_scenario(
+            session,
+            scenario_id=seed_id(tenant_id, "scenario", add_visit.CODE),
+            code=add_visit.CODE,
+            name=add_visit.NAME,
+            description=add_visit.DESCRIPTION,
+            events=add_visit.build_events(w, tenant_id),
+        )
         report["scenario_fleet"] = await ensure_scenario(
             session,
             scenario_id=seed_id(tenant_id, "scenario", nbo_fleet.CODE),
@@ -403,6 +448,46 @@ async def seed_all(
 
 
 GST = timezone(timedelta(hours=4))  # the home zone (plan Q2)
+EAT = timezone(timedelta(hours=3))  # Addis Ababa (plan-pilot-vip §2)
+
+
+def _visit(
+    w: world.World, mission_id: uuid.UUID, trip_id: uuid.UUID, officer: uuid.UUID
+) -> vip.VisitIn:
+    """VV-<year>-031 as the design (plan-pilot-vip §2): six segments, the detail by labels and
+    counts, and the checklist with three items done by the seeded Security Officer (G-7)."""
+    first = w.scenario_date + timedelta(days=data.VIP_FIRST_DAY)
+    segments = []
+    for kind, title, venue, (lat, lon), day, hhmm, minutes, attendees in data.VIP_SEGMENTS:
+        hour, minute = (int(x) for x in hhmm.split(":"))
+        starts = datetime.combine(first + timedelta(days=day), time(hour, minute), EAT)
+        segments.append(
+            vip.SegmentIn(
+                kind=kind,
+                title=title,
+                venue_name=venue,
+                lat=lat,
+                lon=lon,
+                starts_at=starts,
+                ends_at=starts + timedelta(minutes=minutes) if minutes else None,
+                attendees=attendees,
+            )
+        )
+    return vip.VisitIn(
+        reference=add_visit.reference(w),
+        title=data.VIP_TITLE,
+        mission_id=mission_id,
+        principal_role=data.VIP_PRINCIPAL,
+        starts_on=first,
+        ends_on=first + timedelta(days=data.VIP_DAYS - 1),
+        trip_id=trip_id,
+        detail=data.VIP_DETAIL,
+        segments=tuple(segments),
+        checklist=tuple(
+            vip.ItemIn(label, first - timedelta(days=before), officer if done else None)
+            for label, before, done in data.VIP_CHECKLIST
+        ),
+    )
 
 
 def _advisories(scenario_date: date) -> list[health.AdvisoryIn]:

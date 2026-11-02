@@ -1354,3 +1354,50 @@ FLEET_ITEMS: dict[str, list[tuple[str, int]]] = {
 GENERATOR = "Generator 250 kVA"
 SATELLITE = "Satellite terminal"
 GENERATOR_FUEL = {"NBO": 72}
+
+# --- VIP & Delegation Protection (D-42, VIP-01; docs/plan-pilot-vip.md §2) ---------------------
+# Illustrative: the principal by role only (§63 Q3), sample labels, no real names. Times are
+# Addis Ababa local (UTC+3) on scenario days +4..+6. The industrial park sits about 11 km east
+# of Bole airport and 16 km from the city venues, so only it is near the rally (G-4).
+VIP_REFERENCE_NO = 31  # VV-<year>-031, as the design
+VIP_TITLE = "Minister's visit to Addis Ababa"
+VIP_PRINCIPAL = "Minister of Foreign Affairs"
+VIP_MISSION = "ADD"
+VIP_FIRST_DAY = 4  # days after the scenario date
+VIP_DAYS = 3
+# The restricted trip (D-33): two fictional travellers, the Amman diplomats of TRP-8813, the
+# other ministerial trip, so no traveller count changes (G-6).
+VIP_TRIP = ("TRP-8834", "Ministerial visit · Addis Ababa", "AMM", 2, 2, "Abu Dhabi", "ET")
+AIRPORT_ADD = (8.9779, 38.7993)
+INDUSTRIAL_PARK = (8.9779, 38.9000)
+# (kind, title, venue, (lat, lon), day, local hh:mm, minutes or None, attendees or None)
+VIP_SEGMENTS: list[
+    tuple[str, str, str, tuple[float, float], int, str, int | None, int | None]
+] = [
+    ("ARRIVAL", "Arrival · Bole Intl. Airport (VIP terminal)", "Bole Intl. Airport",
+     AIRPORT_ADD, 0, "09:30", None, None),
+    ("MOTORCADE", "Motorcade · Airport → Hotel", "Hotel (sample)",
+     (9.0190, 38.7530), 0, "09:50", 14, None),
+    ("MEETING", "Bilateral meeting · Ministry of Foreign Affairs", "Ministry of Foreign Affairs",
+     (9.0330, 38.7600), 0, "11:00", 90, None),
+    ("EVENT", "Business forum · Conference centre", "Conference centre",
+     (9.0150, 38.7680), 0, "14:00", 150, 600),
+    ("SITE_VISIT", "Site visit · Industrial park", "Industrial park",
+     INDUSTRIAL_PARK, 1, "10:00", 120, None),
+    ("DEPARTURE", "Departure", "Bole Intl. Airport", AIRPORT_ADD, 2, "16:00", None, None),
+]  # fmt: skip
+VIP_DETAIL = {
+    "team_lead": "Close-protection lead (sample)",
+    "advance_team": "3 officers",
+    "team_size": 8,
+    "medic": True,
+    "vehicles": ["VH-11", "VH-12"],
+    "safe_havens": ["Embassy", "Hotel safe floor"],  # and the nearest hospital, at read time
+}
+# (label, days before the visit's first day, done by the seeded Security Officer: G-7)
+VIP_CHECKLIST = [
+    ("Threat assessment issued", 7, True),
+    ("Host-nation security liaison confirmed", 5, True),
+    ("Hospital & evacuation plan", 3, True),
+    ("Industrial park venue survey", 1, False),
+]

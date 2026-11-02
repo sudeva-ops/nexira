@@ -56,7 +56,8 @@ test("Travel & Air acceptance: notify, advise, cancel; people decide; restricted
   const trp8811 = byRef("TRP-8811");
   const restricted = trips.filter((t) => t.restricted);
   expect([trp8818, trp8811].every(Boolean)).toBe(true);
-  expect(restricted.map((t) => t.reference)).toEqual(["TRP-8813"]);
+  // TRP-8813, and TRP-8834 for the VIP visit (D-42), by start date.
+  expect(restricted.map((t) => t.reference)).toEqual(["TRP-8813", "TRP-8834"]);
 
   // --- 0. The scenarios that give the agent something to see --------------------------------
   const xw451 = async () => (await duty.get<Flight[]>("/api/flights")).find((f) => f.flight_number === "XW 451");

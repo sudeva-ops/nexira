@@ -359,6 +359,8 @@ async def test_journey_seed_country_risk_trips_and_counter(seeded: Seeded) -> No
         "TRP-8818": ("APPROVED", "MODERATE", True),  # XW 451, the scenario flight
         "TRP-8819": ("APPROVED", "LOW", True),
         "TRP-8820": ("APPROVED", "LOW", True),
+        # VIP & Delegation Protection (D-42): the visit's trip, restricted, no segments.
+        "TRP-8834": ("APPROVED", "MODERATE", True),
     }
     scoped = await seeded.conn.fetchrow(
         "SELECT m.code, (SELECT count(*) FROM trip WHERE requested_by IS NOT NULL) AS requested "
@@ -379,7 +381,8 @@ async def test_air_seed_airports_and_the_scenario_flight_only(seeded: Seeded) ->
     )
     assert [tuple(f) for f in flights] == [("XW 451", "SCHEDULED", "SCENARIO", "TRP-8818")]
     restricted = await seeded.conn.fetch("SELECT reference FROM trip WHERE restricted")
-    assert [r["reference"] for r in restricted] == ["TRP-8813"]
+    # TRP-8834 (the VIP visit, D-42) has no FLIGHT segment, so nothing to track either.
+    assert sorted(r["reference"] for r in restricted) == ["TRP-8813", "TRP-8834"]
     # A real AT-05 fixture: a trackable FLIGHT segment that names nothing on screen.
     segment = await seeded.conn.fetchrow(
         "SELECT s.title, s.place_label, s.flight_number, s.from_airport, s.to_airport "
