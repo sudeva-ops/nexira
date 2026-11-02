@@ -773,7 +773,7 @@ Playwright on the real stack:
 - **Audit:** presence moves, sensor changes and the readiness tick are audited, and the chain verifies.
 - `make acceptance` (all existing specs) still passes.
 
-## 68. Questions for the product owner (defaults proposed)
+## 68. Questions answered by the product owner (2026-11-02: "use the defaults")
 
 1. **Scope:** the Nairobi embassy's ground floor only, seeded as the design; other sites show "No floor plan yet". *Default: yes.*
 2. **Presence:** simulated access control and Wi-Fi presence only, moved by scenario events (`SITE_PRESENCE`) through the worker; seeded with the 11 Nairobi staff at "Embassy", 3 guards and 11 visitors. Presence never feeds location confidence or the check-in, so Phase 1 figures do not change. *Default: yes.*

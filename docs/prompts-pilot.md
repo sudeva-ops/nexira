@@ -744,9 +744,9 @@ Playwright, real stack (requirements-pilot.md §62). Report the real output; mak
 acceptance (all specs) still passes.
 ```
 
-## Pilot module 13 · Site Twin (proposed, awaiting the product owner)
+## Pilot module 13 · Site Twin (approved 2026-11-02, PR #98)
 
-Sources: D-43 (proposed), `docs/requirements-pilot.md` §64–68 (TWN-01..07), PC-39..42. Simulated building systems only; presence never feeds location confidence.
+Sources: D-43, `docs/requirements-pilot.md` §64–68 (TWN-01..07), PC-39..42. Simulated building systems only; presence never feeds location confidence.
 
 ### Prompt 83 · Read and plan (no code)
 ```
