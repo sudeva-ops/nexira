@@ -4,6 +4,7 @@ import { checkinKeys } from "./checkin";
 import { documentKeys } from "./documents";
 import { evacuationKeys } from "./evacuations";
 import { fleetKeys } from "./fleet";
+import { twinKeys } from "./twin";
 import { partnerKeys } from "./partners";
 import { flightKeys } from "./flights";
 import { hazardKeys } from "./hazards";
@@ -47,6 +48,7 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
         healthKeys.all, // a facility's Avoid flag follows ACTIVE incidents (plan-pilot-hl G-8)
         evacuationKeys.all, // "plan ready" needs an ACTIVE incident (plan-pilot-ev G-6)
         fleetKeys.all, // "in the impact zone" follows ACTIVE incidents (plan-pilot-flt §3)
+        twinKeys.all, // shelter-in-place follows ACTIVE incidents (plan-pilot-twn §5)
         ...incident,
       ];
     case "EXPOSURE_COMPUTED":
@@ -66,7 +68,8 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
     case "PLAYBOOK_STEP":
     case "PLAYBOOK_STEP_APPROVED": {
       const runId = typeof event.data.run_id === "string" ? [playbookKeys.run(event.data.run_id)] : [];
-      return [playbookKeys.runs, playbookKeys.permissions, ["audit"], hazardKeys.all, ...runId, ...incident];
+      // Shelter-in-place follows a playbook's shelter alert (plan-pilot-twn G-4).
+      return [playbookKeys.runs, playbookKeys.permissions, ["audit"], hazardKeys.all, twinKeys.all, ...runId, ...incident];
     }
     case "PLAYBOOK_RUN_ARMED": // the banner and the event's armed run (HZ-05, HZ-09)
     case "PLAYBOOK_RUN_DISARMED": {
@@ -100,14 +103,22 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
     case "PARTNER_REQUEST_UPDATED": // the requests list, and an evacuation's options (AS-03)
       return [partnerKeys.all, evacuationKeys.all];
     case "EVACUATION_UPDATED": // requested, activated, a check-in, a step, stood down (D-40)
-      return [evacuationKeys.all, fleetKeys.all]; // vehicles are assigned while it is ACTIVE
+      // Vehicles are assigned and the site's route shows while it is ACTIVE (plan-pilot-twn §5).
+      return [evacuationKeys.all, fleetKeys.all, twinKeys.all];
     case "FLEET_UPDATED": {
       // A position, a status or a maintenance item (D-41). A zone crossing names its incidents,
       // whose timelines gain a FLEET entry: the event is not INCIDENT_UPDATED, which would make
       // the worker recompute exposure (plan-pilot-flt §6, review of Prompt 73).
       const ids = Array.isArray(event.data.incident_ids) ? event.data.incident_ids : [];
       const crossed = ids.filter((id): id is string => typeof id === "string").map((id) => keys.incident(id));
-      return [fleetKeys.all, ...crossed];
+      return [fleetKeys.all, twinKeys.all, ...crossed]; // the twin shows the generator's state
+    }
+    case "SITE_UPDATED": {
+      // Presence, a sensor or readiness (D-43); a fault in an ACTIVE zone adds a SITE entry to
+      // its incidents' timelines (plan-pilot-twn §4). Ids and counts only (G-8).
+      const ids = Array.isArray(event.data.incident_ids) ? event.data.incident_ids : [];
+      const touched = ids.filter((id): id is string => typeof id === "string").map((id) => keys.incident(id));
+      return [twinKeys.all, ...touched];
     }
     case "WEATHER_UPDATED": // the panel, the map layer and the mission popup (WX-02)
       return [weatherKeys.all];

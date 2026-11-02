@@ -35,6 +35,7 @@ describe("app shell", () => {
       "Fleet & Assets", // pilot module 11 (D-30, D-41), after Evacuation Management
       "Mass Notification", // pilot module 1 (D-30)
       "Assistance Partners", // pilot module 5 (D-30, D-36)
+      "Site Twin", // pilot module 13 (D-30, D-43), after Assistance Partners
       "Safety Check-in",
       "Document Expiry", // pilot module 7 (D-30, D-37), under PLAN & INSIGHT (plan-pilot-dx G-9)
       "Audit",

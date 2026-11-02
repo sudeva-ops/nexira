@@ -20,6 +20,7 @@ import { PartnersScreen } from "../screens/partners/PartnersScreen";
 import { PeopleScreen } from "../screens/people/PeopleScreen";
 import { PlaybooksScreen } from "../screens/playbooks/PlaybooksScreen";
 import { DecisionQueueScreen } from "../screens/queue/DecisionQueueScreen";
+import { TwinScreen } from "../screens/twin/TwinScreen";
 import { VipScreen } from "../screens/vip/VipScreen";
 import { AppShell } from "./AppShell";
 import { SCREENS } from "./screens";
@@ -41,6 +42,7 @@ const BUILT: Record<string, ReactElement> = {
   "/vip": <VipScreen />,
   "/notifications": <NotifyScreen />,
   "/partners": <PartnersScreen />,
+  "/twin": <TwinScreen />,
   "/checkin": <CheckinScreen />,
   "/documents": <DocumentsScreen />,
   "/audit": <AuditScreen />,

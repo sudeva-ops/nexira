@@ -149,18 +149,29 @@ describe("realtime client (PLT-05)", () => {
     expect(staleKeys(event("INCIDENT_CREATED", { incident_id: "i1" }))).toContainEqual(["health"]);
     expect(staleKeys(event("INCIDENT_UPDATED", { incident_id: "i1" }))).toContainEqual(["health"]);
     // D-40: the evacuation, its partners, its message and the incident behind it.
-    expect(staleKeys(event("EVACUATION_UPDATED", { evacuation_id: "e1" }))).toEqual([["evacuations"], ["fleet"]]);
+    expect(staleKeys(event("EVACUATION_UPDATED", { evacuation_id: "e1" }))).toEqual([["evacuations"], ["fleet"], ["twin"]]);
     expect(staleKeys(event("CAMPAIGN_UPDATED", { campaign_id: "c1" }))).toContainEqual(["evacuations"]);
     expect(staleKeys(event("INCIDENT_UPDATED", { incident_id: "i1" }))).toContainEqual(["evacuations"]);
     // D-41: the fleet, and the timelines a zone crossing wrote to (not INCIDENT_UPDATED, which
     // would recompute exposure); its states follow incidents, check-ins and evacuations.
     expect(staleKeys(event("FLEET_UPDATED", { asset_id: "a1", incident_ids: ["i1", 7] }))).toEqual([
       ["fleet"],
+      ["twin"],
       ["incident", "i1"],
     ]);
-    expect(staleKeys(event("FLEET_UPDATED", { asset_id: "a1", incident_ids: [] }))).toEqual([["fleet"]]);
+    expect(staleKeys(event("FLEET_UPDATED", { asset_id: "a1", incident_ids: [] }))).toEqual([["fleet"], ["twin"]]);
     for (const type of ["INCIDENT_UPDATED", "CHECKIN_UPDATED", "EVACUATION_UPDATED"]) {
       expect(staleKeys(event(type, { incident_id: "i1" })), type).toContainEqual(["fleet"]);
+    }
+    // D-43: the twin, and the timelines a sensor fault wrote to; its overlays follow incidents,
+    // playbook steps and evacuations.
+    expect(staleKeys(event("SITE_UPDATED", { site_id: "s1", incident_ids: ["i1"] }))).toEqual([
+      ["twin"],
+      ["incident", "i1"],
+    ]);
+    expect(staleKeys(event("SITE_UPDATED", { site_id: "s1" }))).toEqual([["twin"]]);
+    for (const type of ["INCIDENT_UPDATED", "PLAYBOOK_STEP", "EVACUATION_UPDATED"]) {
+      expect(staleKeys(event(type, { incident_id: "i1" })), type).toContainEqual(["twin"]);
     }
     expect(staleKeys(event("SOMETHING_ELSE"))).toEqual([]);
   });
