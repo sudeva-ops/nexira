@@ -56,6 +56,8 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       # Substituted into the realm import (${DEMO_USER_PASSWORD} placeholders).
       DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD}
+      # The public profile's origin, allowed as a redirect (docs/plan-demo-codespaces.md §2).
+      NEXIRA_PUBLIC_ORIGIN: ${NEXIRA_PUBLIC_ORIGIN:-http://localhost:3000}
       # Plan G-04: pin the issuer to the browser-facing URL, while the backend
       # still reaches Keycloak on the internal network for JWKS.
       KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8080}

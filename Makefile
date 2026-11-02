@@ -1,6 +1,11 @@
 SHELL := /bin/bash
-COMPOSE := docker compose --env-file .env -f infra/docker-compose.yml
-APP_ENV ?= $(shell grep -E '^APP_ENV=' .env 2>/dev/null | cut -d= -f2)
+# ENV_FILE and COMPOSE_EXTRA let the same targets run the public profile (one origin under /auth;
+# docs/plan-demo-codespaces.md), e.g. make acceptance ENV_FILE=.env.public \
+#   COMPOSE_EXTRA="-f infra/docker-compose.public.yml".
+ENV_FILE ?= .env
+COMPOSE_EXTRA ?=
+COMPOSE := docker compose --env-file $(ENV_FILE) -f infra/docker-compose.yml $(COMPOSE_EXTRA)
+APP_ENV ?= $(shell grep -E '^APP_ENV=' $(ENV_FILE) 2>/dev/null | cut -d= -f2)
 
 .PHONY: help env up down logs test test-backend test-simulator test-frontend \
         lint lint-backend lint-simulator lint-frontend migrate seed reset-demo tiles e2e acceptance \
@@ -25,10 +30,10 @@ logs:
 test: test-backend test-simulator test-frontend
 
 test-backend: env
-	set -a && . ./.env && set +a && cd backend && uv run pytest
+	set -a && . ./$(ENV_FILE) && set +a && cd backend && uv run pytest
 
 test-simulator: env
-	set -a && . ./.env && set +a && cd simulator && uv run pytest
+	set -a && . ./$(ENV_FILE) && set +a && cd simulator && uv run pytest
 
 test-frontend:
 	cd frontend && npm run test
@@ -36,7 +41,7 @@ test-frontend:
 # Playwright against the running stack (`make up`, then `make seed` or `make reset-demo`).
 e2e: env
 	cd frontend && npx playwright install chromium
-	set -a && . ./.env && set +a && cd frontend && npx playwright test --grep-invert "acceptance"
+	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test --grep-invert "acceptance"
 
 # Prompt 15: the whole Phase 1 acceptance scenario (decisions.md §7) from a fresh
 # demo database; prints the performance numbers (frontend/test-results/performance.json).
@@ -54,7 +59,7 @@ e2e: env
 acceptance: env reset-demo up
 	$(COMPOSE) restart backend worker
 	cd frontend && npx playwright install chromium
-	set -a && . ./.env && set +a && cd frontend && npx playwright test e2e/acceptance.spec.ts \
+	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/acceptance.spec.ts \
 	  e2e/ntf-acceptance.spec.ts e2e/jrn-acceptance.spec.ts e2e/air-acceptance.spec.ts \
 	  e2e/ta-acceptance.spec.ts e2e/wx-acceptance.spec.ts e2e/ast-acceptance.spec.ts \
 	  e2e/dx-acceptance.spec.ts e2e/ev-acceptance.spec.ts e2e/flt-acceptance.spec.ts \
@@ -79,7 +84,7 @@ migrate: env
 
 # Loads seed data through the backend service layer (identities now, the rest in Prompt 4).
 seed: env
-	set -a && . ./.env && set +a && cd simulator && uv run python -m nexira_sim.seed
+	set -a && . ./$(ENV_FILE) && set +a && cd simulator && uv run python -m nexira_sim.seed
 
 # D-21: drops and recreates the LOCAL/DEMO database volume only, then migrates and
 # seeds. Refuses to run for any other APP_ENV. Never deletes audit rows in a live DB.
