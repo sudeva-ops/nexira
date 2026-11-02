@@ -622,20 +622,31 @@ body {
 }
 
 .nx-incident-marker {
-  width: 18px;
-  height: 18px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
   padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* The diamond (UI 2): on an inner element, since MapLibre sets the marker's own transform. */
+.nx-incident-core {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
   border: 2px solid #fff;
   background: var(--c, #cd4246);
   transform: rotate(45deg);
-  cursor: pointer;
   animation: nx-pulse 1.6s ease-out infinite;
 }
 
 /* A hazard event (HZ-09): a round marker with its hazard's icon. */
-.nx-incident-marker.nx-hazard {
-  display: grid;
-  place-items: center;
+.nx-incident-marker.nx-hazard .nx-incident-core {
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -2211,7 +2222,7 @@ tr.nx-flash-b > td {
   animation-delay: calc(var(--pulse, 2.4s) / 2);
 }
 
-.nx-incident-marker.nx-new {
+.nx-incident-marker.nx-new .nx-incident-core {
   animation:
     nx-pulse 1.6s ease-out infinite,
     nx-flare 0.8s ease-out 3;
@@ -2525,4 +2536,32 @@ tr.nx-flash-b > td {
   height: 8px;
   border-radius: 50%;
   margin-right: 4px;
+}
+
+/* Globe or flat (UI 2): top right, beside the zoom buttons. */
+.nx-map-toggle {
+  position: absolute;
+  top: 10px;
+  right: 52px;
+  z-index: 2;
+  display: flex;
+  border: 1px solid #404854;
+  background: rgba(17, 20, 24, 0.85);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+
+.nx-map-toggle button {
+  padding: 3px 10px;
+  border: 0;
+  background: transparent;
+  color: #abb3bf;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.nx-map-toggle button[aria-pressed="true"] {
+  background: #2d72d2;
+  color: #fff;
 }
