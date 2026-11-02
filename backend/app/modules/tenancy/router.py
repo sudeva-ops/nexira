@@ -19,6 +19,7 @@ from app.modules.playbooks.schemas import PermissionsOut
 from app.modules.tenancy.schemas import MeOut, RoleOut
 from app.modules.travel import trips
 from app.modules.travel.models import Trip
+from app.modules.twin import service as twin
 from app.modules.vip import service as vip
 
 router = APIRouter(prefix="/api", tags=["tenancy"])
@@ -62,6 +63,7 @@ async def my_permissions(
         "evacuation",
         "fleet",
         "vip_visit",
+        "site",
     ],
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -147,6 +149,13 @@ async def my_permissions(
             tick_vip_checklist=visit.tick,
             propose_vip_change=list(visit.propose),
             decide_vip_change=list(visit.decide),
+        )
+    if entity_type == "site":
+        # TWN-05: entity_id is the site; the endpoint's own check.
+        return PermissionsOut(
+            entity_type=entity_type,
+            entity_id=str(entity_id),
+            tick_readiness=(await twin.permissions(session, user, entity_id)).tick_readiness,
         )
     if entity_type == "trip":
         trip = await session.get(Trip, entity_id)
