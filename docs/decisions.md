@@ -189,6 +189,7 @@ Record each sign-off in the PR.
 | 10. **Evacuation Management** (EV), simulated (D-40) | |
 | 11. **Fleet & Assets** (FLT), simulated (D-41) | |
 | 12. **VIP & Delegation Protection** (VIP), simulated (D-42) | |
+| 13. **Site Twin** (TWN), simulated (D-43) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -266,6 +267,11 @@ Rules:
 - **Restricted by default.** A visit exists only for the protection roles and the host mission's Head of Mission; for everyone else it does not exist (D-33's principle for restricted trips).
 - **Never a position.** No live location of a principal, protection team or motorcade is stored or shown (AIR-06); "live" means programme status only.
 - **People decide.** Segment risk is worked out from data; a programme change needs two people through `app/core/approvals.py` (D-05). No agent acts on visits.
+
+**D-43 · Site Twin (simulated).** Approved by the product owner on 2026-11-02 (PR #98). Requirements TWN-01 to TWN-07 in `docs/requirements-pilot.md` §64–68, with the defaults in §68. Amends D-30 by adding Site Twin to the pilot.
+- **Simulated building systems.** Floor plans, presence, sensors and readiness are illustrative and simulated (D-19); NEXIRA controls nothing on site.
+- **Presence stays on the site.** Who is in which zone is shown only on Site Twin; it is not a location observation and never changes People & Sites, the check-in or Phase 1 figures. Staff names only within the people scope; guards and visitors are never named.
+- **Derived overlays.** Shelter-in-place and the evacuation route are worked out from playbook runs and evacuations, so they clear by themselves. No agent acts on sites.
 
 ---
 

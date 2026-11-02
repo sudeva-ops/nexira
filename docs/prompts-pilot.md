@@ -743,3 +743,60 @@ the change flow, the checklist, live status and the restricted view.
 Playwright, real stack (requirements-pilot.md §62). Report the real output; make
 acceptance (all specs) still passes.
 ```
+
+## Pilot module 13 · Site Twin (approved 2026-11-02, PR #98)
+
+Sources: D-43, `docs/requirements-pilot.md` §64–68 (TWN-01..07), PC-39..42. Simulated building systems only; presence never feeds location confidence.
+
+### Prompt 83 · Read and plan (no code)
+```
+Read D-05, D-16, D-19, D-29, D-30, D-40, D-41, D-43, requirements-pilot.md §1-6 and §64-68,
+sites and people, location confidence, Fleet equipment, PB-07 step 4, evacuations and
+approvals.py. Write docs/plan-pilot-twn.md: requirement-to-code mapping, the seeded floor plan,
+presence and who sees names, sensors and the Fleet link, the derived shelter and route
+overlays, readiness, the SITE timeline entries, the NBO-SITE scenes, what changes in the
+acceptance specs, gaps with proposed answers, and the migration for PC-39..42 (only after
+approval). No code.
+```
+
+### Prompt 84 · Site Twin tables (migration) 🔒
+```
+PC-39..42, once approved. A new migration: site_zone, site_route, site_presence, site_sensor,
+site_readiness and site_readiness_item with FORCE RLS, tenant_isolation and the grants as
+proposed; the guards (same-tenant and same-site references, frozen columns, times written by
+the database, done once); pinned search_path. Tests (as nexira_api): isolation; every
+refusal; the backup role reads them; the downgrade restores the previous revision exactly.
+```
+
+### Prompt 85 · Plan, presence, sensors, overlays and readiness 🔒
+```
+TWN-01..05. The service: the plan; presence with names only within the people scope; sensors
+with the generator and satellite comms from Fleet; shelter-in-place and the route worked out
+on read; readiness with the derived access item; the readiness tick through
+app/core/approvals.py; SITE timeline entries for faults in an ACTIVE zone; GET /api/sites/*
+and /api/me/permissions; SITE_UPDATED with ids and counts only; audit. Tests against real
+PostgreSQL, including that People & Sites figures do not change.
+```
+
+### Prompt 86 · Seed, simulated feeds and NBO-SITE
+```
+TWN-01, TWN-07. The Nairobi embassy's plan, routes, sensors, readiness and presence (the 11
+staff at "Embassy", 3 guards, 11 visitors); SITE_PRESENCE and SITE_SENSOR in the worker; the
+NBO-SITE scenario and its presenter bar entry. The Phase 1 scenario still starts with no
+active incident and an empty Decision Queue. Tests in the simulator.
+```
+
+### Prompt 87 · Site Twin screen
+```
+TWN-06. The screen (as the design, Blueprint dark): site picker, KPIs, the SVG floor plan
+with counts, dots and overlays, sensors & systems, occupancy by zone, emergency readiness;
+the nav entry under RESPOND after Assistance Partners; every button from
+/api/me/permissions; realtime refresh. Tests: Vitest for the plan, names by scope, overlays,
+sensors and readiness.
+```
+
+### Prompt 88 · Site Twin acceptance
+```
+Playwright, real stack (requirements-pilot.md §67). Report the real output; make
+acceptance (all specs) still passes.
+```

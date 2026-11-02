@@ -720,3 +720,68 @@ Playwright on the real stack:
 8. **Screen:** "VIP Protection" under RESPOND, after Fleet & Assets; the nav entry shows only to the roles that may see visits. *Default: yes.*
 9. **Demo:** `ADD-VISIT` from the presenter bar (live, then the rally, then the forum completes); people make the change in the browser. *Default: yes.*
 10. **🔒 prompts:** the migration (PC-35..38: RLS, grants, guards) and the visibility and change approvals (`approvals.py`) need your named sign-off, as before (D-29).
+
+## 64. Purpose and starting point
+
+Show a critical site as it is now: its floor plan with rooms, the safe room, the muster point and the gates; who is on site and in which zone; the status of gates, CCTV, the generator and satellite comms; and, in a crisis, where people shelter and which route an evacuation takes. Master spec §5.21 (Site Twin, TWN-01..04); the design's Site Twin screen ("Embassy Nairobi · ground floor").
+
+| Exists today | Where |
+|---|---|
+| Sites per mission (embassy, residence) with a location; people with an `ACCESS_CONTROL` location source at "Embassy" | people |
+| Fleet equipment per mission: `GEN-NBO` (generator, fuel) and `SAT-NBO` (satellite terminal) | fleet (D-41) |
+| Incidents with impact zones; PB-07's step 4 staff alert "Shelter in place"; evacuations per mission with a muster point | intel, playbooks, evacuations (D-40) |
+| The people scope for names (`evacuations.name_scope()`) | evacuations |
+| No floor plans, zones, presence, sensors or Site Twin screen | — |
+
+## 65. Requirements: Site Twin (TWN)
+
+| ID | Requirement | Master | Pri. | Acceptance |
+|---|---|---|---|---|
+| TWN-01 | **A floor plan per critical site.** A site's zones on one floor, each with a kind (OFFICE, SUITE, CONFERENCE, COMMS, SAFE_ROOM, LOBBY, CONSULAR, MUSTER, GATE), a name, a rectangle in plan coordinates (not on the map) and, for the safe room and the muster point, a capacity. Seeded and illustrative (simulated); read-only in the pilot. Sites without a plan say so. | TWN-01 | M | The Nairobi embassy's ground floor as the design: chancery offices, Ambassador suite, conference room, comms / IT room, safe room (hardened, capacity 20), lobby & reception, consular hall, muster point · courtyard, Gate 1 and Gate 2. Other sites: "No floor plan yet". |
+| TWN-02 | **Live occupancy.** Who is in which zone now, from simulated access control and Wi-Fi presence: staff (a person of the mission), guard force and visitors, the last two as labels only ("Guard 2", "Visitor 7"), never named. Counts per zone and in total. Staff names only for those who may read the mission's people (as Fleet's drivers, FLT-07); others see a dot and "Staff". Presence is not a location observation: People & Sites figures do not change. | TWN-02 | M | Before the unrest: 25 on site (11 staff, 3 guards, 11 visitors). The Viewer sees the same counts and no name. |
+| TWN-03 | **Sensors and systems.** Each sensor or system of the site with a kind (GATE, BADGE_READER, CCTV, SAFE_ROOM, ACCESS, ALARM), a zone, a status (OK, DEGRADED, FAULT, OFFLINE) and a short detail, changed only by simulated access-control, CCTV and building-management events. The generator and satellite comms come from Fleet & Assets (`GEN-<mission>`, `SAT-<mission>`) with their live state and fuel, not stored twice. A fault at a site inside an ACTIVE incident's zone writes a SITE entry on the incident's timeline. | TWN-03 | M | Before the unrest: 43 / 43 online. During it: Gate 2 badge reader FAULT ("manual guard"), one CCTV camera offline (15 / 16): 41 / 43, and two SITE entries on INC-<year>-1042. |
+| TWN-04 | **Shelter-in-place and evacuation overlays.** *Shelter-in-place* shows while a playbook run for an ACTIVE incident at the site's mission has sent its shelter-in-place staff alert (PB-07 step 4): a banner, the safe room highlighted with its occupancy against its capacity, and Gate 1 shown locked down when its sensor says so. The *evacuation route* (a seeded route on the plan, e.g. "Route B → vehicles via Gate 2") shows while the mission has an ACTIVE evacuation (EV-05). Both are worked out on every read, not stored, so they clear by themselves. | TWN-04 | M | After PB-07 step 4 and NBO-SITE scene 2: "Shelter-in-place active", 9 / 20 in the safe room, the comms team in the IT room, the visitors held in the conference room. With EVN-1001 ACTIVE: Route B shown. |
+| TWN-05 | **Emergency readiness.** Per site: a readiness score with the date of the last drill (illustrative, seeded; real scoring comes with the Exercises module), and readiness items: floor wardens assigned, safe-room supplies checked, evacuation routes surveyed, ticked by a Security Officer or the mission's Head of Mission (once, audited), plus "All access points monitored", worked out from the sensors. | — | M | Score 91, last drill three weeks before the scenario date; "All access points monitored" turns open while Gate 2 is in FAULT. |
+| TWN-06 | **Site Twin screen.** As the design, Blueprint dark, under RESPOND after Assistance Partners (§68 Q8): a site picker (sites with a plan); KPIs from data (on site now with the split, safe room occupancy, sensors online with faults, site readiness); the floor plan (SVG) with rooms, counts, people as dots by kind and the overlays; "Sensors & systems"; "Occupancy by zone"; "Emergency readiness". The screen refreshes on realtime `SITE_UPDATED` events, which carry ids and counts only. Every button comes from `GET /api/me/permissions`. | — | M | — |
+| TWN-07 | **A demo scenario** `NBO-SITE`, played during NBO-CIVIL-UNREST (from scene 2):<br>· scene 1: the Gate 2 badge reader faults and a CCTV camera goes offline;<br>· scene 2: simulated presence moves 9 staff to the safe room, the comms team stays in the IT room, the visitors are held in the conference room, and Gate 1 locks down;<br>· scene 3: the Gate 2 reader and the camera recover.<br>The scenario changes presence and sensors only; it approves nothing. | — | M | Played from the presenter bar. |
+
+### Not in this module
+- Real access control, VMS, BMS or Wi-Fi presence feeds (master spec integrations); everything is simulated;
+- more than one floor, or a floor plan editor; floor plans for sites other than the Nairobi embassy;
+- visitor management (names, badges, hosts);
+- controlling anything (locking gates, sealing rooms) from NEXIRA;
+- Cyber-Physical (faults are shown, not analysed);
+- presence feeding location confidence or the check-in;
+- an agent proposal (§68 Q6).
+
+## 66. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-39 · `site_zone`**: tenant, site, code (UNIQUE with the site), name, kind, plan rectangle (`x`, `y`, `w`, `h`, integers in plan units), capacity (nullable). FORCE RLS; SELECT and INSERT (seeded); no UPDATE or DELETE.
+- **PC-40 · `site_route`**: tenant, site, code (`A`, `B`), label, kind (`EVACUATION`), the path as plan points (`jsonb`, at most 20 `[x, y]` pairs), the gate zone it leaves by. FORCE RLS; SELECT and INSERT; no UPDATE or DELETE.
+- **PC-41 · `site_presence`**: tenant, site, zone (same site), kind (`STAFF`, `GUARD`, `VISITOR`), `person_id` (staff only: a person of the same tenant and the site's mission), label (guards and visitors only), since (written by the database), source. One row per present occupant, UNIQUE (site, person) and (site, label); moved between zones by the simulated feed, removed when they leave. FORCE RLS; SELECT, INSERT, `UPDATE (zone_id)` and DELETE (a departure); every change audited. Guard: zone of the same site; kind and person or label frozen.
+- **PC-42 · `site_sensor`** and **`site_readiness_item`**: sensors (tenant, site, zone, code UNIQUE with the site, kind, label, status, detail, `status_at` written by the database; `UPDATE (status, detail)` only) and readiness items (tenant, site, label, done at and by; done once, by a user of the tenant), and the site's illustrative score and last drill date on `site_readiness` (tenant, site UNIQUE, score 0..100, last drill date; seeded, read-only). FORCE RLS on each; no DELETE.
+- Backups include the new tables like every other table (D-21).
+
+## 67. Acceptance for the module
+
+Playwright on the real stack:
+- **Before the unrest:** the Nairobi embassy's plan as TWN-01; 25 on site (11 · 3 · 11); 43 / 43 sensors; readiness 91; labelled simulated. Generator and satellite comms from Fleet (GEN-NBO 72%).
+- **`NBO-SITE` from the presenter bar** (after NBO-CIVIL-UNREST scene 2, with PB-07 approved by the Phase 1 run): scene 1 gives 41 / 43 with Gate 2 in FAULT and two SITE timeline entries; scene 2 gives "Shelter-in-place active" and 9 / 20 in the safe room; scene 3 gives 43 / 43 again.
+- **With EVN-1001 ACTIVE** (the Evacuation spec), Route B shows; it clears when the evacuation is completed.
+- **Readiness:** a Security Officer ticks an item; the Viewer cannot.
+- **Names:** the Viewer and the Cairo Head of Mission see counts and dots, no staff name; the Duty Officer sees names.
+- **Audit:** presence moves, sensor changes and the readiness tick are audited, and the chain verifies.
+- `make acceptance` (all existing specs) still passes.
+
+## 68. Questions answered by the product owner (2026-11-02: "use the defaults")
+
+1. **Scope:** the Nairobi embassy's ground floor only, seeded as the design; other sites show "No floor plan yet". *Default: yes.*
+2. **Presence:** simulated access control and Wi-Fi presence only, moved by scenario events (`SITE_PRESENCE`) through the worker; seeded with the 11 Nairobi staff at "Embassy", 3 guards and 11 visitors. Presence never feeds location confidence or the check-in, so Phase 1 figures do not change. *Default: yes.*
+3. **Who sees what:** every role sees the plan, counts, sensors and readiness (an operational picture, as Fleet); staff names only within the people scope (FLT-07, `evacuations.name_scope()`); guards and visitors are never named. *Default: yes.*
+4. **Shelter-in-place and the route:** worked out from PB-07's shelter alert for an ACTIVE incident and from an ACTIVE evacuation, not stored and not set by hand. *Default: yes.*
+5. **Generator and satellite comms:** read from Fleet & Assets, not duplicated as sensors. *Default: yes.*
+6. **Agent proposal:** none in this module. *Default: not now.*
+7. **Readiness:** an illustrative score and last drill date until the Exercises module; three items ticked by a Security Officer or the mission's Head of Mission, through `app/core/approvals.py`; "All access points monitored" from the sensors. *Default: yes.*
+8. **Screen:** "Site Twin" (icon `grid-view`) under RESPOND, after Assistance Partners, as the design. *Default: yes.*
+9. **Demo:** `NBO-SITE` from the presenter bar during NBO-CIVIL-UNREST (faults, shelter, recovery). The Phase 1 scenes are unchanged; the Site Twin screen reflects them. *Default: yes.*
+10. **🔒 prompts:** the migration (PC-39..42: RLS, grants, guards) and the readiness tick and name scope (`approvals.py`) need your named sign-off, as before (D-29).
