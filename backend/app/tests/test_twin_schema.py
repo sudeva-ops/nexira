@@ -6,6 +6,7 @@ detail; readiness items are done once by a person of the tenant; the database wr
 
 import json
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import asyncpg
@@ -212,6 +213,7 @@ async def test_a_zone_is_seeded_once_and_fixed(world: World, owner: asyncpg.Conn
         {"x": -1},
         {"capacity": 20},  # only a safe room or the muster point has a capacity
         {"kind": "SAFE_ROOM", "capacity": 0},
+        {"x": 9950, "w": 100},  # off the plan (review of Prompt 84, L3)
     ],
 )
 async def test_a_zone_refuses_bad_values(world: World, change: dict[str, Any]) -> None:
@@ -254,6 +256,10 @@ async def test_a_route_leaves_by_a_gate_of_the_same_site(
         [[1, 2], [-3, 4]],
         {"x": 1},
         [[i, i] for i in range(21)],
+        [[1, 2], [10001, 4]],  # off the plan (review of Prompt 84, L3)
+        [[1, 2], [123456, 4]],
+        [5, [1, 2]],  # a scalar point (L4)
+        [[1, 2], "x"],
     ],
 )
 async def test_a_route_path_is_points_on_the_plan(world: World, path: Any) -> None:
@@ -284,6 +290,11 @@ async def test_staff_presence_moves_within_the_site_and_the_database_writes_sinc
     assert tuple(row) == (world.safe, True, "Access control + Wi-Fi presence (simulated)")
     with pytest.raises(UNIQUE):
         await world.present()  # one row per person per site
+    # Nor at another site of the mission: one place at a time (review of Prompt 84, M1).
+    residence = await site(world.conn, world.mission)
+    hall = await world.zone("hall", "LOBBY", site_id=residence)
+    with pytest.raises(UNIQUE):
+        await world.present(site_id=residence, zone_id=hall)
     with pytest.raises((FK, REFUSED)):
         await world.conn.execute(
             "UPDATE site_presence SET zone_id = $2 WHERE id = $1", presence_id, world.elsewhere
@@ -473,3 +484,123 @@ async def test_no_site_readiness_table(db: DbUrls) -> None:
         assert await conn.fetchval("SELECT to_regclass('public.site_readiness')") is None
     finally:
         await conn.close()
+
+
+# --- review of Prompt 84 -----------------------------------------------------------------------
+
+
+async def test_staff_are_active_mission_personnel(world: World) -> None:
+    """M1."""
+    for person_type in ("DEPENDANT", "CITIZEN", "DELEGATE"):
+        other = await world.conn.fetchval(
+            "INSERT INTO person (tenant_id, mission_id, person_type, full_name) "
+            "VALUES (current_tenant_id(), $1, $2, 'Fictional') RETURNING id",
+            world.mission,
+            person_type,
+        )
+        with pytest.raises(REFUSED, match="active mission personnel"):
+            await world.present(person_id=other)
+    gone = await person(world.conn, world.mission)
+    await world.conn.execute("UPDATE person SET is_active = false WHERE id = $1", gone)
+    with pytest.raises(REFUSED, match="active mission personnel"):
+        await world.present(person_id=gone)
+
+
+async def test_the_database_writes_every_time_even_when_forged(
+    world: World, owner: asyncpg.Connection
+) -> None:
+    """Finding 9: forged times on insert are overwritten; unchanged values keep theirs."""
+    forged = datetime(2000, 1, 1, tzinfo=UTC)
+    async with world.conn.transaction():
+        presence_id = await world.conn.fetchval(
+            "INSERT INTO site_presence (tenant_id, site_id, zone_id, kind, label, since) "
+            "VALUES (current_tenant_id(), $1, $2, 'GUARD', 'Guard 1', $3::timestamptz) "
+            "RETURNING id",
+            world.site,
+            world.gate,
+            forged,
+        )
+        sensor_id = await world.conn.fetchval(
+            "INSERT INTO site_sensor (tenant_id, site_id, code, kind, label, status_at, "
+            "created_at) VALUES (current_tenant_id(), $1, 'CAM-01', 'CCTV', 'Camera 1', "
+            "$2::timestamptz, $2::timestamptz) RETURNING id",
+            world.site,
+            forged,
+        )
+        item_id = await world.conn.fetchval(
+            "INSERT INTO site_readiness_item (tenant_id, site_id, label, done_at, created_at) "
+            "VALUES (current_tenant_id(), $1, 'Item', $2::timestamptz, $2::timestamptz) "
+            "RETURNING id",
+            world.site,
+            forged,
+        )
+        zone_id = await world.conn.fetchval(
+            "INSERT INTO site_zone (tenant_id, site_id, code, name, kind, x, y, w, h, created_at) "
+            "VALUES (current_tenant_id(), $1, 'amb', 'Suite', 'SUITE', 1, 1, 9, 9, "
+            "$2::timestamptz) RETURNING id",
+            world.site,
+            forged,
+        )
+        rows = await world.conn.fetchrow(
+            "SELECT (SELECT since = now() FROM site_presence WHERE id = $1) AS since, "
+            "(SELECT status_at = now() AND created_at = now() FROM site_sensor WHERE id = $2) "
+            "AS sensor, (SELECT done_at IS NULL AND created_at = now() FROM site_readiness_item "
+            "WHERE id = $3) AS item, (SELECT created_at = now() FROM site_zone WHERE id = $4) "
+            "AS zone",
+            presence_id,
+            sensor_id,
+            item_id,
+            zone_id,
+        )
+    assert rows is not None
+    assert tuple(rows) == (True, True, True, True)
+    # The app cannot write the times at all; the owner's are overwritten.
+    for statement in (
+        "UPDATE site_presence SET since = now()",
+        "UPDATE site_sensor SET status_at = now()",
+        "UPDATE site_readiness_item SET done_at = now()",
+    ):
+        with pytest.raises(DENIED):
+            await world.conn.execute(statement)
+    before = await world.conn.fetchrow(
+        "SELECT (SELECT since FROM site_presence WHERE id = $1) AS since, "
+        "(SELECT status_at FROM site_sensor WHERE id = $2) AS status_at",
+        presence_id,
+        sensor_id,
+    )
+    assert before is not None
+    await owner.execute(
+        "UPDATE site_presence SET since = $2::timestamptz WHERE id = $1", presence_id, forged
+    )
+    await owner.execute(
+        "UPDATE site_sensor SET status_at = $2::timestamptz WHERE id = $1", sensor_id, forged
+    )
+    # Same zone, same status and detail: the times are kept, not forged.
+    await world.conn.execute(
+        "UPDATE site_presence SET zone_id = zone_id WHERE id = $1", presence_id
+    )
+    after = await world.conn.fetchrow(
+        "SELECT (SELECT since FROM site_presence WHERE id = $1) AS since, "
+        "(SELECT status_at FROM site_sensor WHERE id = $2) AS status_at",
+        presence_id,
+        sensor_id,
+    )
+    assert after is not None
+    assert tuple(after) == tuple(before)
+
+
+async def test_a_readiness_item_cannot_be_undone(world: World, owner: asyncpg.Connection) -> None:
+    item_id = await world.conn.fetchval(
+        "INSERT INTO site_readiness_item (tenant_id, site_id, label) "
+        "VALUES (current_tenant_id(), $1, 'Open item') RETURNING id",
+        world.site,
+    )
+    with pytest.raises(REFUSED, match="the only change is marking it done"):
+        await world.conn.execute(
+            "UPDATE site_readiness_item SET done_by = NULL WHERE id = $1", item_id
+        )
+    await world.conn.execute(
+        "UPDATE site_readiness_item SET done_by = $2 WHERE id = $1", item_id, world.security
+    )
+    with pytest.raises(REFUSED, match="done is final"):
+        await owner.execute("UPDATE site_readiness_item SET done_by = NULL WHERE id = $1", item_id)

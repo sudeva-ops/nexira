@@ -23,7 +23,9 @@ CREATE TABLE site_zone (
   UNIQUE (site_id, code),
   -- For site_route's and site_presence's same-site foreign keys.
   UNIQUE (id, site_id),
-  CHECK (capacity IS NULL OR kind IN ('SAFE_ROOM','MUSTER'))
+  CHECK (capacity IS NULL OR kind IN ('SAFE_ROOM','MUSTER')),
+  -- On the plan (review of Prompt 84, L3).
+  CHECK (x + w <= 10000 AND y + h <= 10000)
 );
 CREATE INDEX site_zone_site_idx ON site_zone (tenant_id, site_id);
 ALTER TABLE site_zone ENABLE ROW LEVEL SECURITY;
@@ -87,13 +89,18 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'site route: the exit is a gate of this site';
   END IF;
-  -- Each point is [x, y] with integers on the plan.
+  -- Each point is [x, y] with integers on the plan (0..10000). CASE, not OR, so no step runs
+  -- on an element of the wrong type (review of Prompt 84, L3, L4).
   IF jsonb_typeof(NEW.path) <> 'array' OR EXISTS (
        SELECT 1 FROM jsonb_array_elements(NEW.path) p
-        WHERE jsonb_typeof(p) <> 'array' OR jsonb_array_length(p) <> 2
-           OR jsonb_typeof(p -> 0) <> 'number' OR jsonb_typeof(p -> 1) <> 'number'
-           OR (p ->> 0) !~ '^[0-9]{1,5}$' OR (p ->> 1) !~ '^[0-9]{1,5}$') THEN
-    RAISE EXCEPTION 'site route: the path is [x, y] points';
+        WHERE NOT CASE
+                WHEN jsonb_typeof(p) <> 'array' THEN false
+                WHEN jsonb_array_length(p) <> 2 THEN false
+                WHEN jsonb_typeof(p -> 0) <> 'number' OR jsonb_typeof(p -> 1) <> 'number' THEN false
+                WHEN (p ->> 0) !~ '^[0-9]{1,5}$' OR (p ->> 1) !~ '^[0-9]{1,5}$' THEN false
+                ELSE (p ->> 0)::int <= 10000 AND (p ->> 1)::int <= 10000
+              END) THEN
+    RAISE EXCEPTION 'site route: the path is [x, y] points on the plan';
   END IF;
   NEW.created_at := now();
   RETURN NEW;
@@ -115,7 +122,8 @@ CREATE TABLE site_presence (
   since       timestamptz NOT NULL DEFAULT now(),
   source      text NOT NULL DEFAULT 'Access control + Wi-Fi presence (simulated)'
               CHECK (length(source) BETWEEN 1 AND 100),
-  UNIQUE (site_id, person_id),
+  -- A person is in one place at a time (review of Prompt 84, M1).
+  UNIQUE (tenant_id, person_id),
   UNIQUE (site_id, label),
   FOREIGN KEY (zone_id, site_id) REFERENCES site_zone (id, site_id),
   CHECK ((kind = 'STAFF') = (person_id IS NOT NULL)),
@@ -152,6 +160,13 @@ BEGIN
          AND p.mission_id = s.mission_id;
       IF NOT FOUND THEN
         RAISE EXCEPTION 'site presence: staff are people of the site''s mission';
+      END IF;
+      -- Mission personnel, still active; never a citizen or dependant (review of Prompt 84, M1).
+      PERFORM 1 FROM person p
+       WHERE p.id = NEW.person_id AND p.is_active
+         AND p.person_type IN ('DIPLOMAT', 'LOCAL_STAFF', 'CONTRACTOR');
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'site presence: staff are active mission personnel';
       END IF;
     END IF;
   END IF;
