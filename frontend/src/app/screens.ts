@@ -33,6 +33,8 @@ export const SCREENS: readonly Screen[] = [
   { path: "/vip", title: "VIP Protection", subtitle: "Protection · Visits, programme risk & checklist", icon: "shield", group: "RESPOND", builtIn: "Prompt 81", restricted: "vip" },
   { path: "/notifications", title: "Mass Notification", subtitle: "Comms · Multi-channel delivery", icon: "send-message", group: "RESPOND", builtIn: "Prompt 21" },
   { path: "/partners", title: "Assistance Partners", subtitle: "Response · Medical, evacuation & secure transport", icon: "heart", group: "RESPOND", builtIn: "Prompt 46" },
+  // D-43: under RESPOND, after Assistance Partners (§68 Q8).
+  { path: "/twin", title: "Site Twin", subtitle: "Sites · Floor plan, occupancy & sensors", icon: "grid-view", group: "RESPOND", builtIn: "Prompt 87" },
   { path: "/checkin", title: "Safety Check-in", subtitle: "Workflows · Personnel accountability", icon: "tick-circle", group: "RESPOND", builtIn: "Prompt 11" },
   // Plan-pilot-dx G-9: PLAN & INSIGHT, as the design; Predictive Risk and Executive Overview join it later.
   { path: "/documents", title: "Document Expiry", subtitle: "Compliance · Passports, visas & clearances", icon: "document", group: "PLAN & INSIGHT", builtIn: "Prompt 51" },
