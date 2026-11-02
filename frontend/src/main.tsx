@@ -10,8 +10,10 @@ import { BrowserRouter } from "react-router-dom";
 import { setTokenProvider } from "./api/client";
 import { App } from "./app/App";
 import { getToken, initAuth, logout } from "./auth/keycloak";
+import { initCalm } from "./ui/calm";
 
 document.body.classList.add(Classes.DARK);
+initCalm(); // Calm mode, if chosen in this browser (UI 3)
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root missing from index.html");
