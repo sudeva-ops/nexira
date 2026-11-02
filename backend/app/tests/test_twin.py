@@ -4,6 +4,7 @@ Fleet systems and SITE timeline entries (§4); shelter-in-place and the route wo
 (§5); readiness with the tick through approvals.py (§6); permissions; the simulated feeds; audit
 without names. Against real PostgreSQL, as nexira_api."""
 
+import asyncio
 import json
 import uuid
 from dataclasses import dataclass
@@ -145,6 +146,7 @@ async def world(client: AsyncClient, idp: Idp) -> World:
         "hom.nbo": [("HEAD_OF_MISSION", nbo)],
         "hom.cai": [("HEAD_OF_MISSION", cai)],
         "viewer": [("VIEWER", None)],
+        "security.cai": [("SECURITY_OFFICER", cai)],
     }
     users = {sub: await idp.user(sub, roles) for sub, roles in grants.items()}
     async with tenant_session(idp.tenant_id, idp.engine) as session:
@@ -462,12 +464,13 @@ async def test_the_route_shows_while_the_mission_evacuates(world: World) -> None
 async def test_a_readiness_item_is_ticked_once_by_the_caller(world: World) -> None:
     item = (await world.items())["Generator load test witnessed"]
     url = f"/api/sites/readiness/{item['id']}/done"
-    for who in ("viewer", "duty", "hom.cai"):
+    for who in ("viewer", "duty", "hom.cai", "security.cai"):
         assert (await world.send(who, "POST", url)).status_code == 403, who
     response = await world.send("hom.nbo", "POST", url)
     assert response.status_code == 200, response.text
     ticked = next(i for i in response.json()["readiness"]["items"] if i["id"] == item["id"])
     assert (ticked["done"], ticked["done_by_name"]) == (True, "User hom.nbo")
+    assert ticked["done_at"] is not None  # written by the database, read back (review L2)
     again = await world.send("security", "POST", url)
     assert (again.status_code, again.json()["detail"]) == (
         409,
@@ -527,3 +530,119 @@ async def test_the_feeds_take_only_the_scenario_players_events(world: World) -> 
     out = await world.twin()
     assert (out["counts"]["safe_room"], out["counts"]["faults"]) == (1, 1)
     assert [e.type for e in world.publisher.events] == ["SITE_UPDATED", "SITE_UPDATED"]
+
+
+# --- review of Prompt 85 ------------------------------------------------------------------------
+
+
+async def test_who_ticked_is_shown_only_within_the_people_scope(world: World) -> None:
+    """M1."""
+    wardens = "Floor wardens assigned (3)"
+    duty = {i["label"]: i for i in (await world.twin("duty"))["readiness"]["items"]}
+    assert duty[wardens]["done_by_name"] == "User security"
+    for who in ("viewer", "hom.cai"):
+        items = {i["label"]: i for i in (await world.twin(who))["readiness"]["items"]}
+        assert (items[wardens]["done"], items[wardens]["done_by_name"]) == (True, None), who
+
+
+async def _person(world: World, mission: uuid.UUID, person_type: str = "DIPLOMAT") -> str:
+    found = (
+        await world.sql(
+            "INSERT INTO person (tenant_id, mission_id, person_type, full_name) "
+            "VALUES (current_tenant_id(), :m, :t, 'Fictional Other') RETURNING id",
+            m=mission,
+            t=person_type,
+        )
+    ).scalar_one()
+    return str(found)
+
+
+async def test_an_arrival_is_active_personnel_of_the_mission_only(world: World) -> None:
+    """L9: none of these is applied, and nothing escapes as an error."""
+    cairo = await _person(world, world.cai)
+    citizen = await _person(world, world.nbo, "CITIZEN")
+    dependant = await _person(world, world.nbo, "DEPENDANT")
+    inactive = await _person(world, world.nbo)
+    await world.sql("UPDATE person SET is_active = false WHERE id = :p", p=inactive)
+    for occupant in (cairo, citizen, dependant, inactive):
+        assert await world.presence(occupant, "ch") is None, occupant
+    assert (await world.twin())["counts"]["staff"] == 3
+
+
+async def test_a_person_deactivated_on_site_can_still_leave(world: World) -> None:
+    """L3."""
+    officer = world.staff[0]
+    await world.sql("UPDATE person SET is_active = false WHERE id = :p", p=officer)
+    assert await world.presence(str(officer), "safe") is not None  # a move
+    assert await world.presence(str(officer), None) is not None  # a departure
+    assert (await world.twin())["counts"]["staff"] == 2
+
+
+async def test_two_arrivals_of_the_same_person_at_once(world: World) -> None:
+    """L4: one applies, the other is not applied; no error."""
+    newcomer = await _person(world, world.nbo)
+
+    async def arrive() -> Any:
+        async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+            outcome = await twin.presence(session, KEY, newcomer, "ch")
+            await session.commit()
+        return outcome
+
+    results = await asyncio.gather(arrive(), arrive())
+    assert sorted(r is None for r in results) == [False, True]
+    assert (await world.twin())["counts"]["staff"] == 4
+
+
+async def test_a_shelter_alert_elsewhere_does_not_shelter_this_site(world: World) -> None:
+    cairo = (
+        await world.sql(
+            "INSERT INTO incident (tenant_id, reference, title, category, severity, "
+            "signal_severity, location, mission_id, status) VALUES (current_tenant_id(), "
+            "'INC-2026-1050', 'Unrest', 'CIVIL_UNREST', 'HIGH', 'HIGH', :pt, :m, 'ACTIVE') "
+            "RETURNING id",
+            pt=pt(CAIRO),
+            m=world.cai,
+        )
+    ).scalar_one()
+    await _shelter_run(world, cairo, "DONE")
+    assert (await world.twin())["shelter"] is None
+
+
+async def test_no_timeline_entry_far_away_or_for_an_inactive_incident(world: World) -> None:
+    await world.sql(
+        "INSERT INTO incident (tenant_id, reference, title, category, severity, signal_severity, "
+        "location, mission_id, status) VALUES (current_tenant_id(), 'INC-2026-1051', 'Far', "
+        "'CIVIL_UNREST', 'HIGH', 'HIGH', :pt, :m, 'ACTIVE')",
+        pt=pt(CAIRO),
+        m=world.cai,
+    )
+    incident = await world.incident()
+    await world.sql("UPDATE incident SET status = 'MONITORING' WHERE id = :i", i=incident)
+    outcome = await world.sensor("G2-READER", "FAULT", "Fault")
+    assert outcome.events[0].payload["incident_ids"] == []
+    assert (
+        await world.sql("SELECT count(*) FROM incident_event WHERE event_type = 'SITE'")
+    ).scalar_one() == 0
+
+
+async def test_the_route_matches_a_longer_plan_label(world: World) -> None:
+    """L5: the plan may name the route at length."""
+    await world.sql(
+        "INSERT INTO evacuation_plan (tenant_id, mission_id, reference, muster_name, "
+        "muster_location, route_label, destination, options) VALUES (current_tenant_id(), :m, "
+        "'EVP-NBO', 'Courtyard', :pt, 'Route A via the main road', 'Dubai', "
+        '\'[{"role": "PRIMARY", "kind": "CHARTER", "label": "C", "seats": 72}]\')',
+        m=world.nbo,
+        pt=pt(EMBASSY),
+    )
+    await world.sql(
+        "INSERT INTO evacuation (tenant_id, reference, plan_id, mission_id, requested_by, "
+        "requested_role) SELECT current_tenant_id(), 'EVN-1001', id, mission_id, :u, "
+        "'HQ_CRISIS_DIRECTOR' FROM evacuation_plan",
+        u=world.users["duty"],
+    )
+    await world.sql(
+        "UPDATE evacuation SET status = 'ACTIVE', activated_by = :a, step = 2",
+        a=world.users["hom.nbo"],
+    )
+    assert (await world.twin())["route"]["code"] == "A"

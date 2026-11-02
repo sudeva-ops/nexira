@@ -56,8 +56,8 @@ async def twin(site_id: uuid.UUID, user: Reader, session: Db) -> TwinOut:
 async def tick(item_id: uuid.UUID, user: User, session: Db, publisher: Pub) -> TwinOut:
     try:
         outcome = await service.tick(session, user, item_id)
+        out = await service.twin(session, user, outcome.site_id)
     except service.TwinError as e:
         raise _http(e) from None
-    out = await service.twin(session, user, outcome.site_id)
     await _done(session, publisher, outcome.events)
     return out

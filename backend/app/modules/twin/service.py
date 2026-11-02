@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import approvals, audit
@@ -126,7 +127,8 @@ _SHELTER = text(
 _EVACUATION = text(
     "SELECT e.reference, p.route_label FROM evacuation e "
     "JOIN evacuation_plan p ON p.id = e.plan_id "
-    "WHERE e.mission_id = :mission AND e.status = 'ACTIVE' LIMIT 1"
+    "WHERE e.mission_id = :mission AND e.status = 'ACTIVE' "
+    "ORDER BY e.activated_at, e.reference LIMIT 1"
 )
 
 
@@ -141,8 +143,11 @@ async def _route(
             select(SiteRoute).where(SiteRoute.site_id == site.id).order_by(SiteRoute.code)
         )
     )
+    # The plan names the route ("Route B"); either label may be the longer (review of
+    # Prompt 85, L5).
+    named = evacuation.route_label.strip()
     route = next(
-        (r for r in routes if r.label.startswith(evacuation.route_label)),
+        (r for r in routes if r.label.startswith(named) or named.startswith(f"Route {r.code}")),
         next((r for r in routes if r.code == DEFAULT_ROUTE), routes[0] if routes else None),
     )
     if route is None:
@@ -193,20 +198,22 @@ def _counts(
 
 
 async def _readiness(
-    session: AsyncSession, site: Site, sensors: list[SiteSensor]
+    session: AsyncSession, site: Site, sensors: list[SiteSensor], names: bool
 ) -> schemas.ReadinessOut:
     rows = await session.execute(
         select(SiteReadinessItem, AppUser.display_name)
         .outerjoin(AppUser, AppUser.id == SiteReadinessItem.done_by)
         .where(SiteReadinessItem.site_id == site.id)
         .order_by(SiteReadinessItem.created_at, SiteReadinessItem.label)
+        .execution_options(populate_existing=True)  # done_at, written by the database (L2)
     )
     items = [
         schemas.ReadinessItemOut(
             id=item.id,
             label=item.label,
             done=item.done_by is not None,
-            done_by_name=name,
+            # A person's name only within the people scope (review of Prompt 85, M1).
+            done_by_name=name if names else None,
             done_at=item.done_at,
         )
         for item, name in rows.all()
@@ -245,7 +252,8 @@ async def twin(session: AsyncSession, user: CurrentUser, site_id: uuid.UUID) -> 
         select(SitePresence, Person.full_name)
         .outerjoin(Person, Person.id == SitePresence.person_id)
         .where(SitePresence.site_id == site.id)
-        .order_by(SitePresence.kind.desc(), SitePresence.label, Person.full_name)
+        # Never by name: the order must not hint at hidden names (review of Prompt 85, L6).
+        .order_by(SitePresence.kind.desc(), SitePresence.label, SitePresence.since, SitePresence.id)
     )
     presence = list(rows.all())
     names = evacuations.sees_names(await evacuations.name_scope(session, user), site.mission_id)
@@ -309,7 +317,7 @@ async def twin(session: AsyncSession, user: CurrentUser, site_id: uuid.UUID) -> 
             else None
         ),
         route=await _route(session, site, by_id),
-        readiness=await _readiness(session, site, sensors),
+        readiness=await _readiness(session, site, sensors, names),
     )
 
 
@@ -432,19 +440,6 @@ async def presence(
     zone = await _zone(session, site, zone_code) if zone_code else None
     if zone_code and zone is None:
         return None
-    if person_id is not None:
-        # Staff are active personnel of the site's mission (the PC-41 guard): anyone else is
-        # not applied, rather than an error in the worker.
-        staff = await session.scalar(
-            select(Person.id).where(
-                Person.id == person_id,
-                Person.mission_id == site.mission_id,
-                Person.is_active,
-                Person.person_type.in_(STAFF_TYPES),
-            )
-        )
-        if staff is None:
-            return None
     match = (
         SitePresence.person_id == person_id
         if person_id
@@ -466,16 +461,25 @@ async def presence(
             return None
         await session.delete(row)
     elif row is None:
-        session.add(
-            SitePresence(
-                tenant_id=site.tenant_id,
-                site_id=site.id,
-                zone_id=zone.id,
-                kind=kind,
-                person_id=person_id,
-                label=label,
-            )
-        )
+        # An arrival: staff are active personnel of the site's mission (the PC-41 guard);
+        # anyone else is not applied. Moves and departures are always applied, so a person
+        # deactivated while on site can still leave (review of Prompt 85, L3).
+        if person_id is not None and not await _staff(session, site, person_id):
+            return None
+        try:
+            async with session.begin_nested():
+                session.add(
+                    SitePresence(
+                        tenant_id=site.tenant_id,
+                        site_id=site.id,
+                        zone_id=zone.id,
+                        kind=kind,
+                        person_id=person_id,
+                        label=label,
+                    )
+                )
+        except IntegrityError:
+            return None  # a concurrent event added them first (review of Prompt 85, L4)
     elif row.zone_id == zone.id:
         return None
     else:
@@ -488,6 +492,18 @@ async def presence(
         details["label"] = label
     await _audit(session, ACCESS, "PRESENCE", site, details)
     return Outcome(site.id, [await site_event(session, site, "presence")])
+
+
+async def _staff(session: AsyncSession, site: Site, person_id: uuid.UUID) -> bool:
+    found = await session.scalar(
+        select(Person.id).where(
+            Person.id == person_id,
+            Person.mission_id == site.mission_id,
+            Person.is_active,
+            Person.person_type.in_(STAFF_TYPES),
+        )
+    )
+    return found is not None
 
 
 _ZONES = text(
