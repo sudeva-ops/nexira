@@ -99,3 +99,10 @@ class PermissionsOut(BaseModel):
     # fleet (entity_id = the mission; D-41, plan-pilot-flt §7)
     set_asset_status: bool = False
     complete_maintenance: bool = False
+    # vip_visit (D-42, plan-pilot-vip §5, §6); nothing for a caller who may not see it (VIP-06)
+    start_visit: bool = False
+    progress_visit: bool = False
+    cancel_visit: bool = False
+    tick_vip_checklist: bool = False
+    propose_vip_change: list[uuid.UUID] = []  # segments
+    decide_vip_change: list[uuid.UUID] = []  # pending changes

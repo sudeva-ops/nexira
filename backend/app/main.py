@@ -25,6 +25,7 @@ from app.modules.scenarios.router import router as scenarios_router
 from app.modules.scenarios.service import registry
 from app.modules.tenancy.router import router as tenancy_router
 from app.modules.travel.router import router as travel_router
+from app.modules.vip.router import router as vip_router
 from app.modules.weather.router import router as weather_router
 
 
@@ -67,6 +68,7 @@ def create_app(app_env: str) -> FastAPI:
         health_router,
         evacuations_router,
         fleet_router,
+        vip_router,
         checkin_router,
         agents_router,
         travel_router,
