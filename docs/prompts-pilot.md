@@ -800,3 +800,60 @@ sensors and readiness.
 Playwright, real stack (requirements-pilot.md §67). Report the real output; make
 acceptance (all specs) still passes.
 ```
+
+## Pilot module 14 · Supply Chain & Third-Party Risk (proposed, awaiting the product owner)
+
+Sources: D-44 (proposed), `docs/requirements-pilot.md` §69–73 (SUP-01..07), PC-43..45. Simulated suppliers and routes only; NEXIRA contacts no supplier.
+
+### Prompt 89 · Read and plan (no code)
+```
+Read D-05, D-16, D-19, D-29, D-30, D-41, D-44, requirements-pilot.md §1-6 and §69-73,
+missions, incidents and impact zones, Fleet equipment (GEN-<mission>), the incident timeline
+and approvals.py. Write docs/plan-pilot-sup.md: requirement-to-code mapping, the seeded
+register and routes (Nairobi as the design), reported and shown statuses, the incident link
+and SUPPLY timeline entries, the fuel stock from Fleet, mitigations and who may act, the
+NBO-SUPPLY scenes, what changes in the acceptance specs, gaps with proposed answers, and the
+migration for PC-43..45 (only after approval). No code.
+```
+
+### Prompt 90 · Supply Chain tables (migration) 🔒
+```
+PC-43..45, once approved. A new migration: supplier, logistics_route and supply_mitigation
+with FORCE RLS, tenant_isolation and the grants as proposed; the guards (same-tenant
+references, frozen columns, times written by the database, one active mitigation, stand
+down once); pinned search_path. Tests (as nexira_api): isolation; every refusal; the backup
+role reads them; the downgrade restores the previous revision exactly.
+```
+
+### Prompt 91 · Register, statuses, disruption and mitigation 🔒
+```
+SUP-01..04, SUP-06. The service: the register with dependencies; reported and shown
+statuses (ROUTE BLOCKED, ALTERNATE, impacted) worked out on read; routes tagged by ACTIVE
+impact zones; the fuel stock from Fleet; SUPPLY timeline entries; activate and stand down
+through app/core/approvals.py; names within the people scope; GET /api/supply/* and
+/api/me/permissions; SUPPLY_UPDATED with ids and statuses only; audit. Tests against real
+PostgreSQL.
+```
+
+### Prompt 92 · Seed, simulated feeds and NBO-SUPPLY
+```
+SUP-01, SUP-02, SUP-07. The 52 suppliers and 37 routes (Nairobi as the design);
+SUPPLY_ROUTE and SUPPLY_SUPPLIER in the worker; the NBO-SUPPLY scenario and its presenter
+bar entry. The Phase 1 scenario still starts with no active incident and an empty Decision
+Queue. Tests in the simulator.
+```
+
+### Prompt 93 · Supply Chain Risk screen
+```
+SUP-05. The screen (as the design, Blueprint dark): impact banner, KPIs, suppliers table
+with a mission filter, the supplier card with dependencies and mitigation, logistics routes;
+the nav entry under PLAN & INSIGHT after Document Expiry; every button from
+/api/me/permissions; realtime refresh. Tests: Vitest for statuses, the banner, dependencies,
+mitigation and names by scope.
+```
+
+### Prompt 94 · Supply Chain acceptance
+```
+Playwright, real stack (requirements-pilot.md §72). Report the real output; make
+acceptance (all specs) still passes.
+```

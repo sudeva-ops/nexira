@@ -785,3 +785,65 @@ Playwright on the real stack:
 8. **Screen:** "Site Twin" (icon `grid-view`) under RESPOND, after Assistance Partners, as the design. *Default: yes.*
 9. **Demo:** `NBO-SITE` from the presenter bar during NBO-CIVIL-UNREST (faults, shelter, recovery). The Phase 1 scenes are unchanged; the Site Twin screen reflects them. *Default: yes.*
 10. **🔒 prompts:** the migration (PC-39..42: RLS, grants, guards) and the readiness tick and name scope (`approvals.py`) need your named sign-off, as before (D-29).
+
+## 69. Purpose and starting point
+
+Know which third parties each mission depends on (couriers, guard force, fuel, IT, transport), which of them and which logistics routes are disrupted by an incident now, and what has been done about it: a backup supplier on standby, an alternate route in use. Master spec §5.27 (Supply Chain & Third-Party Risk, SUP-01..03); the design's Supply Chain Risk screen ("Third parties · Vendors & logistics routes"), under PLAN & INSIGHT.
+
+| Exists today | Where |
+|---|---|
+| 36 missions; incidents with a location and impact radius (INC-<year>-1042, 5 km); the incident timeline | intel |
+| The Nairobi generator `GEN-NBO` with its fuel (72%) | Fleet & Assets (D-41) |
+| "Inside an ACTIVE incident's impact zone" tests | health_intel, fleet |
+| The design's SITREP mentions "diplomatic pouch courier route blocked; generator fuel delivery delayed (72 h on-site stock)" | design (Copilot, later) |
+| No suppliers, logistics routes, disruptions, mitigations or Supply Chain screen | — |
+
+## 70. Requirements: Supply Chain & Third-Party Risk (SUP)
+
+| ID | Requirement | Master | Pri. | Acceptance |
+|---|---|---|---|---|
+| SUP-01 | **A supplier register.** Each supplier: code (`SUP-nnn`), name, service, mission (or Global), tier (1 critical, 2 important, 3 routine), a backup supplier (another supplier of the tenant, optional), "included in the mission BCP" (an illustrative flag until Continuity & Compliance), security vetting valid until, and the last performance review score. Seeded and illustrative, labelled simulated; read-only in the pilot apart from status (SUP-02) and mitigations (SUP-04). **Dependencies** are shown from data: backup supplier identified (named), included in the BCP, vetting current (valid until today or later). | SUP-01 | M | 52 suppliers across the 36 missions, 14 in Tier 1, as the design's KPIs. Nairobi as the design: SUP-104 Swiftline Couriers (diplomatic pouch, T1), SUP-117 Equator Guard Services (guard force, T1), SUP-121 Rift Valley Fuels (generator fuel, T2), SUP-126 Savanna IT Networks (ISP & IT, T1), SUP-130 Kilima Catering (T3). |
+| SUP-02 | **Logistics routes and supplier status.** Each route: code, label, kind (POUCH, FUEL, STAFF_TRANSPORT, FREIGHT), mission, the supplier that runs it, optionally the route it is an alternate for, its path (a line on the map) and a reported status (OPEN, RESTRICTED, DELAYED, BLOCKED) with a detail. Each supplier has a reported status (NORMAL, WATCH, DELAYED, AT RISK) with a detail. Both are changed only by simulated logistics and supplier events. **Shown, not stored:** a supplier is **ROUTE BLOCKED** when one of its routes is BLOCKED; an OPEN route whose primary is BLOCKED is **ALTERNATE**; a supplier's status is the worst of what it reports and its routes (ROUTE BLOCKED > AT RISK > DELAYED > WATCH > NORMAL). | SUP-02 | M | 37 routes monitored. Before the unrest: Nairobi's suppliers NORMAL and its four routes OPEN (pouch via CBD, pouch via Southern Bypass, fuel depot → Embassy, staff shuttle Westlands → Embassy); SUP-251 Islamabad and SUP-262 Jakarta WATCH. |
+| SUP-03 | **Disruption from incidents.** A route whose path passes through an ACTIVE incident's impact zone is tagged with that incident. A supplier is **impacted** when its mission has an ACTIVE incident and its shown status is DELAYED, AT RISK or ROUTE BLOCKED; the screen shows a banner naming the incident and the impacted suppliers. A reported change of a route or supplier at a mission with an ACTIVE incident writes a SUPPLY entry on that incident's timeline. For the generator fuel supplier, the on-site stock is shown from Fleet (`GEN-<mission>` fuel × an illustrative 100 h full-tank endurance), not stored twice. | SUP-02 | M | After NBO-SUPPLY scene 2: "3 third parties impacted by INC-<year>-1042" (SUP-104 ROUTE BLOCKED, SUP-117 AT RISK, SUP-121 DELAYED · "72 h on-site stock"); SUPPLY entries on the timeline. |
+| SUP-04 | **Mitigation.** For an impacted supplier, "Activate mitigation" records: the backup supplier put on standby (if any), the alternate route in use (if its route is BLOCKED and an alternate is OPEN), the incident and a note. A Duty Officer, a Security Officer or the mission's Head of Mission may do it, through `app/core/approvals.py`; one active mitigation per supplier; "Stand down" ends it (the same roles, once). Both are audited and write SUPPLY entries on the incident. **Nothing is sent to the supplier**: NEXIRA records the decision; contacting the supplier happens outside it in the pilot. | SUP-03 | M | The Duty Officer activates mitigation for SUP-104: the backup courier on standby and "Pouch via Southern Bypass" in use; a SUPPLY entry. The Viewer and the Cairo Head of Mission are refused (403). Stand down ends it. |
+| SUP-05 | **Supply Chain Risk screen.** As the design, Blueprint dark, under PLAN & INSIGHT after Document Expiry (§73 Q8): the impact banner; KPIs from data (third parties monitored and across how many missions, Tier 1 suppliers, impacted now, routes monitored); the suppliers table (code, supplier, service, mission, tier, status) with a mission filter; the selected supplier's card (status, tier, mission, detail, dependencies, the mitigation and its button); "Logistics routes · <mission>" with each route's status. Every button comes from `GET /api/me/permissions`. The screen refreshes on realtime `SUPPLY_UPDATED` events, which carry ids and statuses only. | — | M | — |
+| SUP-06 | **Who sees what.** Suppliers, routes, statuses and mitigations are an operational picture: every role sees them (as Fleet). The name of the person who activated or stood down a mitigation only for those who may read the mission's people (as TWN-05); others see "Activated". | — | M | The Viewer sees the register, the routes and SUP-104's mitigation, without the Duty Officer's name. |
+| SUP-07 | **A demo scenario** `NBO-SUPPLY`, played while INC-<year>-1042 is ACTIVE (after NBO-CIVIL-UNREST scene 2):<br>· scene 1: the pouch route via the CBD is BLOCKED ("Road closure CBD → JKIA; reroute via Southern Bypass, +55 min"), so SUP-104 is ROUTE BLOCKED and the Southern Bypass ALTERNATE;<br>· scene 2: Rift Valley Fuels reports the fuel delivery postponed 24 h (DELAYED, the fuel route DELAYED); Equator Guard Services reports the 18:00 shift change at risk ("6 guards must cross the impact zone": AT RISK, the staff shuttle RESTRICTED);<br>· scene 3: the routes reopen and the suppliers report NORMAL.<br>The scenario changes reported statuses only; it activates no mitigation and approves nothing. | — | M | Played from the presenter bar. |
+
+### Not in this module
+- Real procurement, contract, logistics or road-closure feeds (master spec integrations); everything is simulated;
+- contacting a supplier, or ordering from a backup, from NEXIRA (no channel is used);
+- adding or editing suppliers and routes in the app; contracts, costs and performance reviews beyond the seeded score;
+- the mission BCP itself (Continuity & Compliance, later): "included in the BCP" is a seeded flag;
+- a fuel delivery changing Fleet's fuel figures (GEN-NBO stays as Fleet shows it);
+- the SITREP's supply-chain section (the Briefing agent and Copilot, later);
+- an agent proposal (§73 Q7).
+
+## 71. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-43 · `supplier`**: tenant, code (UNIQUE with the tenant), name, service, mission (nullable: Global), tier (1..3), backup supplier (nullable, same tenant, not itself), `in_bcp`, vetting valid until, performance score (0..100, nullable), reported status and detail, `status_at` (written by the database), source. FORCE RLS; SELECT, INSERT (seeded) and `UPDATE (status, status_detail)` only; no DELETE. Guard: everything but the status frozen.
+- **PC-44 · `logistics_route`**: tenant, mission, code (UNIQUE with the tenant), label, kind, supplier (nullable, same tenant), alternate for (nullable, a route of the same mission, not itself), `path geography(LineString,4326)` (2..50 points; §73 Q5), reported status and detail, `status_at` (written by the database). FORCE RLS; SELECT, INSERT and `UPDATE (status, detail)` only; no DELETE.
+- **PC-45 · `supply_mitigation`**: tenant, supplier, incident (nullable), backup supplier and alternate route at the time (nullable), note, activated by and at, stood down by and at (times written by the database). One active mitigation per supplier (a partial UNIQUE index). FORCE RLS; SELECT, INSERT and `UPDATE (stood_down_by)` once; no DELETE. Guard: same-tenant references; the backup is the supplier's own backup and the route its alternate.
+- The SUPPLY timeline entry uses the existing incident timeline; no new event table. Backups include the new tables like every other table (D-21).
+
+## 72. Acceptance for the module
+
+Playwright on the real stack:
+- **Before the unrest:** 52 suppliers across 36 missions, 14 in Tier 1, 0 impacted, 37 routes; Nairobi's five suppliers NORMAL and four routes OPEN; Islamabad and Jakarta WATCH; dependencies as seeded; labelled simulated.
+- **`NBO-SUPPLY` from the presenter bar** (after NBO-CIVIL-UNREST scene 2): scene 1 gives SUP-104 ROUTE BLOCKED and the Southern Bypass ALTERNATE; scene 2 gives "3 third parties impacted by INC-<year>-1042", SUP-121 DELAYED with "72 h on-site stock" (from GEN-NBO) and SUP-117 AT RISK; SUPPLY entries on the timeline; scene 3 gives 0 impacted again.
+- **Mitigation:** the Duty Officer activates it for SUP-104 (backup on standby, Southern Bypass in use) and stands it down; the Viewer and the Cairo Head of Mission cannot; the Viewer sees no name.
+- **Audit:** status changes, activation and stand-down are audited, and the chain verifies.
+- `make acceptance` (all existing specs) still passes.
+
+## 73. Questions for the product owner (proposed defaults)
+
+1. **Register:** 52 seeded suppliers across the 36 missions (14 in Tier 1) and 37 routes, illustrative and read-only apart from status and mitigations; Nairobi as the design. Adding or editing suppliers comes later. *Default: yes.*
+2. **Statuses:** reported by simulated logistics and supplier events only (`SUPPLY_ROUTE`, `SUPPLY_SUPPLIER`) through the worker; ROUTE BLOCKED, ALTERNATE and "impacted" worked out on every read, so they clear by themselves. *Default: yes.*
+3. **Link to incidents:** a route is tagged when its path passes through an ACTIVE incident's impact zone; a supplier is impacted when its mission has an ACTIVE incident and it is DELAYED, AT RISK or ROUTE BLOCKED; changes write SUPPLY timeline entries. *Default: yes.*
+4. **Mitigation:** one person (Duty Officer, Security Officer or the mission's Head of Mission) through `approvals.py`, since it records a decision and sends nothing; stand down by the same roles. *Default: yes (one person).*
+5. **Routes as lines:** `geography(LineString,4326)`. AGENTS.md asks for `geography(Point,4326)` for all **locations**; a route is a path, not a location, so this is the first line geometry. The alternative is a list of points in `jsonb`. *Default: LineString.*
+6. **Fuel stock:** shown from Fleet's GEN-<mission> fuel with an illustrative 100 h full-tank endurance (72% gives 72 h), not stored. *Default: yes.*
+7. **Agent proposal:** none in this module; Predictive Risk and the Briefing agent come later. *Default: not now.*
+8. **Screen:** "Supply Chain Risk" (icon `box`, since Fleet uses `truck`) under PLAN & INSIGHT, after Document Expiry, as the design. *Default: yes.*
+9. **Demo:** `NBO-SUPPLY` from the presenter bar during NBO-CIVIL-UNREST (route blocked, then fuel and guards, then recovery); people activate mitigations in the browser. The Phase 1 scenes are unchanged. *Default: yes.*
+10. **🔒 prompts:** the migration (PC-43..45: RLS, grants, guards) and the mitigation actions (`approvals.py`) need your named sign-off, as before (D-29).

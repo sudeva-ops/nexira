@@ -190,6 +190,7 @@ Record each sign-off in the PR.
 | 11. **Fleet & Assets** (FLT), simulated (D-41) | |
 | 12. **VIP & Delegation Protection** (VIP), simulated (D-42) | |
 | 13. **Site Twin** (TWN), simulated (D-43) | |
+| 14. **Supply Chain & Third-Party Risk** (SUP), simulated (D-44, **proposed**) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -272,6 +273,11 @@ Rules:
 - **Simulated building systems.** Floor plans, presence, sensors and readiness are illustrative and simulated (D-19); NEXIRA controls nothing on site.
 - **Presence stays on the site.** Who is in which zone is shown only on Site Twin; it is not a location observation and never changes People & Sites, the check-in or Phase 1 figures. Staff names only within the people scope; guards and visitors are never named.
 - **Derived overlays.** Shelter-in-place and the evacuation route are worked out from playbook runs and evacuations, so they clear by themselves. No agent acts on sites.
+
+**D-44 · Supply Chain & Third-Party Risk (simulated). Proposed, awaiting the product owner.** Requirements SUP-01 to SUP-07 in `docs/requirements-pilot.md` §69–73, with the proposed defaults in §73. Would amend D-30 by adding Supply Chain to the pilot.
+- **Simulated third parties.** Suppliers, routes and their statuses are illustrative and simulated (D-19); NEXIRA contacts no supplier and orders nothing.
+- **Derived disruption.** ROUTE BLOCKED, ALTERNATE and "impacted" are worked out from reported statuses and ACTIVE incidents on every read, so they clear by themselves.
+- **People decide.** A mitigation is recorded by a person through `app/core/approvals.py` and audited. No agent acts on suppliers.
 
 ---
 
