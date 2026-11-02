@@ -47,7 +47,8 @@ e2e: env
 # Prompt 52: then the Document Expiry acceptance (requirements-pilot.md §37).
 # Prompt 58: then the Natural Hazards acceptance (requirements-pilot.md §42).
 # Prompt 70: then the Evacuation Management acceptance (requirements-pilot.md §52).
-# Prompt 76: and the Fleet & Assets acceptance (requirements-pilot.md §57). Playwright runs
+# Prompt 76: and the Fleet & Assets acceptance (requirements-pilot.md §57).
+# Prompt 82: and the VIP Protection acceptance (requirements-pilot.md §62). Playwright runs
 # the files in name order.
 acceptance: env reset-demo up
 	$(COMPOSE) restart backend worker
@@ -56,7 +57,7 @@ acceptance: env reset-demo up
 	  e2e/ntf-acceptance.spec.ts e2e/jrn-acceptance.spec.ts e2e/air-acceptance.spec.ts \
 	  e2e/ta-acceptance.spec.ts e2e/wx-acceptance.spec.ts e2e/ast-acceptance.spec.ts \
 	  e2e/dx-acceptance.spec.ts e2e/ev-acceptance.spec.ts e2e/flt-acceptance.spec.ts \
-	  e2e/hl-acceptance.spec.ts e2e/hz-acceptance.spec.ts
+	  e2e/hl-acceptance.spec.ts e2e/hz-acceptance.spec.ts e2e/vip-acceptance.spec.ts
 
 lint: lint-backend lint-simulator lint-frontend
 
