@@ -85,6 +85,15 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
   expect([(await fleet()).available, (await fleet()).vehicles]).toEqual([4, 5]);
   expect((await vehicles())["VH-05"]?.status).toBe("MAINTENANCE");
   expect(Object.values(await vehicles()).every((a) => a.simulated)).toBe(true);
+  // TWN-01 (Prompt 88): the Nairobi embassy's twin before the unrest: 25 on site, no overlay.
+  const embassy = (await duty.get<{ id: string; name: string }[]>("/api/sites/twin")).find(
+    (s) => s.name === "Embassy Nairobi",
+  );
+  const twinOf = () =>
+    duty.get<{ counts: { on_site: number }; shelter: unknown; route: { code: string; evacuation_reference: string } | null }>(
+      `/api/sites/${embassy?.id}/twin`,
+    );
+  expect(await twinOf()).toMatchObject({ counts: { on_site: 25 }, shelter: null, route: null });
 
   // --- Scene 1 · Signals fused ---------------------------------------------------------
   await presenter.getByRole("button", { name: "Next scene" }).click();
@@ -227,6 +236,11 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
   // FLT-02 (Prompt 76): the available vehicles are assigned to the evacuation.
   const assigned = Object.entries(await tags()).filter(([, t]) => t.includes("ASSIGNED")).map(([c]) => c);
   expect(assigned).toEqual(["VH-01", "VH-03", "VH-04"]);
+  // TWN-04 (Prompt 88; plan-pilot-twn G-3): while EVN-1001 is ACTIVE the embassy shows Route B,
+  // and PB-07's shelter alert (step 4) has gone out for the ACTIVE incident.
+  const evacuating = await twinOf();
+  expect(evacuating.route).toMatchObject({ code: "B", evacuation_reference: "EVN-1001" });
+  expect(evacuating.shelter).not.toBeNull();
 
   // --- Scene 6 · Review: a user sets MONITORING; the audit chain verifies ---------------------
   await presenter.getByRole("button", { name: "Next scene" }).click();
