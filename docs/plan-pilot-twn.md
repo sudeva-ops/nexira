@@ -145,3 +145,8 @@ For the product owner and the coding agent. It maps TWN-01..07 (`docs/requiremen
 ## 13. Prompts
 
 As `docs/prompts-pilot.md` Prompts 84–88: the migration (🔒); the service (🔒); the seed, feeds and NBO-SITE; the screen; the acceptance. Each ships with its tests, and `make acceptance` passes at the end.
+
+## 14. Decisions by the product owner (2026-11-02, PR #99: "approved with recommended")
+
+- G-1: Site Twin reads `site.readiness_score` and `site.last_drill_on`; `site_readiness` is dropped from PC-42. The acceptance expects the seeded score (Nairobi embassy 79), not 91.
+- G-2..G-10: as proposed.
