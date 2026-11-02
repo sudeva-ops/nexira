@@ -14,13 +14,17 @@ from typing import Any
 
 import pytest
 from httpx import AsyncClient, Response
+from pydantic import ValidationError
 from sqlalchemy import select, text
 
+from app.core import realtime
 from app.core.db import tenant_session
+from app.core.events import Event
 from app.modules.audit.models import AuditLog
 from app.modules.documents.service import today_utc
 from app.modules.fleet import service as fleet
 from app.modules.fleet.service import AssetIn
+from app.modules.vip import consumer
 from app.modules.vip import service as vip
 from app.tests.auth_helpers import Idp
 
@@ -836,3 +840,121 @@ async def test_audit_gives_references_never_venues_times_or_the_principal(world:
     for word in (*VENUES, "Minister", "Rally", "Venue x", "venue survey"):
         assert word not in details, word
     assert not re.search(r"\d{2}:\d{2}", details)  # no times
+
+
+# --- the seed and the simulated progress (Prompt 80; plan §2, §5, §9) ---------------------------
+
+
+async def test_ensure_visits_seeds_once_and_audits_counts_only(world: World) -> None:
+    first = world.day + timedelta(10)
+    visit = vip.VisitIn(
+        reference="VV-2026-040",
+        title="Delegation visit",
+        mission_id=world.cai,
+        principal_role="Deputy Minister",
+        starts_on=first,
+        ends_on=first,
+        trip_id=None,
+        detail={"team_size": 4, "vehicles": [], "safe_havens": ["Embassy"]},
+        segments=(
+            vip.SegmentIn("ARRIVAL", "Arrival", "Cairo airport", *CAIRO, at(first, 6)),
+            vip.SegmentIn("DEPARTURE", "Departure", "Cairo airport", *CAIRO, at(first, 18)),
+        ),
+        checklist=(
+            vip.ItemIn("Threat assessment issued", first, world.users["security"]),
+            vip.ItemIn("Cairo airport venue survey", first),
+        ),
+    )
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        assert await vip.ensure_visits(session, [visit]) == 1
+        assert await vip.ensure_visits(session, [visit]) == 0
+        await session.commit()
+    seeded = next(
+        v
+        for v in await world.ok("security", "GET", "/api/vip/visits")
+        if v["mission_code"] == "CAI"
+    )
+    detail = await world.ok("hom.cai", "GET", f"/api/vip/visits/{seeded['id']}")
+    assert [s["kind"] for s in detail["segments"]] == ["ARRIVAL", "DEPARTURE"]
+    assert {c["label"]: c["done"] for c in detail["checklist"]} == {
+        "Threat assessment issued": True,
+        "Cairo airport venue survey": False,
+    }
+    assert (detail["kpis"]["venues_surveyed"], detail["kpis"]["venues"]) == (0, 1)
+    seed = [a for a in await world.audit() if a.action == "VIP.SEED"]
+    assert [(a.actor_type, a.entity_id, a.details) for a in seed] == [
+        ("SYSTEM", "VV-2026-040", {"segments": 2, "checklist": 2, "done": 1})
+    ]
+
+
+async def test_the_simulated_start_is_by_the_seeded_security_officer(world: World) -> None:
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        assert await vip.simulated_start(session, "VV-2026-999") is None
+        started = await vip.simulated_start(session, world.reference)
+        assert started is not None
+        await session.commit()
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        assert await vip.simulated_start(session, world.reference) is None  # already live
+    visit = await world.get()
+    assert visit["status"] == "LIVE"
+    start = [a for a in await world.audit() if a.action == "VIP.START"]
+    assert [(a.actor_type, a.actor_id, a.details) for a in start] == [
+        (
+            "SYSTEM",
+            "visit progress (simulated)",
+            {"from": "PLANNED", "to": "LIVE", "started_by": str(world.users["security"])},
+        )
+    ]
+
+
+async def test_the_progress_handler(world: World) -> None:
+    handle = consumer.progress_handler(world.idp.engine)
+
+    async def send(payload: dict[str, Any]) -> None:
+        await handle(Event("VIP_PROGRESS", world.idp.tenant_id, payload, "scenario:ADD-VISIT:1"))
+
+    # Only the scenario player's events (review of Prompt 80, M1).
+    forged = {"visit": world.reference, "status": "LIVE"}
+    for source in ("scenario", "api", "intel"):
+        await handle(Event("VIP_PROGRESS", world.idp.tenant_id, forged, source))
+    assert (await world.get())["status"] == "PLANNED"
+
+    for refused in (
+        {"visit": world.reference, "status": "IN_PROGRESS"},  # a step needs its seq
+        {"visit": world.reference, "seq": 1, "status": "LIVE"},
+        {"visit": "VV-31", "status": "LIVE"},
+        {"visit": world.reference, "seq": 1, "status": "DONE"},
+    ):
+        with pytest.raises(ValidationError):
+            consumer.ProgressIn.model_validate(refused)
+        await send(refused)  # logged and dropped
+    await send({"visit": world.reference, "seq": 1, "status": "IN_PROGRESS"})  # not live yet
+    assert (await world.segment(1))["status"] == "PLANNED"
+    await send({"visit": world.reference, "status": "LIVE"})
+    await send({"visit": world.reference, "seq": 1, "status": "IN_PROGRESS"})
+    await send({"visit": world.reference, "seq": 1, "status": "COMPLETED"})
+    await send({"visit": world.reference, "seq": 3, "status": "IN_PROGRESS"})  # out of order
+    visit = await world.get()
+    assert visit["status"] == "LIVE"
+    assert [s["status"] for s in visit["segments"][:3]] == ["COMPLETED", "PLANNED", "PLANNED"]
+
+
+async def test_the_simulated_start_needs_a_planned_visit_and_an_active_officer(
+    world: World,
+) -> None:
+    await world.sql("UPDATE app_user SET is_active = false WHERE id = :u", u=world.users["both"])
+    await world.sql(
+        "UPDATE app_user SET is_active = false WHERE id = :u", u=world.users["security"]
+    )
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        assert await vip.simulated_start(session, world.reference) is None  # no active officer
+    await world.sql("UPDATE app_user SET is_active = true WHERE id = :u", u=world.users["both"])
+    await world.ok("hq", "POST", f"/api/vip/visits/{world.visit}/cancel", {"reason": "Postponed"})
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        assert await vip.simulated_start(session, world.reference) is None  # final
+        assert await vip.simulated_progress(session, world.reference, 1, "IN_PROGRESS") is None
+
+
+def test_vip_events_never_reach_the_browser() -> None:
+    """G-3: realtime forwards to every socket of a tenant, so no VIP event is forwarded."""
+    assert not any(t.startswith("VIP") for t in realtime.FORWARDED)

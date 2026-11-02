@@ -18,7 +18,7 @@
 
 import uuid
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import ColumnElement, or_, select, text, true
@@ -33,7 +33,7 @@ from app.modules.fleet import service as fleet
 from app.modules.intel.fusion import CATEGORY_LABELS
 from app.modules.people.models import Mission
 from app.modules.tenancy.models import AppUser
-from app.modules.tenancy.service import Actor
+from app.modules.tenancy.service import SYSTEM, Actor
 from app.modules.vip import schemas
 from app.modules.vip.models import VipChecklistItem, VipSegment, VipSegmentChange, VipVisit
 
@@ -620,6 +620,43 @@ async def simulated_progress(
     return visit
 
 
+async def _security_officer(session: AsyncSession) -> uuid.UUID | None:
+    """The tenant's first unscoped Security Officer: the seeded `security.officer` in the
+    demo, as for the seeded checklist items (plan G-7)."""
+    found: uuid.UUID | None = await session.scalar(
+        text(
+            "SELECT u.id FROM app_user u JOIN user_role ur ON ur.user_id = u.id "
+            "JOIN role r ON r.id = ur.role_id WHERE r.code = 'SECURITY_OFFICER' "
+            "AND ur.mission_id IS NULL AND u.is_active ORDER BY u.created_at, u.id LIMIT 1"
+        )
+    )
+    return found
+
+
+async def simulated_start(session: AsyncSession, reference: str) -> VipVisit | None:
+    """ADD-VISIT scene 1 (plan §9): the visit LIVE, as the SYSTEM actor. The PC-35 guard
+    needs who started it: the seeded Security Officer. None if there is no such planned
+    visit or no Security Officer."""
+    visit_id = await session.scalar(select(VipVisit.id).where(VipVisit.reference == reference))
+    if visit_id is None:
+        return None
+    visit = await _lock(session, visit_id)
+    started_by = await _security_officer(session)
+    if visit.status != "PLANNED" or started_by is None:
+        return None
+    visit.status = "LIVE"
+    visit.started_by = started_by
+    await session.flush()
+    await _audit(
+        session,
+        PROGRESS,
+        "START",
+        visit,
+        {"from": "PLANNED", "to": "LIVE", "started_by": str(started_by)},
+    )
+    return visit
+
+
 # --- the checklist (VIP-03, §4) -----------------------------------------------------------------
 
 
@@ -843,3 +880,105 @@ async def permissions(session: AsyncSession, user: CurrentUser, visit_id: uuid.U
         ),
         decide=tuple(decidable),
     )
+
+
+# --- the seed (VIP-01, §2) ----------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SegmentIn:
+    kind: str
+    title: str
+    venue_name: str
+    lat: float
+    lon: float
+    starts_at: datetime
+    ends_at: datetime | None = None
+    attendees: int | None = None
+
+
+@dataclass(frozen=True)
+class ItemIn:
+    label: str
+    due_on: date
+    done_by: uuid.UUID | None = None  # seeded done by this user (G-7)
+
+
+@dataclass(frozen=True)
+class VisitIn:
+    reference: str
+    title: str
+    mission_id: uuid.UUID
+    principal_role: str  # a role, never a name (§63 Q3)
+    starts_on: date
+    ends_on: date
+    trip_id: uuid.UUID | None
+    detail: dict[str, Any]
+    segments: tuple[SegmentIn, ...]
+    checklist: tuple[ItemIn, ...]
+
+
+async def ensure_visits(session: AsyncSession, visits: list[VisitIn], actor: Actor = SYSTEM) -> int:
+    """Seed the visits not yet present, with their programme and checklist (VIP-01). An
+    existing visit is never changed. Audited per visit, by reference and counts only."""
+    has = set(await session.scalars(select(VipVisit.reference)))
+    new = [v for v in visits if v.reference not in has]
+    for v in new:
+        visit = VipVisit(
+            tenant_id=session.info["tenant_id"],
+            reference=v.reference,
+            title=v.title,
+            mission_id=v.mission_id,
+            principal_role=v.principal_role,
+            starts_on=v.starts_on,
+            ends_on=v.ends_on,
+            trip_id=v.trip_id,
+            detail=v.detail,
+        )
+        session.add(visit)
+        await session.flush()
+        for seq, segment in enumerate(v.segments, start=1):
+            await session.execute(
+                text(
+                    "INSERT INTO vip_segment (tenant_id, visit_id, seq, kind, title, venue_name, "
+                    "venue_location, starts_at, ends_at, attendees) VALUES (current_tenant_id(), "
+                    ":visit, :seq, :kind, :title, :venue, "
+                    "ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography, :starts, :ends, "
+                    ":attendees)"
+                ),
+                {
+                    "visit": visit.id,
+                    "seq": seq,
+                    "kind": segment.kind,
+                    "title": segment.title,
+                    "venue": segment.venue_name,
+                    "lon": segment.lon,
+                    "lat": segment.lat,
+                    "starts": segment.starts_at,
+                    "ends": segment.ends_at,
+                    "attendees": segment.attendees,
+                },
+            )
+        for item in v.checklist:
+            session.add(
+                VipChecklistItem(
+                    tenant_id=visit.tenant_id,
+                    visit_id=visit.id,
+                    label=item.label,
+                    due_on=item.due_on,
+                    done_by=item.done_by,
+                )
+            )
+        await session.flush()
+        await _audit(
+            session,
+            actor,
+            "SEED",
+            visit,
+            {
+                "segments": len(v.segments),
+                "checklist": len(v.checklist),
+                "done": sum(1 for i in v.checklist if i.done_by),
+            },
+        )
+    return len(new)

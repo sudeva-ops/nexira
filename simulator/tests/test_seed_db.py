@@ -334,7 +334,8 @@ async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> No
 
 
 async def test_journey_seed_country_risk_trips_and_counter(seeded: Seeded) -> None:
-    """D-32, PC-16: simulated country risk, a few future trips, and TRP-8821 next."""
+    """D-32, PC-16: simulated country risk, a few future trips, and TRP-8835 next (after the
+    VIP visit's TRP-8834, D-42)."""
     levels = {
         r["country_code"]: r["level"]
         for r in await seeded.conn.fetch("SELECT country_code, level FROM country_risk")
@@ -359,6 +360,8 @@ async def test_journey_seed_country_risk_trips_and_counter(seeded: Seeded) -> No
         "TRP-8818": ("APPROVED", "MODERATE", True),  # XW 451, the scenario flight
         "TRP-8819": ("APPROVED", "LOW", True),
         "TRP-8820": ("APPROVED", "LOW", True),
+        # VIP & Delegation Protection (D-42): the visit's trip, restricted, no segments.
+        "TRP-8834": ("APPROVED", "MODERATE", True),
     }
     scoped = await seeded.conn.fetchrow(
         "SELECT m.code, (SELECT count(*) FROM trip WHERE requested_by IS NOT NULL) AS requested "
@@ -366,7 +369,7 @@ async def test_journey_seed_country_risk_trips_and_counter(seeded: Seeded) -> No
     )
     assert scoped is not None
     assert (scoped["code"], scoped["requested"]) == ("BGW", 1)  # plan G-2; the draft
-    assert await seeded.conn.fetchval("SELECT next_reference('TRP', false)") == "TRP-8821"
+    assert await seeded.conn.fetchval("SELECT next_reference('TRP', false)") == "TRP-8835"
 
 
 async def test_air_seed_airports_and_the_scenario_flight_only(seeded: Seeded) -> None:
@@ -379,7 +382,8 @@ async def test_air_seed_airports_and_the_scenario_flight_only(seeded: Seeded) ->
     )
     assert [tuple(f) for f in flights] == [("XW 451", "SCHEDULED", "SCENARIO", "TRP-8818")]
     restricted = await seeded.conn.fetch("SELECT reference FROM trip WHERE restricted")
-    assert [r["reference"] for r in restricted] == ["TRP-8813"]
+    # TRP-8834 (the VIP visit, D-42) has no FLIGHT segment, so nothing to track either.
+    assert sorted(r["reference"] for r in restricted) == ["TRP-8813", "TRP-8834"]
     # A real AT-05 fixture: a trackable FLIGHT segment that names nothing on screen.
     segment = await seeded.conn.fetchrow(
         "SELECT s.title, s.place_label, s.flight_number, s.from_airport, s.to_airport "
