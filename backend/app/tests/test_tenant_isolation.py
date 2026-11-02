@@ -46,6 +46,8 @@ class Ids:
     vip_segment: uuid.UUID
     site: uuid.UUID
     zone: uuid.UUID
+    supplier: uuid.UUID
+    route: uuid.UUID
 
 
 PT = "'SRID=4326;POINT(36.8245 -1.2838)'"
@@ -175,6 +177,14 @@ ROWS: dict[str, str] = {
     "VALUES ('{t}', '{site}', '{zone}', 'G2-READER', 'BADGE_READER', 'Gate 2 · badge reader')",
     "site_readiness_item": "INSERT INTO site_readiness_item (tenant_id, site_id, label) "
     "VALUES ('{t}', '{site}', 'Floor wardens assigned (3)')",
+    "supplier": "INSERT INTO supplier (id, tenant_id, code, name, service, mission_id, tier, "
+    "vetting_valid_until) VALUES ('{supplier}', '{t}', 'SUP-104', 'Courier', 'Pouch', '{mission}', "
+    "1, current_date)",
+    "logistics_route": "INSERT INTO logistics_route (id, tenant_id, mission_id, code, label, kind, "
+    "supplier_id, path) VALUES ('{route}', '{t}', '{mission}', 'R-NBO-1', 'Pouch', 'POUCH', "
+    "'{supplier}', 'SRID=4326;LINESTRING(36.808 -1.295, 36.9278 -1.3192)')",
+    "supply_mitigation": "INSERT INTO supply_mitigation (tenant_id, supplier_id, activated_by) "
+    "VALUES ('{t}', '{supplier}', '{user}')",
     "fleet_asset": "INSERT INTO fleet_asset (id, tenant_id, mission_id, code, kind, type_label, "
     "seats, location, location_label, fuel_pct) VALUES ('{asset}', '{t}', '{mission}', 'VH-01', "
     "'VEHICLE', 'Armoured SUV (B6)', 4, " + PT + ", 'Embassy garage', 82)",
@@ -230,6 +240,9 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "site_route",  # seeded; no UPDATE or DELETE (PC-40)
     "site_sensor",  # UPDATE of status and detail only, no DELETE (PC-42)
     "site_readiness_item",  # UPDATE of done_by only, no DELETE (PC-42)
+    "supplier",  # UPDATE of the reported status only, no DELETE (PC-43)
+    "logistics_route",  # UPDATE of the reported status only, no DELETE (PC-44)
+    "supply_mitigation",  # UPDATE of the stand-down only, once; no DELETE (PC-45)
 }
 NO_UPDATE = {  # an UPDATE of other columns is refused; a DELETE is a departure
     "site_presence",  # UPDATE of zone_id only (PC-41)
@@ -386,6 +399,8 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
             r"|vip visit: no such mission|vip segment: no such visit|vip change: no such segment"
             r"|vip checklist: no such visit|site zone: no such site|site route: no such site"
             r"|site presence: no such site|site sensor: no such site|site readiness: no such site"
+            r"|supplier: no such mission|logistics route: no such mission"
+            r"|supply mitigation: no such supplier"
         ),
     ):
         await api.execute(sql_for(table, world.a))
