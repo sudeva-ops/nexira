@@ -4,6 +4,7 @@ import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAgents, usePendingCount } from "../api/proposals";
 import { PresenterBar } from "../presenter/PresenterBar";
 import { RealtimeProvider } from "../api/realtime";
+import { useVipAccess } from "../api/vip";
 
 import { Clock } from "./Clock";
 import { LastEvent, LiveIndicator } from "./Heartbeat";
@@ -11,9 +12,11 @@ import { SCREENS, type Screen } from "./screens";
 import { UserMenu } from "./UserMenu";
 
 function NavList() {
+  const vip = useVipAccess().data?.visible ?? false;
   let group: Screen["group"] | null = null;
   const items = [];
   for (const screen of SCREENS) {
+    if (screen.restricted === "vip" && !vip) continue; // VIP-06: no entry for anyone else
     if (screen.group !== group) {
       group = screen.group;
       items.push(
