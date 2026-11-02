@@ -2376,3 +2376,74 @@ tr.nx-flash-b > td {
   gap: 6px;
   margin-top: 8px;
 }
+
+/* --- VIP & Delegation Protection (VIP-07, D-42) ----------------------------------- */
+.nx-sev.nt {
+  background: #383e47;
+  color: #abb3bf;
+}
+
+.nx-vip-grid {
+  grid-template-columns: 1.3fr 1fr;
+}
+
+@media (max-width: 1100px) {
+  .nx-vip-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nx-vip-table td {
+  font-size: 11.5px;
+  vertical-align: top;
+}
+
+.nx-vip-time {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.nx-vip-reason {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.nx-vip-live {
+  gap: 6px;
+  font-size: 11px;
+}
+
+.nx-vip-flag,
+.nx-vip-change {
+  margin: 0 0 6px;
+}
+
+.nx-vip-form {
+  margin: 0 0 6px;
+}
+
+.nx-vip-form-row {
+  gap: 6px;
+}
+
+.nx-vip-note {
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.nx-vip-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 4px 10px;
+}
+
+.nx-vip-checklist li {
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.nx-vip-source {
+  font-size: 11px;
+  margin-top: 8px;
+}

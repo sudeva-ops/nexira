@@ -7,6 +7,7 @@ export interface Screen {
   icon: IconName;
   group: "COMMAND" | "MONITOR" | "RESPOND" | "PLAN & INSIGHT" | "ADMIN";
   builtIn: string; // prompt that builds the real screen
+  restricted?: "vip"; // in the nav only when GET /api/vip/access says visible (VIP-06)
 }
 
 // D-25: the Phase 1 screens, plus the pilot modules approved under D-30. Groups and subtitles follow the demo,
@@ -28,6 +29,8 @@ export const SCREENS: readonly Screen[] = [
   { path: "/evacuation", title: "Evacuation Management", subtitle: "Response · Manifests, seats & routes", icon: "log-out", group: "RESPOND", builtIn: "Prompt 69" },
   // D-41: under RESPOND, after Evacuation Management (§58 Q9).
   { path: "/fleet", title: "Fleet & Assets", subtitle: "Assets · Vehicles, fuel & availability", icon: "truck", group: "RESPOND", builtIn: "Prompt 75" },
+  // D-42: under RESPOND, after Fleet & Assets (§63 Q8); only for those who may see visits.
+  { path: "/vip", title: "VIP Protection", subtitle: "Protection · Visits, programme risk & checklist", icon: "shield", group: "RESPOND", builtIn: "Prompt 81", restricted: "vip" },
   { path: "/notifications", title: "Mass Notification", subtitle: "Comms · Multi-channel delivery", icon: "send-message", group: "RESPOND", builtIn: "Prompt 21" },
   { path: "/partners", title: "Assistance Partners", subtitle: "Response · Medical, evacuation & secure transport", icon: "heart", group: "RESPOND", builtIn: "Prompt 46" },
   { path: "/checkin", title: "Safety Check-in", subtitle: "Workflows · Personnel accountability", icon: "tick-circle", group: "RESPOND", builtIn: "Prompt 11" },
