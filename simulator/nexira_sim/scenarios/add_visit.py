@@ -8,8 +8,8 @@ meeting and the business forum complete. Programme status only, never a position
 change to the site visit is proposed and decided by people in the browser; the scenario
 approves nothing. The rally is MODERATE and no site or person is near it, so PB-07 (HIGH civil
 unrest near staff) is not proposed. A replay needs `make reset-demo` (a live visit stays
-live). Every scene starts with a SCENE_START marker; scene texts name no venue or time
-(the presenter bar is open to non-readers, VIP-06).
+live). Every scene starts with a SCENE_START marker. The name and scene texts name no visit,
+place or time: the presenter bar is open to ADMIN, who may not see visits (VIP-06).
 """
 
 import uuid
@@ -21,16 +21,15 @@ from nexira_sim.seed.ids import seed_id
 from nexira_sim.seed.world import World
 
 CODE = "ADD-VISIT"
-NAME = "Addis Ababa visit"
-DESCRIPTION = (
-    "VIP & Delegation Protection: a restricted visit goes live, a planned rally raises one "
-    "segment's risk, and the programme moves on. Programme status only. Simulated."
-)
+# Neutral words: the presenter bar and the scenario API are open to ADMIN, who may not see
+# visits (VIP-06; review of Prompt 80, M2). The details are on VIP Protection.
+NAME = "Protection programme"
+DESCRIPTION = "VIP & Delegation Protection demo: programme status and a signal. Simulated."
 SCENES = [
-    (0, "Planned", "The visit planned, risk MODERATE (open VIP Protection)"),
-    (1, "Live", "The visit LIVE: first segment completed, the second in progress"),
-    (2, "Rally", "A planned-rally signal opens an incident; one segment HIGH"),
-    (3, "Forum", "Segments 2-4 completed"),
+    (0, "Ready", "Open VIP Protection"),
+    (1, "Start", "Programme status moves (see VIP Protection)"),
+    (2, "Signal", "A simulated signal (see VIP Protection)"),
+    (3, "Progress", "Programme status moves (see VIP Protection)"),
 ]
 STEP_MS = 3_000
 RALLY = (data.INDUSTRIAL_PARK[0] + 0.01078, data.INDUSTRIAL_PARK[1])  # 1.2 km north

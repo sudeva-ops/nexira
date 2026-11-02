@@ -627,7 +627,7 @@ async def _security_officer(session: AsyncSession) -> uuid.UUID | None:
         text(
             "SELECT u.id FROM app_user u JOIN user_role ur ON ur.user_id = u.id "
             "JOIN role r ON r.id = ur.role_id WHERE r.code = 'SECURITY_OFFICER' "
-            "AND ur.mission_id IS NULL ORDER BY u.created_at, u.id LIMIT 1"
+            "AND ur.mission_id IS NULL AND u.is_active ORDER BY u.created_at, u.id LIMIT 1"
         )
     )
     return found

@@ -17,6 +17,7 @@ from httpx import AsyncClient, Response
 from pydantic import ValidationError
 from sqlalchemy import select, text
 
+from app.core import realtime
 from app.core.db import tenant_session
 from app.core.events import Event
 from app.modules.audit.models import AuditLog
@@ -910,7 +911,13 @@ async def test_the_progress_handler(world: World) -> None:
     handle = consumer.progress_handler(world.idp.engine)
 
     async def send(payload: dict[str, Any]) -> None:
-        await handle(Event("VIP_PROGRESS", world.idp.tenant_id, payload, "scenario"))
+        await handle(Event("VIP_PROGRESS", world.idp.tenant_id, payload, "scenario:ADD-VISIT:1"))
+
+    # Only the scenario player's events (review of Prompt 80, M1).
+    forged = {"visit": world.reference, "status": "LIVE"}
+    for source in ("scenario", "api", "intel"):
+        await handle(Event("VIP_PROGRESS", world.idp.tenant_id, forged, source))
+    assert (await world.get())["status"] == "PLANNED"
 
     for refused in (
         {"visit": world.reference, "status": "IN_PROGRESS"},  # a step needs its seq
@@ -930,3 +937,24 @@ async def test_the_progress_handler(world: World) -> None:
     visit = await world.get()
     assert visit["status"] == "LIVE"
     assert [s["status"] for s in visit["segments"][:3]] == ["COMPLETED", "PLANNED", "PLANNED"]
+
+
+async def test_the_simulated_start_needs_a_planned_visit_and_an_active_officer(
+    world: World,
+) -> None:
+    await world.sql("UPDATE app_user SET is_active = false WHERE id = :u", u=world.users["both"])
+    await world.sql(
+        "UPDATE app_user SET is_active = false WHERE id = :u", u=world.users["security"]
+    )
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        assert await vip.simulated_start(session, world.reference) is None  # no active officer
+    await world.sql("UPDATE app_user SET is_active = true WHERE id = :u", u=world.users["both"])
+    await world.ok("hq", "POST", f"/api/vip/visits/{world.visit}/cancel", {"reason": "Postponed"})
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        assert await vip.simulated_start(session, world.reference) is None  # final
+        assert await vip.simulated_progress(session, world.reference, 1, "IN_PROGRESS") is None
+
+
+def test_vip_events_never_reach_the_browser() -> None:
+    """G-3: realtime forwards to every socket of a tenant, so no VIP event is forwarded."""
+    assert not any(t.startswith("VIP") for t in realtime.FORWARDED)

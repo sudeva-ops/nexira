@@ -112,7 +112,7 @@ OTHER_CITIZENS = 1000  # D-27: about 1,000 citizens across the other missions
 # --- trip TRP-8812 (demo TRIPS) ------------------------------------------------------------------
 TRIP_REFERENCE = "TRP-8812"
 TRIP_PURPOSE = "Trade delegation (3)"
-TRP_START = 8820  # next user trip: TRP-8821 (D-18)
+TRP_START = 8834  # next user trip: TRP-8835, after the VIP visit's TRP-8834 (D-18, D-42)
 
 # --- Journey Management (D-32, PC-16) ------------------------------------------------------------
 # Simulated base risk per country: (security, unrest, health, transport), 0-100. Kenya and
@@ -1367,7 +1367,9 @@ VIP_FIRST_DAY = 4  # days after the scenario date
 VIP_DAYS = 3
 # The restricted trip (D-33): two fictional travellers, the Amman diplomats of TRP-8813, the
 # other ministerial trip, so no traveller count changes (G-6).
-VIP_TRIP = ("TRP-8834", "Ministerial visit · Addis Ababa", "AMM", 2, 2, "Abu Dhabi", "ET")
+# The purpose names no visit: a trip's header is shown to every trip reader (review of
+# Prompt 80, M3).
+VIP_TRIP = ("TRP-8834", "Delegation travel (restricted)", "AMM", 2, 2, "Abu Dhabi", "ET")
 AIRPORT_ADD = (8.9779, 38.7993)
 INDUSTRIAL_PARK = (8.9779, 38.9000)
 # (kind, title, venue, (lat, lon), day, local hh:mm, minutes or None, attendees or None)

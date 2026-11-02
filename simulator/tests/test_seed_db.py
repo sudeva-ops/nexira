@@ -334,7 +334,8 @@ async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> No
 
 
 async def test_journey_seed_country_risk_trips_and_counter(seeded: Seeded) -> None:
-    """D-32, PC-16: simulated country risk, a few future trips, and TRP-8821 next."""
+    """D-32, PC-16: simulated country risk, a few future trips, and TRP-8835 next (after the
+    VIP visit's TRP-8834, D-42)."""
     levels = {
         r["country_code"]: r["level"]
         for r in await seeded.conn.fetch("SELECT country_code, level FROM country_risk")
@@ -368,7 +369,7 @@ async def test_journey_seed_country_risk_trips_and_counter(seeded: Seeded) -> No
     )
     assert scoped is not None
     assert (scoped["code"], scoped["requested"]) == ("BGW", 1)  # plan G-2; the draft
-    assert await seeded.conn.fetchval("SELECT next_reference('TRP', false)") == "TRP-8821"
+    assert await seeded.conn.fetchval("SELECT next_reference('TRP', false)") == "TRP-8835"
 
 
 async def test_air_seed_airports_and_the_scenario_flight_only(seeded: Seeded) -> None:

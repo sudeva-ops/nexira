@@ -1,7 +1,8 @@
 """The simulated programme progress for the worker (plan-pilot-vip §5, §9). A VIP_PROGRESS
 event starts a visit (status LIVE) or moves one segment one step, as the SYSTEM actor
 "visit progress (simulated)", through the same checks as a person's step. Nothing is
-published (G-3): the screen polls. Programme status only, never a position (VIP-04)."""
+published (G-3): the screen polls. Only events from the scenario player are taken.
+Programme status only, never a position (VIP-04)."""
 
 import logging
 
@@ -13,6 +14,7 @@ from app.core.events import Event, Handler
 from app.modules.vip import service
 
 log = logging.getLogger(__name__)
+SOURCE = "scenario:"  # the scenario player's events (app/modules/scenarios/player.py)
 
 
 class ProgressIn(BaseModel):
@@ -29,6 +31,10 @@ class ProgressIn(BaseModel):
 
 def progress_handler(engine: AsyncEngine) -> Handler:
     async def handle(event: Event) -> None:
+        if not event.source.startswith(SOURCE):
+            # Only the scenario player moves a programme (review of Prompt 80, M1).
+            log.warning("visit progress from %r ignored", event.source)
+            return
         try:
             p = ProgressIn.model_validate(event.payload)
         except ValidationError as e:

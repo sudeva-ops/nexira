@@ -135,7 +135,7 @@ async def played(db: DbUrls) -> Played:
         for n in (0, 1, 2, 3):
             await bus.deliver(
                 [
-                    Event(e.event_type, tenant_id, dict(e.payload), "scenario")
+                    Event(e.event_type, tenant_id, dict(e.payload), "scenario:ADD-VISIT:test")
                     for e in sorted(events, key=lambda e: e.offset_ms)
                     if e.scene_no == n and e.event_type != "SCENE_START"
                 ]
