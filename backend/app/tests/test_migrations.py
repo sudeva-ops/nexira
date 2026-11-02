@@ -59,9 +59,10 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     # (0003), airport, flight and flight_event (0004), weather_current (0005), partner and
     # partner_request (0006), travel_document (0007), mission_climate_risk (0008), the four
     # health tables (0009), the three evacuation tables (0010), the two fleet tables (0011),
-    # and alembic_version.
+    # the four VIP tables (0012), and alembic_version.
     assert (
-        len(upgraded["tables"] - before["tables"]) == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 2 + 1
+        len(upgraded["tables"] - before["tables"])
+        == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 2 + 4 + 1
     )
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
@@ -787,28 +788,33 @@ FLEET_TABLES = ("fleet_asset", "fleet_maintenance")
 
 
 async def _fleet_shape(admin_url: str) -> dict[str, object]:
+    return await _shape(admin_url, FLEET_TABLES, "fleet%guard")
+
+
+async def _shape(admin_url: str, names: tuple[str, ...], guards: str) -> dict[str, object]:
     conn = await asyncpg.connect(admin_url)
     try:
         tables = await conn.fetch(
             "SELECT relname, relforcerowsecurity, relacl::text AS acl FROM pg_class "
             "WHERE relname = ANY($1::text[]) AND relkind = 'r' ORDER BY relname",
-            list(FLEET_TABLES),
+            list(names),
         )
         columns = await conn.fetch(
             "SELECT table_name, column_name FROM information_schema.column_privileges "
             "WHERE table_name = ANY($1::text[]) AND grantee = 'nexira_app' "
             "AND privilege_type = 'UPDATE' ORDER BY table_name, column_name",
-            list(FLEET_TABLES),
+            list(names),
         )
         search_paths = await conn.fetch(
             "SELECT proname, proconfig::text AS config FROM pg_proc "
-            "WHERE proname LIKE 'fleet%guard' ORDER BY proname"
+            "WHERE proname LIKE $1 ORDER BY proname",
+            guards,
         )
         policies = await conn.fetchval(
             "SELECT count(*) FROM pg_policies WHERE tablename = ANY($1::text[])",
-            list(FLEET_TABLES),
+            list(names),
         )
-        # Everything in public, so a leftover of 0011 shows (review of Prompt 49, L4).
+        # Everything in public, so a leftover shows (review of Prompt 49, L4).
         public = await conn.fetchrow(
             "SELECT (SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
             "        WHERE n.nspname = 'public') AS relations, "
@@ -862,5 +868,55 @@ def test_downgrading_0011_restores_0010_exactly(fresh: DbUrls) -> None:
     assert at_head["search_paths"] == [
         (name, '{"search_path=pg_catalog, public, pg_temp"}')
         for name in ("fleet_asset_guard", "fleet_maintenance_guard")
+    ]
+    command.upgrade(cfg, "head")
+
+
+VIP_TABLES = ("vip_checklist_item", "vip_segment", "vip_segment_change", "vip_visit")
+
+
+def test_downgrading_0012_restores_0011_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0011")
+    at_0011 = asyncio.run(_shape(admin, VIP_TABLES, "vip%guard"))
+    at_0011_fleet = asyncio.run(_fleet_shape(admin))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_shape(admin, VIP_TABLES, "vip%guard"))
+    command.downgrade(cfg, "0011")
+    assert asyncio.run(_shape(admin, VIP_TABLES, "vip%guard")) == at_0011
+    assert asyncio.run(_fleet_shape(admin)) == at_0011_fleet
+    assert at_0011["tables"] == []
+    # PC-35..38: FORCE RLS; read and added by the app; the backup role reads them. The app
+    # updates them through column grants only.
+    seeded = (
+        "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+        "nexira_app=ar/nexira_owner}"
+    )
+    assert at_head["tables"] == [(table, True, seeded) for table in VIP_TABLES]
+    assert at_head["columns"] == [
+        ("vip_checklist_item", "done_by"),
+        ("vip_segment", "ends_at"),
+        ("vip_segment", "starts_at"),
+        ("vip_segment", "status"),
+        ("vip_segment", "virtual"),
+        ("vip_segment_change", "decided_by"),
+        ("vip_segment_change", "decision_note"),
+        ("vip_segment_change", "status"),
+        ("vip_visit", "cancel_reason"),
+        ("vip_visit", "cancelled_by"),
+        ("vip_visit", "started_by"),
+        ("vip_visit", "status"),
+    ]
+    assert at_head["policies"] == 4
+    assert at_head["search_paths"] == [
+        (name, '{"search_path=pg_catalog, public, pg_temp"}')
+        for name in (
+            "vip_checklist_item_guard",
+            "vip_segment_change_guard",
+            "vip_segment_guard",
+            "vip_visit_guard",
+        )
     ]
     command.upgrade(cfg, "head")

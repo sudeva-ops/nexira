@@ -42,6 +42,8 @@ class Ids:
     plan: uuid.UUID
     evacuation: uuid.UUID
     asset: uuid.UUID
+    visit: uuid.UUID
+    vip_segment: uuid.UUID
 
 
 PT = "'SRID=4326;POINT(36.8245 -1.2838)'"
@@ -151,6 +153,16 @@ ROWS: dict[str, str] = {
     "evacuation_manifest": "UPDATE evacuation SET status = 'ACTIVE', activated_by = '{activator}', "
     "step = 2 WHERE id = '{evacuation}'; INSERT INTO evacuation_manifest (tenant_id, "
     "evacuation_id, person_id, category) VALUES ('{t}', '{evacuation}', '{person}', 'STAFF')",
+    "vip_visit": "INSERT INTO vip_visit (id, tenant_id, reference, title, mission_id, "
+    "principal_role, starts_on, ends_on) VALUES ('{visit}', '{t}', 'VV-2026-001', 'Visit', "
+    "'{mission}', 'Minister', current_date, current_date)",
+    "vip_segment": "INSERT INTO vip_segment (id, tenant_id, visit_id, seq, kind, title, "
+    "venue_name, venue_location, starts_at) VALUES ('{vip_segment}', '{t}', '{visit}', 1, "
+    "'ARRIVAL', 'Arrival', 'Airport', " + PT + ", now())",
+    "vip_segment_change": "INSERT INTO vip_segment_change (tenant_id, segment_id, make_virtual, "
+    "reason, proposed_by) VALUES ('{t}', '{vip_segment}', true, 'r', '{user}')",
+    "vip_checklist_item": "INSERT INTO vip_checklist_item (tenant_id, visit_id, label, due_on) "
+    "VALUES ('{t}', '{visit}', 'Survey', current_date)",
     "fleet_asset": "INSERT INTO fleet_asset (id, tenant_id, mission_id, code, kind, type_label, "
     "seats, location, location_label, fuel_pct) VALUES ('{asset}', '{t}', '{mission}', 'VH-01', "
     "'VEHICLE', 'Armoured SUV (B6)', 4, " + PT + ", 'Embassy garage', 82)",
@@ -198,6 +210,10 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "evacuation_manifest",  # UPDATE of the check-in only, no DELETE (PC-32)
     "fleet_asset",  # UPDATE of position, fuel and status only, no DELETE (PC-33)
     "fleet_maintenance",  # UPDATE of the done columns only, no DELETE (PC-34)
+    "vip_visit",  # UPDATE of status, start and cancel only, no DELETE (PC-35)
+    "vip_segment",  # UPDATE of status, times and virtual only, no DELETE (PC-36)
+    "vip_segment_change",  # UPDATE of the decision only, no DELETE (PC-38)
+    "vip_checklist_item",  # UPDATE of done_by only, no DELETE (PC-37)
 }
 NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELETE)
     "message_template",
@@ -344,6 +360,8 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
             r"|medical facility: no such mission|health readiness: no such mission"
             r"|evacuation plan: no such mission|evacuation manifest: no such evacuation"
             r"|fleet asset: no such mission|fleet maintenance: no such asset"
+            r"|vip visit: no such mission|vip segment: no such visit|vip change: no such segment"
+            r"|vip checklist: no such visit"
         ),
     ):
         await api.execute(sql_for(table, world.a))
