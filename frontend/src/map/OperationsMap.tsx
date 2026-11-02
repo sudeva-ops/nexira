@@ -13,9 +13,20 @@ import { useReducedMotion } from "../ui/useMotion";
 import { exposureFeatures, missionFeatures, SEVERITY_COLOUR, zoneFeatures } from "./geo";
 import { registerPmtiles, tilesAvailable } from "./base";
 import { GROW_MS, growScale } from "./motion";
+import { breath, phase, sonar } from "./plane";
 import { ATTRIBUTION, baseStyle, CITY_MINZOOM } from "./style";
 
 const EMPTY = { type: "FeatureCollection" as const, features: [] };
+const PULSE_MS = 2400; // a mission halo's sonar
+const BREATH_MS = 3200; // an impact zone's breath
+const FRAME_MS = 40; // about 25 frames a second is enough for a pulse
+// How fast an incident's rings go out, by severity (CSS --pulse).
+const PULSE_BY_SEVERITY: Record<string, string> = {
+  CRITICAL: "1.2s",
+  HIGH: "1.8s",
+  MODERATE: "2.6s",
+  LOW: "3.4s",
+};
 
 interface Props {
   missions: Mission[];
@@ -88,6 +99,16 @@ export function OperationsMap({
           source: "zones",
           paint: { "line-color": ["get", "colour"], "line-width": 1.5, "line-dasharray": [3, 2] },
         });
+        // Missions with an ACTIVE incident send out a sonar ring (two, half a beat apart).
+        for (const id of ["mission-halo-a", "mission-halo-b"]) {
+          m.addLayer({
+            id,
+            type: "circle",
+            source: "missions",
+            filter: ["==", ["get", "active"], true],
+            paint: { "circle-color": ["get", "colour"], "circle-radius": 9, "circle-opacity": 0.3 },
+          });
+        }
         m.addLayer({
           id: "missions",
           type: "circle",
@@ -188,6 +209,7 @@ export function OperationsMap({
       }
       const el = marker.getElement();
       el.style.setProperty("--c", SEVERITY_COLOUR[incident.severity]);
+      el.style.setProperty("--pulse", PULSE_BY_SEVERITY[incident.severity] ?? "2.4s");
       el.classList.toggle("nx-hazard", isHazard(incident.category)); // its own icon (HZ-09)
       el.setAttribute("aria-label", `${incident.reference} · ${incident.severity} · ${incident.title}`);
       el.title = `${incident.reference} · ${incident.title}`;
@@ -206,6 +228,33 @@ export function OperationsMap({
   useEffect(() => {
     (map?.getSource("exposure") as GeoJSONSource | undefined)?.setData(exposureFeatures(exposure));
   }, [map, exposure]);
+
+  // The live picture: impact zones breathe and missions with an ACTIVE incident pulse. None of
+  // it with reduced motion; browsers pause animation frames in a hidden tab.
+  useEffect(() => {
+    if (!map || reduced) return;
+    let frame = 0;
+    let last = 0;
+    const step = (now: number) => {
+      if (now - last >= FRAME_MS) {
+        last = now;
+        if (map.getLayer("zones-fill")) {
+          map.setPaintProperty("zones-fill", "fill-opacity", breath(now, BREATH_MS, 0.08, 0.26));
+          map.setPaintProperty("zones-line", "line-opacity", breath(now, BREATH_MS, 0.5, 1));
+        }
+        const k = phase(now, PULSE_MS);
+        for (const [id, offset] of [["mission-halo-a", 0], ["mission-halo-b", 0.5]] as const) {
+          if (!map.getLayer(id)) continue;
+          const ring = sonar((k + offset) % 1, 5, 24);
+          map.setPaintProperty(id, "circle-radius", ring.radius);
+          map.setPaintProperty(id, "circle-opacity", ring.opacity);
+        }
+      }
+      frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [map, reduced]);
 
   // The weather layer (WX-02): a marker per mission, offset from its dot; the icon is
   // rendered into it by a portal below.

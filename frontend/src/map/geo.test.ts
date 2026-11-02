@@ -1,5 +1,15 @@
 import { at, DETAIL, INCIDENT, MISSIONS, NAIROBI, PETER } from "../test/fixtures";
-import { circlePolygon, exposureFeatures, missionFeatures, SEVERITY_COLOUR, zoneFeatures } from "./geo";
+import {
+  bearing,
+  circlePolygon,
+  exposureFeatures,
+  flightBearing,
+  flightFeatures,
+  missionFeatures,
+  routeFeatures,
+  SEVERITY_COLOUR,
+  zoneFeatures,
+} from "./geo";
 
 function haversineM([lon1, lat1]: [number, number], [lon2, lat2]: [number, number]): number {
   const r = (d: number) => (d * Math.PI) / 180;
@@ -35,5 +45,58 @@ describe("map geometry", () => {
     const trip = { ...PETER, subject_type: "TRIP" as const, lat: null, lon: null };
     const features = exposureFeatures([...DETAIL.exposure, trip]).features;
     expect(features.map((f) => f.properties?.name)).toEqual(["Peter Mwangi", "Hana Takeda"]);
+  });
+
+  it("pulses missions with an ACTIVE incident", () => {
+    expect(at(missionFeatures(MISSIONS).features, 0).properties?.active).toBe(NAIROBI.incident_id !== null);
+    expect(at(missionFeatures([{ ...NAIROBI, incident_id: null }]).features, 0).properties?.active).toBe(false);
+  });
+});
+
+// Abu Dhabi, Nairobi and Mombasa ([lat, lon]), as XW 451's route.
+const AUH: [number, number] = [24.43, 54.65];
+const NBO: [number, number] = [-1.32, 36.93];
+const MBA: [number, number] = [-4.03, 39.59];
+const flight = (status: string, at: [number, number] | null, route: [number, number][] = [AUH, NBO, MBA]) => ({
+  id: "f1",
+  flight_number: "XW 451",
+  status,
+  lat: at?.[0] ?? null,
+  lon: at?.[1] ?? null,
+  route,
+});
+
+describe("the air picture", () => {
+  it("works out compass bearings", () => {
+    expect(bearing([0, 0], [1, 0])).toBeCloseTo(0, 5); // north
+    expect(bearing([0, 0], [0, 1])).toBeCloseTo(90, 5); // east
+    expect(bearing([0, 0], [-1, 0])).toBeCloseTo(180, 5); // south
+    expect(bearing([0, 0], [0, -1])).toBeCloseTo(270, 5); // west
+  });
+
+  it("points a plane at where it is going: the destination, or the diversion airport", () => {
+    // Abu Dhabi to Nairobi is south-west.
+    const enRoute = flightBearing(flight("AIRBORNE", [12, 46]));
+    expect(enRoute).toBeGreaterThan(200);
+    expect(enRoute).toBeLessThan(240);
+    expect(flightBearing(flight("SCHEDULED", null))).toBeCloseTo(bearing(AUH, NBO), 5);
+    // Diverted near Nairobi: heading south-east to Mombasa.
+    const diverted = flightBearing(flight("DIVERTED", [-1.0, 37.0]));
+    expect(diverted).toBeGreaterThan(110);
+    expect(diverted).toBeLessThan(160);
+    const [f] = flightFeatures([flight("HOLDING", [-1.0, 37.0])]).features;
+    expect(f?.properties).toMatchObject({ holding: true, label: "XW 451" });
+  });
+
+  it("splits a route at the aircraft: flown and ahead", () => {
+    const parts = (status: string, at: [number, number] | null) =>
+      routeFeatures([flight(status, at)]).features.map((f) => f.properties?.part);
+    expect(parts("SCHEDULED", null)).toEqual(["ahead"]);
+    expect(parts("AIRBORNE", [12, 46])).toEqual(["flown", "ahead"]);
+    expect(parts("LANDED", NBO)).toEqual(["flown"]);
+    const [flown, ahead] = routeFeatures([flight("DIVERTED", [-1.0, 37.0])]).features;
+    // The part ahead of a diverted flight ends at Mombasa.
+    expect(ahead?.geometry.coordinates.at(-1)?.[1]).toBeCloseTo(MBA[0], 3);
+    expect(flown?.geometry.coordinates[0]?.[1]).toBeCloseTo(AUH[0], 3);
   });
 });
