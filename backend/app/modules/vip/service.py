@@ -21,12 +21,13 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import ColumnElement, or_, select, text, true
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.core import approvals, audit
 from app.core.security import CurrentUser
+from app.modules.audit.models import AuditLog
 from app.modules.documents.service import Scope
 from app.modules.fleet import service as fleet
 from app.modules.intel.fusion import CATEGORY_LABELS
@@ -51,7 +52,7 @@ LEVELS = ("LOW", "MODERATE", "HIGH", "CRITICAL")  # CRITICAL only from the count
 RECOMMENDATION = "Move it out of the window, or replace it with a virtual alternative"
 FINAL = ("COMPLETED", "CANCELLED")
 NEXT = {"PLANNED": "IN_PROGRESS", "IN_PROGRESS": "COMPLETED"}
-SURVEY = "venue survey"  # a checklist label ending so is a venue survey (G-2)
+SURVEY = "{venue} venue survey"  # the checklist label of a venue's survey (G-2)
 NOT_FOUND = "Visit not found"
 
 
@@ -163,6 +164,19 @@ async def _lock_segment(session: AsyncSession, segment_id: uuid.UUID) -> VipSegm
     return segment
 
 
+def audit_visible(scope: Scope | None) -> ColumnElement[bool]:
+    """For GET /api/audit (review of Prompt 79, H1): a VIP row only for a caller who sees its
+    visit, so the log never tells anyone else that a visit exists (VIP-06)."""
+    others = AuditLog.entity_type != "vip_visit"
+    if scope is None:
+        return others
+    missions = scope.missions
+    if missions is None:
+        return true()
+    seen = select(VipVisit.reference).where(VipVisit.mission_id.in_(missions))
+    return or_(others, AuditLog.entity_id.in_(seen))
+
+
 # --- segment risk (VIP-02, §3) ------------------------------------------------------------------
 
 # One row per segment, with every ACTIVE incident whose zone edge is within MODERATE_M of the
@@ -175,8 +189,8 @@ _SEGMENTS = text(
              SELECT jsonb_agg(jsonb_build_object(
                       'id', i.id, 'reference', i.reference, 'category', i.category,
                       'centre_m', round(ST_Distance(s.venue_location, i.location)),
-                      'edge_m', round(greatest(0, ST_Distance(s.venue_location, i.location)
-                                                  - i.impact_radius_m)))
+                      'edge_m', greatest(0, ST_Distance(s.venue_location, i.location)
+                                            - i.impact_radius_m))
                     ORDER BY ST_Distance(s.venue_location, i.location) - i.impact_radius_m,
                              i.reference)
                FROM incident i
@@ -388,10 +402,8 @@ def _kpis(
     """G-2: the venues of segments that are not virtual, and how many have no open "<venue>
     venue survey" item (the design's 4 / 5)."""
     venues = {s.venue_name for s in segments if not s.virtual}
-    open_surveys = [
-        c.label.lower() for c in checklist if not c.done and c.label.lower().endswith(SURVEY)
-    ]
-    unsurveyed = {v for v in venues if any(label.startswith(v.lower()) for label in open_surveys)}
+    open_surveys = {c.label.lower() for c in checklist if not c.done}
+    unsurveyed = {v for v in venues if SURVEY.format(venue=v).lower() in open_surveys}
     return schemas.KpisOut(
         segments=len(segments),
         high=sum(1 for s in segments if s.risk == "HIGH"),
@@ -543,6 +555,21 @@ async def _advance(
         raise VipError(409, f"{visit.reference} is {visit.status.lower()}, not live")
     if NEXT.get(segment.status) != to:
         raise VipError(409, f"Segment {segment.seq} is {segment.status.lower().replace('_', ' ')}")
+    if to == "IN_PROGRESS":
+        # In programme order, so the departure cannot complete the visit while earlier
+        # segments are still planned (review of Prompt 79, M2).
+        earlier = await session.scalar(
+            select(VipSegment.seq)
+            .where(
+                VipSegment.visit_id == visit.id,
+                VipSegment.seq < segment.seq,
+                VipSegment.status != "COMPLETED",
+            )
+            .order_by(VipSegment.seq)
+            .limit(1)
+        )
+        if earlier is not None:
+            raise VipError(409, f"Segment {earlier} is not completed yet")
     before = segment.status
     segment.status = to
     await session.flush()
@@ -586,9 +613,10 @@ async def simulated_progress(
     if segment_id is None:
         return None
     segment = await _lock_segment(session, segment_id)
-    if visit.status != "LIVE" or NEXT.get(segment.status) != status:
-        return None
-    await _advance(session, PROGRESS, visit, segment, status)
+    try:
+        await _advance(session, PROGRESS, visit, segment, status)
+    except VipError:
+        return None  # refused before any write
     return visit
 
 

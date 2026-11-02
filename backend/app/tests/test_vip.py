@@ -275,6 +275,7 @@ async def world(client: AsyncClient, idp: Idp) -> World:
         "travel": [("TRAVEL_DESK", None)],
         "consular": [("CONSULAR_OFFICER", None)],
         "both": [("SECURITY_OFFICER", None), ("HQ_CRISIS_DIRECTOR", None)],
+        "admin": [("ADMIN", None)],
     }
     users = {sub: await idp.user(sub, roles) for sub, roles in grants.items()}
     async with tenant_session(idp.tenant_id, idp.engine) as session:
@@ -388,6 +389,26 @@ async def test_a_head_of_mission_sees_only_their_missions_visits(world: World) -
     assert len(await world.ok("security", "GET", "/api/vip/visits")) == 2
     assert (await world.send("hom.add", "GET", f"/api/vip/visits/{other}")).status_code == 404
     assert await world.ok("hom.cai", "GET", "/api/vip/access") == {"visible": True}
+
+
+async def test_the_audit_trail_is_shown_only_to_those_who_see_the_visit(world: World) -> None:
+    """Review of Prompt 79, H1: GET /api/audit never tells anyone else a visit exists."""
+    await world.start()
+    other = await add_visit(world.idp, world.cai, "VV-2026-032", world.day, world.users["security"])
+    await world.ok("security", "POST", f"/api/vip/visits/{other}/start")
+    url = "/api/audit?entity_type=vip_visit&entity_id={}"
+    for who in ("viewer", "travel", "consular", "admin", "hom.cai"):
+        assert await world.ok(who, "GET", url.format("VV-2026-031")) == [], who
+    for who in READERS:
+        trail = await world.ok(who, "GET", url.format("VV-2026-031"))
+        assert [e["action"] for e in trail] == ["VIP.START"], who
+    assert len(await world.ok("hom.cai", "GET", url.format("VV-2026-032"))) == 1
+    assert await world.ok("hom.add", "GET", url.format("VV-2026-032")) == []
+    # The whole log (ADMIN only) has no VIP row for an ADMIN who is not a reader.
+    everything = await world.ok("admin", "GET", "/api/audit?limit=500")
+    assert everything
+    assert all(e["entity_type"] != "vip_visit" for e in everything)
+    assert "VV-2026" not in json.dumps(everything)
 
 
 async def test_no_position_in_any_response(world: World) -> None:
@@ -565,6 +586,15 @@ async def test_the_programme_moves_one_step_at_a_time_while_live(world: World) -
         "Segment 1 is already completed",
     )
     assert (await world.progress(2)).json()["segments"][1]["status"] == "IN_PROGRESS"
+    # In programme order (review of Prompt 79, M2): not the departure while 2..5 are open.
+    response = await world.progress(6)
+    assert (response.status_code, response.json()["detail"]) == (
+        409,
+        "Segment 2 is not completed yet",
+    )
+    assert (await world.progress(3)).status_code == 409
+    for seq in (2, 3, 3, 4, 4, 5, 5):
+        assert (await world.progress(seq)).status_code == 200, seq
     # The departure completed completes the visit (L6); nothing moves after.
     await world.progress(6)
     visit = (await world.progress(6)).json()
@@ -587,6 +617,7 @@ async def test_the_simulated_progress_events(world: World) -> None:
         assert await vip.simulated_progress(session, world.reference, 1, "COMPLETED") is None
         assert await vip.simulated_progress(session, "VV-2026-999", 1, "IN_PROGRESS") is None
         assert await vip.simulated_progress(session, world.reference, 9, "IN_PROGRESS") is None
+        assert await vip.simulated_progress(session, world.reference, 2, "IN_PROGRESS") is None
         assert await vip.simulated_progress(session, world.reference, 1, "IN_PROGRESS")
         assert await vip.simulated_progress(session, world.reference, 1, "COMPLETED")
         await session.commit()

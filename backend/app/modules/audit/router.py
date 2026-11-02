@@ -3,6 +3,8 @@
 - GET /api/audit with entity_type and entity_id: any user with a role. Screens
   such as the playbook run's audit trail panel need it (plan G-06).
 - GET /api/audit without that filter, and GET /api/audit/verify: ADMIN only.
+- Either way, a VIP visit's rows only for a caller who may see that visit (VIP-06; review of
+  Prompt 79, H1).
 """
 
 from typing import Annotated
@@ -16,6 +18,7 @@ from app.core.security import CurrentUser, get_db
 from app.modules.audit.models import AuditLog
 from app.modules.audit.schemas import AuditEntryOut, AuditVerifyOut
 from app.modules.tenancy.service import ROLES
+from app.modules.vip import service as vip
 
 router = APIRouter(prefix="/api/audit", tags=["audit"])
 
@@ -35,7 +38,12 @@ async def list_audit(
         raise HTTPException(
             status.HTTP_403_FORBIDDEN, "Only ADMIN may list the audit log without an entity filter"
         )
-    query = select(AuditLog).order_by(AuditLog.chain_seq.desc()).limit(limit)
+    query = (
+        select(AuditLog)
+        .where(vip.audit_visible(await vip.reader_scope(session, user)))
+        .order_by(AuditLog.chain_seq.desc())
+        .limit(limit)
+    )
     if entity_type is not None:
         query = query.where(AuditLog.entity_type == entity_type)
     if entity_id is not None:
