@@ -1403,3 +1403,69 @@ VIP_CHECKLIST = [
     ("Hospital & evacuation plan", 3, True),
     ("Industrial park venue survey", 1, False),
 ]
+
+# --- Site Twin (D-43, TWN-01; docs/plan-pilot-twn.md §2-§6) -------------------------------------
+# The Nairobi embassy's ground floor as the design, in plan units (viewBox 790 x 455).
+# (code, name, kind, x, y, w, h, capacity)
+TWIN_SITE = "NBO:EMBASSY"
+TWIN_ZONES: list[tuple[str, str, str, int, int, int, int, int | None]] = [
+    ("ch", "Chancery offices", "OFFICE", 130, 30, 270, 220, None),
+    ("amb", "Ambassador suite", "SUITE", 415, 30, 160, 110, None),
+    ("conf", "Conference room", "CONFERENCE", 415, 155, 160, 95, None),
+    ("comms", "Comms / IT room", "COMMS", 590, 30, 180, 100, None),
+    ("safe", "Safe room (hardened)", "SAFE_ROOM", 590, 145, 180, 105, 20),
+    ("lob", "Lobby & reception", "LOBBY", 130, 265, 170, 120, None),
+    ("cons", "Consular hall", "CONSULAR", 315, 265, 260, 120, None),
+    ("must", "Muster point · courtyard", "MUSTER", 590, 265, 180, 60, 60),
+    ("g1", "Gate 1", "GATE", 20, 320, 95, 65, None),
+    ("g2", "Gate 2", "GATE", 680, 340, 90, 45, None),
+]
+# (code, label, path, exit gate)
+TWIN_ROUTES: list[tuple[str, str, tuple[tuple[int, int], ...], str]] = [
+    ("A", "Route A → main road via Gate 1", ((215, 250), (215, 300), (115, 350)), "g1"),
+    ("B", "Route B → vehicles via Gate 2", ((680, 200), (680, 300), (725, 300), (725, 340)), "g2"),
+]
+# 43 sensors (G-2): the gates and safe room, 16 cameras, 16 doors and 8 panic alarms.
+TWIN_CAMERA_ZONES = ["g1", "g1", "g2", "g2", "lob", "lob", "cons", "cons",
+                     "ch", "ch", "conf", "comms", "safe", "must", "must", "amb"]  # fmt: skip
+TWIN_DOOR_ZONES = ["ch", "ch", "ch", "amb", "conf", "comms", "comms", "safe",
+                   "safe", "lob", "lob", "cons", "cons", "must", "g1", "g2"]  # fmt: skip
+TWIN_ALARM_ZONES = ["ch", "amb", "conf", "comms", "safe", "lob", "cons", "must"]
+# (code, kind, label, zone, detail)
+TWIN_SENSORS: list[tuple[str, str, str, str | None, str | None]] = [
+    ("G1-MAIN", "GATE", "Gate 1 · main", "g1", "Open · screening"),
+    ("G2-READER", "BADGE_READER", "Gate 2 · badge reader", "g2", "Online"),
+    ("SAFE-ROOM", "SAFE_ROOM", "Safe room", "safe", "Ready"),
+    *[(f"CAM-{n:02d}", "CCTV", f"Camera {n}", z, None) for n, z in enumerate(TWIN_CAMERA_ZONES, 1)],
+    *[(f"DOOR-{n:02d}", "ACCESS", f"Door {n}", z, None) for n, z in enumerate(TWIN_DOOR_ZONES, 1)],
+    *[(f"PANIC-{n:02d}", "ALARM", f"Panic alarm {n}", z, None)
+      for n, z in enumerate(TWIN_ALARM_ZONES, 1)],
+]  # fmt: skip
+# (label, seeded done by the seeded Security Officer: G-7). The fourth stays open (G-6).
+TWIN_READINESS = [
+    ("Floor wardens assigned (3)", True),
+    ("Safe room supplies checked · 14 d", True),
+    ("Evacuation routes A & B surveyed", True),
+    ("Generator load test witnessed", False),
+]
+# The 11 staff at "Embassy" (NAIROBI_PEOPLE), as the design: (name, normal zone, shelter zone).
+TWIN_STAFF = [
+    ("Omar Siddiqui", "ch", "safe"),
+    ("Aisha Rahman", "ch", "safe"),
+    ("Sara Lindqvist", "ch", "safe"),
+    ("Nadia Petrova", "ch", "safe"),
+    ("Karim Mansour", "ch", "safe"),
+    ("Martin Keller", "conf", "safe"),
+    ("David Okafor", "conf", "safe"),
+    ("Grace Wanjiru", "cons", "safe"),
+    ("Ruth Achieng", "cons", "safe"),
+    ("Yusuf Al-Amin", "comms", "comms"),
+    ("James Otieno", "comms", "comms"),
+]
+# Guards and visitors are labels, never names (§68 Q3): (label, normal zone, shelter zone).
+TWIN_LABELS = [
+    ("Guard 1", "g1", "g1"),
+    ("Guard 2", "g2", "g2"),
+    ("Guard 3", "lob", "lob"),
+    *[(f"Visitor {n}", "cons" if n <= 9 else "lob", "conf") for n in range(1, 12)],
+]
