@@ -2193,14 +2193,37 @@ tr.nx-flash-b > td {
 }
 
 /* A new incident's marker pings three times (map/OperationsMap.tsx). */
-.nx-incident-marker.nx-new::after {
+/* Every ACTIVE incident sends out two rings, half a beat apart; faster for higher severity
+   (--pulse, set from the severity). A new one also flares three times. */
+.nx-incident-marker::before,
+.nx-incident-marker::after {
   content: "";
   position: absolute;
   inset: -2px;
   border: 2px solid var(--c, #cd4246);
-  animation: nx-sonar 1.2s ease-out 3;
+  border-radius: inherit;
+  animation: nx-sonar var(--pulse, 2.4s) ease-out infinite;
   opacity: 0;
   pointer-events: none;
+}
+
+.nx-incident-marker::after {
+  animation-delay: calc(var(--pulse, 2.4s) / 2);
+}
+
+.nx-incident-marker.nx-new {
+  animation:
+    nx-pulse 1.6s ease-out infinite,
+    nx-flare 0.8s ease-out 3;
+}
+
+@keyframes nx-flare {
+  0% {
+    filter: brightness(1.8) drop-shadow(0 0 10px var(--c, #cd4246));
+  }
+  100% {
+    filter: none;
+  }
 }
 
 @keyframes nx-sonar {

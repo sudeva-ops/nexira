@@ -8,9 +8,12 @@ import { useReducedMotion } from "../ui/useMotion";
 import { registerPmtiles, tilesAvailable } from "./base";
 import { flightFeatures, routeFeatures } from "./geo";
 import { DASH_FRAMES, DASH_STEP_MS, GLIDE_MS, glideFlights, type LonLat, positions } from "./motion";
+import { phase, PLANE_ICON, planeImage, sonar } from "./plane";
 import { ATTRIBUTION, baseStyle } from "./style";
 
 const EMPTY = { type: "FeatureCollection" as const, features: [] };
+const HOLD_MS = 2000; // a holding flight's sonar ring
+const SPIN_DEG_PER_S = 40; // a holding flight circles
 
 interface Props {
   flights: Flight[];
@@ -50,28 +53,65 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
         if (disposed) return;
         m.addSource("routes", { type: "geojson", data: EMPTY });
         m.addSource("flights", { type: "geojson", data: EMPTY });
+        // The part of each route flown is solid; the part ahead is dashed and moves along.
+        m.addLayer({
+          id: "routes-flown",
+          type: "line",
+          source: "routes",
+          filter: ["==", ["get", "part"], "flown"],
+          paint: { "line-color": ["get", "colour"], "line-opacity": 0.75, "line-width": 2 },
+        });
         m.addLayer({
           id: "routes",
           type: "line",
           source: "routes",
+          filter: ["==", ["get", "part"], "ahead"],
           paint: {
             "line-color": ["get", "colour"],
-            "line-opacity": 0.45,
+            "line-opacity": 0.5,
             "line-width": 1.4,
             "line-dasharray": [3, 3],
           },
         });
+        // A holding flight sends out a sonar ring while it circles.
         m.addLayer({
-          id: "flights",
+          id: "flight-holding",
           type: "circle",
           source: "flights",
-          paint: {
-            "circle-color": ["get", "colour"],
-            "circle-radius": 6,
-            "circle-stroke-color": "#111418",
-            "circle-stroke-width": 1.5,
-          },
+          filter: ["==", ["get", "holding"], true],
+          paint: { "circle-color": ["get", "colour"], "circle-radius": 10, "circle-opacity": 0.3 },
         });
+        const plane = planeImage();
+        if (plane) {
+          // A plane pointing where the flight is going; its colour is its status.
+          m.addImage(PLANE_ICON, plane, { sdf: true, pixelRatio: 2 });
+          m.addLayer({
+            id: "flights",
+            type: "symbol",
+            source: "flights",
+            layout: {
+              "icon-image": PLANE_ICON,
+              "icon-size": 0.7,
+              "icon-rotate": ["get", "bearing"],
+              "icon-rotation-alignment": "map",
+              "icon-allow-overlap": true,
+              "icon-ignore-placement": true,
+            },
+            paint: { "icon-color": ["get", "colour"], "icon-halo-color": "#111418", "icon-halo-width": 1.2 },
+          });
+        } else {
+          m.addLayer({
+            id: "flights",
+            type: "circle",
+            source: "flights",
+            paint: {
+              "circle-color": ["get", "colour"],
+              "circle-radius": 6,
+              "circle-stroke-color": "#111418",
+              "circle-stroke-width": 1.5,
+            },
+          });
+        }
         // Labels need the self-hosted glyphs, installed with the tiles (D-24).
         if (available) m.addLayer({
           id: "flight-labels",
@@ -81,7 +121,7 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
             "text-field": ["get", "label"],
             "text-font": ["Noto Sans Regular"],
             "text-size": 11,
-            "text-offset": [0, 1.3],
+            "text-offset": [0, 1.6],
           },
           paint: { "text-color": ["get", "colour"], "text-halo-color": "#111418", "text-halo-width": 1 },
         });
@@ -130,7 +170,8 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
     return () => cancelAnimationFrame(frame);
   }, [map, flights, reduced]);
 
-  // Flight paths move along, so the picture reads as live.
+  // Flight paths move along, a holding flight circles with a sonar ring, so the picture reads
+  // as live.
   useEffect(() => {
     if (!map || reduced) return;
     let frame = 0;
@@ -141,6 +182,20 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
         last = now;
         i = (i + 1) % DASH_FRAMES.length;
         if (map.getLayer("routes")) map.setPaintProperty("routes", "line-dasharray", DASH_FRAMES[i]);
+        if (map.getLayer("flight-holding")) {
+          const ring = sonar(phase(now, HOLD_MS), 8, 26, 0.5);
+          map.setPaintProperty("flight-holding", "circle-radius", ring.radius);
+          map.setPaintProperty("flight-holding", "circle-opacity", ring.opacity);
+        }
+        if (map.getLayer("flights") && map.getLayer("flights")?.type === "symbol") {
+          const spin = ((now / 1000) * SPIN_DEG_PER_S) % 360;
+          map.setLayoutProperty("flights", "icon-rotate", [
+            "case",
+            ["get", "holding"],
+            ["%", ["+", ["get", "bearing"], spin], 360],
+            ["get", "bearing"],
+          ]);
+        }
       }
       frame = requestAnimationFrame(step);
     };

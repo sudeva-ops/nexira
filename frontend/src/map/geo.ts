@@ -57,6 +57,7 @@ export function missionFeatures(missions: Mission[]): FeatureCollection<Point> {
         risk: m.display_risk,
         label: MISSION_RISK_LABEL[m.display_risk],
         colour: SEVERITY_COLOUR[m.display_risk],
+        active: m.incident_id !== null, // an ACTIVE incident at the mission: the map pulses it
       },
     })),
   };
@@ -153,6 +154,33 @@ interface FlightLike {
   route: [number, number][];
 }
 
+/** The initial great-circle bearing from a to b, in degrees clockwise from north (0..360);
+ * [lat, lon] in. The heading a plane's icon points along. */
+export function bearing(a: [number, number], b: [number, number]): number {
+  const [lat1, lat2] = [a[0] * RAD, b[0] * RAD];
+  const dLon = (b[1] - a[1]) * RAD;
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  return (Math.atan2(y, x) / RAD + 360) % 360;
+}
+
+/** Where a flight is heading: the diversion airport once diverted, else its destination. */
+function target(f: FlightLike): [number, number] | undefined {
+  const [, destination, diversion] = f.route;
+  return f.status === "DIVERTED" && diversion ? diversion : destination;
+}
+
+/** A flight's heading from where it is to where it is going; along its route before it leaves
+ * and after it lands (the icon still points the way it flew). */
+export function flightBearing(f: FlightLike): number {
+  const [origin] = f.route;
+  const to = target(f);
+  if (!origin || !to) return 0;
+  const here: [number, number] | null = f.lat !== null && f.lon !== null ? [f.lat, f.lon] : null;
+  const far = here && Math.abs(here[0] - to[0]) + Math.abs(here[1] - to[1]) > 0.05;
+  return here && far ? bearing(here, to) : bearing(origin, to);
+}
+
 export function flightFeatures(flights: FlightLike[]): FeatureCollection<Point> {
   return {
     type: "FeatureCollection",
@@ -161,28 +189,42 @@ export function flightFeatures(flights: FlightLike[]): FeatureCollection<Point> 
       .map((f) => ({
         type: "Feature",
         geometry: point(f.lon ?? 0, f.lat ?? 0),
-        properties: { id: f.id, label: f.flight_number, colour: flightColour(f.status) },
+        properties: {
+          id: f.id,
+          label: f.flight_number,
+          colour: flightColour(f.status),
+          bearing: flightBearing(f),
+          holding: f.status === "HOLDING",
+        },
       })),
   };
 }
 
-/** The planned leg, and the diversion leg from the destination to the diversion airport. */
+const FLOWN: ReadonlySet<string> = new Set(["AIRBORNE", "HOLDING", "DIVERTED"]);
+
+/** Each flight's route, split at the aircraft: the part flown (solid) and the part ahead
+ * (dashed, moving). Before departure all of it is ahead; after landing all of it is flown. A
+ * diverted flight's part ahead goes to the diversion airport. */
 export function routeFeatures(flights: FlightLike[]): FeatureCollection<LineString> {
   const features: Feature<LineString>[] = [];
+  const line = (f: FlightLike, from: [number, number], to: [number, number], part: string, steps = 48) => {
+    const coordinates = greatCircle(from, to, steps);
+    if (coordinates.length < 2) return;
+    const colour = flightColour(part === "ahead" ? f.status : f.status === "DIVERTED" ? "AIRBORNE" : f.status);
+    features.push({ type: "Feature", geometry: { type: "LineString", coordinates }, properties: { id: f.id, part, colour } });
+  };
   for (const f of flights) {
-    const [origin, destination, diversion] = f.route;
-    if (!origin || !destination) continue;
-    features.push({
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: greatCircle(origin, destination) },
-      properties: { id: f.id, colour: flightColour(f.status === "DIVERTED" ? "AIRBORNE" : f.status) },
-    });
-    if (diversion) {
-      features.push({
-        type: "Feature",
-        geometry: { type: "LineString", coordinates: greatCircle(destination, diversion, 16) },
-        properties: { id: f.id, colour: flightColour("DIVERTED") },
-      });
+    const [origin, destination] = f.route;
+    const to = target(f);
+    if (!origin || !destination || !to) continue;
+    const here: [number, number] | null = f.lat !== null && f.lon !== null ? [f.lat, f.lon] : null;
+    if (here && FLOWN.has(f.status)) {
+      line(f, origin, here, "flown");
+      line(f, here, to, "ahead", 32);
+    } else if (f.status === "LANDED") {
+      line(f, origin, to, "flown");
+    } else {
+      line(f, origin, to, "ahead");
     }
   }
   return { type: "FeatureCollection", features };
