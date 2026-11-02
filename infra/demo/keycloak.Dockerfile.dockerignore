@@ -1,0 +1,3 @@
+# Only the realm file.
+*
+!infra/keycloak
