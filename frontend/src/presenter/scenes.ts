@@ -64,6 +64,13 @@ export const SCENE_SCREEN: Record<DemoScenario, Record<number, string>> = {
     2: "/fleet",
     3: "/fleet",
   },
+  // D-43 (TWN-07): during NBO-CIVIL-UNREST, every scene on Site Twin (Prompt 87).
+  "NBO-SITE": {
+    0: "/twin",
+    1: "/twin",
+    2: "/twin",
+    3: "/twin",
+  },
   // D-42 (VIP-08): the visit plays on VIP Protection (Prompt 81).
   "ADD-VISIT": {
     0: "/vip",

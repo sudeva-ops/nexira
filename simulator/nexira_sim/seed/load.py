@@ -34,11 +34,12 @@ from app.modules.travel.service import (
     ensure_scenario_flight,
     ensure_trip,
 )
+from app.modules.twin import service as twin
 from app.modules.vip import service as vip
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from nexira_sim.scenarios import add_visit, nbo_fleet
+from nexira_sim.scenarios import add_visit, nbo_fleet, nbo_site
 from nexira_sim.scenarios import dac_cyclone as dac
 from nexira_sim.scenarios import fra_national_protests as fra
 from nexira_sim.scenarios import mnl_tropical_storm as mnl
@@ -342,6 +343,12 @@ async def seed_all(
             approval_status="APPROVED",
             restricted=True,
         )
+        # Site Twin (D-43, plan-pilot-twn §2-§6): the Nairobi embassy's plan, after the identities
+        # (G-7) and Fleet (the generator and satellite terminal are read from there).
+        report["twin_plan"] = await twin.ensure_plan(
+            session,
+            _twin(w, tenant_id, await demo_user_id(session, "security.officer")),
+        )
         report["vip_visits"] = await vip.ensure_visits(
             session,
             [
@@ -435,6 +442,14 @@ async def seed_all(
             description=add_visit.DESCRIPTION,
             events=add_visit.build_events(w, tenant_id),
         )
+        report["scenario_site"] = await ensure_scenario(
+            session,
+            scenario_id=seed_id(tenant_id, "scenario", nbo_site.CODE),
+            code=nbo_site.CODE,
+            name=nbo_site.NAME,
+            description=nbo_site.DESCRIPTION,
+            events=nbo_site.build_events(w, tenant_id),
+        )
         report["scenario_fleet"] = await ensure_scenario(
             session,
             scenario_id=seed_id(tenant_id, "scenario", nbo_fleet.CODE),
@@ -449,6 +464,24 @@ async def seed_all(
 
 GST = timezone(timedelta(hours=4))  # the home zone (plan Q2)
 EAT = timezone(timedelta(hours=3))  # Addis Ababa (plan-pilot-vip §2)
+
+
+def _twin(w: world.World, tenant_id: uuid.UUID, officer: uuid.UUID) -> twin.PlanIn:
+    """The Nairobi embassy as the design (plan-pilot-twn §2-§6): 25 on site, 43 sensors."""
+    staff = {str(p.id) for p in w.persons}
+    return twin.PlanIn(
+        site_id=seed_id(tenant_id, "site", data.TWIN_SITE),
+        zones=tuple(twin.ZoneIn(*z) for z in data.TWIN_ZONES),
+        routes=tuple(twin.RouteIn(*r) for r in data.TWIN_ROUTES),
+        sensors=tuple(twin.SensorIn(*s) for s in data.TWIN_SENSORS),
+        items=tuple((label, officer if done else None) for label, done in data.TWIN_READINESS),
+        occupants=tuple(
+            twin.OccupantIn(zone, person_id=uuid.UUID(o))
+            if o in staff
+            else twin.OccupantIn(zone, label=o)
+            for o, zone, _ in nbo_site.occupants(w)
+        ),
+    )
 
 
 def _visit(
