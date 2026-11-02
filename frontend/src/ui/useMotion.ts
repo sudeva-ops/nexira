@@ -1,20 +1,27 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
+import { calmNow, subscribeCalm } from "./calm";
+
 // Motion shows that something changed, and nothing else: the screen is still when
 // nothing happens. Everything here is off for people who ask for reduced motion.
 
 const REDUCE = "(prefers-reduced-motion: reduce)";
 
 function subscribe(onChange: () => void): () => void {
-  if (typeof window.matchMedia !== "function") return () => undefined;
+  const unsubscribeCalm = subscribeCalm(onChange);
+  if (typeof window.matchMedia !== "function") return unsubscribeCalm;
   const query = window.matchMedia(REDUCE);
   query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
+  return () => {
+    query.removeEventListener("change", onChange);
+    unsubscribeCalm();
+  };
 }
 
-/** True when the person asked for reduced motion, or the browser cannot say (no animation). */
+/** True when the person asked for reduced motion or chose Calm mode, or the browser cannot say
+ * (no animation). */
 function reducedNow(): boolean {
-  return typeof window.matchMedia !== "function" || window.matchMedia(REDUCE).matches;
+  return typeof window.matchMedia !== "function" || window.matchMedia(REDUCE).matches || calmNow();
 }
 
 export function useReducedMotion(): boolean {

@@ -100,7 +100,7 @@ body {
 
 .nx-main {
   display: grid;
-  grid-template-rows: 44px 1fr auto; /* the presenter bar, when shown */
+  grid-template-rows: 44px 26px 1fr auto; /* header, live ticker, view, presenter bar */
   min-width: 0;
   min-height: 0;
 }
@@ -110,8 +110,10 @@ body {
   align-items: center;
   gap: 10px;
   padding: 0 12px;
-  background: var(--nx-panel2);
+  background: linear-gradient(180deg, #2a3039 0%, var(--nx-panel2) 100%);
   border-bottom: 1px solid var(--nx-line);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  z-index: 3;
 }
 
 .nx-header h1 {
@@ -226,11 +228,15 @@ body {
   color: #fa999c;
 }
 
+/* Depth (UI 3): raised panels with a soft shadow and a faint light along the top edge. */
 .nx-card {
   position: relative;
-  background: var(--nx-panel);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, transparent 40%), var(--nx-panel);
   border: 1px solid var(--nx-line);
-  box-shadow: 0 0 0 1px rgba(17, 20, 24, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(17, 20, 24, 0.4),
+    0 10px 26px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   min-width: 0;
 }
 
@@ -240,7 +246,7 @@ body {
   gap: 8px;
   height: 32px;
   padding: 0 10px;
-  background: var(--nx-panel2);
+  background: linear-gradient(180deg, #2c333d 0%, var(--nx-panel2) 100%);
   border-bottom: 1px solid var(--nx-line);
 }
 
@@ -293,6 +299,23 @@ body {
 
 .nx-kpi.alert {
   border-left: 3px solid #cd4246;
+  animation: nx-alert-glow 2.8s ease-in-out infinite;
+}
+
+/* A figure that needs attention glows red, slowly (UI 3). */
+@keyframes nx-alert-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(17, 20, 24, 0.4),
+      0 10px 26px rgba(0, 0, 0, 0.38);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(205, 66, 70, 0.45),
+      0 0 22px rgba(205, 66, 70, 0.28),
+      0 10px 26px rgba(0, 0, 0, 0.38);
+  }
 }
 
 .nx-posture.CRITICAL,
@@ -2564,4 +2587,107 @@ tr.nx-flash-b > td {
 .nx-map-toggle button[aria-pressed="true"] {
   background: #2d72d2;
   color: #fff;
+}
+
+/* --- The operations feed (UI 3) ----------------------------------------------------- */
+/* The live ticker under the header: ACTIVE incidents and the latest events, scrolling. Its text
+   is drawn from data-text, so it is not part of the page's text (aria-hidden, see Ticker.tsx). */
+.nx-ticker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  padding: 0 12px;
+  background: #0f1216;
+  border-bottom: 1px solid var(--nx-line);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.nx-ticker-tag {
+  flex-shrink: 0;
+}
+
+/* The scrolling text stays beside the tag, fading out at both ends. */
+.nx-ticker-viewport {
+  flex: 1;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent 0%, #000 3%, #000 92%, transparent 100%);
+}
+
+.nx-ticker-tag::before {
+  content: attr(data-text);
+  padding: 1px 6px;
+  background: #cd4246;
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.nx-ticker-track {
+  display: inline-flex;
+  gap: 28px;
+  animation: nx-ticker linear infinite;
+}
+
+.nx-ticker:hover .nx-ticker-track {
+  animation-play-state: paused;
+}
+
+.nx-ticker.still .nx-ticker-track {
+  animation: none;
+}
+
+.nx-ticker-item::before {
+  content: attr(data-text);
+  color: #abb3bf;
+  font-family: ui-monospace, Consolas, monospace;
+}
+
+.nx-ticker-item.crit::before {
+  color: #fa999c;
+}
+
+.nx-ticker-item.high::before {
+  color: #fbb360;
+}
+
+.nx-ticker-item::after {
+  content: "◆";
+  margin-left: 28px;
+  color: #404854;
+  font-size: 8px;
+}
+
+@keyframes nx-ticker {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* A faint radar sweep over the operations map. */
+.nx-mapwrap::after {
+  content: "";
+  position: absolute;
+  inset: -50%;
+  z-index: 1;
+  background: conic-gradient(from 0deg, rgba(76, 144, 240, 0.2), rgba(76, 144, 240, 0.05) 12%, transparent 22%);
+  pointer-events: none;
+  animation: nx-turn 9s linear infinite;
+}
+
+/* Calm mode (user menu): no motion at all, as with reduced motion. */
+:root.nx-calm *,
+:root.nx-calm ::before,
+:root.nx-calm ::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+:root.nx-calm .nx-mapwrap::after {
+  display: none;
 }

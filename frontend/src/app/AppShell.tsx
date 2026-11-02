@@ -9,6 +9,7 @@ import { useVipAccess } from "../api/vip";
 import { Clock } from "./Clock";
 import { LastEvent, LiveIndicator } from "./Heartbeat";
 import { SCREENS, type Screen } from "./screens";
+import { Ticker } from "./Ticker";
 import { UserMenu } from "./UserMenu";
 
 function NavList() {
@@ -97,6 +98,7 @@ export function AppShell({ onLogout }: Props) {
           <Clock />
           <UserMenu onLogout={onLogout} />
         </header>
+        <Ticker />
         <section className={`nx-view${current?.path === "/operations" ? " full" : ""}`}>
           <Outlet />
         </section>
