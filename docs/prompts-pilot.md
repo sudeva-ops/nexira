@@ -801,9 +801,9 @@ Playwright, real stack (requirements-pilot.md §67). Report the real output; mak
 acceptance (all specs) still passes.
 ```
 
-## Pilot module 14 · Supply Chain & Third-Party Risk (proposed, awaiting the product owner)
+## Pilot module 14 · Supply Chain & Third-Party Risk (approved 2026-11-02, PR #112)
 
-Sources: D-44 (proposed), `docs/requirements-pilot.md` §69–73 (SUP-01..07), PC-43..45. Simulated suppliers and routes only; NEXIRA contacts no supplier.
+Sources: D-44, `docs/requirements-pilot.md` §69–73 (SUP-01..07), PC-43..45. Simulated suppliers and routes only; NEXIRA contacts no supplier.
 
 ### Prompt 89 · Read and plan (no code)
 ```

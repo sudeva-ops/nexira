@@ -835,7 +835,7 @@ Playwright on the real stack:
 - **Audit:** status changes, activation and stand-down are audited, and the chain verifies.
 - `make acceptance` (all existing specs) still passes.
 
-## 73. Questions for the product owner (proposed defaults)
+## 73. Questions answered by the product owner (2026-11-02: "use the defaults")
 
 1. **Register:** 52 seeded suppliers across the 36 missions (14 in Tier 1) and 37 routes, illustrative and read-only apart from status and mitigations; Nairobi as the design. Adding or editing suppliers comes later. *Default: yes.*
 2. **Statuses:** reported by simulated logistics and supplier events only (`SUPPLY_ROUTE`, `SUPPLY_SUPPLIER`) through the worker; ROUTE BLOCKED, ALTERNATE and "impacted" worked out on every read, so they clear by themselves. *Default: yes.*
