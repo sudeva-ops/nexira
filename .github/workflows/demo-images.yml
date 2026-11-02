@@ -1,0 +1,82 @@
+# The private images for the Codespaces demo (docs/plan-demo-codespaces.md §2, PR 2).
+# Run by hand (Actions → demo-images → Run workflow) or by pushing a tag `demo-*`. The images
+# go to ghcr.io/<owner>/ as PRIVATE packages; give the nexira-demo repository Codespaces
+# access to each package (package settings), and nothing else.
+name: demo-images
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["demo-*"]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io/${{ github.repository_owner }}
+  TILES_BUILD: "20261024"  # the Protomaps daily build the tiles are pinned to
+
+jobs:
+  images:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      # The docker driver, so the tiles image can build FROM the frontend image loaded locally.
+      - uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Tags
+        id: tags
+        run: |
+          echo "suffix=$(echo "${GITHUB_SHA}" | cut -c1-12)" >> "$GITHUB_OUTPUT"
+      - name: postgres
+        uses: docker/build-push-action@v6
+        with:
+          context: infra/postgres
+          push: true
+          tags: ${{ env.REGISTRY }}/nexira-postgres:latest,${{ env.REGISTRY }}/nexira-postgres:${{ steps.tags.outputs.suffix }}
+      - name: backend (API, worker and migrations)
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: ${{ env.REGISTRY }}/nexira-backend:latest,${{ env.REGISTRY }}/nexira-backend:${{ steps.tags.outputs.suffix }}
+      - name: keycloak (with the demo realm)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/demo/keycloak.Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/nexira-keycloak:latest,${{ env.REGISTRY }}/nexira-keycloak:${{ steps.tags.outputs.suffix }}
+      - name: seed (simulator)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/demo/seed.Dockerfile
+          push: true
+          tags: ${{ env.REGISTRY }}/nexira-seed:latest,${{ env.REGISTRY }}/nexira-seed:${{ steps.tags.outputs.suffix }}
+      - name: frontend (demo mode, login on the same origin)
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          load: true
+          tags: nexira-frontend-base:local
+          build-args: |
+            VITE_DEMO_MODE=true
+            VITE_OIDC_URL=/auth
+      - name: Map tiles (D-24, pinned build)
+        run: infra/scripts/build-tiles.sh
+      - name: frontend with the tiles
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infra/demo/frontend-tiles.Dockerfile
+          build-args: BASE=nexira-frontend-base:local
+          push: true
+          tags: ${{ env.REGISTRY }}/nexira-frontend:latest,${{ env.REGISTRY }}/nexira-frontend:${{ steps.tags.outputs.suffix }}

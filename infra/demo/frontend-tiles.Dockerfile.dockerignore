@@ -1,0 +1,4 @@
+# Only the built tiles (not the pmtiles binary).
+*
+!infra/tiles
+infra/tiles/.bin
