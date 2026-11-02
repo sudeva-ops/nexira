@@ -5,8 +5,9 @@ import Keycloak from "keycloak-js";
 /** The IdP's URL: absolute, or a path on the app's own origin ("/auth"), so one built image
  * works at any address (docs/plan-demo-codespaces.md §2). */
 export function oidcUrl(configured: string | undefined, origin: string): string {
-  const url = configured ?? "http://localhost:8080";
-  return url.startsWith("/") ? new URL(url, origin).toString().replace(/\/$/, "") : url;
+  const url = configured || "http://localhost:8080";
+  // "/auth" is a path; "//host" is another host, never relative (review of demo PR 1, L5).
+  return /^\/(?!\/)/.test(url) ? new URL(url, origin).toString().replace(/\/$/, "") : url;
 }
 
 const keycloak = new Keycloak({

@@ -6,5 +6,7 @@ describe("oidcUrl", () => {
     expect(oidcUrl(undefined, "http://localhost:3000")).toBe("http://localhost:8080");
     expect(oidcUrl("/auth", "https://demo-3000.app.github.dev")).toBe("https://demo-3000.app.github.dev/auth");
     expect(oidcUrl("/auth/", "http://localhost:3000")).toBe("http://localhost:3000/auth");
+    expect(oidcUrl("", "http://localhost:3000")).toBe("http://localhost:8080");
+    expect(oidcUrl("//evil.example", "http://localhost:3000")).toBe("//evil.example"); // not relative
   });
 });
