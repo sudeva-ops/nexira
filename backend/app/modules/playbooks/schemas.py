@@ -106,3 +106,5 @@ class PermissionsOut(BaseModel):
     tick_vip_checklist: bool = False
     propose_vip_change: list[uuid.UUID] = []  # segments
     decide_vip_change: list[uuid.UUID] = []  # pending changes
+    # site (entity_id = the site; D-43, plan-pilot-twn §6)
+    tick_readiness: bool = False
