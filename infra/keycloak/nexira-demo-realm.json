@@ -19,15 +19,17 @@
       "implicitFlowEnabled": false,
       "redirectUris": [
         "http://localhost:3000/*",
-        "http://localhost:5173/*"
+        "http://localhost:5173/*",
+        "${NEXIRA_PUBLIC_ORIGIN:http://localhost:3000}/*"
       ],
       "webOrigins": [
         "http://localhost:3000",
-        "http://localhost:5173"
+        "http://localhost:5173",
+        "${NEXIRA_PUBLIC_ORIGIN:http://localhost:3000}"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "http://localhost:3000/*##http://localhost:5173/*"
+        "post.logout.redirect.uris": "http://localhost:3000/*##http://localhost:5173/*##${NEXIRA_PUBLIC_ORIGIN:http://localhost:3000}/*"
       },
       "protocolMappers": [
         {

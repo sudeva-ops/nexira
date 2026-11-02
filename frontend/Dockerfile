@@ -20,9 +20,10 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY security-headers.conf.template /tmp/security-headers.conf.template
 USER root
 # The IdP's origin (scheme://host[:port]) goes into the CSP, at build time, so the
-# configuration stays read-only at run time.
+# configuration stays read-only at run time. A relative URL ("/auth") is the app's own
+# origin, already 'self', so nothing is added (docs/plan-demo-codespaces.md §2).
 RUN mkdir -p /etc/nginx/snippets \
- && NEXIRA_OIDC_ORIGIN="$(echo "$VITE_OIDC_URL" | sed -E 's#^(https?://[^/]+).*#\1#')" \
+ && NEXIRA_OIDC_ORIGIN="$(case "$VITE_OIDC_URL" in //*) echo "$VITE_OIDC_URL" | sed -E 's#^//([^/]+).*#https://\1#';; /*) ;; *) echo "$VITE_OIDC_URL" | sed -E 's#^(https?://[^/]+).*#\1#';; esac)" \
     envsubst '${NEXIRA_OIDC_ORIGIN}' < /tmp/security-headers.conf.template \
     > /etc/nginx/snippets/security-headers.conf \
  && rm /tmp/security-headers.conf.template

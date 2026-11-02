@@ -2,8 +2,16 @@ import Keycloak from "keycloak-js";
 
 // OIDC login (D-04). The token is used only to call the API; the UI never reads
 // roles from it. Roles come from GET /api/me.
+/** The IdP's URL: absolute, or a path on the app's own origin ("/auth"), so one built image
+ * works at any address (docs/plan-demo-codespaces.md §2). */
+export function oidcUrl(configured: string | undefined, origin: string): string {
+  const url = configured || "http://localhost:8080";
+  // "/auth" is a path; "//host" is another host, never relative (review of demo PR 1, L5).
+  return /^\/(?!\/)/.test(url) ? new URL(url, origin).toString().replace(/\/$/, "") : url;
+}
+
 const keycloak = new Keycloak({
-  url: import.meta.env.VITE_OIDC_URL ?? "http://localhost:8080",
+  url: oidcUrl(import.meta.env.VITE_OIDC_URL, window.location.origin),
   realm: import.meta.env.VITE_OIDC_REALM ?? "nexira-demo",
   clientId: import.meta.env.VITE_OIDC_CLIENT_ID ?? "nexira-web",
 });

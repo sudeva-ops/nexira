@@ -24,3 +24,4 @@ infra/tiles/
 # Playwright output
 frontend/test-results/
 frontend/playwright-report/
+.env.public

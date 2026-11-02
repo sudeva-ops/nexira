@@ -1,0 +1,29 @@
+# The public profile (docs/plan-demo-codespaces.md §2): the whole stack on ONE origin,
+# NEXIRA_PUBLIC_ORIGIN (e.g. https://<codespace>-3000.app.github.dev), with Keycloak under
+# /auth behind the frontend's nginx. Used on top of docker-compose.yml:
+#   docker compose --env-file .env.public -f infra/docker-compose.yml -f infra/docker-compose.public.yml
+# The env file sets NEXIRA_PUBLIC_ORIGIN, OIDC_ISSUER=<origin>/auth/realms/nexira-demo and
+# VITE_OIDC_URL=/auth. Local development does not use this file.
+services:
+  keycloak:
+    environment:
+      # Plan G-04 as locally: the issuer is the browser-facing URL; the backend reaches
+      # Keycloak on the internal network for JWKS.
+      KC_HOSTNAME: ${NEXIRA_PUBLIC_ORIGIN:?set it with scripts/public-env.sh}/auth
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "false"  # the backend's JWKS URL is fixed (review L2)
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_HTTP_MANAGEMENT_RELATIVE_PATH: /  # the healthcheck keeps /health/ready on 9000
+      KC_PROXY_HEADERS: xforwarded  # only the frontend's nginx reaches it in this profile
+
+  backend:
+    environment:
+      OIDC_JWKS_URL: http://keycloak:8080/auth/realms/nexira-demo/protocol/openid-connect/certs
+
+  worker:
+    environment:
+      OIDC_JWKS_URL: http://keycloak:8080/auth/realms/nexira-demo/protocol/openid-connect/certs
+
+  frontend:
+    build:
+      args:
+        VITE_OIDC_URL: /auth
