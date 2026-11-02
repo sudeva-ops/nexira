@@ -10,10 +10,26 @@ import type { Exposure, Incident } from "../api/intel";
 import type { Mission } from "../api/people";
 import { type Weather, weatherMarkers, weatherSummary } from "../api/weather";
 import { useReducedMotion } from "../ui/useMotion";
-import { exposureFeatures, missionFeatures, SEVERITY_COLOUR, zoneFeatures } from "./geo";
+import {
+  circlePolygon,
+  exposureColumns,
+  exposureFeatures,
+  missionFeatures,
+  SEVERITY_COLOUR,
+  zoneFeatures,
+} from "./geo";
+import { MapToggle } from "./MapToggle";
 import { registerPmtiles, tilesAvailable } from "./base";
 import { GROW_MS, growScale } from "./motion";
 import { breath, phase, sonar } from "./plane";
+import {
+  applyProjection,
+  globePreferred,
+  SELECT_BEARING,
+  SELECT_PITCH,
+  setGlobePreferred,
+  startSpin,
+} from "./three";
 import { ATTRIBUTION, baseStyle, CITY_MINZOOM } from "./style";
 
 const EMPTY = { type: "FeatureCollection" as const, features: [] };
@@ -61,6 +77,8 @@ export function OperationsMap({
   const wxData = useMemo(() => weatherMarkers(weather, weatherAt), [weather, weatherAt]);
   const reduced = useReducedMotion();
   const known = useRef<Set<string> | null>(null); // incidents already on the map
+  const [globe, setGlobe] = useState(globePreferred);
+  const globeRef = useRef(globe);
   useEffect(() => {
     onSelectRef.current = onSelect;
     weatherRef.current = new Map(weather.map((w) => [w.mission_code, w]));
@@ -77,14 +95,16 @@ export function OperationsMap({
         container: container.current,
         style: baseStyle(window.location.origin, available),
         center: [20, 15],
-        zoom: 1.4,
+        zoom: globeRef.current ? 2 : 1.4, // a globe at 1.4 is small
         attributionControl: { compact: false, customAttribution: ATTRIBUTION },
       });
       created = m;
       m.addControl(new NavigationControl({ showCompass: false }), "top-right");
       m.on("load", () => {
         if (disposed) return;
+        applyProjection(m, globeRef.current);
         m.addSource("zones", { type: "geojson", data: EMPTY });
+        m.addSource("exposure-columns", { type: "geojson", data: EMPTY });
         m.addSource("missions", { type: "geojson", data: EMPTY });
         m.addSource("exposure", { type: "geojson", data: EMPTY });
         m.addLayer({
@@ -98,6 +118,19 @@ export function OperationsMap({
           type: "line",
           source: "zones",
           paint: { "line-color": ["get", "colour"], "line-width": 1.5, "line-dasharray": [3, 2] },
+        });
+        // In 3D, closer in: each impact zone rises as a translucent column, higher for higher
+        // severity, and exposed people and sites stand as small columns at city zoom.
+        m.addLayer({
+          id: "zones-extrude",
+          type: "fill-extrusion",
+          source: "zones",
+          minzoom: 5,
+          paint: {
+            "fill-extrusion-color": ["get", "colour"],
+            "fill-extrusion-height": ["get", "height"],
+            "fill-extrusion-opacity": 0.26,
+          },
         });
         // Missions with an ACTIVE incident send out a sonar ring (two, half a beat apart).
         for (const id of ["mission-halo-a", "mission-halo-b"]) {
@@ -132,6 +165,17 @@ export function OperationsMap({
             "circle-stroke-width": 1,
           },
         });
+        m.addLayer({
+          id: "exposure-columns",
+          type: "fill-extrusion",
+          source: "exposure-columns",
+          minzoom: CITY_MINZOOM + 3,
+          paint: {
+            "fill-extrusion-color": ["get", "colour"],
+            "fill-extrusion-height": ["get", "height"],
+            "fill-extrusion-opacity": 0.85,
+          },
+        }, "zones-extrude"); // under the translucent zone, or the zone hides them
         const popup = new Popup({ closeButton: false, closeOnClick: false });
         for (const layer of ["missions", "exposure"]) {
           m.on("mouseenter", layer, (e) => {
@@ -197,6 +241,10 @@ export function OperationsMap({
         const el = document.createElement("button");
         el.type = "button";
         el.className = fresh.includes(incident.id) ? "nx-incident-marker nx-new" : "nx-incident-marker";
+        // The diamond is drawn on an inner element: MapLibre sets the marker's own transform.
+        const core = document.createElement("span");
+        core.className = "nx-incident-core";
+        el.append(core);
         el.dataset.testid = `incident-marker-${incident.reference}`;
         el.addEventListener("click", () => {
           const current = incidents.find((i) => i.id === incident.id) ?? incident;
@@ -221,13 +269,33 @@ export function OperationsMap({
         changed = true;
       }
     }
-    if (changed) setHazardElements(new Map([...markers.current].map(([id, m]) => [id, m.getElement()])));
+    if (changed) {
+      setHazardElements(
+        new Map(
+          [...markers.current].map(([id, m]) => [
+            id,
+            m.getElement().querySelector<HTMLElement>(".nx-incident-core") ?? m.getElement(),
+          ]),
+        ),
+      );
+    }
     return () => cancelAnimationFrame(frame);
   }, [map, incidents, incidentsLoaded, reduced]);
 
   useEffect(() => {
     (map?.getSource("exposure") as GeoJSONSource | undefined)?.setData(exposureFeatures(exposure));
+    (map?.getSource("exposure-columns") as GeoJSONSource | undefined)?.setData(exposureColumns(exposure));
   }, [map, exposure]);
+
+  // Globe or flat (UI 2), and the slow turn of the world view while nobody touches it.
+  useEffect(() => {
+    globeRef.current = globe;
+    if (map) applyProjection(map, globe);
+  }, [map, globe]);
+  useEffect(() => {
+    if (!map || reduced) return;
+    return startSpin(map, () => globeRef.current);
+  }, [map, reduced]);
 
   // The live picture: impact zones breathe and missions with an ACTIVE incident pulse. None of
   // it with reduced motion; browsers pause animation frames in a hidden tab.
@@ -241,6 +309,7 @@ export function OperationsMap({
         if (map.getLayer("zones-fill")) {
           map.setPaintProperty("zones-fill", "fill-opacity", breath(now, BREATH_MS, 0.08, 0.26));
           map.setPaintProperty("zones-line", "line-opacity", breath(now, BREATH_MS, 0.5, 1));
+          map.setPaintProperty("zones-extrude", "fill-extrusion-opacity", breath(now, BREATH_MS, 0.18, 0.34));
         }
         const k = phase(now, PULSE_MS);
         for (const [id, offset] of [["mission-halo-a", 0], ["mission-halo-b", 0.5]] as const) {
@@ -293,13 +362,33 @@ export function OperationsMap({
 
   useEffect(() => {
     const incident = incidents.find((i) => i.id === selectedId);
-    if (map && incident) map.flyTo({ center: [incident.lon, incident.lat], zoom: 11.2 });
+    // A tilted camera on the incident, its whole zone in view, so the zone and the people in
+    // it stand up (UI 2); at most city zoom for a small zone.
+    if (map && incident) {
+      const ring = circlePolygon(incident.lon, incident.lat, incident.impact_radius_m).coordinates[0] ?? [];
+      const lons = ring.map((p) => p[0] ?? incident.lon);
+      const lats = ring.map((p) => p[1] ?? incident.lat);
+      map.fitBounds(
+        [
+          [Math.min(...lons), Math.min(...lats)],
+          [Math.max(...lons), Math.max(...lats)],
+        ],
+        { padding: 40, maxZoom: 12, pitch: reduced ? 0 : SELECT_PITCH, bearing: reduced ? 0 : SELECT_BEARING },
+      );
+    }
     // Only when the selection changes, not on every refetch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, selectedId]);
 
   return (
     <div className="nx-map" ref={container} data-testid="operations-map">
+      <MapToggle
+        globe={globe}
+        onChange={(g) => {
+          setGlobePreferred(g);
+          setGlobe(g);
+        }}
+      />
       {incidents.map((i) => {
         const el = hazardElements.get(i.id);
         return el && isHazard(i.category)

@@ -8,7 +8,9 @@ import { useReducedMotion } from "../ui/useMotion";
 import { registerPmtiles, tilesAvailable } from "./base";
 import { flightFeatures, routeFeatures } from "./geo";
 import { DASH_FRAMES, DASH_STEP_MS, GLIDE_MS, glideFlights, type LonLat, positions } from "./motion";
+import { MapToggle } from "./MapToggle";
 import { phase, PLANE_ICON, planeImage, sonar } from "./plane";
+import { applyProjection, globePreferred, setGlobePreferred } from "./three";
 import { ATTRIBUTION, baseStyle } from "./style";
 
 const EMPTY = { type: "FeatureCollection" as const, features: [] };
@@ -29,6 +31,8 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
   const onSelectRef = useRef(onSelect);
   const reduced = useReducedMotion();
   const drawn = useRef(new Map<string, LonLat>()); // where each aircraft is on screen now
+  const [globe, setGlobe] = useState(globePreferred);
+  const globeRef = useRef(globe);
   useEffect(() => {
     onSelectRef.current = onSelect;
   });
@@ -44,13 +48,14 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
         container: container.current,
         style: baseStyle(window.location.origin, available),
         center: [40, 15],
-        zoom: 1.6,
+        zoom: globeRef.current ? 2 : 1.6, // a globe at 1.6 is small
         attributionControl: { compact: false, customAttribution: ATTRIBUTION },
       });
       created = m;
       m.addControl(new NavigationControl({ showCompass: false }), "top-right");
       m.on("load", () => {
         if (disposed) return;
+        applyProjection(m, globeRef.current);
         m.addSource("routes", { type: "geojson", data: EMPTY });
         m.addSource("flights", { type: "geojson", data: EMPTY });
         // The part of each route flown is solid; the part ahead is dashed and moves along.
@@ -144,6 +149,11 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
     (map?.getSource("routes") as GeoJSONSource | undefined)?.setData(routeFeatures(flights));
   }, [map, flights]);
 
+  useEffect(() => {
+    globeRef.current = globe;
+    if (map) applyProjection(map, globe);
+  }, [map, globe]);
+
   // Aircraft glide from where they are drawn to their new position (positions arrive
   // every 15 s, D-33) instead of jumping.
   useEffect(() => {
@@ -214,6 +224,13 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
 
   return (
     <div className="nx-map nx-air-map" ref={container} data-testid="air-map">
+      <MapToggle
+        globe={globe}
+        onChange={(g) => {
+          setGlobePreferred(g);
+          setGlobe(g);
+        }}
+      />
       {baseMissing && <div className="nx-map-note">Base map not installed. Run `make tiles` (D-24).</div>}
     </div>
   );

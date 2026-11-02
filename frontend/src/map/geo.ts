@@ -64,6 +64,14 @@ export function missionFeatures(missions: Mission[]): FeatureCollection<Point> {
 }
 
 /** Impact zones; `scale` draws a zone partly grown (0..1), as when an incident appears. */
+/** How high an impact zone rises in the 3D view, by severity (metres; illustrative). */
+export const ZONE_HEIGHT_M: Record<Severity, number> = {
+  CRITICAL: 2400,
+  HIGH: 1600,
+  MODERATE: 1000,
+  LOW: 600,
+};
+
 export function zoneFeatures(incidents: Incident[], scale: (id: string) => number = () => 1): FeatureCollection<Polygon> {
   return {
     type: "FeatureCollection",
@@ -72,7 +80,11 @@ export function zoneFeatures(incidents: Incident[], scale: (id: string) => numbe
         type: "Feature",
         id: i.reference,
         geometry: circlePolygon(i.lon, i.lat, Math.max(1, i.impact_radius_m * scale(i.id))),
-        properties: { reference: i.reference, colour: SEVERITY_COLOUR[i.severity] },
+        properties: {
+          reference: i.reference,
+          colour: SEVERITY_COLOUR[i.severity],
+          height: ZONE_HEIGHT_M[i.severity], // the raised zone in the 3D view
+        },
       }),
     ),
   };
@@ -228,4 +240,37 @@ export function routeFeatures(flights: FlightLike[]): FeatureCollection<LineStri
     }
   }
   return { type: "FeatureCollection", features };
+}
+
+const COLUMN_M = 70; // half the side of an exposure column
+
+/** The exposed people and sites as small columns for the 3D view at city zoom: sites taller
+ * than people, each in its own colour. */
+export function exposureColumns(exposure: Exposure[]): FeatureCollection<Polygon> {
+  const points = exposureFeatures(exposure).features;
+  return {
+    type: "FeatureCollection",
+    features: points.map((p) => {
+      const [lon, lat] = p.geometry.coordinates as [number, number];
+      const dLat = COLUMN_M / 111_320;
+      const dLon = COLUMN_M / (111_320 * Math.max(0.1, Math.cos((lat * Math.PI) / 180)));
+      return {
+        type: "Feature",
+        id: p.id,
+        geometry: {
+          type: "Polygon",
+          coordinates: [
+            [
+              [lon - dLon, lat - dLat],
+              [lon + dLon, lat - dLat],
+              [lon + dLon, lat + dLat],
+              [lon - dLon, lat + dLat],
+              [lon - dLon, lat - dLat],
+            ],
+          ],
+        },
+        properties: { ...p.properties, height: p.properties?.kind === "SITE" ? 1500 : 700 },
+      };
+    }),
+  };
 }
