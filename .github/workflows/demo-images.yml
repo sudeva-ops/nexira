@@ -15,7 +15,9 @@ permissions:
 
 env:
   REGISTRY: ghcr.io/${{ github.repository_owner }}
-  TILES_BUILD: "20261024"  # the Protomaps daily build the tiles are pinned to
+  # The latest Protomaps daily build: old daily builds are removed, so a pin breaks after about
+  # a week. The image records the build it used in /srv/tiles/BUILD.txt.
+  TILES_BUILD: ""
 
 jobs:
   images:
