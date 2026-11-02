@@ -59,10 +59,10 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     # (0003), airport, flight and flight_event (0004), weather_current (0005), partner and
     # partner_request (0006), travel_document (0007), mission_climate_risk (0008), the four
     # health tables (0009), the three evacuation tables (0010), the two fleet tables (0011),
-    # the four VIP tables (0012), and alembic_version.
+    # the four VIP tables (0012), the five Site Twin tables (0013), and alembic_version.
     assert (
         len(upgraded["tables"] - before["tables"])
-        == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 2 + 4 + 1
+        == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 2 + 4 + 5 + 1
     )
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
@@ -917,6 +917,55 @@ def test_downgrading_0012_restores_0011_exactly(fresh: DbUrls) -> None:
             "vip_segment_change_guard",
             "vip_segment_guard",
             "vip_visit_guard",
+        )
+    ]
+    command.upgrade(cfg, "head")
+
+
+TWIN_TABLES = ("site_presence", "site_readiness_item", "site_route", "site_sensor", "site_zone")
+
+
+def test_downgrading_0013_restores_0012_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0012")
+    at_0012 = asyncio.run(_shape(admin, TWIN_TABLES, "site%guard"))
+    at_0012_vip = asyncio.run(_shape(admin, VIP_TABLES, "vip%guard"))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_shape(admin, TWIN_TABLES, "site%guard"))
+    command.downgrade(cfg, "0012")
+    assert asyncio.run(_shape(admin, TWIN_TABLES, "site%guard")) == at_0012
+    assert asyncio.run(_shape(admin, VIP_TABLES, "vip%guard")) == at_0012_vip
+    assert at_0012["tables"] == []
+    # PC-39..42: FORCE RLS; read and added by the app; the backup role reads them. Presence is
+    # also deleted (a departure); the rest changes through column grants only.
+    seeded = (
+        "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+        "nexira_app=ar/nexira_owner}"
+    )
+    presence = (
+        "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+        "nexira_app=ard/nexira_owner}"
+    )
+    assert at_head["tables"] == [
+        (table, True, presence if table == "site_presence" else seeded) for table in TWIN_TABLES
+    ]
+    assert at_head["columns"] == [
+        ("site_presence", "zone_id"),
+        ("site_readiness_item", "done_by"),
+        ("site_sensor", "detail"),
+        ("site_sensor", "status"),
+    ]
+    assert at_head["policies"] == 5
+    assert at_head["search_paths"] == [
+        (name, '{"search_path=pg_catalog, public, pg_temp"}')
+        for name in (
+            "site_presence_guard",
+            "site_readiness_item_guard",
+            "site_route_guard",
+            "site_sensor_guard",
+            "site_zone_guard",
         )
     ]
     command.upgrade(cfg, "head")

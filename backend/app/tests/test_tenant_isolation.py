@@ -44,6 +44,8 @@ class Ids:
     asset: uuid.UUID
     visit: uuid.UUID
     vip_segment: uuid.UUID
+    site: uuid.UUID
+    zone: uuid.UUID
 
 
 PT = "'SRID=4326;POINT(36.8245 -1.2838)'"
@@ -57,8 +59,8 @@ ROWS: dict[str, str] = {
     "VALUES ('{mission}', '{t}', 'NBO', 'Nairobi', 'KE', " + PT + ")",
     "user_role": "INSERT INTO user_role (tenant_id, user_id, role_id, mission_id) "
     "VALUES ('{t}', '{user}', '{role}', '{mission}')",
-    "site": "INSERT INTO site (tenant_id, mission_id, site_type, name, location) "
-    "VALUES ('{t}', '{mission}', 'EMBASSY', 'Embassy', " + PT + ")",
+    "site": "INSERT INTO site (id, tenant_id, mission_id, site_type, name, location) "
+    "VALUES ('{site}', '{t}', '{mission}', 'EMBASSY', 'Embassy', " + PT + ")",
     "person": "INSERT INTO person (id, tenant_id, mission_id, person_type, full_name) "
     "VALUES ('{person}', '{t}', '{mission}', 'DIPLOMAT', 'Test Person')",
     "location_observation": "INSERT INTO location_observation (tenant_id, person_id, source, "
@@ -163,6 +165,16 @@ ROWS: dict[str, str] = {
     "reason, proposed_by) VALUES ('{t}', '{vip_segment}', true, 'r', '{user}')",
     "vip_checklist_item": "INSERT INTO vip_checklist_item (tenant_id, visit_id, label, due_on) "
     "VALUES ('{t}', '{visit}', 'Survey', current_date)",
+    "site_zone": "INSERT INTO site_zone (id, tenant_id, site_id, code, name, kind, x, y, w, h) "
+    "VALUES ('{zone}', '{t}', '{site}', 'g2', 'Gate 2', 'GATE', 680, 340, 90, 45)",
+    "site_route": "INSERT INTO site_route (tenant_id, site_id, code, label, path, exit_zone_id) "
+    "VALUES ('{t}', '{site}', 'B', 'Route B', '[[680, 200], [725, 340]]', '{zone}')",
+    "site_presence": "INSERT INTO site_presence (tenant_id, site_id, zone_id, kind, person_id) "
+    "VALUES ('{t}', '{site}', '{zone}', 'STAFF', '{person}')",
+    "site_sensor": "INSERT INTO site_sensor (tenant_id, site_id, zone_id, code, kind, label) "
+    "VALUES ('{t}', '{site}', '{zone}', 'G2-READER', 'BADGE_READER', 'Gate 2 · badge reader')",
+    "site_readiness_item": "INSERT INTO site_readiness_item (tenant_id, site_id, label) "
+    "VALUES ('{t}', '{site}', 'Floor wardens assigned (3)')",
     "fleet_asset": "INSERT INTO fleet_asset (id, tenant_id, mission_id, code, kind, type_label, "
     "seats, location, location_label, fuel_pct) VALUES ('{asset}', '{t}', '{mission}', 'VH-01', "
     "'VEHICLE', 'Armoured SUV (B6)', 4, " + PT + ", 'Embassy garage', 82)",
@@ -214,6 +226,13 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "vip_segment",  # UPDATE of status, times and virtual only, no DELETE (PC-36)
     "vip_segment_change",  # UPDATE of the decision only, no DELETE (PC-38)
     "vip_checklist_item",  # UPDATE of done_by only, no DELETE (PC-37)
+    "site_zone",  # seeded; no UPDATE or DELETE (PC-39)
+    "site_route",  # seeded; no UPDATE or DELETE (PC-40)
+    "site_sensor",  # UPDATE of status and detail only, no DELETE (PC-42)
+    "site_readiness_item",  # UPDATE of done_by only, no DELETE (PC-42)
+}
+NO_UPDATE = {  # an UPDATE of other columns is refused; a DELETE is a departure
+    "site_presence",  # UPDATE of zone_id only (PC-41)
 }
 NO_DELETE = {  # PC-07, PC-10, PC-11 (checkin_response: PC-12, in NO_UPDATE_DELETE)
     "message_template",
@@ -333,6 +352,10 @@ async def test_tenant_b_cannot_update_or_delete_tenant_a_rows(
         for stmt in (f"UPDATE {table} SET tenant_id = tenant_id", f"DELETE FROM {table}"):
             with pytest.raises(asyncpg.InsufficientPrivilegeError):
                 await api.execute(stmt)
+    elif table in NO_UPDATE:
+        with pytest.raises(asyncpg.InsufficientPrivilegeError):
+            await api.execute(f"UPDATE {table} SET tenant_id = tenant_id")
+        assert await api.execute(f"DELETE FROM {table}") == "DELETE 0"
     else:
         assert await api.execute(f"UPDATE {table} SET tenant_id = tenant_id") == "UPDATE 0"
         if table in NO_DELETE:
@@ -361,7 +384,8 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
             r"|evacuation plan: no such mission|evacuation manifest: no such evacuation"
             r"|fleet asset: no such mission|fleet maintenance: no such asset"
             r"|vip visit: no such mission|vip segment: no such visit|vip change: no such segment"
-            r"|vip checklist: no such visit"
+            r"|vip checklist: no such visit|site zone: no such site|site route: no such site"
+            r"|site presence: no such site|site sensor: no such site|site readiness: no such site"
         ),
     ):
         await api.execute(sql_for(table, world.a))
