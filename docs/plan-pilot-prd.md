@@ -94,7 +94,7 @@ For the selected mission, each non-zero component is shown with:
 
 ## 8. The Forecast agent (PRD-06, §83 Q7)
 
-**G-1 · needs a decision.** The approved PRD-06 has the agent propose a programme change for a VIP segment. That conflicts with D-42 and VIP-06:
+**G-1 · decided: option B** (the product owner, 2026-11-03, PR #127). The approved PRD-06 has the agent propose a programme change for a VIP segment. That conflicts with D-42 and VIP-06:
 - A visit "does not exist" for anyone outside the protection roles. The Decision Queue is readable by every role, so a proposal naming the visit, a segment, a venue or a time would reveal it to the Viewer.
 - D-42 says "no agent acts on visits".
 - The VIP module lets only a Security Officer propose a change (`PROPOSER`). PC-48's approvers (Security Officer, Duty Officer, HQ Crisis Director) do not match.
@@ -166,7 +166,7 @@ The options:
 
 | # | Gap | Proposed answer |
 |---|---|---|
-| G-1 | **Needs a decision.** An agent proposal about a VIP segment would reveal a restricted visit to every role (D-42, VIP-06), and D-42 says no agent acts on visits | **Option B** (§8): an advice-only, visit-free readiness proposal; the VIP change stays with the Security Officer on VIP Protection. PC-48 becomes the agent row only; Prompt 102 is not 🔒. |
+| G-1 | **Decided: option B** (PR #127). An agent proposal about a VIP segment would reveal a restricted visit to every role (D-42, VIP-06), and D-42 says no agent acts on visits | **Option B** (§8): an advice-only, visit-free readiness proposal; the VIP change stays with the Security Officer on VIP Protection. PC-48 becomes the agent row only; Prompt 102 is not 🔒. |
 | G-2 | The index's points | As §2, chosen so one CRITICAL incident gives about 80 and a calm mission never reaches 70; all in one table in `predictive/service.py`. |
 | G-3 | The seeded history must meet today's computed value | It drifts into the calm index, so the line has no jump at "Today" in the calm state. |
 | G-4 | Auditing a snapshot every 15 minutes would flood the audit log | Audit the first snapshot of each day per tenant; the updates are derived figures, recomputable from the audited sources. |
@@ -191,4 +191,7 @@ The options:
 
 As `docs/prompts-pilot.md` Prompts 100–105. With option B, Prompt 102 adds the FORECAST agent (advice only) and is not 🔒; PC-48 is the agent row only.
 
-Reply "approved with option B" (or "option A") to settle G-1; the rest follows as proposed.
+## 15. Decisions by the product owner (2026-11-03, PR #127: "approved with option B")
+
+- G-1: option B. The Forecast agent raises a visit-free, advice-only `ADVISE_READINESS_CHECK`; the VIP change stays with the Security Officer on VIP Protection. PC-48 is the agent row only; Prompt 102 is not 🔒.
+- G-2..G-8: as proposed.
