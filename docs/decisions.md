@@ -191,7 +191,7 @@ Record each sign-off in the PR.
 | 12. **VIP & Delegation Protection** (VIP), simulated (D-42) | |
 | 13. **Site Twin** (TWN), simulated (D-43) | |
 | 14. **Supply Chain & Third-Party Risk** (SUP), simulated (D-44) | |
-| 15. **Executive Overview** (EXE), from existing data (D-45, **proposed**) | |
+| 15. **Executive Overview** (EXE), from existing data (D-45) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -280,7 +280,7 @@ Rules:
 - **Derived disruption.** ROUTE BLOCKED, ALTERNATE and "impacted" are worked out from reported statuses and ACTIVE incidents on every read, so they clear by themselves.
 - **People decide.** A mitigation is recorded by a person through `app/core/approvals.py` and audited. No agent acts on suppliers.
 
-**D-45 · Executive Overview. Proposed, awaiting the product owner.** Requirements EXE-01 to EXE-06 in `docs/requirements-pilot.md` §74–78, with the proposed defaults in §78. Would amend D-30 by adding Executive Overview to the pilot.
+**D-45 · Executive Overview.** Approved by the product owner on 2026-11-03 (PR #119). Requirements EXE-01 to EXE-06 in `docs/requirements-pilot.md` §74–78, with the defaults in §78. Amends D-30 by adding Executive Overview to the pilot.
 - **Derived, not entered.** Every figure is worked out on read from existing data; no new table, no seeded history, no invented baseline.
 - **Aggregates only.** No person's name appears on the overview or in the exported briefing; every role sees it.
 - **Explainable.** Posture, regional exposure and the timing figure use stated, simple rules, so leadership can be told how each number is made.

@@ -892,7 +892,7 @@ Playwright on the real stack:
 - **The Viewer** sees the same page.
 - `make acceptance` (all existing specs) still passes.
 
-## 78. Questions for the product owner (proposed defaults)
+## 78. Questions answered by the product owner (2026-11-03: "use the defaults")
 
 1. **Scope:** a read-only leadership page built from existing data; nothing new is entered. *Default: yes.*
 2. **Posture:** SEVERE if any mission is CRITICAL, ELEVATED if any is HIGH or an incident is ACTIVE, else GUARDED. *Default: yes.*

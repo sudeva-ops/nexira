@@ -858,9 +858,9 @@ Playwright, real stack (requirements-pilot.md §72). Report the real output; mak
 acceptance (all specs) still passes.
 ```
 
-## Pilot module 15 · Executive Overview (proposed, awaiting the product owner)
+## Pilot module 15 · Executive Overview (approved 2026-11-03, PR #119)
 
-Sources: D-45 (proposed), `docs/requirements-pilot.md` §74–78 (EXE-01..06). Derived from existing data only; no schema change.
+Sources: D-45, `docs/requirements-pilot.md` §74–78 (EXE-01..06). Derived from existing data only; no schema change.
 
 ### Prompt 95 · Read and plan (no code)
 ```
