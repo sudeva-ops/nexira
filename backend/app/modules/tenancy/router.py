@@ -16,6 +16,7 @@ from app.modules.notifications import compose
 from app.modules.notifications.models import NotificationCampaign
 from app.modules.playbooks import service as playbooks
 from app.modules.playbooks.schemas import PermissionsOut
+from app.modules.supply import service as supply
 from app.modules.tenancy.schemas import MeOut, RoleOut
 from app.modules.travel import trips
 from app.modules.travel.models import Trip
@@ -64,6 +65,7 @@ async def my_permissions(
         "fleet",
         "vip_visit",
         "site",
+        "supplier",
     ],
     user: Annotated[CurrentUser, Depends(current_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -156,6 +158,15 @@ async def my_permissions(
             entity_type=entity_type,
             entity_id=str(entity_id),
             tick_readiness=(await twin.permissions(session, user, entity_id)).tick_readiness,
+        )
+    if entity_type == "supplier":
+        # SUP-04: entity_id is the supplier; the endpoints' own checks.
+        mitigating = await supply.permissions(session, user, documents.today_utc(), entity_id)
+        return PermissionsOut(
+            entity_type=entity_type,
+            entity_id=str(entity_id),
+            activate_mitigation=mitigating.activate_mitigation,
+            stand_down_mitigation=mitigating.stand_down_mitigation,
         )
     if entity_type == "trip":
         trip = await session.get(Trip, entity_id)

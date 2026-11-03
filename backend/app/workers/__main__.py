@@ -19,6 +19,7 @@ from app.modules.notifications.consumer import campaign_handler, tick
 from app.modules.partners import service as partners
 from app.modules.partners.adapter import PartnerAdapter, adapter_for
 from app.modules.playbooks.consumer import resume_runs, run_handler
+from app.modules.supply import consumer as supply
 from app.modules.travel import tracker
 from app.modules.twin import consumer as twin
 from app.modules.vip import consumer as vip
@@ -226,10 +227,19 @@ async def main() -> None:
                 "SITE_SENSOR": twin.sensor_handler(engine, publisher),
             },
         ),
+        StreamConsumer(
+            client,
+            group="supply",
+            consumer=name,
+            handlers={
+                "SUPPLY_ROUTE": supply.route_handler(engine, publisher),
+                "SUPPLY_SUPPLIER": supply.supplier_handler(engine, publisher),
+            },
+        ),
     ]
     log.info(
         "consumers started: intel, exposure, playbooks, notifications, agents, flights, weather, "
-        "checkin, hazards, health, evacuation, fleet, vip, twin"
+        "checkin, hazards, health, evacuation, fleet, vip, twin, supply"
     )
     try:
         async with asyncio.TaskGroup() as tasks:
