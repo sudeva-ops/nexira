@@ -3,6 +3,7 @@ import type { QueryKey } from "@tanstack/react-query";
 import { checkinKeys } from "./checkin";
 import { documentKeys } from "./documents";
 import { evacuationKeys } from "./evacuations";
+import { executiveKeys } from "./executive";
 import { fleetKeys } from "./fleet";
 import { supplyKeys } from "./supply";
 import { twinKeys } from "./twin";
@@ -31,8 +32,30 @@ export interface RealtimeEvent {
   data: Record<string, unknown>;
 }
 
+// The events that move an Executive Overview figure (plan-pilot-exe §7).
+const EXECUTIVE_EVENTS = new Set([
+  "SIGNAL_INGESTED",
+  "INCIDENT_CREATED",
+  "INCIDENT_UPDATED",
+  "EXPOSURE_COMPUTED",
+  "PLAYBOOK_STEP", // a shelter alert
+  "CAMPAIGN_QUEUED",
+  "CAMPAIGN_UPDATED",
+  "CHECKIN_UPDATED",
+  "CHECKIN_ESCALATED",
+  "EVACUATION_UPDATED",
+  "HEALTH_ADVISORY_UPDATED",
+  "FLEET_UPDATED",
+  "SUPPLY_UPDATED",
+]);
+
 /** The cached queries an event makes stale. */
 export function staleKeys(event: RealtimeEvent): QueryKey[] {
+  const keys = moduleKeys(event);
+  return EXECUTIVE_EVENTS.has(event.event) ? [...keys, executiveKeys.all] : keys;
+}
+
+function moduleKeys(event: RealtimeEvent): QueryKey[] {
   const incidentId = typeof event.data.incident_id === "string" ? event.data.incident_id : null;
   const incident = incidentId ? [keys.incident(incidentId)] : [];
   switch (event.event) {
