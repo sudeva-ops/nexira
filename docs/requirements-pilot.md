@@ -953,7 +953,7 @@ Playwright on the real stack:
 - **Audit**: the snapshot, the event, the proposal and its approval are audited, and the chain verifies.
 - `make acceptance` (all existing specs) still passes.
 
-## 83. Questions for the product owner (proposed defaults)
+## 83. Questions answered by the product owner (2026-11-03: "use the defaults")
 
 1. **Scope:** an explainable daily index, a 14-day projection with a band, drivers, rising risk and recommended actions, an events calendar, and one Forecast-agent proposal. *Default: yes.*
 2. **The model:** a transparent rule-based index and projection, labelled "illustrative model", rather than a trained model; every number can be traced to its components. *Default: yes.*

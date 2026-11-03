@@ -192,7 +192,7 @@ Record each sign-off in the PR.
 | 13. **Site Twin** (TWN), simulated (D-43) | |
 | 14. **Supply Chain & Third-Party Risk** (SUP), simulated (D-44) | |
 | 15. **Executive Overview** (EXE), from existing data (D-45) | |
-| 16. **Predictive Risk** (PRD), illustrative model and simulated calendar (D-46, **proposed**) | |
+| 16. **Predictive Risk** (PRD), illustrative model and simulated calendar (D-46) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -286,7 +286,7 @@ Rules:
 - **Aggregates only.** No person's name appears on the overview or in the exported briefing; every role sees it.
 - **Explainable.** Posture, regional exposure and the timing figure use stated, simple rules, so leadership can be told how each number is made.
 
-**D-46 · Predictive Risk (illustrative). Proposed, awaiting the product owner.** Requirements PRD-01 to PRD-08 in `docs/requirements-pilot.md` §79–83, with the proposed defaults in §83. Would amend D-30 by adding Predictive Risk to the pilot.
+**D-46 · Predictive Risk (illustrative).** Approved by the product owner on 2026-11-03 (PR #126). Requirements PRD-01 to PRD-08 in `docs/requirements-pilot.md` §79–83, with the defaults in §83. Amends D-30 by adding Predictive Risk to the pilot.
 - **Explainable, not trained.** The risk index and its 14-day projection are rule-based and labelled "illustrative model"; every number traces to stated components. No precision or recall is claimed.
 - **Advisory only.** Nothing changes because of a forecast. The Forecast agent may only propose a VIP programme change, which a person approves and the VIP module's two people then decide (D-12, D-16, D-42).
 - **Simulated inputs.** The events calendar and the first 30 days of history are seeded and labelled (D-19).

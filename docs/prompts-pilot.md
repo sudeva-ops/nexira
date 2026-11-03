@@ -893,9 +893,9 @@ Playwright, real stack (requirements-pilot.md §77). Report the real output; mak
 acceptance (all specs) still passes.
 ```
 
-## Pilot module 16 · Predictive Risk (proposed, awaiting the product owner)
+## Pilot module 16 · Predictive Risk (approved 2026-11-03, PR #126)
 
-Sources: D-46 (proposed), `docs/requirements-pilot.md` §79–83 (PRD-01..08), PC-46..48. An illustrative, explainable model; advisory only.
+Sources: D-46, `docs/requirements-pilot.md` §79–83 (PRD-01..08), PC-46..48. An illustrative, explainable model; advisory only.
 
 ### Prompt 99 · Read and plan (no code)
 ```
