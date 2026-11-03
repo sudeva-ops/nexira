@@ -1469,3 +1469,60 @@ TWIN_LABELS = [
     ("Guard 3", "lob", "lob"),
     *[(f"Visitor {n}", "cons" if n <= 9 else "lob", "conf") for n in range(1, 12)],
 ]
+
+# --- Supply Chain & Third-Party Risk (D-44, SUP-01; docs/plan-pilot-sup.md §2, §3) -------------
+# Illustrative and fictional: no real company is meant. 52 suppliers across the 36 missions, 14
+# in Tier 1 (the design's KPIs). (code, name, service, mission code or None for Global, tier,
+# backup code, status, detail). Backups come first: they are frozen once referenced (PC-43).
+POUCH = "Diplomatic pouch courier"
+SUPPLY_GLOBAL_BACKUPS = [
+    ("SUP-301", "Meridian Global Couriers", POUCH),
+    ("SUP-302", "Atlas Secure Mobility", "Armoured vehicle leasing"),
+    ("SUP-303", "Continental Freight Partners", "Freight & relocation"),
+    ("SUP-304", "Crestline Facilities Group", "Facilities management"),
+]
+WATCH = "Monitoring local disruption"
+SUPPLY_NAIROBI = [
+    ("SUP-105", "Kestrel Express Couriers", POUCH, 2, None),
+    ("SUP-118", "Highland Guard Services", "Guard force contractor", 2, None),
+    ("SUP-122", "Mara Energy Supplies", "Generator fuel supply", 2, None),
+    ("SUP-127", "Upesi Networks", "Local ISP & IT support", 2, None),
+    ("SUP-104", "Swiftline Couriers", POUCH, 1, "SUP-105"),
+    ("SUP-117", "Equator Guard Services", "Guard force contractor", 1, "SUP-118"),
+    ("SUP-121", "Rift Valley Fuels", "Generator fuel supply", 2, "SUP-122"),
+    ("SUP-126", "Savanna IT Networks", "Local ISP & IT support", 1, "SUP-127"),
+    ("SUP-130", "Kilima Catering", "Catering services", 3, None),
+]
+# The design's other named suppliers: (code, name, service, mission, tier, backup, status).
+SUPPLY_NAMED = [
+    ("SUP-208", "Gulfstar Logistics", "Freight & relocation", "RUH", 2, "SUP-303", "NORMAL"),
+    ("SUP-233", "Nile Secure Mobility", "Armoured vehicle leasing", "CAI", 1, "SUP-302", "NORMAL"),
+    ("SUP-251", "Indus Facilities", "Facilities management", "ISB", 2, "SUP-304", "WATCH"),
+    ("SUP-262", "Archipelago Movers", "Local transport", "JKT", 3, None, "WATCH"),
+    ("SUP-305", "Northbridge Translations", "Interpretation services", None, 3, None, "NORMAL"),
+]  # fmt: skip
+# Every other mission's pouch courier (G-1), backed by SUP-301; Tier 1 at these ten.
+SUPPLY_TIER1_COURIERS = {"ADD", "BGW", "ABV", "AMM", "PRY", "MOW", "ANK", "DAC", "MNL", "DEL"}
+SUPPLY_FIRST_CODE = 201  # in mission order, skipping the design's codes
+# Three more routine local suppliers, to the design's 52.
+SUPPLY_EXTRA = [
+    ("SUP-281", "Addis Facility Services", "Facilities management", "ADD"),
+    ("SUP-282", "Tigris Catering", "Catering services", "BGW"),
+    ("SUP-283", "Abuja Local Transport", "Local transport", "ABV"),
+]
+SUPPLY_VETTING_DAYS = (180, 540)  # vetting valid for 6-18 months after the seed date
+# Routes (§3): Nairobi's four as the design; one pouch route at every other mission but the two
+# multilateral ones (G-3). Points are (lat, lon).
+JKIA = (-1.3192, 36.9278)
+SUPPLY_NAIROBI_ROUTES = [
+    ("R-NBO-1", "Pouch: Embassy → JKIA via CBD", "POUCH", "SUP-104", None,
+     (EMBASSY, (-1.2864, 36.8172), (-1.3000, 36.8600), JKIA)),
+    ("R-NBO-2", "Pouch: Embassy → JKIA via Southern Bypass", "POUCH", "SUP-104", "R-NBO-1",
+     (EMBASSY, (-1.3180, 36.7950), (-1.3350, 36.8500), JKIA)),
+    ("R-NBO-3", "Fuel: depot → Embassy", "FUEL", "SUP-121", None,
+     ((-1.3100, 36.8500), (-1.3000, 36.8250), EMBASSY)),
+    ("R-NBO-4", "Staff shuttle: Westlands → Embassy", "STAFF_TRANSPORT", "SUP-117", None,
+     ((-1.2676, 36.8108), (-1.2800, 36.8100), EMBASSY)),
+]  # fmt: skip
+SUPPLY_NO_ROUTE = {"GVA", "NYC"}  # multilateral missions (G-3)
+SUPPLY_ROUTE_OFFSET = 0.1  # degrees: an illustrative airport about 15 km out

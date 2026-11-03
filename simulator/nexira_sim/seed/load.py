@@ -24,6 +24,7 @@ from app.modules.people import location
 from app.modules.people.service import add_observations, ensure_mission, load_persons, load_sites
 from app.modules.playbooks.service import StepIn, ensure_playbook, retire_older_versions
 from app.modules.scenarios.service import ensure_scenario
+from app.modules.supply import service as supply
 from app.modules.tenancy.service import ensure_reference_counter
 from app.modules.travel.service import (
     AirportIn,
@@ -39,7 +40,7 @@ from app.modules.vip import service as vip
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from nexira_sim.scenarios import add_visit, nbo_fleet, nbo_site
+from nexira_sim.scenarios import add_visit, nbo_fleet, nbo_site, nbo_supply
 from nexira_sim.scenarios import dac_cyclone as dac
 from nexira_sim.scenarios import fra_national_protests as fra
 from nexira_sim.scenarios import mnl_tropical_storm as mnl
@@ -318,6 +319,11 @@ async def seed_all(
         report["fleet_assets"] = await fleet.ensure_assets(
             session, _fleet(w, mission_ids), scenario_date
         )
+        # Supply Chain (D-44, plan-pilot-sup §2, §3): 52 suppliers and 37 routes, after Fleet
+        # (a fuel supplier's stock is read from GEN-<mission>).
+        report["supply"] = await supply.ensure_register(
+            session, *_supply(w, mission_ids, scenario_date)
+        )
 
         # VIP & Delegation Protection (D-42, plan-pilot-vip §2): the restricted TRP-8834 and
         # VV-<year>-031, after the identities (G-7).
@@ -449,6 +455,14 @@ async def seed_all(
             name=nbo_site.NAME,
             description=nbo_site.DESCRIPTION,
             events=nbo_site.build_events(w, tenant_id),
+        )
+        report["scenario_supply"] = await ensure_scenario(
+            session,
+            scenario_id=seed_id(tenant_id, "scenario", nbo_supply.CODE),
+            code=nbo_supply.CODE,
+            name=nbo_supply.NAME,
+            description=nbo_supply.DESCRIPTION,
+            events=nbo_supply.build_events(w, tenant_id),
         )
         report["scenario_fleet"] = await ensure_scenario(
             session,
@@ -700,6 +714,88 @@ async def _air_trips(
         if scenario:
             await ensure_scenario_flight(session, trip_id)
     return created
+
+
+def _supply(
+    w: world.World, mission_ids: dict[str, uuid.UUID], scenario_date: date
+) -> tuple[list[supply.SupplierIn], list[supply.RouteIn]]:
+    """The register and routes as plan-pilot-sup §2, §3 (G-1..G-3). Illustrative and fictional;
+    the Nairobi suppliers and the design's named ones exactly as the design."""
+    low, high = data.SUPPLY_VETTING_DAYS
+    n = 0
+
+    def make(
+        code: str,
+        name: str,
+        service: str,
+        mission: str | None,
+        tier: int,
+        backup: str | None = None,
+        status: str = "NORMAL",
+    ) -> supply.SupplierIn:
+        nonlocal n
+        n += 1
+        return supply.SupplierIn(
+            code=code,
+            name=name,
+            service=service,
+            mission_id=mission_ids[mission] if mission else None,
+            tier=tier,
+            vetting_valid_until=scenario_date + timedelta(days=low + (n * 37) % (high - low)),
+            backup_code=backup,
+            in_bcp=tier == 1,
+            performance_score=92 if code == "SUP-104" else 78 + (n * 7) % 21,
+            status=status,
+            status_detail=data.WATCH if status == "WATCH" else None,
+        )
+
+    suppliers = [make(c, name, service, None, 2) for c, name, service in data.SUPPLY_GLOBAL_BACKUPS]
+    suppliers += [make(*row[:3], "NBO", *row[3:]) for row in data.SUPPLY_NAIROBI]
+    suppliers += [make(*row) for row in data.SUPPLY_NAMED]
+    named = {mission for *_, mission, _, _, _ in data.SUPPLY_NAMED if mission}
+    taken = {code for code, *_ in data.SUPPLY_NAMED}
+    following = data.SUPPLY_FIRST_CODE
+    couriers: dict[str, str] = {"NBO": "SUP-104"}
+    for m in w.missions:
+        if m.code == "NBO" or m.code in named:
+            continue
+        while f"SUP-{following}" in taken:
+            following += 1
+        code = f"SUP-{following}"
+        following += 1
+        tier = 1 if m.code in data.SUPPLY_TIER1_COURIERS else 2
+        city = m.city.split(" (")[0]
+        suppliers.append(
+            make(code, f"{city} Courier Services", data.POUCH, m.code, tier, "SUP-301")
+        )
+        couriers[m.code] = code
+    suppliers += [
+        make(c, name, service, mission, 3) for c, name, service, mission in data.SUPPLY_EXTRA
+    ]
+    for code, _, _, mission, *_ in data.SUPPLY_NAMED:
+        if mission:
+            couriers.setdefault(mission, code)
+
+    routes = [
+        supply.RouteIn(code, mission_ids["NBO"], label, kind, points, by, alternate)
+        for code, label, kind, by, alternate, points in data.SUPPLY_NAIROBI_ROUTES
+    ]
+    d = data.SUPPLY_ROUTE_OFFSET
+    for m in w.missions:
+        if m.code == "NBO" or m.code in data.SUPPLY_NO_ROUTE:
+            continue
+        start = (m.lat, m.lon)
+        routes.append(
+            supply.RouteIn(
+                f"R-{m.code}-1",
+                mission_ids[m.code],
+                f"Pouch: Embassy → {m.city.split(' (')[0]} airport",
+                "POUCH",
+                (start, (m.lat + d / 2, m.lon + d / 2), (m.lat + d, m.lon + d)),
+                couriers[m.code],
+            )
+        )
+    return suppliers, routes
 
 
 def _fleet(w: world.World, mission_ids: dict[str, uuid.UUID]) -> list[fleet.AssetIn]:
