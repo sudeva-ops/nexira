@@ -60,10 +60,10 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     # partner_request (0006), travel_document (0007), mission_climate_risk (0008), the four
     # health tables (0009), the three evacuation tables (0010), the two fleet tables (0011),
     # the four VIP tables (0012), the five Site Twin tables (0013), the three supply tables
-    # (0014), and alembic_version.
+    # (0014), the two predictive tables (0015), and alembic_version.
     assert (
         len(upgraded["tables"] - before["tables"])
-        == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 2 + 4 + 5 + 3 + 1
+        == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 2 + 4 + 5 + 3 + 2 + 1
     )
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
@@ -1006,5 +1006,37 @@ def test_downgrading_0014_restores_0013_exactly(fresh: DbUrls) -> None:
     assert at_head["search_paths"] == [
         (name, '{"search_path=pg_catalog, public, pg_temp"}')
         for name in ("supply_mitigation_guard", "supply_route_guard", "supply_supplier_guard")
+    ]
+    command.upgrade(cfg, "head")
+
+
+PREDICTIVE_TABLES = ("mission_event", "risk_index")
+
+
+def test_downgrading_0015_restores_0014_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0014")
+    at_0014 = asyncio.run(_shape(admin, PREDICTIVE_TABLES, "predictive%guard"))
+    at_0014_supply = asyncio.run(_shape(admin, SUPPLY_TABLES, "supply%guard"))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_shape(admin, PREDICTIVE_TABLES, "predictive%guard"))
+    command.downgrade(cfg, "0014")
+    assert asyncio.run(_shape(admin, PREDICTIVE_TABLES, "predictive%guard")) == at_0014
+    assert asyncio.run(_shape(admin, SUPPLY_TABLES, "supply%guard")) == at_0014_supply
+    assert at_0014["tables"] == []
+    # PC-46, PC-47: FORCE RLS; read and added by the app; the backup role reads them. Nothing is
+    # deleted; only today's index row changes, through a column grant.
+    seeded = (
+        "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+        "nexira_app=ar/nexira_owner}"
+    )
+    assert at_head["tables"] == [(table, True, seeded) for table in PREDICTIVE_TABLES]
+    assert at_head["columns"] == [("risk_index", "components"), ("risk_index", "value")]
+    assert at_head["policies"] == 2
+    assert at_head["search_paths"] == [
+        (name, '{"search_path=pg_catalog, public, pg_temp"}')
+        for name in ("predictive_mission_event_guard", "predictive_risk_index_guard")
     ]
     command.upgrade(cfg, "head")

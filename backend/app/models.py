@@ -32,6 +32,7 @@ from app.modules.people.models import (
     Site,
 )
 from app.modules.playbooks.models import Playbook, PlaybookRun, PlaybookRunStep, PlaybookStep
+from app.modules.predictive.models import MissionEvent, RiskIndex
 from app.modules.scenarios.models import Scenario, ScenarioEvent, ScenarioRun
 from app.modules.supply.models import LogisticsRoute, Supplier, SupplyMitigation
 from app.modules.tenancy.models import AppUser, ReferenceCounter, Role, Tenant, UserRole
@@ -71,6 +72,7 @@ __all__ = [
     "MedicalFacility",
     "Mission",
     "MissionClimateRisk",
+    "MissionEvent",
     "MissionHealthReadiness",
     "NotificationCampaign",
     "NotificationDelivery",
@@ -85,6 +87,7 @@ __all__ = [
     "ProposalApproval",
     "RawSignal",
     "ReferenceCounter",
+    "RiskIndex",
     "Role",
     "Scenario",
     "ScenarioEvent",
