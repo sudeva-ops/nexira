@@ -73,7 +73,7 @@ New backend module: `app/modules/executive/{schemas,service,router}` (no models:
 
 ## 5. The response timeline (EXE-02)
 
-- **For the most severe ACTIVE incident** (by severity, then the latest opened): its `incident_event` rows of types FUSED, EXPOSURE, PLAYBOOK_STEP, NOTIFICATION, CHECKIN, DECISION and STATUS, oldest first, at most 12, as time, type and summary. Summaries are the timeline's own text; none of these types carries a person's name (checked in the tests).
+- **For the most severe ACTIVE incident** (by severity, then the latest opened): its `incident_event` rows of types FUSED, EXPOSURE, PLAYBOOK_STEP, NOTIFICATION, CHECKIN, DECISION and STATUS, oldest first, at most 12, as time, type and summary. Summaries are the timeline's own text, except a CHECKIN entry, which names the person and is shown as "Check-in: a person needs help." (G-11; checked in the tests).
 - **With no ACTIVE incident:** "Recent activity", meaning incidents opened or closed in the last 7 days, newest first, at most 8.
 
 ## 6. The export (EXE-03, §78 Q6)
@@ -134,6 +134,7 @@ New backend module: `app/modules/executive/{schemas,service,router}` (no models:
 | G-8 | The trend's days | UTC days, today included, 30 in all. |
 | G-9 | The export route | An in-app route `/executive/briefing` with a print stylesheet; Playwright checks its content, not a PDF file. |
 | G-10 | 🔒 scope | None: no schema, RLS, `approvals.py` or `audit.py` change (D-45, §78 Q9). |
+| G-11 | Found while building Prompt 96: a CHECKIN timeline entry names the person who needs help ("<name> needs help (NTF-…)") | The overview shows it as "Check-in: a person needs help."; free-text NOTE and ESCALATION entries (which can name people) are left out. A test checks that no seeded person's name appears in the overview or the export. |
 
 None of these needs a decision beyond the approved defaults; reply "approved" to take them as proposed.
 
