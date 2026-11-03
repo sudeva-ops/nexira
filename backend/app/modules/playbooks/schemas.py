@@ -108,3 +108,6 @@ class PermissionsOut(BaseModel):
     decide_vip_change: list[uuid.UUID] = []  # pending changes
     # site (entity_id = the site; D-43, plan-pilot-twn §6)
     tick_readiness: bool = False
+    # supplier (entity_id = the supplier; D-44, plan-pilot-sup §5)
+    activate_mitigation: bool = False
+    stand_down_mitigation: bool = False

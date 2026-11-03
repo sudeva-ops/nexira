@@ -23,6 +23,7 @@ from app.modules.people.router import router as people_router
 from app.modules.playbooks.router import router as playbooks_router
 from app.modules.scenarios.router import router as scenarios_router
 from app.modules.scenarios.service import registry
+from app.modules.supply.router import router as supply_router
 from app.modules.tenancy.router import router as tenancy_router
 from app.modules.travel.router import router as travel_router
 from app.modules.twin.router import router as twin_router
@@ -71,6 +72,7 @@ def create_app(app_env: str) -> FastAPI:
         fleet_router,
         vip_router,
         twin_router,
+        supply_router,
         checkin_router,
         agents_router,
         travel_router,
