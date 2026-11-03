@@ -5,6 +5,7 @@ entries on changes only, the fuel stock from Fleet); mitigations through approva
 supplier, stood down once, nothing sent (§5); names by scope (§6); the simulated feeds and
 SUPPLY_UPDATED with ids only. Against real PostgreSQL, as nexira_api."""
 
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass
@@ -18,6 +19,7 @@ from sqlalchemy import select, text
 from app.core.db import tenant_session
 from app.core.events import Event, get_publisher
 from app.core.realtime import FORWARDED
+from app.core.security import CurrentUser
 from app.main import app
 from app.modules.audit.models import AuditLog
 from app.modules.supply import consumer
@@ -520,3 +522,134 @@ async def test_the_detail_lists_the_missions_routes(world: World) -> None:
     assert response.status_code == 404
     cairo = await world.get("viewer", f"/api/supply/suppliers?mission_id={world.cai}")
     assert [s["code"] for s in cairo] == ["SUP-233"]
+
+
+# --- review of Prompt 91 -----------------------------------------------------------------------
+
+
+async def _current(world: World, sub: str) -> CurrentUser:
+    row = (
+        await world.sql(
+            "SELECT id, email, display_name FROM app_user WHERE external_id = :s", s=sub
+        )
+    ).one()
+    return CurrentUser(
+        id=row.id,
+        tenant_id=world.idp.tenant_id,
+        external_id=sub,
+        email=row.email,
+        display_name=row.display_name,
+    )
+
+
+async def test_an_activation_waiting_on_a_recovery_sees_it(world: World) -> None:
+    """M1: the supplier is re-read under the lock, so a status a feed changed while the
+    activation waited counts: the recovered supplier is no longer impacted (409)."""
+    await world.notice("SUP-121", "DELAYED", "Fuel delivery postponed 24 h")
+    supplier_id = await world.supplier_id("SUP-121")
+    duty = await _current(world, "duty")
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as feed:
+        await supply.supplier_status(feed, "SUP-121", "NORMAL", None)  # holds the row lock
+
+        async def activation() -> Any:
+            async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+                return await supply.activate(session, duty, TODAY, supplier_id, None)
+
+        waiting = asyncio.create_task(activation())
+        await asyncio.sleep(0.5)  # loaded DELAYED, now waits on the lock
+        assert not waiting.done()
+        await feed.commit()
+    with pytest.raises(supply.SupplyError) as refused:
+        await waiting
+    assert refused.value.status_code == 409
+    assert (await world.sql("SELECT count(*) FROM supply_mitigation")).scalar_one() == 0
+
+
+async def test_two_activations_at_once_record_one(world: World) -> None:
+    await world.notice("SUP-121", "DELAYED", "Fuel delivery postponed 24 h")
+    url = f"/api/supply/suppliers/{await world.supplier_id('SUP-121')}/mitigation"
+    results = await asyncio.gather(world.send("duty", url, {}), world.send("security", url, {}))
+    assert sorted(r.status_code for r in results) == [201, 409]
+    assert (await world.sql("SELECT count(*) FROM supply_mitigation")).scalar_one() == 1
+
+
+async def test_who_may_act_and_who_sees_names(world: World, idp: Idp) -> None:
+    await idp.user("nobody", [])
+    await world.notice("SUP-121", "DELAYED", "Fuel delivery postponed 24 h")
+    url = f"/api/supply/suppliers/{await world.supplier_id('SUP-121')}/mitigation"
+    assert (await world.send("nobody", url, {})).status_code == 403
+    response = await world.send("hom.nbo", url, {})
+    assert response.status_code == 201, response.text
+    stand_down = f"/api/supply/mitigations/{response.json()['mitigation']['id']}/stand-down"
+    for who in ("hom.cai", "travel", "nobody", "viewer"):
+        assert (await world.send(who, stand_down)).status_code == 403, who
+    assert (await world.send("duty", stand_down)).status_code == 200
+    for who, activated, stood_down in (
+        ("hom.nbo", "User hom.nbo", "User duty"),
+        ("duty", "User hom.nbo", "User duty"),
+        ("hom.cai", None, None),  # a name reader, but not for Nairobi
+        ("viewer", None, None),
+    ):
+        detail = await world.get(who, f"/api/supply/suppliers/{await world.supplier_id('SUP-121')}")
+        [m] = detail["mitigations"]
+        assert (m["activated_by_name"], m["stood_down_by_name"]) == (activated, stood_down), who
+    # The audit and the timeline record who acted by user id, as everywhere else (D-20); never
+    # a name (review L1).
+    rows = await world.sql(
+        "SELECT actor_id, details::text AS details FROM audit_log "
+        "WHERE action LIKE 'SUPPLY.MITIGATION%' ORDER BY id"
+    )
+    for row in rows:
+        assert "User " not in row.details
+        uuid.UUID(row.actor_id)
+    summaries = await world.timeline()
+    assert not any("User " in summary for summary in summaries)
+
+
+async def test_a_global_supplier_running_a_route_shows_it(world: World) -> None:
+    """L3."""
+    async with tenant_session(world.idp.tenant_id, world.idp.engine) as session:
+        await supply.ensure_register(
+            session,
+            [],
+            [
+                RouteIn(
+                    "R-NBO-9",
+                    world.nbo,
+                    "Interpreters: hotel → Embassy",
+                    "STAFF_TRANSPORT",
+                    ((-1.2975, 36.8240), EMBASSY),
+                    "SUP-305",
+                )
+            ],
+        )
+        await session.commit()
+    await world.route("R-NBO-9", "BLOCKED", "Closed")
+    global_id = await world.supplier_id("SUP-305")
+    detail = await world.get("viewer", f"/api/supply/suppliers/{global_id}")
+    assert (detail["shown"], detail["impacted"]) == ("ROUTE_BLOCKED", False)  # no mission
+    assert [r["code"] for r in detail["routes"]] == ["R-NBO-9"]
+
+
+async def test_every_supply_event_carries_ids_and_statuses_only(world: World) -> None:
+    events = [
+        *(await world.route("R-NBO-1", "BLOCKED", ROAD_CLOSED)).events,
+        *(await world.notice("SUP-121", "DELAYED", "Fuel delivery postponed 24 h")).events,
+    ]
+    url = f"/api/supply/suppliers/{await world.supplier_id('SUP-104')}/mitigation"
+    mitigation = (await world.send("duty", url, {})).json()["mitigation"]
+    await world.send("duty", f"/api/supply/mitigations/{mitigation['id']}/stand-down")
+    events += world.publisher.events
+    assert [e.payload["change"] for e in events] == [
+        "route",
+        "supplier",
+        "mitigation",
+        "mitigation",
+    ]
+    for event in events:
+        assert event.type == "SUPPLY_UPDATED"
+        assert set(event.payload) == {"supplier_id", "route_id", "change", "status"}
+        for key in ("supplier_id", "route_id"):
+            if event.payload[key] is not None:
+                uuid.UUID(event.payload[key])
+        assert event.payload["status"] in (None, "BLOCKED", "DELAYED")

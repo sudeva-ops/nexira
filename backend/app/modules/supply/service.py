@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core import approvals, audit
 from app.core.events import Event
 from app.core.security import CurrentUser
+from app.modules.documents import service as documents
 from app.modules.evacuations import service as evacuations
 from app.modules.fleet.service import ACTORS
 from app.modules.intel.models import IncidentEvent
@@ -77,7 +78,12 @@ def supply_event(
 
 
 async def _audit(
-    session: AsyncSession, actor: Actor, action: str, entity: str, code: str, details: Any
+    session: AsyncSession,
+    actor: Actor,
+    action: str,
+    entity: str,
+    code: str,
+    details: dict[str, Any],
 ) -> None:
     await audit.write(
         session,
@@ -145,7 +151,7 @@ class _Picture:
     mitigations: list[SupplyMitigation]
     references: dict[uuid.UUID, str]  # the mitigations' incidents, ACTIVE or not
     names: dict[uuid.UUID, str]
-    scope: Any
+    scope: documents.Scope | None
     today: date
 
     def routes_of(self, supplier_id: uuid.UUID) -> list[schemas.RouteOut]:
@@ -153,7 +159,11 @@ class _Picture:
 
 
 async def _picture(session: AsyncSession, user: CurrentUser, today: date) -> _Picture:
-    suppliers = list(await session.scalars(select(Supplier).order_by(Supplier.code)))
+    # populate_existing: the current rows, never a copy loaded earlier in the session (M1).
+    fresh = {"populate_existing": True}
+    suppliers = list(
+        await session.scalars(select(Supplier).order_by(Supplier.code).execution_options(**fresh))
+    )
     missions = {m.id: m for m in await session.scalars(select(Mission))}
     routes = [
         schemas.RouteOut(
@@ -188,7 +198,9 @@ async def _picture(session: AsyncSession, user: CurrentUser, today: date) -> _Pi
     }
     mitigations = list(
         await session.scalars(
-            select(SupplyMitigation).order_by(SupplyMitigation.activated_at.desc())
+            select(SupplyMitigation)
+            .order_by(SupplyMitigation.activated_at.desc())
+            .execution_options(**fresh)
         )
     )
     people = {m.activated_by for m in mitigations} | {
@@ -326,7 +338,13 @@ async def supplier_detail(
     out = _supplier_out(picture, supplier)
     return schemas.SupplierDetailOut(
         **out.model_dump(),
-        routes=[r for r in picture.routes if r.mission_id == supplier.mission_id],
+        # The mission's routes, and any a Global supplier runs (review of Prompt 91, L3).
+        routes=[
+            r
+            for r in picture.routes
+            if (supplier.mission_id is not None and r.mission_id == supplier.mission_id)
+            or r.supplier_id == supplier.id
+        ],
         mitigations=[
             _mitigation_out(picture, m, supplier)
             for m in picture.mitigations
@@ -424,7 +442,13 @@ async def activate(
     # (PC-43), so the check holds after the lock.
     await _require(session, user, found)
     supplier = await session.scalar(
-        select(Supplier).where(Supplier.id == supplier_id).with_for_update()
+        select(Supplier)
+        .where(Supplier.id == supplier_id)
+        # Re-read under the lock, not the copy loaded before it, so a status a feed changed
+        # meanwhile counts (review of Prompt 91, M1). NO KEY UPDATE: references to the
+        # supplier (a backup, a mitigation) are not blocked (L6).
+        .with_for_update(key_share=True)
+        .execution_options(populate_existing=True)
     )
     assert supplier is not None
     picture = await _picture(session, user, today)
@@ -578,7 +602,7 @@ async def route_status(
     mission with an ACTIVE incident writes a SUPPLY timeline entry; a report of the same
     status and detail changes nothing (G-6)."""
     route = await session.scalar(
-        select(LogisticsRoute).where(LogisticsRoute.code == code).with_for_update()
+        select(LogisticsRoute).where(LogisticsRoute.code == code).with_for_update(key_share=True)
     )
     if route is None or status not in ROUTE_STATUSES:
         return None
@@ -614,7 +638,9 @@ async def supplier_status(
     session: AsyncSession, code: str, status: str, detail: str | None
 ) -> Outcome | None:
     """A simulated supplier notice; as route_status."""
-    supplier = await session.scalar(select(Supplier).where(Supplier.code == code).with_for_update())
+    supplier = await session.scalar(
+        select(Supplier).where(Supplier.code == code).with_for_update(key_share=True)
+    )
     if supplier is None or status not in SUPPLIER_STATUSES:
         return None
     if (supplier.status, supplier.status_detail) == (status, detail):
