@@ -26,6 +26,12 @@ def today() -> date:
     return datetime.now(UTC).date()
 
 
+async def db_today(conn: asyncpg.Connection) -> date:
+    """The guard's own "today" (review of Prompt 100, L4)."""
+    found: date = await conn.fetchval("SELECT (now() AT TIME ZONE 'UTC')::date")
+    return found
+
+
 async def mission(conn: asyncpg.Connection, code: str = "ADD") -> uuid.UUID:
     mission_id = uuid.uuid4()
     await conn.execute(
@@ -128,10 +134,9 @@ async def test_only_todays_computed_row_changes(world: World, owner: asyncpg.Con
     assert tuple(row) == (80, True)
     with pytest.raises(REFUSED, match="only today's computed row changes"):
         await world.conn.execute(update, world.history)
-    # The owner too, and on a past computed row (seeded the way the snapshot left it).
-    past = await owner.fetchval("SELECT id FROM risk_index WHERE source = 'ILLUSTRATIVE' LIMIT 1")
+    # The owner too, on an illustrative row (a past computed row: L1, below).
     with pytest.raises(REFUSED, match="only today's computed row changes"):
-        await owner.execute(update, past)
+        await owner.execute(update, world.history)
     with pytest.raises(UNIQUE):
         await world.index(today(), "COMPUTED")
 
@@ -159,8 +164,9 @@ async def test_computed_is_today_and_history_is_before_it(world: World) -> None:
 )
 async def test_an_index_row_refuses_bad_values(world: World, change: dict[str, Any]) -> None:
     other = await mission(world.conn, "BGW")
+    change = dict(change)  # parametrize shares the dict (review of Prompt 100, L3)
     source = change.pop("source", "ILLUSTRATIVE")
-    with pytest.raises((CHECK, REFUSED)):
+    with pytest.raises(CHECK):
         await world.index(today() - timedelta(days=4), source, mission_id=other, **change)
 
 
@@ -309,3 +315,48 @@ async def test_the_backup_role_reads_the_predictive_tables(db: DbUrls) -> None:
     finally:
         await conn.close()
     assert [tuple(r) for r in rows] == [("mission_event", True, False), ("risk_index", True, False)]
+
+
+# --- review of Prompt 100 ----------------------------------------------------------------------
+
+
+async def test_a_past_computed_row_is_refused(world: World, owner: asyncpg.Connection) -> None:
+    """L1: yesterday's snapshot stays as it was. The row is made with the guard off, as the
+    owner, in one transaction; then the guard refuses the update for both roles."""
+    yesterday = await db_today(world.conn) - timedelta(days=1)
+    other = await mission(world.conn, "JKT")
+    async with owner.transaction():
+        await owner.execute("ALTER TABLE risk_index DISABLE TRIGGER predictive_risk_index_guard")
+        past = await owner.fetchval(
+            "INSERT INTO risk_index (tenant_id, mission_id, day, value, components, source) "
+            "VALUES (current_tenant_id(), $1, $2, 40, '{}', 'COMPUTED') RETURNING id",
+            other,
+            yesterday,
+        )
+        await owner.execute("ALTER TABLE risk_index ENABLE TRIGGER predictive_risk_index_guard")
+    with pytest.raises(REFUSED, match="only today's computed row changes"):
+        await world.conn.execute("UPDATE risk_index SET value = 90 WHERE id = $1", past)
+    with pytest.raises(REFUSED, match="only today's computed row changes"):
+        await owner.execute("UPDATE risk_index SET value = 90 WHERE id = $1", past)
+
+
+UPSERT = (
+    "INSERT INTO risk_index (tenant_id, mission_id, day, value, components, source) "
+    "VALUES (current_tenant_id(), $1, $2, $3, $4::jsonb, $5) "
+    "ON CONFLICT (mission_id, day) DO UPDATE SET value = EXCLUDED.value, "
+    "components = EXCLUDED.components RETURNING value"
+)
+
+
+async def test_the_snapshot_upserts_todays_row(world: World) -> None:
+    """L2: the snapshot's path as nexira_api: insert, then update the same day's row."""
+    other = await mission(world.conn, "ABV")
+    day = await db_today(world.conn)
+    assert await world.conn.fetchval(UPSERT, other, day, 50, '{"baseline": 50}', "COMPUTED") == 50
+    assert await world.conn.fetchval(UPSERT, other, day, 62, '{"events": 12}', "COMPUTED") == 62
+    rows = await world.conn.fetchval("SELECT count(*) FROM risk_index WHERE mission_id = $1", other)
+    assert rows == 1
+    # A history day is never a computed row.
+    history = day - timedelta(days=1)
+    with pytest.raises(REFUSED, match="a computed row is for today"):
+        await world.conn.fetchval(UPSERT, other, history, 70, "{}", "COMPUTED")

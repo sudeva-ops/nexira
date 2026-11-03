@@ -40,6 +40,7 @@ Each component is worked out for a mission and a day. The index is their sum, ca
 
 - **`risk_index` rows:** one per mission per day (PC-46).
 - **The worker** runs `snapshot(tenant)` every 15 minutes, as the weather feed does. It inserts today's row for each mission (`source COMPUTED`), or updates today's row's value and components. The guard allows UPDATE on today's row only.
+- **The day** is the database's own `(now() AT TIME ZONE 'UTC')::date`, read in the snapshot's transaction, never the worker's clock, so the guard and the snapshot always agree, also around midnight (review of Prompt 100, L5).
 - **Audit:** `PREDICTIVE.SNAPSHOT` once per tenant and day, on the first insert of the day, with the mission count. The 15-minute updates of derived figures are not audited (G-4).
 - **On demand:** `snapshot` also runs after a `MISSION_EVENT` is added and when the overview is read with no row for today, so the demo is always current.
 - **The seeded history (G-3):**

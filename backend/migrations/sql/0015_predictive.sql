@@ -17,7 +17,6 @@ CREATE TABLE risk_index (
   computed_at  timestamptz NOT NULL DEFAULT now(),
   UNIQUE (mission_id, day)
 );
-CREATE INDEX risk_index_mission_day_idx ON risk_index (tenant_id, mission_id, day);
 ALTER TABLE risk_index ENABLE ROW LEVEL SECURITY;
 ALTER TABLE risk_index FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON risk_index
