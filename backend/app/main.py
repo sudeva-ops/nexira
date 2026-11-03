@@ -22,6 +22,7 @@ from app.modules.notifications.router import router as notifications_router
 from app.modules.partners.router import router as partners_router
 from app.modules.people.router import router as people_router
 from app.modules.playbooks.router import router as playbooks_router
+from app.modules.predictive.router import router as predictive_router
 from app.modules.scenarios.router import router as scenarios_router
 from app.modules.scenarios.service import registry
 from app.modules.supply.router import router as supply_router
@@ -75,6 +76,7 @@ def create_app(app_env: str) -> FastAPI:
         twin_router,
         supply_router,
         executive_router,
+        predictive_router,
         checkin_router,
         agents_router,
         travel_router,
