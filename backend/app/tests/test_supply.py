@@ -46,7 +46,7 @@ def _register(nbo: uuid.UUID, cai: uuid.UUID) -> tuple[list[SupplierIn], list[Ro
         # Backups listed after what they back up: ensure_register orders them.
         SupplierIn("SUP-104", "Swiftline Couriers", "Diplomatic pouch courier", nbo, 1, VETTED,
                    backup_code="SUP-105", in_bcp=True, performance_score=92),
-        SupplierIn("SUP-105", "Kestrel Express Couriers", "Diplomatic pouch courier", nbo, 2,
+        SupplierIn("SUP-105", "Falcon Express Couriers", "Diplomatic pouch courier", nbo, 2,
                    VETTED),
         SupplierIn("SUP-117", "Equator Guard Services", "Guard force contractor", nbo, 1, VETTED,
                    backup_code="SUP-118", in_bcp=True),
@@ -222,7 +222,7 @@ async def test_the_register_is_seeded_once(world: World) -> None:
     assert await world.actions() == ["SUPPLY.SEED"]
     found = await world.suppliers()
     courier = found["SUP-104"]
-    assert courier["backup"]["name"] == "Kestrel Express Couriers"
+    assert courier["backup"]["name"] == "Falcon Express Couriers"
     assert (courier["in_bcp"], courier["vetting_current"], courier["performance_score"]) == (
         True,
         True,
@@ -385,7 +385,7 @@ async def test_a_mitigation_records_the_backup_and_the_alternate(world: World) -
     assert (await world.send("security", url, {})).status_code == 409  # one active
     assert await world.permissions("duty", "SUP-104") == (False, True)
     assert (await world.timeline())[-1] == (
-        "Nairobi · Swiftline Couriers: mitigation activated · backup Kestrel Express Couriers "
+        "Nairobi · Swiftline Couriers: mitigation activated · backup Falcon Express Couriers "
         "on standby · Pouch: Embassy → JKIA via Southern Bypass in use."
     )
     viewer = (await world.suppliers("viewer"))["SUP-104"]["mitigation"]

@@ -1476,14 +1476,14 @@ TWIN_LABELS = [
 # backup code, status, detail). Backups come first: they are frozen once referenced (PC-43).
 POUCH = "Diplomatic pouch courier"
 SUPPLY_GLOBAL_BACKUPS = [
-    ("SUP-301", "Meridian Global Couriers", POUCH),
-    ("SUP-302", "Atlas Secure Mobility", "Armoured vehicle leasing"),
+    ("SUP-301", "Polaris Global Couriers", POUCH),
+    ("SUP-302", "Bastion Secure Mobility", "Armoured vehicle leasing"),
     ("SUP-303", "Continental Freight Partners", "Freight & relocation"),
     ("SUP-304", "Crestline Facilities Group", "Facilities management"),
 ]
 WATCH = "Monitoring local disruption"
 SUPPLY_NAIROBI = [
-    ("SUP-105", "Kestrel Express Couriers", POUCH, 2, None),
+    ("SUP-105", "Falcon Express Couriers", POUCH, 2, None),
     ("SUP-118", "Highland Guard Services", "Guard force contractor", 2, None),
     ("SUP-122", "Mara Energy Supplies", "Generator fuel supply", 2, None),
     ("SUP-127", "Upesi Networks", "Local ISP & IT support", 2, None),
