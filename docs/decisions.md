@@ -191,6 +191,7 @@ Record each sign-off in the PR.
 | 12. **VIP & Delegation Protection** (VIP), simulated (D-42) | |
 | 13. **Site Twin** (TWN), simulated (D-43) | |
 | 14. **Supply Chain & Third-Party Risk** (SUP), simulated (D-44) | |
+| 15. **Executive Overview** (EXE), from existing data (D-45) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -242,7 +243,7 @@ Rules:
 **D-37 · Document Expiry (simulated).** Approved by the product owner on 2026-10-30 (PR #57), with the defaults in `docs/requirements-pilot.md` §38. Requirements DX-01 to DX-09 in `docs/requirements-pilot.md`, with the defaults in §38. Amends D-30 by adding Document Expiry to the pilot.
 - **No document numbers.** The platform stores the type, issuing country and valid-until date of a document, never its number, a scan or a photo (DX-01).
 - **People decide.** The Compliance agent only proposes, at level Approve or higher; renewals and reminders are started by a person or by a proposal a person approved (D-12, D-16).
-- **Further modules.** On 2026-10-30 the product owner asked for these modules after the UI work, in this order: Document Expiry, Natural Hazards, Health Intelligence, Evacuation Management, Fleet, VIP Protection, Site Twin, Supply Chain, Wellbeing, Exercises, After-Action Review, Predictive Risk, Executive Overview, AI Risk Copilot chat. Each still needs its own requirements approved before code (D-30). The AI Risk Copilot needs the local model server (D-30, AGR-08).
+- **Further modules.** On 2026-10-30 the product owner asked for these modules after the UI work, in this order: Document Expiry, Natural Hazards, Health Intelligence, Evacuation Management, Fleet, VIP Protection, Site Twin, Supply Chain, Wellbeing, Exercises, After-Action Review, Predictive Risk, Executive Overview, AI Risk Copilot chat. Each still needs its own requirements approved before code (D-30). The AI Risk Copilot needs the local model server (D-30, AGR-08). On 2026-11-03, after Supply Chain, the product owner set the next modules as Executive Overview, Predictive Risk, After-Action Review and Exercises, in that order; Wellbeing and the AI Risk Copilot follow later.
 
 **D-38 · Natural Hazards & Climate (simulated).** Approved by the product owner on 2026-10-31 (PR #63), with the defaults in `docs/requirements-pilot.md` §43. Requirements HZ-01 to HZ-11 in `docs/requirements-pilot.md` §39–43, with the defaults in §43. Amends D-30 by adding Natural Hazards & Climate to the pilot.
 - **Hazards are intelligence.** Earthquakes, cyclone forecasts, wildfire and air quality are signals and incidents through the existing pipeline, as Weather's warnings are (D-35). There is no separate hazard store.
@@ -278,6 +279,11 @@ Rules:
 - **Simulated third parties.** Suppliers, routes and their statuses are illustrative and simulated (D-19); NEXIRA contacts no supplier and orders nothing.
 - **Derived disruption.** ROUTE BLOCKED, ALTERNATE and "impacted" are worked out from reported statuses and ACTIVE incidents on every read, so they clear by themselves.
 - **People decide.** A mitigation is recorded by a person through `app/core/approvals.py` and audited. No agent acts on suppliers.
+
+**D-45 · Executive Overview.** Approved by the product owner on 2026-11-03 (PR #119). Requirements EXE-01 to EXE-06 in `docs/requirements-pilot.md` §74–78, with the defaults in §78. Amends D-30 by adding Executive Overview to the pilot.
+- **Derived, not entered.** Every figure is worked out on read from existing data; no new table, no seeded history, no invented baseline.
+- **Aggregates only.** No person's name appears on the overview or in the exported briefing; every role sees it.
+- **Explainable.** Posture, regional exposure and the timing figure use stated, simple rules, so leadership can be told how each number is made.
 
 ---
 

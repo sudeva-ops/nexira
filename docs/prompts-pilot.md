@@ -857,3 +857,38 @@ mitigation and names by scope.
 Playwright, real stack (requirements-pilot.md §72). Report the real output; make
 acceptance (all specs) still passes.
 ```
+
+## Pilot module 15 · Executive Overview (approved 2026-11-03, PR #119)
+
+Sources: D-45, `docs/requirements-pilot.md` §74–78 (EXE-01..06). Derived from existing data only; no schema change.
+
+### Prompt 95 · Read and plan (no code)
+```
+Read D-08, D-19, D-20, D-30, D-45, requirements-pilot.md §1-6 and §74-78, and the incident,
+signal, campaign, check-in, site readiness, evacuation, health, hazard, supply and fleet code.
+Write docs/plan-pilot-exe.md: requirement-to-code mapping, each figure's query and rule
+(posture, detection to notification, personnel accounted, readiness, the trend, regional
+exposure, attention drivers, the timeline), the country-to-region mapping, the export, what the
+acceptance checks, and gaps with proposed answers. No code.
+```
+
+### Prompt 96 · The overview service
+```
+EXE-01, EXE-02, EXE-04. app/modules/executive: GET /api/executive/overview (and the export's
+audit, EXECUTIVE.EXPORT through app/core/audit.py), every figure worked out on read, no names.
+Tests against real PostgreSQL, including the seeded calm state and the Nairobi incident's
+figures.
+```
+
+### Prompt 97 · Executive Overview screen and the briefing
+```
+EXE-03, EXE-05. The screen (as the design, Blueprint dark), last under PLAN & INSIGHT; the
+trend chart; realtime refresh; "Export briefing" opening the print-ready page. Tests: Vitest
+for the figures, the attention list, the timeline and the briefing.
+```
+
+### Prompt 98 · Executive Overview acceptance
+```
+Playwright, real stack (requirements-pilot.md §77). Report the real output; make
+acceptance (all specs) still passes.
+```
