@@ -324,6 +324,13 @@ async def twin(session: AsyncSession, user: CurrentUser, site_id: uuid.UUID) -> 
 # --- realtime (G-8) -----------------------------------------------------------------------------
 
 
+async def sheltering(session: AsyncSession, mission_id: uuid.UUID) -> str | None:
+    """The ACTIVE incident whose shelter alert covers the mission's sites, if any (G-4); for
+    the Executive Overview's drivers (plan-pilot-exe G-7)."""
+    row = (await session.execute(_SHELTER, {"mission": mission_id})).first()
+    return str(row.reference) if row else None
+
+
 async def site_event(session: AsyncSession, site: Site, change: str) -> Event:
     """Ids and counts only, never names (G-8)."""
     zones = list(await session.scalars(select(SiteZone).where(SiteZone.site_id == site.id)))
