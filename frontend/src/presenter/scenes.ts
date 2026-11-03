@@ -71,6 +71,13 @@ export const SCENE_SCREEN: Record<DemoScenario, Record<number, string>> = {
     2: "/twin",
     3: "/twin",
   },
+  // D-44 (SUP-07): during NBO-CIVIL-UNREST, every scene on Supply Chain Risk (Prompt 93).
+  "NBO-SUPPLY": {
+    0: "/supply",
+    1: "/supply",
+    2: "/supply",
+    3: "/supply",
+  },
   // D-42 (VIP-08): the visit plays on VIP Protection (Prompt 81).
   "ADD-VISIT": {
     0: "/vip",
