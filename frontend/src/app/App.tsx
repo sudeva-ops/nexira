@@ -20,6 +20,8 @@ import { PartnersScreen } from "../screens/partners/PartnersScreen";
 import { PeopleScreen } from "../screens/people/PeopleScreen";
 import { PlaybooksScreen } from "../screens/playbooks/PlaybooksScreen";
 import { DecisionQueueScreen } from "../screens/queue/DecisionQueueScreen";
+import { BriefingScreen } from "../screens/executive/BriefingScreen";
+import { ExecutiveScreen } from "../screens/executive/ExecutiveScreen";
 import { SupplyScreen } from "../screens/supply/SupplyScreen";
 import { TwinScreen } from "../screens/twin/TwinScreen";
 import { VipScreen } from "../screens/vip/VipScreen";
@@ -47,6 +49,7 @@ const BUILT: Record<string, ReactElement> = {
   "/checkin": <CheckinScreen />,
   "/documents": <DocumentsScreen />,
   "/supply": <SupplyScreen />,
+  "/executive": <ExecutiveScreen />,
   "/audit": <AuditScreen />,
 };
 
@@ -57,6 +60,8 @@ interface Props {
 export function App({ onLogout }: Props) {
   return (
     <Routes>
+      {/* EXE-03: the print-ready briefing stands alone, without the shell. */}
+      <Route path="/executive/briefing" element={<BriefingScreen />} />
       <Route element={<AppShell onLogout={onLogout} />}>
         {SCREENS.map((s) => (
           <Route

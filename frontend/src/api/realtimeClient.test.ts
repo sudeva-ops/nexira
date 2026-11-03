@@ -1,6 +1,6 @@
 import { vi } from "vitest";
 
-import { connectRealtime, type RealtimeEvent, staleKeys } from "./realtimeClient";
+import { connectRealtime, type RealtimeEvent, staleKeys as moduleStaleKeys } from "./realtimeClient";
 
 class FakeSocket {
   static sockets: FakeSocket[] = [];
@@ -116,6 +116,8 @@ describe("realtime client (PLT-05)", () => {
   });
 
   it("maps events to the queries they make stale", () => {
+    // The Executive Overview's refresh is checked on its own below.
+    const staleKeys = (e: RealtimeEvent) => moduleStaleKeys(e).filter((k) => k[0] !== "executive");
     expect(staleKeys(event("SIGNAL_INGESTED"))).toEqual([["signals"], ["operations-summary"]]);
     expect(staleKeys(event("EXPOSURE_COMPUTED", { incident_id: "i1" }))).toContainEqual([
       "incident",
@@ -186,4 +188,13 @@ describe("realtime client (PLT-05)", () => {
     expect(staleKeys(event("INCIDENT_UPDATED", { incident_id: "i1" }))).toContainEqual(["supply"]);
     expect(staleKeys(event("SOMETHING_ELSE"))).toEqual([]);
   });
+  it("refreshes the Executive Overview on the events that move its figures (D-45)", () => {
+    for (const type of ["INCIDENT_UPDATED", "EXPOSURE_COMPUTED", "CHECKIN_UPDATED", "SUPPLY_UPDATED", "FLEET_UPDATED"]) {
+      expect(moduleStaleKeys(event(type, { incident_id: "i1" })), type).toContainEqual(["executive"]);
+    }
+    for (const type of ["FLIGHT_POSITIONS", "WEATHER_UPDATED", "SITE_UPDATED"]) {
+      expect(moduleStaleKeys(event(type)), type).not.toContainEqual(["executive"]);
+    }
+  });
+
 });

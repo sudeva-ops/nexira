@@ -40,5 +40,7 @@ export const SCREENS: readonly Screen[] = [
   { path: "/documents", title: "Document Expiry", subtitle: "Compliance · Passports, visas & clearances", icon: "document", group: "PLAN & INSIGHT", builtIn: "Prompt 51" },
   // D-44 (§73 Q8): after Document Expiry; icon box, since Fleet uses truck.
   { path: "/supply", title: "Supply Chain Risk", subtitle: "Third parties · Vendors & logistics routes", icon: "box", group: "PLAN & INSIGHT", builtIn: "Prompt 93" },
+  // D-45 (§78 Q7): last under PLAN & INSIGHT, as the design.
+  { path: "/executive", title: "Executive Overview", subtitle: "Dashboard · Leadership view", icon: "chart", group: "PLAN & INSIGHT", builtIn: "Prompt 97" },
   { path: "/audit", title: "Audit", subtitle: "Admin · Hash-chained audit log", icon: "history", group: "ADMIN", builtIn: "Prompt 3" },
 ];
