@@ -185,6 +185,12 @@ ROWS: dict[str, str] = {
     "'{supplier}', 'SRID=4326;LINESTRING(36.808 -1.295, 36.9278 -1.3192)')",
     "supply_mitigation": "INSERT INTO supply_mitigation (tenant_id, supplier_id, activated_by) "
     "VALUES ('{t}', '{supplier}', '{user}')",
+    "risk_index": "INSERT INTO risk_index (tenant_id, mission_id, day, value, components, source) "
+    "VALUES ('{t}', '{mission}', (now() AT TIME ZONE 'UTC')::date, 35, '{{\"baseline\": 35}}', "
+    "'COMPUTED')",
+    "mission_event": "INSERT INTO mission_event (tenant_id, mission_id, kind, title, starts_on, "
+    "ends_on, weight) VALUES ('{t}', '{mission}', 'RALLY', 'Rally', current_date, current_date, "
+    "30)",
     "fleet_asset": "INSERT INTO fleet_asset (id, tenant_id, mission_id, code, kind, type_label, "
     "seats, location, location_label, fuel_pct) VALUES ('{asset}', '{t}', '{mission}', 'VH-01', "
     "'VEHICLE', 'Armoured SUV (B6)', 4, " + PT + ", 'Embassy garage', 82)",
@@ -243,6 +249,8 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "supplier",  # UPDATE of the reported status only, no DELETE (PC-43)
     "logistics_route",  # UPDATE of the reported status only, no DELETE (PC-44)
     "supply_mitigation",  # UPDATE of the stand-down only, once; no DELETE (PC-45)
+    "risk_index",  # UPDATE of today's computed row only, no DELETE (PC-46)
+    "mission_event",  # fixed once added (PC-47)
 }
 NO_UPDATE = {  # an UPDATE of other columns is refused; a DELETE is a departure
     "site_presence",  # UPDATE of zone_id only (PC-41)
@@ -401,6 +409,7 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
             r"|site presence: no such site|site sensor: no such site|site readiness: no such site"
             r"|supplier: no such mission|logistics route: no such mission"
             r"|supply mitigation: no such supplier"
+            r"|risk index: no such mission|mission event: no such mission"
         ),
     ):
         await api.execute(sql_for(table, world.a))
