@@ -19,6 +19,7 @@ from app.modules.notifications.consumer import campaign_handler, tick
 from app.modules.partners import service as partners
 from app.modules.partners.adapter import PartnerAdapter, adapter_for
 from app.modules.playbooks.consumer import resume_runs, run_handler
+from app.modules.predictive import consumer as predictive
 from app.modules.supply import consumer as supply
 from app.modules.travel import tracker
 from app.modules.twin import consumer as twin
@@ -85,6 +86,19 @@ async def weather_loop(
             except Exception:
                 log.exception("weather tick failed for %s", tenant_id)
         await asyncio.sleep(WEATHER_EVERY_S)
+
+
+async def predictive_loop(
+    engine: AsyncEngine, publisher: Publisher, tenant_ids: list[uuid.UUID]
+) -> None:
+    """From start, so every mission has today's risk index as soon as the worker runs (D-46)."""
+    while True:
+        for tenant_id in tenant_ids:
+            try:
+                await predictive.tick(engine, tenant_id, publisher)
+            except Exception:
+                log.exception("risk index snapshot failed for %s", tenant_id)
+        await asyncio.sleep(predictive.SNAPSHOT_EVERY_S)
 
 
 async def partners_loop(
@@ -251,6 +265,7 @@ async def main() -> None:
             tasks.create_task(tick_loop(engine, publisher, tenant_ids, settings.channel_adapter))
             tasks.create_task(flights_loop(engine, publisher, tenant_ids))
             tasks.create_task(weather_loop(engine, publisher, tenant_ids))
+            tasks.create_task(predictive_loop(engine, publisher, tenant_ids))
             tasks.create_task(partners_loop(engine, publisher, tenant_ids, partner_adapter))
             tasks.create_task(armed_loop(engine, publisher, tenant_ids))
     finally:
