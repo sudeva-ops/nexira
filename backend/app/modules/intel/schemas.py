@@ -74,6 +74,9 @@ class ExposureOut(BaseModel):
     confidence: int | None  # person: location confidence; trip: best traveller
     location_source: str | None  # person: primary_source of the current location
     place_label: str | None
+    # Person: the latest answer to this incident's check-in (SAFE, NEED_HELP), PENDING when
+    # asked and not answered, None when no check-in asked them (the map's pulse, UI).
+    checkin_status: str | None = None
 
 
 class ExposureSummaryOut(BaseModel):

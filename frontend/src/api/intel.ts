@@ -75,6 +75,7 @@ export interface Exposure {
   confidence: number | null;
   location_source: string | null;
   place_label: string | null;
+  checkin_status?: "SAFE" | "NEED_HELP" | "PENDING" | null; // person: this incident's check-in
 }
 
 export interface IncidentEvent {
