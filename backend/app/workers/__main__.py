@@ -243,6 +243,12 @@ async def main() -> None:
         ),
         StreamConsumer(
             client,
+            group="predictive",
+            consumer=name,
+            handlers={"MISSION_EVENT": predictive.event_handler(engine, publisher)},
+        ),
+        StreamConsumer(
+            client,
             group="supply",
             consumer=name,
             handlers={
@@ -253,7 +259,7 @@ async def main() -> None:
     ]
     log.info(
         "consumers started: intel, exposure, playbooks, notifications, agents, flights, weather, "
-        "checkin, hazards, health, evacuation, fleet, vip, twin, supply"
+        "checkin, hazards, health, evacuation, fleet, vip, twin, supply, predictive"
     )
     try:
         async with asyncio.TaskGroup() as tasks:

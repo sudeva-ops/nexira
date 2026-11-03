@@ -1533,3 +1533,22 @@ SUPPLY_NAIROBI_ROUTES = [
 ]  # fmt: skip
 SUPPLY_NO_ROUTE = {"GVA", "NYC"}  # multilateral missions (G-3)
 SUPPLY_ROUTE_OFFSET = 0.1  # degrees: an illustrative airport about 15 km out
+
+# --- Predictive Risk (D-46, PRD-05; docs/plan-pilot-prd.md §7) --------------------------------
+# An illustrative events calendar (simulated): (mission, kind, title, days after the scenario
+# date, weight, days). Weights keep every calm forecast below the threshold of 70 (G-2): a LOW
+# mission is 35 + at most 12, a MODERATE one 50 + at most 12.
+PREDICTIVE_CALENDAR: list[tuple[str, str, str, int, int, int]] = [
+    ("ADD", "HOLIDAY", "National holiday", 3, 8, 1),
+    ("ISB", "RALLY", "Planned rallies", 2, 12, 1),
+    ("ABV", "ELECTION", "Election campaign event", 6, 10, 1),
+    ("JKT", "HOLIDAY", "Religious festival", 4, 10, 2),
+    ("BGW", "RALLY", "Commemoration march", 8, 12, 1),
+    ("NBO", "SPORTS", "City marathon", 9, 6, 1),
+    ("PAR", "SUMMIT", "Trade fair", 7, 5, 3),
+    ("LON", "OTHER", "State visit (host nation)", 10, 5, 2),
+    ("CAI", "HOLIDAY", "National holiday", 12, 6, 1),
+    ("DEL", "HOLIDAY", "Festival", 5, 8, 2),
+    ("MNL", "RALLY", "Election rally", 11, 10, 1),
+    ("DAC", "OTHER", "General strike (hartal)", 3, 12, 1),
+]

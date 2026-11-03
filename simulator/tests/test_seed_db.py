@@ -265,7 +265,10 @@ async def test_bulk_loads_are_audited_once_per_batch(seeded: Seeded) -> None:
     assert actions["LOCATION.RECOMPUTE"] == 1
     assert actions["MISSION.CREATE"] == 36
     assert actions["CLIMATE_RISK.SEED"] == 1  # one row for the 36 scores (D-38)
-    assert sum(actions.values()) < 175  # not one row per person
+    assert actions["PREDICTIVE.CALENDAR_SEED"] == 1  # one row for the calendar (D-46)
+    assert actions["PREDICTIVE.HISTORY"] == 1  # one row for 36 x 30 days
+    # Not one row per person (2,550): the pilot modules' seeds add a few rows each.
+    assert sum(actions.values()) < 200
 
 
 async def test_message_templates_generic_nairobi_and_paris(seeded: Seeded) -> None:
