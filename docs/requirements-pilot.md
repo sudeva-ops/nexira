@@ -847,3 +847,59 @@ Playwright on the real stack:
 8. **Screen:** "Supply Chain Risk" (icon `box`, since Fleet uses `truck`) under PLAN & INSIGHT, after Document Expiry, as the design. *Default: yes.*
 9. **Demo:** `NBO-SUPPLY` from the presenter bar during NBO-CIVIL-UNREST (route blocked, then fuel and guards, then recovery); people activate mitigations in the browser. The Phase 1 scenes are unchanged. *Default: yes.*
 10. **🔒 prompts:** the migration (PC-43..45: RLS, grants, guards) and the mitigation actions (`approvals.py`) need your named sign-off, as before (D-29).
+
+## 74. Purpose and starting point
+
+Give leadership one page that answers "how exposed are we right now, and how well are we responding": global posture, active incidents, how fast people were told, who is accounted for, mission readiness, the alert trend, exposure by region, the missions that need attention and why, and the response timeline. All of it is worked out from data the other modules already hold; nothing new is entered. Master spec §5.32 (Executive Overview, EXE-01..03); the design's Executive Overview screen ("Dashboard · Leadership view").
+
+| Exists today | Where |
+|---|---|
+| Mission risk levels (LOW..CRITICAL, D-08); incidents with severity, status and timeline; raw signals with `received_at` | intel, people |
+| Notification campaigns with `sent_at` and their incident; check-in answers per person | notifications, checkin |
+| Site readiness scores (`site.readiness_score`) | people, Site Twin (G-1) |
+| Per-mission state in other modules: ACTIVE evacuations, health advisories, natural hazards, impacted suppliers, unavailable vehicles | evacuations, health_intel, hazards, supply, fleet |
+| No leadership view, no regions, no export | — |
+
+## 75. Requirements: Executive Overview (EXE)
+
+| ID | Requirement | Master | Pri. |
+|---|---|---|---|
+| EXE-01 | **Headline figures**, worked out on every read:<br>· **Global posture**: GUARDED, ELEVATED or SEVERE, from the missions' risk levels (any CRITICAL mission gives SEVERE, any HIGH or an ACTIVE incident gives ELEVATED, else GUARDED), with "N critical · N elevated missions";<br>· **Active incidents**: the count, with the most recent;<br>· **Detection to notification**: for each incident of the last 30 days, the time from its first signal's `received_at` to its first notification campaign's `sent_at`; the median, and the current incident's own time. No manual baseline is claimed (§78 Q3);<br>· **Personnel accounted**: for ACTIVE incidents' check-ins, mission personnel who answered (SAFE or NEED HELP) out of those asked, as a percentage, with the incident; "No active check-in" otherwise;<br>· **Mission readiness**: the mean embassy readiness score (illustrative until Exercises). | EXE-01 | M |
+| EXE-02 | **Trends and attention**:<br>· **Alerts, last 30 days**: raw signals and fused incidents per day, from the database only (§78 Q4);<br>· **Exposure by region**: Africa, Middle East, Asia-Pacific, Europe and Americas, each the mean of its missions' risk points (LOW 20, MODERATE 50, HIGH 75, CRITICAL 95), so the formula can be explained;<br>· **Missions requiring attention**: every mission at MODERATE or above or with an ACTIVE incident, with its risk, personnel count, embassy readiness and the **drivers** found in the other modules: an ACTIVE incident, an ACTIVE evacuation, a health advisory at the mission, an open natural hazard, impacted suppliers, unavailable vehicles, a shelter-in-place;<br>· **Response timeline**: for the most severe ACTIVE incident, its key timeline events (fused, exposure, playbook steps, notifications, check-in, decisions); with none, the incidents opened and closed in the last 7 days. | EXE-02 | M |
+| EXE-03 | **Board briefing export**: "Export briefing" opens a one-page, print-ready briefing of the same figures (no names, labelled simulated, with the time it was produced), which the browser saves as PDF. The export is audited (`EXECUTIVE.EXPORT`). No file is stored on the server. | EXE-03 | S |
+| EXE-04 | **Who sees what**: every role sees the overview; it holds aggregates and incident references only, never a person's name. | — | M |
+| EXE-05 | **Executive Overview screen**: as the design, Blueprint dark, last under PLAN & INSIGHT (§78 Q7): five KPIs, the alert trend, exposure by region, missions requiring attention and the response timeline. It refreshes on realtime incident, exposure, check-in and campaign events. | — | M |
+| EXE-06 | **The demo**: no new scenario. Before NBO-CIVIL-UNREST the overview shows GUARDED, 0 active incidents and the four elevated missions; after scene 4 it shows SEVERE, Nairobi first in "Missions requiring attention" with its drivers, Africa's exposure up, the detection-to-notification time of INC-<year>-1042 and personnel accounted from its check-in. | — | M |
+
+### Not in this module
+- Seeded or invented history: the trend shows only what the database holds (§78 Q4);
+- forecasts (Predictive Risk, next);
+- a manual-baseline comparison ("▼ 86% vs manual");
+- server-side PDF or scheduled board reports; emailing the briefing;
+- per-person detail (it stays in its own module);
+- an agent proposal.
+
+## 76. Data changes
+
+None. Every figure is worked out on read from existing tables. Regions are a fixed mapping of the missions' country codes in the code (§78 Q5), not a new column.
+
+## 77. Acceptance for the module
+
+Playwright on the real stack:
+- **Before the unrest** (after `reset-demo`): GUARDED, 0 active incidents, mission readiness as the mean seeded score, the four elevated missions in "Missions requiring attention", no response timeline but recent activity.
+- **After NBO-CIVIL-UNREST scene 4** (in the Phase 1 run): SEVERE, INC-<year>-1042 active, its detection-to-notification time shown, personnel accounted from its check-in (15 + 1 of 17 → 94%), Nairobi first with the incident, Africa's exposure higher than before, the response timeline with its playbook and check-in events.
+- **Export**: the briefing opens with the same figures and no names; the export is audited and the chain verifies.
+- **The Viewer** sees the same page.
+- `make acceptance` (all existing specs) still passes.
+
+## 78. Questions for the product owner (proposed defaults)
+
+1. **Scope:** a read-only leadership page built from existing data; nothing new is entered. *Default: yes.*
+2. **Posture:** SEVERE if any mission is CRITICAL, ELEVATED if any is HIGH or an incident is ACTIVE, else GUARDED. *Default: yes.*
+3. **Detection to notification:** first signal received to first campaign sent, median over 30 days; no "vs manual baseline" figure, since there is no data for one. *Default: yes.*
+4. **Alert trend:** real counts only, so the demo's chart is mostly flat until scenarios are played. The alternative is a seeded, labelled 30-day history of simulated signals, which touches the signal tables Phase 1 relies on. *Default: real counts only.*
+5. **Regions:** a fixed country-to-region mapping in code (Africa, Middle East, Asia-Pacific, Europe, Americas), and exposure as the mean of risk points per region. *Default: yes.*
+6. **Export:** a print-ready page saved as PDF by the browser, audited; no server-side files. *Default: yes.*
+7. **Screen:** "Executive Overview" (icon `chart`), last under PLAN & INSIGHT, as the design. Every role sees it. *Default: yes.*
+8. **Demo:** no new scenario; NBO-CIVIL-UNREST scene 6 still opens Incidents for the review (the Phase 1 run is unchanged), and Executive Overview is one click away. *Default: yes.*
+9. **🔒 prompts:** none. There is no schema change and no change to RLS, `approvals.py` or `audit.py` (the export only calls it). *Default: no 🔒 prompts.*
