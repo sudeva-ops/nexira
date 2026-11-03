@@ -38,6 +38,7 @@ describe("app shell", () => {
       "Site Twin", // pilot module 13 (D-30, D-43), after Assistance Partners
       "Safety Check-in",
       "Document Expiry", // pilot module 7 (D-30, D-37), under PLAN & INSIGHT (plan-pilot-dx G-9)
+      "Supply Chain Risk", // pilot module 14 (D-30, D-44), after Document Expiry
       "Audit",
     ]);
     for (const outOfScope of ["Copilot", "Executive", "Integrations", "OSINT"]) {

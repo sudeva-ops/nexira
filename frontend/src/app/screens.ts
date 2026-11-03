@@ -38,5 +38,7 @@ export const SCREENS: readonly Screen[] = [
   { path: "/checkin", title: "Safety Check-in", subtitle: "Workflows · Personnel accountability", icon: "tick-circle", group: "RESPOND", builtIn: "Prompt 11" },
   // Plan-pilot-dx G-9: PLAN & INSIGHT, as the design; Predictive Risk and Executive Overview join it later.
   { path: "/documents", title: "Document Expiry", subtitle: "Compliance · Passports, visas & clearances", icon: "document", group: "PLAN & INSIGHT", builtIn: "Prompt 51" },
+  // D-44 (§73 Q8): after Document Expiry; icon box, since Fleet uses truck.
+  { path: "/supply", title: "Supply Chain Risk", subtitle: "Third parties · Vendors & logistics routes", icon: "box", group: "PLAN & INSIGHT", builtIn: "Prompt 93" },
   { path: "/audit", title: "Audit", subtitle: "Admin · Hash-chained audit log", icon: "history", group: "ADMIN", builtIn: "Prompt 3" },
 ];

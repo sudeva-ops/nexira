@@ -4,6 +4,7 @@ import { checkinKeys } from "./checkin";
 import { documentKeys } from "./documents";
 import { evacuationKeys } from "./evacuations";
 import { fleetKeys } from "./fleet";
+import { supplyKeys } from "./supply";
 import { twinKeys } from "./twin";
 import { partnerKeys } from "./partners";
 import { flightKeys } from "./flights";
@@ -49,6 +50,7 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
         evacuationKeys.all, // "plan ready" needs an ACTIVE incident (plan-pilot-ev G-6)
         fleetKeys.all, // "in the impact zone" follows ACTIVE incidents (plan-pilot-flt §3)
         twinKeys.all, // shelter-in-place follows ACTIVE incidents (plan-pilot-twn §5)
+        supplyKeys.all, // "impacted" and the zone tag follow ACTIVE incidents (plan-pilot-sup §4)
         ...incident,
       ];
     case "EXPOSURE_COMPUTED":
@@ -111,7 +113,8 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
       // the worker recompute exposure (plan-pilot-flt §6, review of Prompt 73).
       const ids = Array.isArray(event.data.incident_ids) ? event.data.incident_ids : [];
       const crossed = ids.filter((id): id is string => typeof id === "string").map((id) => keys.incident(id));
-      return [fleetKeys.all, twinKeys.all, ...crossed]; // the twin shows the generator's state
+      // The twin shows the generator's state; a fuel supplier its stock (plan-pilot-sup G-7).
+      return [fleetKeys.all, twinKeys.all, supplyKeys.all, ...crossed];
     }
     case "SITE_UPDATED": {
       // Presence, a sensor or readiness (D-43); a fault in an ACTIVE zone adds a SITE entry to
@@ -120,6 +123,11 @@ export function staleKeys(event: RealtimeEvent): QueryKey[] {
       const touched = ids.filter((id): id is string => typeof id === "string").map((id) => keys.incident(id));
       return [twinKeys.all, ...touched];
     }
+    case "SUPPLY_UPDATED":
+      // A route, a supplier or a mitigation (D-44); ids and statuses only (G-8). A change at a
+      // mission with an ACTIVE incident adds a SUPPLY entry to its timeline (plan-pilot-sup §4),
+      // and the event does not name the incident, so every open incident detail refetches.
+      return [supplyKeys.all, ["incident"]];
     case "WEATHER_UPDATED": // the panel, the map layer and the mission popup (WX-02)
       return [weatherKeys.all];
     case "DOCUMENT_UPDATED": // the register, its KPIs, and the trip warnings (DX-04, DX-06)

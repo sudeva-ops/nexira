@@ -85,7 +85,7 @@ class World:
         self.mission = await mission(self.conn)
         self.cairo = await mission(self.conn, "CAI")
         self.duty = await user(self.conn)
-        self.backup = await self.supplier("SUP-105", name="Kestrel Express Couriers", tier=2)
+        self.backup = await self.supplier("SUP-105", name="Falcon Express Couriers", tier=2)
         self.courier = await self.supplier("SUP-104", backup_supplier_id=self.backup)
         self.cbd = await self.route("R-NBO-1")
         self.bypass = await self.route("R-NBO-2", path=BYPASS, alternate_of_id=self.cbd)

@@ -157,9 +157,14 @@ describe("realtime client (PLT-05)", () => {
     expect(staleKeys(event("FLEET_UPDATED", { asset_id: "a1", incident_ids: ["i1", 7] }))).toEqual([
       ["fleet"],
       ["twin"],
+      ["supply"],
       ["incident", "i1"],
     ]);
-    expect(staleKeys(event("FLEET_UPDATED", { asset_id: "a1", incident_ids: [] }))).toEqual([["fleet"], ["twin"]]);
+    expect(staleKeys(event("FLEET_UPDATED", { asset_id: "a1", incident_ids: [] }))).toEqual([
+      ["fleet"],
+      ["twin"],
+      ["supply"],
+    ]);
     for (const type of ["INCIDENT_UPDATED", "CHECKIN_UPDATED", "EVACUATION_UPDATED"]) {
       expect(staleKeys(event(type, { incident_id: "i1" })), type).toContainEqual(["fleet"]);
     }
@@ -173,6 +178,12 @@ describe("realtime client (PLT-05)", () => {
     for (const type of ["INCIDENT_UPDATED", "PLAYBOOK_STEP", "EVACUATION_UPDATED"]) {
       expect(staleKeys(event(type, { incident_id: "i1" })), type).toContainEqual(["twin"]);
     }
+    // D-44: the supply picture, and every open incident's timeline (the event names none).
+    expect(staleKeys(event("SUPPLY_UPDATED", { supplier_id: "s1", status: "DELAYED" }))).toEqual([
+      ["supply"],
+      ["incident"],
+    ]);
+    expect(staleKeys(event("INCIDENT_UPDATED", { incident_id: "i1" }))).toContainEqual(["supply"]);
     expect(staleKeys(event("SOMETHING_ELSE"))).toEqual([]);
   });
 });

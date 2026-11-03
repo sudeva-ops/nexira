@@ -27,7 +27,7 @@ New backend module: `app/modules/supply/{models,schemas,service,consumer,router,
 
 | Code | Name | Service | Tier | Backup |
 |---|---|---|---|---|
-| SUP-104 | Swiftline Couriers | Diplomatic pouch courier | T1 | SUP-105 Kestrel Express Couriers |
+| SUP-104 | Swiftline Couriers | Diplomatic pouch courier | T1 | SUP-105 Falcon Express Couriers |
 | SUP-117 | Equator Guard Services | Guard force contractor | T1 | SUP-118 Highland Guard Services |
 | SUP-121 | Rift Valley Fuels | Generator fuel supply | T2 | SUP-122 Mara Energy Supplies |
 | SUP-126 | Savanna IT Networks | Local ISP & IT support | T1 | SUP-127 Upesi Networks |
@@ -84,7 +84,7 @@ New backend module: `app/modules/supply/{models,schemas,service,consumer,router,
     - the backup (`supplier.backup_supplier_id`, if any);
     - the alternate route: an OPEN route whose `alternate_of_id` is a BLOCKED route of this supplier, if any;
     - the note and the user.
-  - **Effects:** audit `SUPPLY.MITIGATION_ACTIVATED`; a SUPPLY entry on the incident ("Nairobi · Swiftline Couriers: mitigation activated · backup Kestrel Express Couriers on standby · Pouch via Southern Bypass in use."); `SUPPLY_UPDATED`.
+  - **Effects:** audit `SUPPLY.MITIGATION_ACTIVATED`; a SUPPLY entry on the incident ("Nairobi · Swiftline Couriers: mitigation activated · backup Falcon Express Couriers on standby · Pouch via Southern Bypass in use."); `SUPPLY_UPDATED`.
 - **`POST /api/supply/mitigations/{id}/stand-down`.**
   - The same roles; once (409 after).
   - Audit `SUPPLY.MITIGATION_STOOD_DOWN`; a SUPPLY entry when the incident is still ACTIVE.

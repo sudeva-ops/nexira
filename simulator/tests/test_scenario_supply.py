@@ -186,7 +186,7 @@ async def test_the_register_meets_the_plan(played: Played) -> None:
             assert backup.service == s.service, s.code
             assert backup.mission_code in (None, s.mission_code), s.code
     assert found["SUP-104"].backup is not None
-    assert found["SUP-104"].backup.name == "Kestrel Express Couriers"
+    assert found["SUP-104"].backup.name == "Falcon Express Couriers"
     assert {c for c, s in found.items() if s.status == "WATCH"} == {"SUP-251", "SUP-262"}
     assert all(s.vetting_current for s in found.values())
     assert all(s.in_bcp == (s.tier == 1) for s in found.values())
