@@ -33,6 +33,7 @@ from app.modules.people.models import (
 )
 from app.modules.playbooks.models import Playbook, PlaybookRun, PlaybookRunStep, PlaybookStep
 from app.modules.scenarios.models import Scenario, ScenarioEvent, ScenarioRun
+from app.modules.supply.models import LogisticsRoute, Supplier, SupplyMitigation
 from app.modules.tenancy.models import AppUser, ReferenceCounter, Role, Tenant, UserRole
 from app.modules.travel.models import Trip, TripTraveller
 from app.modules.twin.models import (
@@ -66,6 +67,7 @@ __all__ = [
     "IncidentSignal",
     "IntelSource",
     "LocationObservation",
+    "LogisticsRoute",
     "MedicalFacility",
     "Mission",
     "MissionClimateRisk",
@@ -93,6 +95,8 @@ __all__ = [
     "SiteRoute",
     "SiteSensor",
     "SiteZone",
+    "Supplier",
+    "SupplyMitigation",
     "Tenant",
     "TravelDocument",
     "Trip",
