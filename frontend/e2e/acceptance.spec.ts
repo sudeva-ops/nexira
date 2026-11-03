@@ -45,6 +45,15 @@ interface MissionFleet {
   available: number;
   capacity: { seats_available: number; seats_needed: number };
 }
+interface Executive {
+  posture: { level: string; critical_missions: number; elevated_missions: number };
+  active_incidents: number;
+  detection: { current_s: number | null; current_reference: string | null };
+  accounted: { pct: number | null };
+  regions: { region: string; exposure: number }[];
+  attention: { mission_code: string; drivers: { kind: string; reference: string | null }[] }[];
+}
+
 interface Tally {
   safe: number;
   need_help: number;
@@ -94,6 +103,17 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
       `/api/sites/${embassy?.id}/twin`,
     );
   expect(await twinOf()).toMatchObject({ counts: { on_site: 25 }, shelter: null, route: null });
+  // EXE-01, EXE-02 (Prompt 98; plan-pilot-exe G-1): the Executive Overview's calm state, which
+  // only exists before this run.
+  const executive = () => duty.get<Executive>("/api/executive/overview");
+  const africa = (o: Executive) => o.regions.find((r) => r.region === "Africa")?.exposure;
+  const calm = await executive();
+  expect([calm.posture.level, calm.posture.critical_missions, calm.posture.elevated_missions]).toEqual([
+    "GUARDED",
+    0,
+    4,
+  ]);
+  expect([calm.active_incidents, calm.accounted.pct, africa(calm)]).toEqual([0, null, 25]);
 
   // --- Scene 1 · Signals fused ---------------------------------------------------------
   await presenter.getByRole("button", { name: "Next scene" }).click();
@@ -215,6 +235,16 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
     "Evacuation plan EVP-NBO is ready but not activated.",
   );
   await expect(dutyPage.getByText("Illustrative evacuation plan (simulated)")).toBeVisible();
+
+  // EXE-01, EXE-02 (Prompt 98): after the check-in, the overview's incident figures.
+  const unrest = await executive();
+  expect([unrest.posture.level, unrest.accounted.pct, africa(unrest)]).toEqual(["SEVERE", 94, 38]);
+  expect(unrest.detection.current_reference).toBe(nairobi.reference);
+  expect(unrest.detection.current_s).not.toBeNull();
+  expect(unrest.attention[0]?.mission_code).toBe("NBO");
+  expect(unrest.attention[0]?.drivers.map((d) => d.kind)).toEqual(
+    expect.arrayContaining(["INCIDENT", "FLEET", "SHELTER"]),
+  );
 
   // --- Scene 5 · Decisions: the two-person rule (plan G-16 fixture) --------------------------
   await presenter.getByRole("button", { name: "Next scene" }).click();
