@@ -924,12 +924,13 @@ and on demand), the projection and band, drivers, rising risk, recommended actio
 GET /api/predictive/*; audit. Tests against real PostgreSQL.
 ```
 
-### Prompt 102 · The Forecast agent 🔒
+### Prompt 102 · The Forecast agent (advice only; plan-pilot-prd G-1, option B)
 ```
-PRD-06, PC-48. The FORECAST agent and the PROPOSE_VIP_CHANGE policy; the trigger and
-evidence; the executor through the VIP module's change proposal with the approving person;
-nothing else. Tests: the trigger, no proposal without a live VIP segment near an event,
-approvals by role, and the VIP two-person decision afterwards.
+PRD-06, PC-48 (the agent row). The FORECAST agent: on MISSION_EVENT_ADDED and
+EXPOSURE_COMPUTED, an ADVISE_READINESS_CHECK (level 4, no policy, never executed) when
+calendar events take a mission's forecast to 70 or more within 14 days; evidence; one per
+mission and peak; no VIP visit, segment, venue or time in it. Tests: the trigger, no
+proposal below 70, idempotency, nothing restricted in the text.
 ```
 
 ### Prompt 103 · Seed, history and ADD-FORECAST

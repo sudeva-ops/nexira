@@ -288,7 +288,7 @@ Rules:
 
 **D-46 · Predictive Risk (illustrative).** Approved by the product owner on 2026-11-03 (PR #126). Requirements PRD-01 to PRD-08 in `docs/requirements-pilot.md` §79–83, with the defaults in §83. Amends D-30 by adding Predictive Risk to the pilot.
 - **Explainable, not trained.** The risk index and its 14-day projection are rule-based and labelled "illustrative model"; every number traces to stated components. No precision or recall is claimed.
-- **Advisory only.** Nothing changes because of a forecast. The Forecast agent may only propose a VIP programme change, which a person approves and the VIP module's two people then decide (D-12, D-16, D-42).
+- **Advisory only.** Nothing changes because of a forecast. The Forecast agent raises only advice (level 4) that names no VIP visit, so D-42's restriction and "no agent acts on visits" hold; a VIP change stays with the Security Officer (plan-pilot-prd G-1, option B, PR #127).
 - **Simulated inputs.** The events calendar and the first 30 days of history are seeded and labelled (D-19).
 
 ---
