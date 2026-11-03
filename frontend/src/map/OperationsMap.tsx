@@ -12,9 +12,10 @@ import { type Weather, weatherMarkers, weatherSummary } from "../api/weather";
 import { useReducedMotion } from "../ui/useMotion";
 import {
   circlePolygon,
-  exposureColumns,
+  EXPOSURE_PULSE_MS,
   exposureFeatures,
   missionFeatures,
+  type PulseTier,
   SEVERITY_COLOUR,
   zoneFeatures,
 } from "./geo";
@@ -33,6 +34,9 @@ import {
 import { ATTRIBUTION, baseStyle, CITY_MINZOOM } from "./style";
 
 const EMPTY = { type: "FeatureCollection" as const, features: [] };
+const PULSE_TIERS: PulseTier[] = ["CRITICAL", "HIGH", "MODERATE"];
+// Light ripples, so they read on the red impact zone: red, amber, yellow.
+const RING_COLOUR: Record<PulseTier, string> = { CRITICAL: "#FF8F8F", HIGH: "#FBB360", MODERATE: "#FBD065" };
 const PULSE_MS = 2400; // a mission halo's sonar
 const BREATH_MS = 3200; // an impact zone's breath
 const FRAME_MS = 40; // about 25 frames a second is enough for a pulse
@@ -76,6 +80,8 @@ export function OperationsMap({
   const [hazardElements, setHazardElements] = useState(new Map<string, HTMLElement>()); // HZ-09
   const wxData = useMemo(() => weatherMarkers(weather, weatherAt), [weather, weatherAt]);
   const reduced = useReducedMotion();
+  // The selected incident's radius sets how critical each exposed dot is (exposureTier).
+  const radius = incidents.find((i) => i.id === selectedId)?.impact_radius_m ?? 5000;
   const known = useRef<Set<string> | null>(null); // incidents already on the map
   const [globe, setGlobe] = useState(globePreferred);
   const globeRef = useRef(globe);
@@ -104,7 +110,6 @@ export function OperationsMap({
         if (disposed) return;
         applyProjection(m, globeRef.current);
         m.addSource("zones", { type: "geojson", data: EMPTY });
-        m.addSource("exposure-columns", { type: "geojson", data: EMPTY });
         m.addSource("missions", { type: "geojson", data: EMPTY });
         m.addSource("exposure", { type: "geojson", data: EMPTY });
         m.addLayer({
@@ -120,7 +125,7 @@ export function OperationsMap({
           paint: { "line-color": ["get", "colour"], "line-width": 1.5, "line-dasharray": [3, 2] },
         });
         // In 3D, closer in: each impact zone rises as a translucent column, higher for higher
-        // severity, and exposed people and sites stand as small columns at city zoom.
+        // severity.
         m.addLayer({
           id: "zones-extrude",
           type: "fill-extrusion",
@@ -153,6 +158,25 @@ export function OperationsMap({
             "circle-stroke-width": 1,
           },
         });
+        // Exposed people and sites at city zoom pulse by how critical they are: the more
+        // critical, the quicker (one ring layer per tier, under the dots).
+        for (const tier of PULSE_TIERS) {
+          m.addLayer({
+            id: `exposure-pulse-${tier}`,
+            type: "circle",
+            source: "exposure",
+            minzoom: CITY_MINZOOM + 3,
+            filter: ["==", ["get", "tier"], tier],
+            paint: {
+              "circle-color": RING_COLOUR[tier],
+              "circle-radius": ["case", ["==", ["get", "kind"], "SITE"], 6, 3.5],
+              "circle-opacity": 0,
+              "circle-stroke-color": RING_COLOUR[tier],
+              "circle-stroke-width": 1.5,
+              "circle-stroke-opacity": 0,
+            },
+          });
+        }
         m.addLayer({
           id: "exposure",
           type: "circle",
@@ -165,17 +189,6 @@ export function OperationsMap({
             "circle-stroke-width": 1,
           },
         });
-        m.addLayer({
-          id: "exposure-columns",
-          type: "fill-extrusion",
-          source: "exposure-columns",
-          minzoom: CITY_MINZOOM + 3,
-          paint: {
-            "fill-extrusion-color": ["get", "colour"],
-            "fill-extrusion-height": ["get", "height"],
-            "fill-extrusion-opacity": 0.85,
-          },
-        }, "zones-extrude"); // under the translucent zone, or the zone hides them
         const popup = new Popup({ closeButton: false, closeOnClick: false });
         for (const layer of ["missions", "exposure"]) {
           m.on("mouseenter", layer, (e) => {
@@ -283,9 +296,8 @@ export function OperationsMap({
   }, [map, incidents, incidentsLoaded, reduced]);
 
   useEffect(() => {
-    (map?.getSource("exposure") as GeoJSONSource | undefined)?.setData(exposureFeatures(exposure));
-    (map?.getSource("exposure-columns") as GeoJSONSource | undefined)?.setData(exposureColumns(exposure));
-  }, [map, exposure]);
+    (map?.getSource("exposure") as GeoJSONSource | undefined)?.setData(exposureFeatures(exposure, radius));
+  }, [map, exposure, radius]);
 
   // Globe or flat (UI 2), and the slow turn of the world view while nobody touches it.
   useEffect(() => {
@@ -317,6 +329,14 @@ export function OperationsMap({
           const ring = sonar((k + offset) % 1, 5, 24);
           map.setPaintProperty(id, "circle-radius", ring.radius);
           map.setPaintProperty(id, "circle-opacity", ring.opacity);
+        }
+        for (const tier of PULSE_TIERS) {
+          const id = `exposure-pulse-${tier}`;
+          if (!map.getLayer(id)) continue;
+          const ring = sonar(phase(now, EXPOSURE_PULSE_MS[tier]), 4, 16, 0.95);
+          map.setPaintProperty(id, "circle-radius", ring.radius);
+          map.setPaintProperty(id, "circle-stroke-opacity", ring.opacity);
+          map.setPaintProperty(id, "circle-opacity", ring.opacity * 0.25);
         }
       }
       frame = requestAnimationFrame(step);

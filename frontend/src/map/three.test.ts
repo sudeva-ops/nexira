@@ -1,4 +1,4 @@
-import { exposureColumns, ZONE_HEIGHT_M, zoneFeatures } from "./geo";
+import { EXPOSURE_PULSE_MS, exposureFeatures, exposureTier, ZONE_HEIGHT_M, zoneFeatures } from "./geo";
 import { globePreferred, IDLE_MS, setGlobePreferred, shouldSpin } from "./three";
 import { DETAIL, INCIDENT } from "../test/fixtures";
 
@@ -9,15 +9,17 @@ describe("the 3D map", () => {
     expect(ZONE_HEIGHT_M.CRITICAL).toBeGreaterThan(ZONE_HEIGHT_M.LOW);
   });
 
-  it("draws exposed people and sites as small closed columns, sites taller", () => {
-    const columns = exposureColumns(DETAIL.exposure).features;
-    expect(columns.length).toBeGreaterThan(0);
-    for (const c of columns) {
-      const ring = c.geometry.coordinates[0] ?? [];
-      expect(ring).toHaveLength(5);
-      expect(ring[0]).toEqual(ring[4]);
-      expect(c.properties?.height).toBe(c.properties?.kind === "SITE" ? 1500 : 700);
-    }
+  it("pulses exposed people and sites quicker the more critical they are", () => {
+    const at = (distance_m: number | null, subject_type: "PERSON" | "SITE" = "PERSON") =>
+      exposureTier({ subject_type, distance_m }, 5000);
+    expect([at(500), at(2500), at(4900), at(null)]).toEqual(["CRITICAL", "HIGH", "MODERATE", "MODERATE"]);
+    expect([at(2200, "SITE"), at(4000, "SITE"), at(100, "SITE")]).toEqual(["CRITICAL", "HIGH", "CRITICAL"]);
+    expect(at(9000)).toBe("MODERATE"); // outside the zone
+    expect(EXPOSURE_PULSE_MS.CRITICAL).toBeLessThan(EXPOSURE_PULSE_MS.HIGH);
+    expect(EXPOSURE_PULSE_MS.HIGH).toBeLessThan(EXPOSURE_PULSE_MS.MODERATE);
+    const tiers = exposureFeatures(DETAIL.exposure).features.map((f) => f.properties?.tier);
+    expect(tiers.length).toBeGreaterThan(0);
+    expect(tiers.every((t) => ["CRITICAL", "HIGH", "MODERATE"].includes(String(t)))).toBe(true);
   });
 
   it("turns the world view only on the globe, at world zoom, when nobody touched it", () => {

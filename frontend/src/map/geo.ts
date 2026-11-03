@@ -97,8 +97,22 @@ const PERSON_COLOUR: Record<string, string> = {
   CITIZEN: "#FBB360",
 };
 
-/** People in the zone (shown at city zoom) and exposed sites. */
-export function exposureFeatures(exposure: Exposure[]): FeatureCollection<Point> {
+export type PulseTier = "CRITICAL" | "HIGH" | "MODERATE";
+/** How often a dot pulses, by how critical it is: the more critical, the quicker. */
+export const EXPOSURE_PULSE_MS: Record<PulseTier, number> = { CRITICAL: 1200, HIGH: 1800, MODERATE: 2600 };
+const TIERS: PulseTier[] = ["CRITICAL", "HIGH", "MODERATE"];
+
+/** How critical an exposed person or site is, from how close it is to the incident: the inner
+ * third of the impact zone is CRITICAL, the middle HIGH, the outer MODERATE. A site counts one
+ * tier higher, since many people depend on it. Unknown distance: MODERATE. */
+export function exposureTier(e: Pick<Exposure, "subject_type" | "distance_m">, radiusM: number): PulseTier {
+  if (e.distance_m === null || radiusM <= 0) return "MODERATE";
+  const band = Math.min(2, Math.floor((3 * e.distance_m) / radiusM));
+  return TIERS[Math.max(0, band - (e.subject_type === "SITE" ? 1 : 0))] ?? "MODERATE";
+}
+
+/** People in the zone (shown at city zoom) and exposed sites, each with its pulse tier. */
+export function exposureFeatures(exposure: Exposure[], radiusM = 5000): FeatureCollection<Point> {
   return {
     type: "FeatureCollection",
     features: exposure
@@ -112,6 +126,7 @@ export function exposureFeatures(exposure: Exposure[]): FeatureCollection<Point>
           name: e.name,
           confidence: e.confidence,
           colour: e.subject_type === "SITE" ? "#F6F7F9" : (PERSON_COLOUR[e.kind] ?? "#ABB3BF"),
+          tier: exposureTier(e, radiusM),
         },
       })),
   };
@@ -240,37 +255,4 @@ export function routeFeatures(flights: FlightLike[]): FeatureCollection<LineStri
     }
   }
   return { type: "FeatureCollection", features };
-}
-
-const COLUMN_M = 70; // half the side of an exposure column
-
-/** The exposed people and sites as small columns for the 3D view at city zoom: sites taller
- * than people, each in its own colour. */
-export function exposureColumns(exposure: Exposure[]): FeatureCollection<Polygon> {
-  const points = exposureFeatures(exposure).features;
-  return {
-    type: "FeatureCollection",
-    features: points.map((p) => {
-      const [lon, lat] = p.geometry.coordinates as [number, number];
-      const dLat = COLUMN_M / 111_320;
-      const dLon = COLUMN_M / (111_320 * Math.max(0.1, Math.cos((lat * Math.PI) / 180)));
-      return {
-        type: "Feature",
-        id: p.id,
-        geometry: {
-          type: "Polygon",
-          coordinates: [
-            [
-              [lon - dLon, lat - dLat],
-              [lon + dLon, lat - dLat],
-              [lon + dLon, lat + dLat],
-              [lon - dLon, lat + dLat],
-              [lon - dLon, lat - dLat],
-            ],
-          ],
-        },
-        properties: { ...p.properties, height: p.properties?.kind === "SITE" ? 1500 : 700 },
-      };
-    }),
-  };
 }
