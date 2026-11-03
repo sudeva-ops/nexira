@@ -397,6 +397,32 @@ async def overview(session: AsyncSession) -> schemas.OverviewOut:
     )
 
 
+@dataclass(frozen=True)
+class Outlook:
+    """One mission today and ahead, for the Forecast agent (PRD-06)."""
+
+    components: Components
+    now: int
+    peak: schemas.ForecastOut
+    events_at_peak: list[MissionEvent]  # the calendar entries that count on the peak's day
+
+
+async def outlook(session: AsyncSession, mission_id: uuid.UUID) -> Outlook | None:
+    today = await db_today(session)
+    c = (await components(session, today)).get(mission_id)
+    if c is None:
+        return None
+    history = (await _history(session, today, [mission_id])).get(mission_id, [])
+    ahead = forecast(c, today, _slope(history))
+    peak = max(ahead, key=lambda f: (f.value, -f.day.toordinal()))
+    return Outlook(
+        components=c,
+        now=total(c.points(today)),
+        peak=peak,
+        events_at_peak=[e for e in c.events if event_points([e], peak.day)],
+    )
+
+
 class MissionNotFoundError(Exception):
     pass
 

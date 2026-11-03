@@ -1077,6 +1077,13 @@ AGENTS: list[tuple[str, str, str, int]] = [
         "Watches travel documents at missions at risk; proposes urgent renewals.",
         2,
     ),
+    # Pilot module 16 (D-46; plan-pilot-prd G-1, option B): advice only, never a VIP visit.
+    (
+        "FORECAST",
+        "Forecast",
+        "Watches the risk forecast and events calendar; advises readiness checks.",
+        4,
+    ),
 ]
 # (action_type, floor, approver_roles, undoable)
 POLICIES: list[tuple[str, int, list[str], bool]] = [

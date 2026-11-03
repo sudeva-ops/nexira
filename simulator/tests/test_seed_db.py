@@ -184,6 +184,7 @@ async def test_sources_playbook_agents_and_counters(seeded: Seeded) -> None:
         "COMMUNICATIONS": 2,
         "TRAVEL_AIR": 2,  # D-34
         "COMPLIANCE": 2,  # D-37
+        "FORECAST": 4,  # D-46: advice only (plan-pilot-prd G-1)
     }
     policies = {
         r["action_type"]: (r["min_autonomy_level"], r["approver_roles"], r["is_undoable"])
