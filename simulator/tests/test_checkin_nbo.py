@@ -13,6 +13,7 @@ from app.core.db import create_engine, tenant_session
 from app.core.events import Event
 from app.modules.checkin import service as checkin
 from app.modules.checkin.consumer import clock_handler, response_handler
+from app.modules.intel import queries
 from app.modules.notifications.consumer import dispatch_all
 from app.modules.notifications.models import NotificationCampaign
 from app.modules.playbooks import engine as playbook_engine
@@ -87,6 +88,9 @@ async def test_scene_4_ends_at_15_1_1_and_168_4_40_and_escalates_hana_once(db: D
             first = await checkin.escalate_due(session, scene_4 + timedelta(seconds=20))
             again = await checkin.escalate_due(session, scene_4 + timedelta(seconds=60))
             await session.commit()
+            found = await queries.get_incident(session, incident_id)
+            assert found is not None
+            exposed = found[1]
     finally:
         await engine.dispose()
 
@@ -96,3 +100,17 @@ async def test_scene_4_ends_at_15_1_1_and_168_4_40_and_escalates_hana_once(db: D
     assert personnel.accounted_pct == 94.1
     assert [(r.personnel, r.citizens) for r in first] == [(["Hana Takeda"], 40)]
     assert again == []  # Hana is escalated once
+    # The map pulses people by their answer (UI): every exposed person carries it.
+    status = {e.name: e.checkin_status for e in exposed if e.subject_type == "PERSON"}
+    assert (status["Peter Mwangi"], status["Hana Takeda"], status["Grace Wanjiru"]) == (
+        "NEED_HELP",
+        "PENDING",
+        "SAFE",
+    )
+    people = [e.checkin_status for e in exposed if e.subject_type == "PERSON"]
+    assert (people.count("NEED_HELP"), people.count("PENDING"), people.count("SAFE")) == (
+        5,
+        41,
+        183,
+    )
+    assert all(e.checkin_status is None for e in exposed if e.subject_type != "PERSON")

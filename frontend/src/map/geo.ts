@@ -101,11 +101,24 @@ export type PulseTier = "CRITICAL" | "HIGH" | "MODERATE";
 /** How often a dot pulses, by how critical it is: the more critical, the quicker. */
 export const EXPOSURE_PULSE_MS: Record<PulseTier, number> = { CRITICAL: 1200, HIGH: 1800, MODERATE: 2600 };
 const TIERS: PulseTier[] = ["CRITICAL", "HIGH", "MODERATE"];
+const ANSWER_TIER: Record<NonNullable<Exposure["checkin_status"]>, PulseTier | null> = {
+  NEED_HELP: "CRITICAL",
+  PENDING: "HIGH",
+  SAFE: null,
+};
 
-/** How critical an exposed person or site is, from how close it is to the incident: the inner
- * third of the impact zone is CRITICAL, the middle HIGH, the outer MODERATE. A site counts one
- * tier higher, since many people depend on it. Unknown distance: MODERATE. */
-export function exposureTier(e: Pick<Exposure, "subject_type" | "distance_m">, radiusM: number): PulseTier {
+/** How critical an exposed person or site is, so how fast its dot pulses (null: still).
+ * A person asked in this incident's check-in: NEED HELP is CRITICAL, no answer yet HIGH, SAFE
+ * still. Otherwise, and for sites, how close it is: the inner third of the impact zone is
+ * CRITICAL, the middle HIGH, the outer MODERATE, a site one tier higher since many people
+ * depend on it. Unknown distance: MODERATE. */
+export function exposureTier(
+  e: Pick<Exposure, "subject_type" | "distance_m" | "checkin_status">,
+  radiusM: number,
+): PulseTier | null {
+  if (e.subject_type === "PERSON" && e.checkin_status) {
+    return ANSWER_TIER[e.checkin_status];
+  }
   if (e.distance_m === null || radiusM <= 0) return "MODERATE";
   const band = Math.min(2, Math.floor((3 * e.distance_m) / radiusM));
   return TIERS[Math.max(0, band - (e.subject_type === "SITE" ? 1 : 0))] ?? "MODERATE";
@@ -126,7 +139,7 @@ export function exposureFeatures(exposure: Exposure[], radiusM = 5000): FeatureC
           name: e.name,
           confidence: e.confidence,
           colour: e.subject_type === "SITE" ? "#F6F7F9" : (PERSON_COLOUR[e.kind] ?? "#ABB3BF"),
-          tier: exposureTier(e, radiusM),
+          tier: exposureTier(e, radiusM) ?? "STILL", // STILL matches no ripple layer
         },
       })),
   };

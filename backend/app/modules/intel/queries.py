@@ -158,7 +158,16 @@ _EXPOSURE = text(
            ST_Y(coalesce(l.location, s.location)::geometry) AS lat,
            ST_X(coalesce(l.location, s.location)::geometry) AS lon,
            l.primary_source AS location_source,
-           coalesce(l.place_label, t.destination) AS place_label
+           coalesce(l.place_label, t.destination) AS place_label,
+           CASE WHEN e.subject_type = 'PERSON' THEN (
+             SELECT coalesce(a.status, 'PENDING')
+               FROM notification_delivery d
+               JOIN notification_campaign c ON c.id = d.campaign_id
+               LEFT JOIN v_checkin_latest a ON a.campaign_id = c.id AND a.person_id = d.person_id
+              WHERE c.incident_id = e.incident_id AND c.campaign_type = 'CHECKIN'
+                AND d.person_id = e.subject_id
+              ORDER BY c.created_at DESC, a.responded_at DESC NULLS LAST
+              LIMIT 1) END AS checkin_status
       FROM incident_exposure e
       LEFT JOIN person p ON e.subject_type = 'PERSON' AND p.id = e.subject_id
       LEFT JOIN person_location_current l ON l.person_id = p.id
