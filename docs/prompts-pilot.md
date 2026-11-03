@@ -892,3 +892,62 @@ for the figures, the attention list, the timeline and the briefing.
 Playwright, real stack (requirements-pilot.md §77). Report the real output; make
 acceptance (all specs) still passes.
 ```
+
+## Pilot module 16 · Predictive Risk (proposed, awaiting the product owner)
+
+Sources: D-46 (proposed), `docs/requirements-pilot.md` §79–83 (PRD-01..08), PC-46..48. An illustrative, explainable model; advisory only.
+
+### Prompt 99 · Read and plan (no code)
+```
+Read D-08, D-12..D-19, D-29, D-30, D-42, D-46, requirements-pilot.md §1-6 and §79-83, the
+agents framework (proposals, policies, executor), VIP changes, incidents, signals, health,
+hazards and weather. Write docs/plan-pilot-prd.md: each index component and its points, the
+projection and band, the snapshot job, the seeded history and calendar, drivers, rising risk
+and the action rules, the Forecast agent's trigger, evidence and executor path, ADD-FORECAST,
+what changes in the acceptance specs, gaps with proposed answers, and the migration for
+PC-46..47 (only after approval). No code.
+```
+
+### Prompt 100 · Risk index and events calendar tables (migration) 🔒
+```
+PC-46, PC-47, once approved. A new migration: risk_index and mission_event with FORCE RLS,
+tenant_isolation and the grants as proposed; the guards (same-tenant references, today's row
+only updated, times written by the database, frozen columns); pinned search_path. Tests (as
+nexira_api): isolation; every refusal; the backup role reads them; the downgrade restores the
+previous revision exactly.
+```
+
+### Prompt 101 · The index, the projection and the screen's API
+```
+PRD-01..05, PRD-07 (API). app/modules/predictive: the components, the daily snapshot (worker
+and on demand), the projection and band, drivers, rising risk, recommended actions,
+GET /api/predictive/*; audit. Tests against real PostgreSQL.
+```
+
+### Prompt 102 · The Forecast agent 🔒
+```
+PRD-06, PC-48. The FORECAST agent and the PROPOSE_VIP_CHANGE policy; the trigger and
+evidence; the executor through the VIP module's change proposal with the approving person;
+nothing else. Tests: the trigger, no proposal without a live VIP segment near an event,
+approvals by role, and the VIP two-person decision afterwards.
+```
+
+### Prompt 103 · Seed, history and ADD-FORECAST
+```
+PRD-01, PRD-05, PRD-08. The 30-day illustrative history and the calendar; the ADD-FORECAST
+scenario and its presenter bar entry. The Phase 1 scenario still starts with no active
+incident and an empty Decision Queue. Tests in the simulator.
+```
+
+### Prompt 104 · Predictive Risk screen
+```
+PRD-07. The screen (as the design, Blueprint dark), under PLAN & INSIGHT before Executive
+Overview; the chart with history, forecast, band and threshold; drivers; rising risk;
+recommended actions. Tests: Vitest.
+```
+
+### Prompt 105 · Predictive Risk acceptance
+```
+Playwright, real stack (requirements-pilot.md §82). Report the real output; make
+acceptance (all specs) still passes.
+```

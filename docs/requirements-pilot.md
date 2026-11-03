@@ -903,3 +903,65 @@ Playwright on the real stack:
 7. **Screen:** "Executive Overview" (icon `chart`), last under PLAN & INSIGHT, as the design. Every role sees it. *Default: yes.*
 8. **Demo:** no new scenario; NBO-CIVIL-UNREST scene 6 still opens Incidents for the review (the Phase 1 run is unchanged), and Executive Overview is one click away. *Default: yes.*
 9. **🔒 prompts:** none. There is no schema change and no change to RLS, `approvals.py` or `audit.py` (the export only calls it). *Default: no 🔒 prompts.*
+
+## 79. Purpose and starting point
+
+Show, per mission, where risk is heading over the next 14 days and why, so leadership can act before it materialises, and let a Forecast agent propose a pre-emptive change that people decide. Master spec §5.26 (Predictive Risk, PRD-01..05) and agent 9 "Forecast" (§6.1, AGR-07); the design's Predictive Risk screen ("Analytics · 14-day risk forecast") and its Addis Ababa proposal.
+
+| Exists today | Where |
+|---|---|
+| Mission risk levels and incidents with severity at each mission (`display_risk`) | people, intel |
+| Signals with location and time; health advisories; natural hazards near missions; severe-weather warnings | intel, health_intel, hazards, weather |
+| The VIP visit VV-<year>-031 to Addis Ababa (days +4..+6) with its industrial-park site visit, and the two-person programme change | vip (D-42) |
+| The agent framework: proposals, autonomy levels, policies, the approval flow and the executor | agents (D-12..D-17) |
+| No risk index, no history, no forecast, no events calendar, no Forecast agent | — |
+
+## 80. Requirements: Predictive Risk (PRD)
+
+| ID | Requirement | Master | Pri. |
+|---|---|---|---|
+| PRD-01 | **A daily risk index per mission (0–100)**, from stated components so it can be explained (§83 Q2): the mission's baseline risk (LOW 15, MODERATE 35, HIGH 55, CRITICAL 75), plus ACTIVE incidents at the mission (by severity), the signals near it in the last 7 days against its 30-day norm, an open health advisory, a natural hazard within range, a severe-weather warning, and events in its calendar in the next 7 days; capped at 100. A snapshot is stored once a day per mission (and on demand in the demo), so there is a **30-day history**; the first 30 days are a seeded, labelled illustrative history (§83 Q3). | PRD-01 | M |
+| PRD-02 | **A 14-day forecast with an uncertainty band**, worked out on read from the same components: incident contributions fade (half-life 3 days), calendar events add their contribution on their dates (rising two days before), the last 30 days' trend continues at most ±1 point a day, and the band widens with the horizon (±3 points plus 0.9 a day). It is a transparent projection, labelled "illustrative model", not a trained one (§83 Q2). | PRD-01 | M |
+| PRD-03 | **Key drivers**: each component's contribution now and its change against 7 days ago (e.g. "Scheduled public events · 2 this week · +18"), for the selected mission. | PRD-02 | M |
+| PRD-04 | **Rising risk and recommended actions**: missions ranked by the forecast's 14-day peak minus today; those crossing the elevated threshold (70) flagged. Recommended actions are worked out from rules and shown as text (e.g. "Schedule a readiness check with Addis Ababa before the visit VV-<year>-031"); no task is created (§83 Q6). | PRD-03 | M |
+| PRD-05 | **Events calendar**: per mission, simulated scheduled events (RALLY, ELECTION, HOLIDAY, SUMMIT, SPORTS, OTHER) with a date range, place, expected attendance and an impact weight; seeded and read-only in the pilot. | — | M |
+| PRD-06 | **Advisory only.** The index, forecast and actions never change anything by themselves. The **Forecast agent** may raise one kind of proposal (§83 Q7): when a mission's forecast crosses 70 within 14 days and a VIP visit there has a segment within 2 km of a calendar event, it proposes a programme change for that segment (make it virtual), with the evidence. A person approves it at the policy's level; the change then goes through the VIP module's own two-person decision (D-42). | PRD-05, AGR-07 | M |
+| PRD-07 | **Predictive Risk screen**: as the design, Blueprint dark, under PLAN & INSIGHT (§83 Q8): the advisory banner; a mission picker; the chart (30-day history, today, 14-day forecast with the band, the threshold at 70); key drivers; "Rising risk · next 14 days"; recommended actions. Every role sees it (aggregates and references only). | — | M |
+| PRD-08 | **A demo scenario** `ADD-FORECAST`: scene 1 a rally near the industrial park is announced (a calendar event), so Addis Ababa's forecast crosses 70 before the visit and the Forecast agent proposes making the site visit virtual; people decide in the Decision Queue and on VIP Protection. The Phase 1 scenario still starts with an empty Decision Queue: the agent proposes only from this scenario's event. | — | M |
+
+### Not in this module
+- A trained statistical or machine-learning model, and **model performance** figures (precision, recall, warning time; PRD-04 in the master spec): they need stored forecasts compared with what happened over months (§83 Q5);
+- real events calendars, sentiment or OSINT feeds;
+- creating tasks from recommended actions;
+- the Forecast agent proposing anything other than the VIP programme change; evacuation or supply proposals (they stay with people);
+- editing the calendar in the app.
+
+## 81. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-46 · `risk_index`**: tenant, mission, day (UNIQUE with the mission), value (0–100), the components (`jsonb`: each driver's points), source (`COMPUTED` or `ILLUSTRATIVE` for the seeded history), computed at (written by the database). FORCE RLS; SELECT and INSERT; `UPDATE` only of today's row by the snapshot (value, components, computed at); no DELETE.
+- **PC-47 · `mission_event`**: tenant, mission, kind, title, place label and location (`geography(Point,4326)`, nullable), starts on and ends on, expected attendance (nullable), impact weight (1–30), source (default "Illustrative events calendar (simulated)"). FORCE RLS; SELECT and INSERT (seeded and by the scenario); no UPDATE or DELETE.
+- **PC-48 · the Forecast agent and its policy**: a new agent row (FORECAST, autonomy as §83 Q7) and an action policy `PROPOSE_VIP_CHANGE` requiring one approver (Security Officer, Duty Officer or HQ Crisis Director); the executor calls the VIP module's existing change proposal with the approving person as the proposer. Data only (agent and policy rows), no table change.
+- The forecast is not stored; it is worked out on read.
+
+## 82. Acceptance for the module
+
+Playwright on the real stack:
+- **The calm state** (in the Phase 1 spec, as G-1 of Executive Overview): every mission has 30 days of history; the Decision Queue is empty; Addis Ababa's forecast stays below 70.
+- **After NBO-CIVIL-UNREST scene 2**: Nairobi's index jumps (the incident driver) and its forecast eases over the 14 days.
+- **`ADD-FORECAST` from the presenter bar**: the rally appears in Addis Ababa's calendar; its forecast crosses 70 before the visit; "Rising risk" lists Addis first; a recommended action names the visit; the Forecast agent's proposal appears in the Decision Queue with its evidence; a Duty Officer approves it; a VIP programme change for the site visit is pending, to be decided by two people as before.
+- **The Viewer** sees the screen and cannot approve.
+- **Audit**: the snapshot, the event, the proposal and its approval are audited, and the chain verifies.
+- `make acceptance` (all existing specs) still passes.
+
+## 83. Questions for the product owner (proposed defaults)
+
+1. **Scope:** an explainable daily index, a 14-day projection with a band, drivers, rising risk and recommended actions, an events calendar, and one Forecast-agent proposal. *Default: yes.*
+2. **The model:** a transparent rule-based index and projection, labelled "illustrative model", rather than a trained model; every number can be traced to its components. *Default: yes.*
+3. **History:** a seeded, labelled 30-day illustrative history per mission (the design's chart needs it), then one real snapshot a day. *Default: yes.*
+4. **Elevated threshold:** 70, as the design. *Default: yes.*
+5. **Model performance (precision, recall, warning time):** not now; it needs months of stored forecasts to compare. *Default: not now.*
+6. **Recommended actions:** text from rules; no tasks are created. *Default: yes.*
+7. **Forecast agent:** one proposal type (`PROPOSE_VIP_CHANGE`, make a segment virtual), autonomy level 2 (a person approves), raised only when the forecast crosses 70 near a live VIP segment; the change then needs the VIP module's two people. Evacuation and supply stay with people. *Default: yes.*
+8. **Screen:** "Predictive Risk" (icon `trending-up`) under PLAN & INSIGHT, before Executive Overview, as the design. *Default: yes.*
+9. **Demo:** `ADD-FORECAST` from the presenter bar; the Phase 1 run keeps an empty Decision Queue at scene 0. *Default: yes.*
+10. **🔒 prompts:** the migration (PC-46, PC-47: RLS, grants, guards) and the Forecast agent's policy and executor (D-29) need your named sign-off, as before. *Default: yes.*
