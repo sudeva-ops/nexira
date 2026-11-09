@@ -188,6 +188,9 @@ describe("realtime client (PLT-05)", () => {
     ]);
     expect(staleKeys(event("INCIDENT_UPDATED", { incident_id: "i1" }))).toContainEqual(["supply"]);
     expect(staleKeys(event("SOMETHING_ELSE"))).toEqual([]);
+    // D-47: a review changed, or an incident that may now be ready for one.
+    expect(staleKeys(event("AAR_UPDATED", { review_id: "r1" }))).toEqual([["aar"]]);
+    expect(staleKeys(event("INCIDENT_UPDATED", { incident_id: "i1" }))).toContainEqual(["aar"]);
   });
   it("refreshes the Executive Overview on the events that move its figures (D-45)", () => {
     for (const type of ["INCIDENT_UPDATED", "EXPOSURE_COMPUTED", "CHECKIN_UPDATED", "SUPPLY_UPDATED", "FLEET_UPDATED"]) {

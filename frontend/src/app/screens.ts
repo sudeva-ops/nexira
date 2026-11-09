@@ -42,6 +42,8 @@ export const SCREENS: readonly Screen[] = [
   { path: "/supply", title: "Supply Chain Risk", subtitle: "Third parties · Vendors & logistics routes", icon: "box", group: "PLAN & INSIGHT", builtIn: "Prompt 93" },
   // D-46 (§83 Q8): before Executive Overview, as the design.
   { path: "/predictive", title: "Predictive Risk", subtitle: "Analytics · 14-day risk forecast", icon: "trending-up", group: "PLAN & INSIGHT", builtIn: "Prompt 104" },
+  // D-47 (§88 Q10): after Predictive Risk, as the design; Exercises later goes before it.
+  { path: "/aar", title: "After-Action Review", subtitle: "Learning · Timeline, lessons & actions", icon: "endorsed", group: "PLAN & INSIGHT", builtIn: "Prompt 110" },
   // D-45 (§78 Q7): last under PLAN & INSIGHT, as the design.
   { path: "/executive", title: "Executive Overview", subtitle: "Dashboard · Leadership view", icon: "chart", group: "PLAN & INSIGHT", builtIn: "Prompt 97" },
   { path: "/audit", title: "Audit", subtitle: "Admin · Hash-chained audit log", icon: "history", group: "ADMIN", builtIn: "Prompt 3" },

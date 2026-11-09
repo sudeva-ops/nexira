@@ -2,6 +2,7 @@ import { Button, Callout, HTMLSelect, Icon, NonIdealState, Spinner, TextArea } f
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useReviews, useStartReview } from "../../api/aar";
 import { ApiError } from "../../api/client";
 import {
   type IncidentDetail as Detail,
@@ -57,6 +58,42 @@ function StatusControl({ incident }: { incident: Detail }) {
   );
 }
 
+/** AAR-08: once an incident is at MONITORING or CLOSED, its after-action review. */
+function ReviewLink({ incident }: { incident: Detail }) {
+  const reviews = useReviews().data;
+  const start = useStartReview();
+  const navigate = useNavigate();
+  if (incident.status === "ACTIVE" || !reviews) return null;
+  const existing = reviews.reviews.find((r) => r.incident_reference === incident.reference);
+  if (existing)
+    return (
+      <Button
+        size="small"
+        icon="endorsed"
+        text={`Open ${existing.reference}`}
+        onClick={() => void navigate(`/aar?review=${existing.id}`)}
+      />
+    );
+  if (!reviews.ready.find((r) => r.incident_id === incident.id)?.can_start) return null;
+  return (
+    <span className="nx-row">
+      <Button
+        size="small"
+        icon="endorsed"
+        intent="primary"
+        text="Start after-action review"
+        loading={start.isPending}
+        onClick={() =>
+          start.mutate(incident.id, {
+            onSuccess: (created) => void navigate(`/aar?review=${created.id}`),
+          })
+        }
+      />
+      {start.isError && <span className="nx-error">{errorText(start.error)}</span>}
+    </span>
+  );
+}
+
 function NoteForm({ incidentId }: { incidentId: string }) {
   const [text, setText] = useState("");
   const add = useAddNote(incidentId);
@@ -104,13 +141,15 @@ export function IncidentDetail({ incidentId }: { incidentId: string }) {
           </span>
         }
         actions={
-          incident.status === "ACTIVE" && (
+          incident.status === "ACTIVE" ? (
             <Button
               size="small"
               icon="globe"
               text="Open in map"
               onClick={() => void navigate(`/operations?incident=${incident.id}`)}
             />
+          ) : (
+            <ReviewLink incident={incident} />
           )
         }
       >

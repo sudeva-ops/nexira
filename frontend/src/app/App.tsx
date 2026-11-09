@@ -21,6 +21,8 @@ import { PeopleScreen } from "../screens/people/PeopleScreen";
 import { PlaybooksScreen } from "../screens/playbooks/PlaybooksScreen";
 import { DecisionQueueScreen } from "../screens/queue/DecisionQueueScreen";
 import { BriefingScreen } from "../screens/executive/BriefingScreen";
+import { AarPrint } from "../screens/aar/AarPrint";
+import { AarScreen } from "../screens/aar/AarScreen";
 import { ExecutiveScreen } from "../screens/executive/ExecutiveScreen";
 import { PredictiveScreen } from "../screens/predictive/PredictiveScreen";
 import { SupplyScreen } from "../screens/supply/SupplyScreen";
@@ -51,6 +53,7 @@ const BUILT: Record<string, ReactElement> = {
   "/documents": <DocumentsScreen />,
   "/supply": <SupplyScreen />,
   "/predictive": <PredictiveScreen />,
+  "/aar": <AarScreen />,
   "/executive": <ExecutiveScreen />,
   "/audit": <AuditScreen />,
 };
@@ -64,6 +67,8 @@ export function App({ onLogout }: Props) {
     <Routes>
       {/* EXE-03: the print-ready briefing stands alone, without the shell. */}
       <Route path="/executive/briefing" element={<BriefingScreen />} />
+      {/* AAR-07: the print-ready review stands alone too. */}
+      <Route path="/aar/:id/print" element={<AarPrint />} />
       <Route element={<AppShell onLogout={onLogout} />}>
         {SCREENS.map((s) => (
           <Route
