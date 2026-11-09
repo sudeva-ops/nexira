@@ -60,11 +60,11 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     # partner_request (0006), travel_document (0007), mission_climate_risk (0008), the four
     # health tables (0009), the three evacuation tables (0010), the two fleet tables (0011),
     # the four VIP tables (0012), the five Site Twin tables (0013), the three supply tables
-    # (0014), the two predictive tables (0015), the two review tables (0016), and
-    # alembic_version.
+    # (0014), the two predictive tables (0015), the two review tables (0016), the two exercise
+    # tables (0017), and alembic_version.
     assert (
         len(upgraded["tables"] - before["tables"])
-        == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 2 + 4 + 5 + 3 + 2 + 2 + 1
+        == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 2 + 4 + 5 + 3 + 2 + 2 + 2 + 1
     )
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
@@ -1084,5 +1084,53 @@ def test_downgrading_0016_restores_0015_exactly(fresh: DbUrls) -> None:
     assert at_head["search_paths"] == [
         (name, '{"search_path=pg_catalog, public, pg_temp"}')
         for name in ("aar_item_guard", "aar_no_truncate_guard", "aar_review_guard")
+    ]
+    command.upgrade(cfg, "head")
+
+
+EXERCISE_TABLES = ("exercise", "exercise_score")
+
+
+def test_downgrading_0017_restores_0016_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0016")
+    at_0016 = asyncio.run(_shape(admin, EXERCISE_TABLES, "exercise%"))
+    at_0016_aar = asyncio.run(_shape(admin, AAR_TABLES, "aar%guard"))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_shape(admin, EXERCISE_TABLES, "exercise%"))
+    command.downgrade(cfg, "0016")
+    assert asyncio.run(_shape(admin, EXERCISE_TABLES, "exercise%")) == at_0016
+    assert asyncio.run(_shape(admin, AAR_TABLES, "aar%guard")) == at_0016_aar
+    assert at_0016["tables"] == []
+    # PC-51, PC-52: FORCE RLS; read and added by the app; the backup role reads them. Nothing is
+    # deleted; an exercise ends through column grants; a score is never updated.
+    seeded = (
+        "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+        "nexira_app=ar/nexira_owner}"
+    )
+    assert at_head["tables"] == [(table, True, seeded) for table in EXERCISE_TABLES]
+    assert at_head["columns"] == [
+        ("exercise", column)
+        for column in (
+            "ended_by",
+            "incident_id",
+            "overall_score",
+            "participants",
+            "reason",
+            "status",
+        )
+    ]
+    assert at_head["policies"] == 2
+    assert at_head["search_paths"] == [
+        (name, '{"search_path=pg_catalog, public, pg_temp"}')
+        for name in (
+            "exercise_guard",
+            "exercise_no_truncate_guard",
+            "exercise_run_guard",
+            "exercise_score_guard",
+            "exercise_scored_check",
+        )
     ]
     command.upgrade(cfg, "head")
