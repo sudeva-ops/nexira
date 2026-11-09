@@ -1017,7 +1017,7 @@ Playwright on the real stack, after the Phase 1 run (INC-<year>-1042 at MONITORI
 - **The Viewer** reads the review and cannot act.
 - `make acceptance` (all existing specs) still passes.
 
-## 88. Questions for the product owner, with proposed defaults
+## 88. Questions answered by the product owner (2026-11-09: "use the defaults")
 
 1. **Scope:** one review per incident, built from the platform record; nothing is typed in again except decisions and added lessons. *Default: yes.*
 2. **When:** only for incidents at MONITORING or CLOSED. *Default: yes.*

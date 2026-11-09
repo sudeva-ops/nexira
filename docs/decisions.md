@@ -193,7 +193,7 @@ Record each sign-off in the PR.
 | 14. **Supply Chain & Third-Party Risk** (SUP), simulated (D-44) | |
 | 15. **Executive Overview** (EXE), from existing data (D-45) | |
 | 16. **Predictive Risk** (PRD), illustrative model and simulated calendar (D-46) | |
-| 17. **After-Action Review** (AAR), from the platform record (D-47, **proposed**) | |
+| 17. **After-Action Review** (AAR), from the platform record (D-47) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -292,7 +292,7 @@ Rules:
 - **Advisory only.** Nothing changes because of a forecast. The Forecast agent raises only advice (level 4) that names no VIP visit, so D-42's restriction and "no agent acts on visits" hold; a VIP change stays with the Security Officer (plan-pilot-prd G-1, option B, PR #127).
 - **Simulated inputs.** The events calendar and the first 30 days of history are seeded and labelled (D-19).
 
-**D-47 · After-Action Review. Proposed, awaiting the product owner.** Requirements AAR-01 to AAR-09 in `docs/requirements-pilot.md` §84–88, with the proposed defaults in §88. Would amend D-30 by adding After-Action Review to the pilot.
+**D-47 · After-Action Review.** Approved by the product owner on 2026-11-09 (PR #134). Requirements AAR-01 to AAR-09 in `docs/requirements-pilot.md` §84–88, with the defaults in §88. Amends D-30 by adding After-Action Review to the pilot.
 - **From the record.** The timeline and metrics are worked out from what the platform recorded; nothing is typed in again, and the metrics are frozen when the review is finalised.
 - **Rules draft, people decide.** Lessons and actions are drafted by stated rules and labelled so; people accept, reject or add them and choose owner teams. No agent, no proposal, no language model until the model server exists (AGR-08).
 - **Roles, not names.** The review and its export show roles, references and counts; who decided stays in the audit log (D-20).

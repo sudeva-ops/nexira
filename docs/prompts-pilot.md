@@ -953,7 +953,7 @@ Playwright, real stack (requirements-pilot.md §82). Report the real output; mak
 acceptance (all specs) still passes.
 ```
 
-## Pilot module 17 · After-Action Review (proposed, D-47)
+## Pilot module 17 · After-Action Review (approved 2026-11-09, PR #134)
 
 Sources: D-47, `docs/requirements-pilot.md` §84–88 (AAR-01..09), PC-49..50. Built from the platform record; rules draft, people decide; roles, not names.
 
