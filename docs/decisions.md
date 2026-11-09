@@ -194,6 +194,7 @@ Record each sign-off in the PR.
 | 15. **Executive Overview** (EXE), from existing data (D-45) | |
 | 16. **Predictive Risk** (PRD), illustrative model and simulated calendar (D-46) | |
 | 17. **After-Action Review** (AAR), from the platform record (D-47) | |
+| 18. **Exercise & Training** (EXR), scored from the platform record (D-48, proposed) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -296,6 +297,11 @@ Rules:
 - **From the record.** The timeline and metrics are worked out from what the platform recorded; nothing is typed in again, and the metrics are frozen when the review is finalised.
 - **Rules draft, people decide.** Lessons and actions are drafted by stated rules and labelled so; people accept, reject or add them and choose owner teams. No agent, no proposal, no language model until the model server exists (AGR-08).
 - **Roles, not names.** The review and its export show roles, references and counts; who decided stays in the audit log (D-20).
+
+**D-48 · Exercise & Training (proposed).** Requirements EXR-01 to EXR-09 in `docs/requirements-pilot.md` §89–93, with the proposed defaults in §93. Would amend D-30 by adding Exercise & Training to the pilot.
+- **An exercise is a scenario run.** Launched on the live scenario engine in `EXERCISE` mode; people respond through the normal screens and approvals; everything it produces is labelled EXERCISE and left out of leadership figures.
+- **Scored from the record.** Five stated formulas, using After-Action Review's targets (D-47); the scores are frozen when the exercise ends.
+- **Readiness from exercises.** A mission's readiness is its latest completed exercise's score; the seeded illustrative history keeps today's figures until a real exercise replaces them.
 
 ---
 
