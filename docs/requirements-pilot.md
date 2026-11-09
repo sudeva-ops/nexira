@@ -965,3 +965,69 @@ Playwright on the real stack:
 8. **Screen:** "Predictive Risk" (icon `trending-up`) under PLAN & INSIGHT, before Executive Overview, as the design. *Default: yes.*
 9. **Demo:** `ADD-FORECAST` from the presenter bar; the Phase 1 run keeps an empty Decision Queue at scene 0. *Default: yes.*
 10. **🔒 prompts:** the migration (PC-46, PC-47: RLS, grants, guards) and the Forecast agent's policy and executor (D-29) need your named sign-off, as before. *Default: yes.*
+
+## 84. Purpose and starting point
+
+After an incident, turn the platform's own record into a review: what happened and when, how fast each step was, what did not go well, and the improvement actions that people accept and own. Nothing is typed in again. Master spec §5.31 (After-Action Review, AAR-01..03); the design's After-Action Review screen ("Learning · Timeline, lessons & actions").
+
+| Exists today | Where |
+|---|---|
+| The incident and its timeline (`incident_event`: SIGNAL, FUSED, EXPOSURE, PLAYBOOK_STEP, NOTIFICATION, CHECKIN, DECISION, STATUS, NOTE), its status (ACTIVE, MONITORING, CLOSED) and its mission | intel |
+| Signal `received_at`; exposure; playbook runs with each step's time and the approving role; campaigns with `sent_at`; check-in answers and escalations; agent proposals and their decisions | intel, playbooks, notifications, checkin, agents |
+| What happened at the mission during the incident: evacuation, vehicle SOS and impact-zone entries, site sensor faults, impacted suppliers, expiring travel documents | evacuations, fleet, twin, supply, documents |
+| The hash-chained audit of every decision and who made it | audit (D-20) |
+| The detection-to-notification figure | executive (D-45) |
+| No review, no lessons, no improvement actions | — |
+
+## 85. Requirements: After-Action Review (AAR)
+
+| ID | Requirement | Master | Pri. |
+|---|---|---|---|
+| AAR-01 | **Start a review** for an incident at MONITORING or CLOSED (an ACTIVE incident is refused; §88 Q2). One review per incident, with the reference `AAR-<year>-<incident number>` (e.g. AAR-2026-1042). Started by a reviewer (§88 Q7); audited (`AAR.START`). | AAR-01 | M |
+| AAR-02 | **Reconstructed timeline**, worked out on read from the record: the incident's timeline events, playbook steps with the approving role, notifications sent, the check-in (asked, answered, escalated), agent proposals and their decisions, status changes, and what the linked modules recorded at its mission between the first signal and the review (evacuation, fleet, site, supply). Roles and references, never a person's name (§88 Q5). | AAR-01 | M |
+| AAR-03 | **Response metrics** with stated formulas and targets (§88 Q8):<br>· detection → incident: first signal received → incident created (target ≤ 5 s, requirements §5);<br>· incident → exposure: incident created → exposure computed (≤ 5 s);<br>· detection → first notification: first signal received → first campaign sent (target < 2 min, as the design);<br>· decision speed: each agent proposal and playbook gate, raised → decided; the median and the slowest;<br>· personnel accounted: mission personnel asked who answered (SAFE or NEED HELP), as a percentage, and the time to reach it;<br>· playbook: started → completed.<br>Each shows met or missed against its target, and "—" when the record holds no figure. Worked out on read while the review is a draft, and frozen when it is finalised. | AAR-01 | M |
+| AAR-04 | **Draft lessons and actions from rules** (§88 Q3, Q4): when a review starts, the service reads the record and drafts findings, each with a proposed action, an owner team and a priority. The rules, each firing only when the record shows it:<br>· people who did not answer the check-in and were escalated;<br>· people located with low confidence (below 80%) in the exposure;<br>· a playbook gate or proposal that waited longer than 5 minutes for a second person;<br>· detection → first notification over its target;<br>· a vehicle SOS or a vehicle entering the impact zone;<br>· a site sensor fault or offline device during the incident;<br>· suppliers impacted at the mission;<br>· travel documents expiring among the people to be moved.<br>Each draft states its evidence (references and counts), never a name. Labelled "Drafted from the platform record by rules · reviewed by people". | AAR-02 | M |
+| AAR-05 | **People decide each draft**: a reviewer accepts it (choosing the owner team from a fixed list and a due date, and may reword it), rejects it with a reason, or adds a finding and action of their own. An accepted action can later be marked done. Every decision is audited (`AAR.ITEM_ACCEPT`, `AAR.ITEM_REJECT`, `AAR.ITEM_ADD`, `AAR.ITEM_DONE`); role checks go through `approvals.py` (D-05). | AAR-02 | M |
+| AAR-06 | **Finalise**: once no draft is pending, a Security Officer or the HQ Crisis Director finalises the review; the metrics are frozen and only marking actions done remains possible. Audited (`AAR.FINALISE`). | AAR-02 | M |
+| AAR-07 | **Export review**: a one-page, print-ready review (metrics, timeline, lessons and actions; no names; labelled simulated; with the time it was produced), saved as PDF by the browser. Audited (`AAR.EXPORT`); no file is stored on the server. | AAR-03 | M |
+| AAR-08 | **After-Action Review screen**: as the design, Blueprint dark, under PLAN & INSIGHT after Predictive Risk (§88 Q10): the reviews and the incidents ready for one; for the selected review, the banner, KPIs (detection → first alert, alert → notification, personnel accounted, actions accepted), the other metrics, the reconstructed timeline, "Lessons & actions" with Accept and Reject, "Export review" and "Finalise". The Incidents screen links "Start after-action review" on a MONITORING or CLOSED incident. Every role reads it; only reviewers act. | — | M |
+| AAR-09 | **The demo**: no new scenario. After NBO-CIVIL-UNREST scene 6 (INC-<year>-1042 at MONITORING), a reviewer starts AAR-<year>-1042: the timeline from first signal to the check-in, the metrics, and drafts that include the escalated person and step 7 waiting for the Head of Mission. The Phase 1 run itself is unchanged. | — | M |
+
+### Not in this module
+- Lessons written by a language model: the drafts come from rules now; model-written wording waits for the local model server (with the AI Risk Copilot, AGR-08; §88 Q3);
+- an agent proposal: drafting changes nothing outside the review (§88 Q4);
+- assigning actions to named people, task tracking, reminders or email;
+- server-side PDF or storing the export on the incident;
+- reviews of exercises (Exercises, next), and trends across reviews;
+- editing the timeline or the metrics.
+
+## 86. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-49 · `after_action_review`**: tenant, incident (UNIQUE, same tenant), reference (UNIQUE with the tenant), status (`DRAFT`, `FINAL`), the frozen metrics (`jsonb`, null until final), started by (a user of the tenant) and started at (written by the database), finalised by and finalised at (written by the database). FORCE RLS; SELECT, INSERT and `UPDATE (status, metrics, finalised_by)` once, DRAFT → FINAL (guard); no DELETE.
+- **PC-50 · `aar_item`**: tenant, review (same tenant), rule code (null for a reviewer's own; UNIQUE with the review when set), finding, action, owner team (`SECURITY`, `HR`, `FACILITIES`, `FLEET`, `CONSULAR`, `LOGISTICS`, `COMMUNICATIONS`, `IT`, `MISSION_MANAGEMENT`), priority (`HIGH`, `MEDIUM`, `LOW`), evidence (`jsonb`: references and counts), status (`DRAFT`, `ACCEPTED`, `REJECTED`, `DONE`), due on (nullable), reason (for a rejection), decided by and at, done by and at (times written by the database), created at. FORCE RLS; SELECT, INSERT and `UPDATE` of the decision columns; guard: DRAFT → ACCEPTED or REJECTED, ACCEPTED → DONE, nothing else; on a FINAL review only ACCEPTED → DONE; no DELETE.
+- The timeline and the draft metrics are not stored; they are worked out on read.
+
+## 87. Acceptance for the module
+
+Playwright on the real stack, after the Phase 1 run (INC-<year>-1042 at MONITORING):
+- **Refused while ACTIVE**: a review cannot be started for an ACTIVE incident.
+- **Start**: a Duty Officer starts AAR-<year>-1042 from Incidents; the timeline holds the fusion, the exposure, the PB-07 steps with roles, the notifications, the check-in and the decisions; the metrics agree with the Phase 1 performance numbers and the Executive Overview's figure; the drafts include the escalated person and the step 7 wait, with evidence; no person's name appears.
+- **Decide**: two drafts accepted with owner teams and due dates, one rejected with a reason, one added; finalising is refused while a draft is pending; then the Security Officer finalises; the metrics are frozen; marking an action done still works and any other change is refused.
+- **Export**: the print-ready review opens with no names; the export is audited and the chain verifies.
+- **The Viewer** reads the review and cannot act.
+- `make acceptance` (all existing specs) still passes.
+
+## 88. Questions for the product owner, with proposed defaults
+
+1. **Scope:** one review per incident, built from the platform record; nothing is typed in again except decisions and added lessons. *Default: yes.*
+2. **When:** only for incidents at MONITORING or CLOSED. *Default: yes.*
+3. **Drafting:** lessons and actions drafted by stated rules now, labelled as such; wording drafted by a local language model later, when the model server exists (AGR-08). The design's "Drafted by AI" label is not used until then. *Default: rules now.*
+4. **Agent:** no agent and no proposal: drafting a review changes nothing outside it. *Default: no agent.*
+5. **Names:** the review and its export show roles, references and counts only; who decided stays in the audit log. *Default: yes.*
+6. **Owners:** a team from a fixed list and a due date; no named person, task tracking or reminders. *Default: yes.*
+7. **Who acts:** starting a review and deciding drafts: Security Officer, Duty Officer, HQ Crisis Director, and the mission's Head of Mission; finalising: Security Officer or HQ Crisis Director; marking done: any of the reviewers. *Default: yes.*
+8. **Targets:** ≤ 5 s for fusion and exposure (requirements §5), < 2 min to the first notification (the design); a gate waiting more than 5 minutes is a finding. *Default: yes.*
+9. **Export:** a print-ready page saved as PDF by the browser, audited; no server-side file. *Default: yes.*
+10. **Screen:** "After-Action Review" (icon `endorsed`) under PLAN & INSIGHT after Predictive Risk and before Executive Overview, as the design; Exercises later goes before it. Every role reads it. *Default: yes.*
+11. **Demo:** no new scenario; the review is started after the Phase 1 run's scene 6, and Incidents links to it. The Phase 1 run is unchanged. *Default: yes.*
+12. **🔒 prompts:** the migration (PC-49, PC-50: RLS, grants, guards) needs your named sign-off (D-29). The review's role checks only call `approvals.py`. *Default: yes.*
