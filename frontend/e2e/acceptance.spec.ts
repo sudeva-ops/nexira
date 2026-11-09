@@ -53,6 +53,16 @@ interface Executive {
   regions: { region: string; exposure: number }[];
   attention: { mission_code: string; drivers: { kind: string; reference: string | null }[] }[];
 }
+// Predictive Risk (D-46): what the Phase 1 run checks of it (plan-pilot-prd §11).
+interface PrdOverview {
+  rising: { mission_code: string; peak: number; crosses: boolean }[];
+}
+interface PrdMission {
+  now: number;
+  history: { source: string }[];
+  forecast: { value: number }[];
+  drivers: { key: string; points: number }[];
+}
 
 interface Tally {
   safe: number;
@@ -114,6 +124,16 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
     4,
   ]);
   expect([calm.active_incidents, calm.accounted.pct, africa(calm)]).toEqual([0, null, 25]);
+  // PRD-01..03 (Prompt 105; plan-pilot-prd §11): the calm forecast, which also only exists
+  // before this run: 30 illustrative days and today's live figure, every 14-day peak below 70.
+  const missionId = (code: string) => missions.find((m) => m.code === code)?.id ?? "";
+  const risk = (code: string) => duty.get<PrdMission>(`/api/predictive/missions/${missionId(code)}`);
+  for (const code of ["NBO", "ADD"]) {
+    const history = (await risk(code)).history.map((h) => h.source);
+    expect(history, code).toEqual([...Array<string>(30).fill("ILLUSTRATIVE"), "LIVE"]);
+  }
+  const forecastCalm = await duty.get<PrdOverview>("/api/predictive/overview");
+  expect(forecastCalm.rising.filter((r) => r.crosses || r.peak >= 70)).toEqual([]);
 
   // --- Scene 1 · Signals fused ---------------------------------------------------------
   await presenter.getByRole("button", { name: "Next scene" }).click();
@@ -156,6 +176,11 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
   expect(scene2.some((p) => p.agent_code === "EXPOSURE" && p.incident_id === nairobi.id && p.status === "AUTO_EXECUTED")).toBe(true);
   const pb07 = scene2.find((p) => p.action_type === "START_PLAYBOOK" && p.incident_id === nairobi.id);
   expect([pb07?.status, pb07?.effective_level]).toEqual(["PENDING", 2]);
+  // PRD-02, PRD-03 (Prompt 105): the incident lifts Nairobi's index, and its forecast eases.
+  const nboRisk = await risk("NBO");
+  expect(nboRisk.now).toBeGreaterThanOrEqual(80);
+  expect(nboRisk.drivers.find((d) => d.key === "incidents")?.points).toBe(45);
+  expect(nboRisk.forecast.at(-1)?.value ?? 100).toBeLessThan(nboRisk.now);
   // JR-06 (Prompt 27): while the incident is ACTIVE, TRP-8812 shows as impacted. Scene 6
   // sets it to MONITORING, so the Journey acceptance cannot check this later.
   const journeys = await signedIn(browser, "travel.desk", "/journeys");
