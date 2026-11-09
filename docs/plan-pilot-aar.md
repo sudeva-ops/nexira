@@ -41,12 +41,12 @@ The window runs from the first signal to the review's start, or to `closed_at` i
 
 | Metric | Formula | Target | Demo record |
 |---|---|---|---|
-| Detection → incident | `incident.opened_at` − min `received_at` of its signals | ≤ 5 s | ~2 s |
-| Incident → exposure | min `incident_exposure.computed_at` − `opened_at` | ≤ 5 s | < 1 s |
-| Detection → first notification | min `sent_at` of its campaigns − min `received_at` (Executive's query) | < 2 min | ~2m 40s, **missed** |
-| Decision speed | proposals decided by a person (not AUTO_EXECUTED), `decided_at − created_at`; gates, completed − previous step completed (G-2) | median; the slowest named by title | median ~1m 40s; slowest renewal ~4 min |
-| Personnel accounted | Executive's rule for the incident's CHECKIN campaign, and the time from `sent_at` to the last of those answers | — | 16 of 17, 94% |
-| Playbook | PB run `started_at` → `completed_at` | — | ~11 s |
+| Detection → incident | `incident.opened_at` − min `received_at` of its signals | ≤ 5 s | 0 s |
+| Incident → exposure | the first EXPOSURE timeline event − `opened_at` (G-8) | ≤ 5 s | 0.03 s |
+| Detection → first notification | min `sent_at` of its campaigns − min `received_at` (Executive's query) | < 2 min | 1m 45s, met |
+| Decision speed | proposals decided by a person (not AUTO_EXECUTED), `decided_at − created_at`; gates, completed − previous step completed (G-2) | median; the slowest named by title | median 56 s (4 decisions); slowest the document renewal, 3m 56s |
+| Personnel accounted | Executive's rule for the incident's CHECKIN campaign, and the time from `sent_at` to the last of those answers | — | 16 of 17, 94%, in 23 s |
+| Playbook | PB run `started_at` → `completed_at` | — | 13 s |
 
 - Each metric is `{value_s, target_s, met}` or `null`, which shows as "—".
 - Finalising writes the same object to `metrics` (PC-49). A final review reads only what was stored.
@@ -59,7 +59,7 @@ Run once when the review starts. Each rule fires only on evidence in the window 
 |---|---|---|---|---|---|
 | `CHECKIN_SILENT` | an ESCALATION with person scope | "1 staff member did not answer NTF-3103 and was escalated" | Confirm contact details and a second channel for staff who did not answer | HR | HIGH |
 | `LOW_CONFIDENCE` | an exposed DIPLOMAT, LOCAL_STAFF, CONTRACTOR or DELEGATE below 80% (G-3) | "1 of 17 staff located below 80% (lowest 55%)" | Enable mobile check-in for staff located from calendar or badge data | SECURITY | HIGH |
-| `NOTIFY_LATE` | detection → first notification over 2 min | "First notification after 2m 40s (target 2 min)" | Review the alert template and its approval for a faster first message | COMMUNICATIONS | MEDIUM |
+| `NOTIFY_LATE` | detection → first notification over 2 min | "First notification after 2m 40s (target 2 min)"; does not fire in the demo (1m 45s) | Review the alert template and its approval for a faster first message | COMMUNICATIONS | MEDIUM |
 | `GATE_WAIT` | a gate or proposal waited > 5 min for a person (G-2) | "Run PB-07 waited 6m 10s for a Duty Officer" | Name a deputy for this approval | MISSION_MANAGEMENT | MEDIUM |
 | `FLEET_ZONE` | a FLEET entry "entered the impact zone" | "VH-04 entered the impact zone" | Add impact-zone alerts to vehicle routing | FLEET | MEDIUM |
 | `SITE_FAULT` | a SITE entry at FAULT or OFFLINE | "Embassy Nairobi: Gate 2 badge reader fault, Camera 7 offline" | Fit backup power and a spare for these devices | FACILITIES | HIGH |
@@ -127,7 +127,7 @@ As Executive's briefing:
   - **refused while ACTIVE:** a Duty Officer cannot start a review while the incident is ACTIVE;
   - **start:** the Duty Officer sets INC-<year>-1042 to MONITORING (as scene 6 does), then starts AAR-<year>-1042 from Incidents;
   - **the review:** the timeline holds the fusion, exposure, PB-07 steps with the Head of Mission role, the notifications, the check-in and the decisions, and no seeded name; the metrics agree with the Phase 1 numbers and Executive's figure;
-  - **the drafts:** at least `CHECKIN_SILENT`, `LOW_CONFIDENCE`, `NOTIFY_LATE`, `FLEET_ZONE`, `SITE_FAULT`, `SUPPLY_IMPACT` and `DOCS_EXPIRING`, which the earlier specs produce;
+  - **the drafts:** at least `CHECKIN_SILENT`, `LOW_CONFIDENCE`, `FLEET_ZONE`, `SITE_FAULT`, `SUPPLY_IMPACT` and `DOCS_EXPIRING`, which the earlier specs produce;
   - **decisions:** two accepted with teams and dates, one rejected, one added; Finalise is refused while drafts remain; the remaining drafts are decided and the Security Officer finalises; marking done works and any other change is refused;
   - **export and roles:** the export is audited with no names; the Viewer reads and cannot act; the chain verifies.
 - **The Phase 1 spec is unchanged.**
@@ -143,6 +143,7 @@ As Executive's briefing:
 | G-5 | A rule's evidence may change after the review starts (e.g. a late answer) | Drafts are written once at the start; the timeline and metrics keep updating until finalised, then freeze. No re-drafting in the pilot |
 | G-6 | The design's "Drafted by AI · reviewed by Security" | "Drafted from the platform record by rules · reviewed by people" (§88 Q3) |
 | G-7 | 🔒 scope | Prompt 107 (migration: RLS, grants, guards) is 🔒. The API only calls `approvals.py` and `audit.py`, so Prompt 109 is not |
+| G-8 | `incident_exposure.computed_at` is rewritten each time exposure is recomputed (in the demo record its earliest value is 310 s after the incident opened) | Time the exposure from the first EXPOSURE timeline event, which is written once (0.03 s in the demo) |
 
 ## 11. Migration 0016 (Prompt 107, 🔒)
 
