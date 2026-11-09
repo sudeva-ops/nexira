@@ -56,7 +56,8 @@ e2e: env
 # Prompt 82: and the VIP Protection acceptance (requirements-pilot.md §62).
 # Prompt 88: and the Site Twin acceptance (requirements-pilot.md §67).
 # Prompt 94: and the Supply Chain acceptance (requirements-pilot.md §72).
-# Prompt 98: and the Executive Overview acceptance (requirements-pilot.md §77). Playwright runs the
+# Prompt 98: and the Executive Overview acceptance (requirements-pilot.md §77).
+# Prompt 105: and the Predictive Risk acceptance (requirements-pilot.md §82). Playwright runs the
 # files in name order.
 acceptance: env reset-demo up
 	$(COMPOSE) restart backend worker
@@ -67,7 +68,7 @@ acceptance: env reset-demo up
 	  e2e/dx-acceptance.spec.ts e2e/ev-acceptance.spec.ts e2e/flt-acceptance.spec.ts \
 	  e2e/hl-acceptance.spec.ts e2e/hz-acceptance.spec.ts e2e/vip-acceptance.spec.ts \
 	  e2e/twn-acceptance.spec.ts e2e/sup-acceptance.spec.ts \
-	  e2e/exe-acceptance.spec.ts
+	  e2e/exe-acceptance.spec.ts e2e/prd-acceptance.spec.ts
 
 lint: lint-backend lint-simulator lint-frontend
 
