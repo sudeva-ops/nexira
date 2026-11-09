@@ -137,7 +137,7 @@ As Executive's briefing:
 | # | Gap | Proposed answer |
 |---|---|---|
 | G-1 | Some timeline summaries name a person: CHECKIN ("Hana Takeda needs help"), person-scope ESCALATION ("… has not answered NTF-3103") and DECISION ("approved by Layla Haddad") | Build every entry's text from its type and `data` (§2); leave NOTE out; a test runs the timeline over the demo seed and checks no `person.full_name` or `app_user.display_name` appears |
-| G-2 | `playbook_run_step.started_at` is set when a gate is approved, so a gate's recorded wait is 0 s. In the demo, step 7 is approved about 2 s after step 6 | Measure a gate's wait from the previous step's completion. With a 5-minute threshold `GATE_WAIT` does not fire in the demo, so **§87 and AAR-09 change**: the drafts include the escalated person and the module findings, and step 7 shows in the timeline and decision speed. **Needs a decision**: keep 5 min (proposed) or lower it |
+| G-2 | `playbook_run_step.started_at` is set when a gate is approved, so a gate's recorded wait is 0 s. In the demo, step 7 is approved about 2 s after step 6 | Measure a gate's wait from the previous step's completion. With a 5-minute threshold `GATE_WAIT` does not fire in the demo, so **§87 and AAR-09 change**: the drafts include the escalated person and the module findings, and step 7 shows in the timeline and decision speed. **Decided: 5 minutes** (PR #135) |
 | G-3 | 212 of 229 exposed people in the demo are citizens with confidence below 80% | `LOW_CONFIDENCE` counts staff and delegates only (1 of 17 in the demo); citizens are the consular team's, via the check-in |
 | G-4 | Later specs (Document Expiry onwards) set INC-<year>-1042 back to ACTIVE; Playwright orders files by name, and `aar-` would run first | Run the review spec as a second command after all others in `make acceptance`; it sets MONITORING itself through the Incidents status action (audited), as scene 6 does |
 | G-5 | A rule's evidence may change after the review starts (e.g. a late answer) | Drafts are written once at the start; the timeline and metrics keep updating until finalised, then freeze. No re-drafting in the pilot |
@@ -162,3 +162,8 @@ As Executive's briefing:
 ## 12. Prompts
 
 As `docs/prompts-pilot.md` Prompts 107–111.
+
+## 13. Decisions by the product owner (2026-11-09, PR #135: "approved to keep 5 minutes")
+
+- G-2: the gate-wait threshold stays at 5 minutes, measured from the previous step's completion. AAR-09 and §87 are reworded to match.
+- G-1, G-3..G-8: as proposed.
