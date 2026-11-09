@@ -19,7 +19,14 @@ from app.tests.auth_helpers import Idp
 T0 = datetime(2026, 11, 9, 5, 53, 58, tzinfo=UTC)
 NOW = T0 + timedelta(hours=1)
 PT = "'SRID=4326;POINT(36.8245 -1.2838)'"
-NAMES = ("Hana Takeda", "Peter Mwangi", "Ama Mensah", "Layla Haddad", "Daniel Mercer")
+NAMES = (
+    "Hana Takeda",
+    "Peter Mwangi",
+    "Ama Mensah",
+    "Omar Siddiqui",
+    "Layla Haddad",
+    "Daniel Mercer",
+)
 
 
 async def _sql(session: AsyncSession, sql: str, **params: Any) -> Any:
@@ -244,6 +251,59 @@ async def _world(idp: Idp, *, quiet: bool = False) -> uuid.UUID:
             supplier="SUP-130",
             status="NORMAL",
         )
+        # An evacuation: Hana's passport has under six months left on the day it was requested
+        # (DOCS_EXPIRING), Omar's has more. Counted though the incident is no longer ACTIVE.
+        omar = await _person(s, mission, "DIPLOMAT", "Omar Siddiqui")
+        requester, activator = uuid.uuid4(), uuid.uuid4()
+        for user in (requester, activator):
+            await s.execute(
+                text(
+                    "INSERT INTO app_user (id, tenant_id, external_id, email, display_name) "
+                    "VALUES (:u, current_tenant_id(), :x, :e, 'Reviewer')"
+                ),
+                {"u": user, "x": f"sub-{user}", "e": f"{user}@x"},
+            )
+        plan = await _sql(
+            s,
+            "INSERT INTO evacuation_plan (tenant_id, mission_id, reference, muster_name, "
+            f"muster_location, route_label, destination, options) VALUES (current_tenant_id(), "
+            f":m, 'EVP-NBO', 'Courtyard', {PT}, 'Route B', 'Dubai', "
+            """'[{"role": "PRIMARY", "kind": "CHARTER", "label": "C", "seats": 72}]') """
+            "RETURNING id",
+            m=mission,
+        )
+        evacuation = await _sql(
+            s,
+            "INSERT INTO evacuation (tenant_id, reference, plan_id, mission_id, incident_id, "
+            "requested_by, requested_role) VALUES (current_tenant_id(), 'EVN-1001', :p, :m, :i, "
+            ":u, 'HEAD_OF_MISSION') RETURNING id",
+            p=plan,
+            m=mission,
+            i=incident,
+            u=requester,
+        )
+        await s.execute(
+            text(
+                "UPDATE evacuation SET status = 'ACTIVE', activated_by = :u, step = 2 WHERE id = :e"
+            ),
+            {"u": activator, "e": evacuation},
+        )
+        for person, days in ((hana, 40), (omar, 400)):
+            await s.execute(
+                text(
+                    "INSERT INTO evacuation_manifest (tenant_id, evacuation_id, person_id, "
+                    "category) VALUES (current_tenant_id(), :e, :p, 'STAFF')"
+                ),
+                {"e": evacuation, "p": person},
+            )
+            await s.execute(
+                text(
+                    "INSERT INTO travel_document (tenant_id, person_id, doc_type, issuing_country, "
+                    "valid_until) VALUES (current_tenant_id(), :p, 'DIPLOMATIC_PASSPORT', 'JP', "
+                    "current_date + CAST(:d AS integer))"
+                ),
+                {"p": person, "d": days},
+            )
         # After the window (the review's start): not on the timeline, no evidence.
         await _event(
             s,
@@ -319,7 +379,7 @@ async def test_every_rule_fires_on_its_evidence(idp: Idp) -> None:
         "FLEET_ZONE",
         "SITE_FAULT",
         "SUPPLY_IMPACT",
-    ]
+    ]  # the evacuation is requested after this review's window (the guard stamps it now)
     assert found["CHECKIN_SILENT"].finding == (
         "1 staff member did not answer NTF-3103 and was escalated."
     )
@@ -339,6 +399,22 @@ async def test_every_rule_fires_on_its_evidence(idp: Idp) -> None:
     assert found["SUPPLY_IMPACT"].evidence == {"suppliers": ["SUP-121"]}  # not the NORMAL one
     assert {d.priority for d in drafts} <= {"HIGH", "MEDIUM", "LOW"}
     assert rules.LABEL == "Drafted from the platform record by rules · reviewed by people"
+
+
+async def test_documents_are_judged_on_the_day_of_the_evacuation(idp: Idp) -> None:
+    """Document Expiry's "could block" counts only while the mission is at risk; the review
+    starts once the incident is over, so the rule reads the manifest itself (Prompt 111 run)."""
+    incident = await _world(idp)
+    async with tenant_session(idp.tenant_id, idp.engine) as s:
+        found = await service.incident(s, incident)
+        assert found is not None
+        assert found.status == "MONITORING"
+        drafts = {d.rule_code: d for d in await rules.draft(s, found, datetime.now(UTC))}
+    docs = drafts["DOCS_EXPIRING"]
+    assert docs.finding == (
+        "1 person on the evacuation list had no passport valid for six months (EVN-1001)."
+    )
+    assert docs.evidence == {"people": 1, "evacuations": ["EVN-1001"]}  # Omar's is ready
 
 
 async def test_a_quiet_record_drafts_nothing(idp: Idp) -> None:

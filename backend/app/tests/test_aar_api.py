@@ -93,6 +93,7 @@ async def test_a_reviewer_starts_a_review_with_its_drafts(client: AsyncClient, i
     )
     assert [i["rule_code"] for i in review["items"]] == [
         "CHECKIN_SILENT",
+        "DOCS_EXPIRING",
         "FLEET_ZONE",
         "GATE_WAIT",
         "LOW_CONFIDENCE",
@@ -111,7 +112,7 @@ async def test_a_reviewer_starts_a_review_with_its_drafts(client: AsyncClient, i
     assert await _audit(idp) == ["AAR.START"]
     listed = (await client.get("/api/aar", headers=idp.headers("viewer"))).json()
     assert [(r["reference"], r["drafts"], r["items"]) for r in listed["reviews"]] == [
-        ("AAR-2026-1042", 7, 7)
+        ("AAR-2026-1042", 8, 8)
     ]
     assert listed["ready"] == []
     assert "AAR_UPDATED" in FORWARDED
@@ -201,7 +202,7 @@ async def test_finalising_freezes_the_metrics(client: AsyncClient, idp: Idp) -> 
     final = f"/api/aar/{review['id']}/finalise"
     assert (await client.post(final, headers=idp.headers("duty"))).status_code == 403
     pending = await client.post(final, headers=idp.headers("security"))
-    assert (pending.status_code, pending.json()["detail"]) == (409, "7 drafts still to be decided")
+    assert (pending.status_code, pending.json()["detail"]) == (409, "8 drafts still to be decided")
     first, *others = list(review["by_rule"].values())
     await client.post(
         f"/api/aar/items/{first}/accept",
