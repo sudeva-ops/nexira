@@ -1,5 +1,6 @@
 import type { QueryKey } from "@tanstack/react-query";
 
+import { aarKeys } from "./aar";
 import { checkinKeys } from "./checkin";
 import { documentKeys } from "./documents";
 import { evacuationKeys } from "./evacuations";
@@ -88,6 +89,7 @@ function moduleKeys(event: RealtimeEvent): QueryKey[] {
         fleetKeys.all, // "in the impact zone" follows ACTIVE incidents (plan-pilot-flt §3)
         twinKeys.all, // shelter-in-place follows ACTIVE incidents (plan-pilot-twn §5)
         supplyKeys.all, // "impacted" and the zone tag follow ACTIVE incidents (plan-pilot-sup §4)
+        aarKeys.all, // "ready for review" follows MONITORING and CLOSED incidents (D-47)
         ...incident,
       ];
     case "EXPOSURE_COMPUTED":
@@ -167,6 +169,8 @@ function moduleKeys(event: RealtimeEvent): QueryKey[] {
       return [supplyKeys.all, ["incident"]];
     case "WEATHER_UPDATED": // the panel, the map layer and the mission popup (WX-02)
       return [weatherKeys.all];
+    case "AAR_UPDATED": // a review started, decided or finalised; its id only (D-47)
+      return [aarKeys.all];
     case "DOCUMENT_UPDATED": // the register, its KPIs, and the trip warnings (DX-04, DX-06)
       return [documentKeys.all, tripKeys.all];
     default:
