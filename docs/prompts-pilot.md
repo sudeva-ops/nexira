@@ -1006,3 +1006,60 @@ Incidents screen. Tests: Vitest.
 Playwright, real stack (requirements-pilot.md §87), after the Phase 1 run. Report the real
 output; make acceptance (all specs) still passes.
 ```
+
+## Pilot module 18 · Exercise & Training (approved 2026-11-09, PR #141)
+
+Sources: D-48, `docs/requirements-pilot.md` §89–93 (EXR-01..09), PC-51..52. An exercise is a scenario run in `EXERCISE` mode; scored from the record; readiness from exercises.
+
+### Prompt 112 · Read and plan (no code)
+```
+Read D-05, D-19, D-21, D-29, D-30, D-43, D-45, D-46, D-47, D-48, requirements-pilot.md §1-6
+and §89-93, the scenario engine (runs, modes, the player, external ids per run), what a
+response records, After-Action Review's metrics, and where readiness is shown. Write
+docs/plan-pilot-exr.md: the templates, how a run's incident is found, how EXERCISE is labelled
+and left out of Executive and Predictive, each score's formula and its "—", participants, the
+seeded history, readiness on People & Sites, Site Twin and Executive, the state rules, the
+screen, the acceptance spec and how it runs after a reset, gaps with proposed answers, and the
+migration for PC-51..52 (only after approval). No code.
+```
+
+### Prompt 113 · Exercise tables (migration) 🔒
+```
+PC-51, PC-52, once approved. A new migration: exercise and exercise_score with FORCE RLS,
+tenant_isolation and the grants as proposed; the guards (same-tenant references, RUNNING to
+COMPLETED or ABANDONED once, scores only on COMPLETED, one RUNNING per mission, times written
+by the database, no TRUNCATE); pinned search_path. Tests (as nexira_api): isolation; every
+refusal; the backup role reads them; the downgrade restores the previous revision exactly.
+```
+
+### Prompt 114 · Scoring, history and readiness
+```
+EXR-05, EXR-06, EXR-07. app/modules/exercises: the five scores from a run's incident using
+After-Action Review's metrics, the overall score, participants, the KPIs; the seeded
+illustrative history (matching today's seeded readiness); readiness read from the latest
+completed exercise on People & Sites, Site Twin and Executive. Tests against real PostgreSQL
+as nexira_api: each score and its "—", the mean, participants, readiness before and after.
+```
+
+### Prompt 115 · Launch, end and the EXERCISE label (API)
+```
+EXR-01..04. Templates; launch (a scenario run in EXERCISE mode, one per mission), end (score
+and freeze) and abandon (reason); the EXERCISE label on the run's incident, proposals,
+campaigns and check-in; exercise incidents left out of Executive and Predictive. Role checks
+through app/core/approvals.py; every change through app/core/audit.py; realtime
+EXERCISE_UPDATED (ids only). Tests: each role and refusal, every audited action, frozen scores.
+```
+
+### Prompt 116 · Exercise & Training screen
+```
+EXR-08. The screen (as the design, Blueprint dark) under PLAN & INSIGHT before After-Action
+Review: KPIs, recent exercises, Run an exercise (template, kind, Launch, End, Abandon), the
+scoring breakdown; the SIMULATED EXERCISE banner while one runs; EXERCISE tags where the
+incident appears. Tests: Vitest.
+```
+
+### Prompt 117 · Exercise & Training acceptance
+```
+Playwright, real stack (requirements-pilot.md §92), run on its own after a demo reset. Report
+the real output; make acceptance (all specs) still passes.
+```

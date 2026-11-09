@@ -1031,3 +1031,69 @@ Playwright on the real stack, after the Phase 1 run (INC-<year>-1042 at MONITORI
 10. **Screen:** "After-Action Review" (icon `endorsed`) under PLAN & INSIGHT after Predictive Risk and before Executive Overview, as the design; Exercises later goes before it. Every role reads it. *Default: yes.*
 11. **Demo:** no new scenario; the review is started after the Phase 1 run's scene 6, and Incidents links to it. The Phase 1 run is unchanged. *Default: yes.*
 12. **🔒 prompts:** the migration (PC-49, PC-50: RLS, grants, guards) needs your named sign-off (D-29). The review's role checks only call `approvals.py`. *Default: yes.*
+
+## 89. Purpose and starting point
+
+Measure readiness through exercises: launch a scripted scenario on the live scenario engine as an exercise, let people respond with the platform as they would for real, then score the response on five stated dimensions and keep the history. A mission's readiness becomes its latest exercise score. Master spec §5.30 (Exercise & Training, EXR-01..03); the design's Exercise & Training screen ("Readiness · Drills & scoring").
+
+| Exists today | Where |
+|---|---|
+| The scenario engine: scripted scenarios played scene by scene, one active run per scenario, `scenario_run.mode` (`DEMO`, `EXERCISE`; only `DEMO` used so far); each run's signals carry the run in their external id | scenarios (PLT-06, D-21) |
+| What a response records: the incident, its exposure, playbook runs and steps, campaigns and deliveries, check-in answers and escalations, proposals and decisions | intel, playbooks, notifications, checkin, agents |
+| The response metrics with stated formulas and targets (detection → first notification, decision speed, personnel accounted) | aar (D-47) |
+| Per site: an illustrative `readiness_score` and `last_drill_on`, labelled "illustrative until Exercises" | people, twin, executive (D-43, D-45) |
+| No exercise, no score, no history | — |
+
+## 90. Requirements: Exercise & Training (EXR)
+
+| ID | Requirement | Master | Pri. |
+|---|---|---|---|
+| EXR-01 | **Scenario templates**: the tenant's scenarios that open with a signal at a mission (not the add-on scenes such as `ADD-FORECAST` and `ADD-VISIT`), each with its mission, its scenes and what it exercises (civil unrest, hazard, health, cyber-physical…). The count is the "Scenario templates" KPI. | EXR-01 | M |
+| EXR-02 | **Launch an exercise** from a template: a new scenario run in `EXERCISE` mode, started by an Administrator or a Duty Officer (§93 Q6), with a kind (`TABLETOP`, `FUNCTIONAL`, `FULL_SCALE`). One running exercise per mission. Audited (`EXERCISE.START`). Injects arrive as simulated signals; people respond through the normal screens, approvals and playbooks (§93 Q3). | EXR-01 | M |
+| EXR-03 | **Labelled everywhere**: while it runs, a "SIMULATED EXERCISE" banner shows on every screen; the incident it produces, its proposals, campaigns and check-in are labelled EXERCISE wherever they appear. Exercise incidents are left out of the Executive Overview's figures and Predictive Risk's active-incident driver (§93 Q4). | EXR-01 | M |
+| EXR-04 | **End and score**: the same roles end the exercise (or abandon it, with a reason; no score). Ending scores it from the record of the run's incident, freezes the scores and counts who took part. Audited (`EXERCISE.END`, `EXERCISE.ABANDON`). | EXR-02 | M |
+| EXR-05 | **Five scores, 0–100, with stated formulas** (§93 Q5), using After-Action Review's metrics and targets (D-47):<br>· **Detection → alert**: first signal received → first campaign sent; 100 × target ÷ actual, capped at 100 (target 2 min);<br>· **Accountability**: mission personnel asked who answered the check-in (SAFE or NEED HELP), as a percentage;<br>· **Decision speed**: the share of proposals and playbook gates decided within 5 minutes of being raised;<br>· **Communication**: the share of exposed people with a notification DELIVERED or READ;<br>· **Plan adherence**: the share of the playbook run's steps completed (a skipped or unfinished step counts against).<br>Each shows its figure and target, or "—" when the record holds none. The **overall score** is the mean of the scores that have a figure, rounded; below 80 is shown amber, as the design. | EXR-02 | M |
+| EXR-06 | **History and staff who took part**: every exercise with its scenario, mission, kind, date, overall score and status; the "Exercises this year" count, the average score against the previous year, and "Staff who took part": distinct mission personnel who answered an exercise check-in in the last 12 months, and their share of all personnel (§93 Q7). A seeded, labelled illustrative history (one past exercise per mission, matching today's seeded readiness and last drill) keeps the screen and the figures meaningful (§93 Q8). | EXR-03 | M |
+| EXR-07 | **Mission readiness from exercises**: an embassy's readiness score and last drill are those of its mission's latest completed exercise, illustrative or real, on People & Sites, Site Twin and the Executive Overview, labelled with the exercise's source. No other formula. | — | M |
+| EXR-08 | **Exercise & Training screen**: as the design, Blueprint dark, under PLAN & INSIGHT before After-Action Review (§88 Q10): KPIs (exercises this year, average score, staff who took part, scenario templates), recent exercises with score bars, "Run an exercise" (choose a template and kind, Launch; End or Abandon while running), and "Scoring breakdown" for the selected exercise with each figure and target. Every role reads it; only the launching roles act. | — | M |
+| EXR-09 | **The demo**: on a freshly reset demo, a Duty Officer launches the Nairobi civil-unrest exercise (NBO-CIVIL-UNREST in `EXERCISE` mode) from the screen; people respond as in the Phase 1 run; ending it scores the five dimensions and the Nairobi embassy's readiness becomes the new score. The Phase 1 run, in `DEMO` mode, is unchanged and is not an exercise. | — | M |
+
+### Not in this module
+- Scheduling exercises, invitations and the "Upcoming drills" list (Continuity & Compliance);
+- a separate exercise sandbox: an exercise runs in the live tenant, labelled, and nothing leaves the platform because channels stay simulated (D-19). A real deployment needs its own isolation decision (§93 Q3);
+- training records, courses or certificates ("took part" is counted from check-in answers, not "trained");
+- writing new scenario templates in the UI;
+- the Compliance & Readiness agent (master spec Phase 4);
+- scores written or explained by a language model.
+
+## 91. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-51 · `exercise`**: tenant, mission (same tenant), scenario and scenario run (same tenant; the run UNIQUE; both null for an illustrative row), incident (same tenant, null until ended), name, kind (`TABLETOP`, `FUNCTIONAL`, `FULL_SCALE`), status (`RUNNING`, `COMPLETED`, `ABANDONED`), overall score (0..100, null unless completed), participants (≥ 0, null unless completed), reason (for an abandon), source (`EXERCISE`, `ILLUSTRATIVE`), started by and at, ended by and at (times written by the database). FORCE RLS; SELECT, INSERT and `UPDATE` of the end columns once, RUNNING → COMPLETED or ABANDONED (guard); one RUNNING exercise per mission; no DELETE.
+- **PC-52 · `exercise_score`**: tenant, exercise (same tenant, COMPLETED), dimension (`DETECTION`, `ACCOUNTABILITY`, `DECISION_SPEED`, `COMMUNICATION`, `PLAN_ADHERENCE`; UNIQUE with the exercise), score (0..100, nullable for "—"), measured (`jsonb`: the figure, the target and the counts). FORCE RLS; SELECT and INSERT only; no UPDATE or DELETE.
+- No change to `scenario_run` (its `EXERCISE` mode exists) or to `site` (readiness is read from exercises; the seeded columns stay as they are).
+
+## 92. Acceptance for the module
+
+Playwright on the real stack, run on its own after a demo reset:
+- **Templates**: the screen lists the tenant's scenario templates and the seeded illustrative history; the Nairobi embassy's readiness matches its seeded exercise.
+- **Launch**: a Duty Officer launches the Nairobi civil-unrest exercise; the banner shows; a second launch for Nairobi is refused; the incident and its proposals are labelled EXERCISE; the Executive Overview leaves it out.
+- **Respond and end**: people respond as in the Phase 1 run; the Duty Officer ends the exercise; the five scores agree with the After-Action Review metrics of the same record, each with its figure and target; the overall score is their mean; the Nairobi embassy's readiness and last drill now come from this exercise on People & Sites, Site Twin and the Executive Overview.
+- **Audit**: start and end are audited and the chain verifies; the scores cannot be changed.
+- **The Viewer** reads the screen and cannot launch or end.
+- `make acceptance` (all existing specs) still passes.
+
+## 93. Questions answered by the product owner (2026-11-09: "approved")
+
+1. **Scope:** an exercise is a scenario run in `EXERCISE` mode, scored from what the platform recorded; nothing is scored by hand. *Default: yes.*
+2. **Templates:** the tenant's existing scenarios that open with a signal; no template editor. *Default: yes.*
+3. **Live or sandbox:** an exercise runs in the live tenant through the same approvals, playbooks and agents, labelled EXERCISE everywhere; channels are simulated, so nothing reaches people. A separate sandbox is a deployment decision for later. *Default: live, labelled.*
+4. **Leadership figures:** exercise incidents are left out of the Executive Overview and Predictive Risk; an exercise's incident can still have an after-action review, labelled EXERCISE. *Default: yes.*
+5. **Scoring:** the five formulas in EXR-05, using After-Action Review's targets (2 min to the first notification, 5 min per decision); the overall score is the plain mean; amber below 80. *Default: yes.*
+6. **Who acts:** an Administrator or a Duty Officer launches, ends or abandons (the scenario engine's operators); everyone else responds in their usual role. *Default: yes.*
+7. **"Staff trained":** shown as "Staff who took part", counted from exercise check-in answers over 12 months; no training records. *Default: yes.*
+8. **History:** a seeded, labelled illustrative past exercise per mission, matching today's seeded readiness score and last drill date, then real ones. *Default: yes.*
+9. **Readiness:** a mission's readiness is its latest completed exercise's overall score, replacing the "illustrative until Exercises" label on People & Sites, Site Twin and the Executive Overview. *Default: yes.*
+10. **Agent:** no agent and no proposal; the Compliance & Readiness agent is later. *Default: no agent.*
+11. **Screen:** "Exercise & Training" (icon `target`) under PLAN & INSIGHT before After-Action Review, as the design. Every role reads it. *Default: yes.*
+12. **Demo:** the Nairobi civil-unrest exercise is launched from the screen on a freshly reset demo; its acceptance spec runs on its own after a reset; the Phase 1 run is unchanged. *Default: yes.*
+13. **🔒 prompts:** the migration (PC-51, PC-52: RLS, grants, guards) needs your named sign-off (D-29). The launch and end role checks only call `approvals.py`. *Default: yes.*
