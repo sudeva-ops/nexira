@@ -92,11 +92,11 @@ They are worked out from the run's incident up to `ended_at`. Each one uses `aar
 - **Scenario API guards.** `reset` on a scenario whose active run is an EXERCISE is refused (409, "end or abandon the exercise first"). `active_run` still creates only DEMO runs.
 - **Realtime.** `EXERCISE_UPDATED` carries ids only and is added to `realtime.FORWARDED`.
 
-## 7. Check-in timing in an exercise (G-3, needs a decision)
+## 7. Check-in timing in an exercise (G-3, decided: A)
 
 `notifications.service.scenario_escalate_after_s()` shortens check-in escalation to the scenario's own setting (20 s for NBO-CIVIL-UNREST), but only while a **DEMO** run is going. It also applies to **every** campaign, which is harmless only because "pilot tenants have no scenario runs". Once exercises exist, that assumption no longer holds.
 
-- **A (proposed):** an EXERCISE run uses the scenario's setting too, but only for campaigns of its own incidents. A live check-in running at the same time keeps the platform default (600 s, D-07). The scripted injects are compressed in time anyway, and the acceptance spec does not wait 10 minutes.
+- **A (decided, PR #142):** an EXERCISE run uses the scenario's setting too, but only for campaigns of its own incidents. A live check-in running at the same time keeps the platform default (600 s, D-07). The scripted injects are compressed in time anyway, and the acceptance spec does not wait 10 minutes.
 - **B:** an exercise uses the platform default, which is more realistic. The acceptance spec waits 10 minutes, and the escalated-person finding needs that wait.
 
 ## 8. The screen (EXR-08, §93 Q11)
@@ -134,7 +134,7 @@ They are worked out from the run's incident up to `ended_at`. Each one uses `aar
 |---|---|---|
 | G-1 | Nothing marks which scenarios are templates or names their mission; the add-ons share the `NBO-` prefix | A `template` block on scene 0's `SCENE_START` payload, written by the seed (§2). `ensure_scenario` skips codes it already has, so existing databases pick it up at the next `make reset-demo`; no schema change |
 | G-2 | Fusion joins any ACTIVE incident nearby, so an exercise signal could merge into a live incident, and a live signal into an exercise | Exercise signals carry their run, and fusion joins only like with like (§4). This changes `intel.fusion`, which is not 🔒 |
-| G-3 | The scripted 20 s check-in escalation applies only to DEMO runs, and to every campaign | **Needs a decision** (§7). Proposed: A |
+| G-3 | The scripted 20 s check-in escalation applies only to DEMO runs, and to every campaign | **Decided: A** (§7, PR #142): an exercise uses the scenario's setting for its own incidents' campaigns only |
 | G-4 | "Distinct people who took part" cannot count the illustrative rows, which have no people | Each exercise stores `participants`. The KPI takes the largest per mission over 12 months, summed across missions, so one person is not counted twice for the same mission |
 | G-5 | The simulated adapter marks every delivery READ, so Communication scores 100 in every simulated exercise | Keep the approved formula, which separates exercises once real channels exist (Phase 2), and label it "simulated delivery" on the breakdown |
 | G-6 | `site` holds readiness for the embassy and the residence (the embassy's minus 6); EXR-07 names the embassy | The embassy's comes from exercises; the residence keeps its seeded value |
@@ -164,3 +164,8 @@ They are worked out from the run's incident up to `ended_at`. Each one uses `aar
 ## 12. Prompts
 
 As `docs/prompts-pilot.md` Prompts 113–117. Prompt 115 also covers the player's run marker, the fusion condition (G-2), the check-in timing (G-3) and the scenario API's `reset` guard.
+
+## 13. Decisions by the product owner (2026-11-09, PR #142: "approved A")
+
+- G-3: option A. An EXERCISE run uses the scenario's check-in escalation setting (20 s for NBO-CIVIL-UNREST) for its own incidents' campaigns only; live check-ins keep the platform default (600 s, D-07).
+- G-1, G-2, G-4..G-9: as proposed.
