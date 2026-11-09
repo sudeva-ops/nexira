@@ -1007,7 +1007,7 @@ Playwright, real stack (requirements-pilot.md §87), after the Phase 1 run. Repo
 output; make acceptance (all specs) still passes.
 ```
 
-## Pilot module 18 · Exercise & Training (proposed)
+## Pilot module 18 · Exercise & Training (approved 2026-11-09, PR #141)
 
 Sources: D-48, `docs/requirements-pilot.md` §89–93 (EXR-01..09), PC-51..52. An exercise is a scenario run in `EXERCISE` mode; scored from the record; readiness from exercises.
 

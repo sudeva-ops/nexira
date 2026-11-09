@@ -1082,7 +1082,7 @@ Playwright on the real stack, run on its own after a demo reset:
 - **The Viewer** reads the screen and cannot launch or end.
 - `make acceptance` (all existing specs) still passes.
 
-## 93. Questions for the product owner (proposed defaults)
+## 93. Questions answered by the product owner (2026-11-09: "approved")
 
 1. **Scope:** an exercise is a scenario run in `EXERCISE` mode, scored from what the platform recorded; nothing is scored by hand. *Default: yes.*
 2. **Templates:** the tenant's existing scenarios that open with a signal; no template editor. *Default: yes.*
