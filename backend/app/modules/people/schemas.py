@@ -45,8 +45,9 @@ class SiteOut(BaseModel):
     city: str
     lat: float
     lon: float
-    readiness_score: int | None
+    readiness_score: int | None  # the embassy's from its latest exercise (EXR-07)
     last_drill_on: date | None
+    readiness_source: str | None = None  # EXERCISE, ILLUSTRATIVE; None: the seeded site value
     in_zone: bool
 
 

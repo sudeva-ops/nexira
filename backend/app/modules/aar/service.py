@@ -5,6 +5,7 @@ counts only: a summary that may name a person is never copied (G-1)."""
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import ROUND_HALF_UP, Decimal
 from statistics import median
 from typing import Any
 
@@ -361,10 +362,44 @@ async def metrics(session: AsyncSession, found: Incident, now: datetime) -> list
     return out
 
 
-async def _accounted(session: AsyncSession, found: Incident) -> MetricOut:
-    """Executive Overview's rule (EXE-01) for this incident's check-in, and how long it took."""
+def half_up(value: float) -> int:
+    """Rounds half away from zero, as PostgreSQL's round(numeric) (89.5 → 90), so the figures
+    agree with what the database checks (migration 0017); Python's round() rounds half to even."""
+    return int(Decimal(str(value)).quantize(Decimal(1), rounding=ROUND_HALF_UP))
+
+
+@dataclass(frozen=True)
+class Answers:
+    """The incident's latest check-in and how many mission personnel answered it."""
+
+    campaign_id: uuid.UUID
+    reference: str
+    sent_at: datetime
+    last_answer: datetime | None
+    answered: int  # SAFE or NEED HELP
+    asked: int
+
+
+async def checkin_answers(session: AsyncSession, found: Incident) -> Answers | None:
+    """Executive Overview's rule (EXE-01) for this incident's check-in."""
     row = (await session.execute(_CHECKIN, {"incident": found.id})).one_or_none()
     if row is None:
+        return None
+    personnel = (await checkin.tally(session, row.id))["personnel"]
+    return Answers(
+        row.id,
+        row.reference,
+        row.sent_at,
+        row.last_answer,
+        personnel.safe + personnel.need_help,
+        personnel.recipients,
+    )
+
+
+async def _accounted(session: AsyncSession, found: Incident) -> MetricOut:
+    """Personnel accounted, and how long it took."""
+    answers = await checkin_answers(session, found)
+    if answers is None:
         return MetricOut(
             key="personnel_accounted",
             label="Personnel accounted",
@@ -373,10 +408,8 @@ async def _accounted(session: AsyncSession, found: Incident) -> MetricOut:
             target=None,
             met=None,
         )
-    personnel = (await checkin.tally(session, row.id))["personnel"]
-    answered = personnel.safe + personnel.need_help
-    pct = round(100 * answered / personnel.recipients) if personnel.recipients else None
-    took = _seconds(row.sent_at, row.last_answer)
+    pct = half_up(100 * answers.answered / answers.asked) if answers.asked else None
+    took = _seconds(answers.sent_at, answers.last_answer)
     return MetricOut(
         key="personnel_accounted",
         label="Personnel accounted",
@@ -384,6 +417,6 @@ async def _accounted(session: AsyncSession, found: Incident) -> MetricOut:
         unit="%",
         target=None,
         met=None,
-        detail=f"{answered} of {personnel.recipients} · {row.reference}"
+        detail=f"{answers.answered} of {answers.asked} · {answers.reference}"
         + (f" · in {duration(took)}" if took is not None else ""),
     )

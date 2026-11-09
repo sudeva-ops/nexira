@@ -36,6 +36,8 @@ class AccountedOut(BaseModel):
 class ReadinessOut(BaseModel):
     mean: int | None
     sites: int
+    from_exercises: int = 0  # embassies whose figure is a completed exercise's (EXR-07)
+    illustrative: int = 0  # of those shown, the seeded (illustrative) ones
 
 
 class TrendDayOut(BaseModel):
