@@ -1,6 +1,7 @@
 """Imports every module's models so Base.metadata is complete."""
 
 from app.core.model_base import Base
+from app.modules.aar.models import AarItem, AfterActionReview
 from app.modules.agents.models import ActionPolicy, Agent, AgentProposal, ProposalApproval
 from app.modules.audit.models import AuditLog
 from app.modules.checkin.models import CheckinResponse
@@ -48,7 +49,9 @@ from app.modules.vip.models import VipChecklistItem, VipSegment, VipSegmentChang
 from app.modules.weather.models import WeatherCurrent
 
 __all__ = [
+    "AarItem",
     "ActionPolicy",
+    "AfterActionReview",
     "Agent",
     "AgentProposal",
     "AppUser",
