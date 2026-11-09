@@ -59,6 +59,9 @@ e2e: env
 # Prompt 98: and the Executive Overview acceptance (requirements-pilot.md §77).
 # Prompt 105: and the Predictive Risk acceptance (requirements-pilot.md §82). Playwright runs the
 # files in name order.
+# Prompt 111: then, last and on its own, the After-Action Review acceptance (requirements-pilot.md
+# §87): later specs set INC-<year>-1042 back to ACTIVE, and it needs the whole run's record
+# (plan-pilot-aar G-4).
 acceptance: env reset-demo up
 	$(COMPOSE) restart backend worker
 	cd frontend && npx playwright install chromium
@@ -69,6 +72,7 @@ acceptance: env reset-demo up
 	  e2e/hl-acceptance.spec.ts e2e/hz-acceptance.spec.ts e2e/vip-acceptance.spec.ts \
 	  e2e/twn-acceptance.spec.ts e2e/sup-acceptance.spec.ts \
 	  e2e/exe-acceptance.spec.ts e2e/prd-acceptance.spec.ts
+	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/aar-acceptance.spec.ts
 
 lint: lint-backend lint-simulator lint-frontend
 

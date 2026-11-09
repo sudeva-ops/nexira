@@ -2,6 +2,7 @@
 window and drafts one lesson and action when the record shows it. Evidence is references and
 counts, never a name (D-47). People decide every draft (AAR-05)."""
 
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -11,8 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.aar import service
 from app.modules.aar.service import GATE_WAIT_S, NOTIFICATION_TARGET_S, Incident, duration
-from app.modules.evacuations import service as evacuations
-from app.modules.evacuations.models import Evacuation
+from app.modules.documents.service import PASSPORTS, ready_by
 
 LABEL = "Drafted from the platform record by rules · reviewed by people"  # G-6
 CONFIDENCE_FLOOR = 80  # below this a person's location is a finding (G-3)
@@ -222,7 +222,7 @@ def _supply_impact(rows: list[Any]) -> Draft | None:
 
 _EVACUATIONS = text(
     """
-    SELECT id FROM evacuation
+    SELECT id, reference, requested_at FROM evacuation
      WHERE requested_at <= :until
        AND (incident_id = :incident
             OR (mission_id = :mission AND requested_at >= :since))
@@ -230,12 +230,25 @@ _EVACUATIONS = text(
     """
 )
 
+# The people on an evacuation's manifest and their passport-type documents.
+_MANIFEST_DOCUMENTS = text(
+    """
+    SELECT m.person_id, d.doc_type, d.valid_until
+      FROM evacuation_manifest m
+      JOIN travel_document d ON d.person_id = m.person_id AND d.doc_type = ANY(:passports)
+     WHERE m.evacuation_id = :evacuation
+    """
+)
+
 
 async def _docs_expiring(session: AsyncSession, found: Incident, until: datetime) -> Draft | None:
     if found.mission_id is None:
         return None
+    # Document Expiry's "could block" counts only while the mission is at risk, and a review
+    # starts once the incident is over; so the six-month rule is applied to the manifest as it
+    # stood on the day the evacuation was requested (review of the Prompt 111 run).
     flagged: dict[str, int] = {}
-    ids = await session.scalars(
+    found_evacuations = await session.execute(
         _EVACUATIONS,
         {
             "incident": found.id,
@@ -244,11 +257,16 @@ async def _docs_expiring(session: AsyncSession, found: Incident, until: datetime
             "until": until,
         },
     )
-    for evacuation_id in ids:
-        evacuation = await session.get(Evacuation, evacuation_id)
-        if evacuation is None:
-            continue
-        n = await evacuations.documents_flagged(session, evacuation, until.date())
+    for evacuation in found_evacuations:
+        on = evacuation.requested_at.date()
+        ready: dict[uuid.UUID, bool] = {}
+        for row in await session.execute(
+            _MANIFEST_DOCUMENTS, {"evacuation": evacuation.id, "passports": list(PASSPORTS)}
+        ):
+            ready[row.person_id] = ready.get(row.person_id, False) or ready_by(
+                row.doc_type, row.valid_until, on
+            )
+        n = sum(1 for ok in ready.values() if not ok)
         if n:
             flagged[evacuation.reference] = n
     if not flagged:
@@ -256,10 +274,10 @@ async def _docs_expiring(session: AsyncSession, found: Incident, until: datetime
     total = sum(flagged.values())
     return Draft(
         "DOCS_EXPIRING",
-        f"{_plural(total, 'travel document')} could block the evacuation "
-        f"({', '.join(sorted(flagged))}).",
+        f"{_plural(total, 'person', 'people')} on the evacuation list had no passport valid for "
+        f"six months ({', '.join(sorted(flagged))}).",
         "Check document validity for the evacuation list every quarter.",
         "CONSULAR",
         "MEDIUM",
-        {"documents": total, "evacuations": sorted(flagged)},
+        {"people": total, "evacuations": sorted(flagged)},
     )
