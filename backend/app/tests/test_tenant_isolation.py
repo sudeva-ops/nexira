@@ -50,6 +50,9 @@ class Ids:
     route: uuid.UUID
     reviewed: uuid.UUID
     review: uuid.UUID
+    exercise_run: uuid.UUID
+    exercise: uuid.UUID
+    scored: uuid.UUID
 
 
 PT = "'SRID=4326;POINT(36.8245 -1.2838)'"
@@ -225,6 +228,28 @@ ROWS: dict[str, str] = {
     "VALUES ('{review}', '{t}', '{reviewed}', 'AAR-', '{user}')",
     "aar_item": "INSERT INTO aar_item (tenant_id, review_id, rule_code, finding, action, "
     "owner_team, priority) VALUES ('{t}', '{review}', 'CHECKIN_SILENT', 'F', 'A', 'HR', 'HIGH')",
+    # A real exercise needs a run in EXERCISE mode; a completed one is written with its five
+    # scores in one transaction (PC-51, PC-52), so the score row brings its own seeded exercise.
+    "exercise": "INSERT INTO scenario_run (id, tenant_id, scenario_id, mode) VALUES "
+    "('{exercise_run}', '{t}', '{scenario}', 'EXERCISE'); "
+    "INSERT INTO exercise (id, tenant_id, mission_id, scenario_id, scenario_run_id, name, kind, "
+    "started_by) VALUES ('{exercise}', '{t}', '{mission}', '{scenario}', '{exercise_run}', 'E', "
+    "'TABLETOP', '{user}')",
+    "exercise_score": "INSERT INTO exercise (id, tenant_id, mission_id, name, kind, status, "
+    "overall_score, participants, source, started_at, ended_at) VALUES ('{scored}', '{t}', "
+    "'{mission}', 'D', 'TABLETOP', 'COMPLETED', 80, 1, 'ILLUSTRATIVE', now() - interval '1 day', "
+    "now() - interval '1 day'); "
+    + "; ".join(
+        "INSERT INTO exercise_score (tenant_id, exercise_id, dimension, score) "
+        f"VALUES ('{{t}}', '{{scored}}', '{dimension}', 80)"
+        for dimension in (
+            "DETECTION",
+            "ACCOUNTABILITY",
+            "DECISION_SPEED",
+            "COMMUNICATION",
+            "PLAN_ADHERENCE",
+        )
+    ),
 }
 
 # nexira_app has no UPDATE/DELETE on audit_log at all (D-20), so those fail with
@@ -263,6 +288,8 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "mission_event",  # fixed once added (PC-47)
     "after_action_review",  # UPDATE of the finalising columns only, once; no DELETE (PC-49)
     "aar_item",  # UPDATE of the decision columns only; no DELETE (PC-50)
+    "exercise",  # UPDATE of the ending columns only, once; no DELETE (PC-51)
+    "exercise_score",  # frozen once written (PC-52)
 }
 NO_UPDATE = {  # an UPDATE of other columns is refused; a DELETE is a departure
     "site_presence",  # UPDATE of zone_id only (PC-41)
@@ -423,6 +450,7 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
             r"|supply mitigation: no such supplier"
             r"|risk index: no such mission|mission event: no such mission"
             r"|after-action review: no such incident|aar item: no such review"
+            r"|exercise: no such mission"
         ),
     ):
         await api.execute(sql_for(table, world.a))
