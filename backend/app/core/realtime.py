@@ -71,6 +71,7 @@ FORWARDED = frozenset(
         "SITE_UPDATED",  # presence, a sensor or readiness; ids and counts only (D-43, G-8)
         "SUPPLY_UPDATED",  # a route, a supplier or a mitigation; ids and statuses only (D-44)
         "PREDICTIVE_UPDATED",  # today's risk index refreshed; counts only (D-46)
+        "AAR_UPDATED",  # a review started, decided or finalised; its id only (D-47)
         "CAMPAIGN_QUEUED",
         "CAMPAIGN_UPDATED",
         "CHECKIN_UPDATED",
