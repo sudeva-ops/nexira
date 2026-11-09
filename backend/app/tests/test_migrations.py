@@ -60,10 +60,11 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     # partner_request (0006), travel_document (0007), mission_climate_risk (0008), the four
     # health tables (0009), the three evacuation tables (0010), the two fleet tables (0011),
     # the four VIP tables (0012), the five Site Twin tables (0013), the three supply tables
-    # (0014), the two predictive tables (0015), and alembic_version.
+    # (0014), the two predictive tables (0015), the two review tables (0016), and
+    # alembic_version.
     assert (
         len(upgraded["tables"] - before["tables"])
-        == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 2 + 4 + 5 + 3 + 2 + 1
+        == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 2 + 4 + 5 + 3 + 2 + 2 + 1
     )
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
@@ -1038,5 +1039,50 @@ def test_downgrading_0015_restores_0014_exactly(fresh: DbUrls) -> None:
     assert at_head["search_paths"] == [
         (name, '{"search_path=pg_catalog, public, pg_temp"}')
         for name in ("predictive_mission_event_guard", "predictive_risk_index_guard")
+    ]
+    command.upgrade(cfg, "head")
+
+
+AAR_TABLES = ("aar_item", "after_action_review")
+
+
+def test_downgrading_0016_restores_0015_exactly(fresh: DbUrls) -> None:
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0015")
+    at_0015 = asyncio.run(_shape(admin, AAR_TABLES, "aar%guard"))
+    at_0015_predictive = asyncio.run(_shape(admin, PREDICTIVE_TABLES, "predictive%guard"))
+    command.upgrade(cfg, "head")
+    at_head = asyncio.run(_shape(admin, AAR_TABLES, "aar%guard"))
+    command.downgrade(cfg, "0015")
+    assert asyncio.run(_shape(admin, AAR_TABLES, "aar%guard")) == at_0015
+    assert asyncio.run(_shape(admin, PREDICTIVE_TABLES, "predictive%guard")) == at_0015_predictive
+    assert at_0015["tables"] == []
+    # PC-49, PC-50: FORCE RLS; read and added by the app; the backup role reads them. Nothing is
+    # deleted; a review is finalised and an item decided through column grants.
+    seeded = (
+        "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+        "nexira_app=ar/nexira_owner}"
+    )
+    assert at_head["tables"] == [(table, True, seeded) for table in AAR_TABLES]
+    assert at_head["columns"] == [
+        ("aar_item", column)
+        for column in (
+            "action",
+            "decided_by",
+            "done_by",
+            "due_on",
+            "finding",
+            "owner_team",
+            "priority",
+            "reason",
+            "status",
+        )
+    ] + [("after_action_review", column) for column in ("finalised_by", "metrics", "status")]
+    assert at_head["policies"] == 2
+    assert at_head["search_paths"] == [
+        (name, '{"search_path=pg_catalog, public, pg_temp"}')
+        for name in ("aar_item_guard", "aar_no_truncate_guard", "aar_review_guard")
     ]
     command.upgrade(cfg, "head")

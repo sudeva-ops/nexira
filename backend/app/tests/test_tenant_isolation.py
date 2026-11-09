@@ -48,6 +48,8 @@ class Ids:
     zone: uuid.UUID
     supplier: uuid.UUID
     route: uuid.UUID
+    reviewed: uuid.UUID
+    review: uuid.UUID
 
 
 PT = "'SRID=4326;POINT(36.8245 -1.2838)'"
@@ -215,6 +217,14 @@ ROWS: dict[str, str] = {
     "event_type, payload) VALUES ('{t}', '{scenario}', 0, 0, 'RAW_SIGNAL', '{{}}')",
     "scenario_run": "INSERT INTO scenario_run (tenant_id, scenario_id) "
     "VALUES ('{t}', '{scenario}')",
+    # A review needs an incident that is no longer ACTIVE (PC-49), so it brings its own.
+    "after_action_review": "INSERT INTO incident (id, tenant_id, reference, title, category, "
+    "severity, signal_severity, status, location) VALUES ('{reviewed}', '{t}', 'INC-2026-0001', "
+    "'I', 'CIVIL_UNREST', 'HIGH', 'HIGH', 'MONITORING', " + PT + "); "
+    "INSERT INTO after_action_review (id, tenant_id, incident_id, reference, started_by) "
+    "VALUES ('{review}', '{t}', '{reviewed}', 'AAR-', '{user}')",
+    "aar_item": "INSERT INTO aar_item (tenant_id, review_id, rule_code, finding, action, "
+    "owner_team, priority) VALUES ('{t}', '{review}', 'CHECKIN_SILENT', 'F', 'A', 'HR', 'HIGH')",
 }
 
 # nexira_app has no UPDATE/DELETE on audit_log at all (D-20), so those fail with
@@ -251,6 +261,8 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "supply_mitigation",  # UPDATE of the stand-down only, once; no DELETE (PC-45)
     "risk_index",  # UPDATE of today's computed row only, no DELETE (PC-46)
     "mission_event",  # fixed once added (PC-47)
+    "after_action_review",  # UPDATE of the finalising columns only, once; no DELETE (PC-49)
+    "aar_item",  # UPDATE of the decision columns only; no DELETE (PC-50)
 }
 NO_UPDATE = {  # an UPDATE of other columns is refused; a DELETE is a departure
     "site_presence",  # UPDATE of zone_id only (PC-41)
@@ -410,6 +422,7 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
             r"|supplier: no such mission|logistics route: no such mission"
             r"|supply mitigation: no such supplier"
             r"|risk index: no such mission|mission event: no such mission"
+            r"|after-action review: no such incident|aar item: no such review"
         ),
     ):
         await api.execute(sql_for(table, world.a))
