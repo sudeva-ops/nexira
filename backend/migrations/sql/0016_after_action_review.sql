@@ -52,6 +52,12 @@ BEGIN
     IF NOT FOUND THEN
       RAISE EXCEPTION 'after-action review: no such user';
     END IF;
+    -- The check below is race-free only at READ COMMITTED: an item's guard holds FOR SHARE on
+    -- this row, so a finalise waits for it and then sees the committed item. A REPEATABLE READ
+    -- snapshot would not see it (review of Prompt 107, M1), so finalising needs READ COMMITTED.
+    IF current_setting('transaction_isolation') <> 'read committed' THEN
+      RAISE EXCEPTION 'after-action review: finalise at READ COMMITTED';
+    END IF;
     PERFORM 1 FROM aar_item i WHERE i.review_id = NEW.id AND i.status = 'DRAFT';
     IF FOUND THEN
       RAISE EXCEPTION 'after-action review: drafts are still to be decided';
@@ -110,6 +116,8 @@ CREATE TABLE aar_item (
   CHECK ((status = 'DRAFT') = (decided_by IS NULL)),
   CHECK ((status = 'REJECTED') = (reason IS NOT NULL)),
   CHECK (status NOT IN ('ACCEPTED','DONE') OR due_on IS NOT NULL),
+  -- The reviewer chooses the due date when accepting (review of Prompt 107, L1).
+  CHECK (status NOT IN ('DRAFT','REJECTED') OR due_on IS NULL),
   CHECK ((status = 'DONE') = (done_by IS NOT NULL))
 );
 CREATE INDEX aar_item_review_idx ON aar_item (review_id);
@@ -170,6 +178,11 @@ BEGIN
     IF review_status <> 'DRAFT' THEN
       RAISE EXCEPTION 'aar item: the review is final';
     END IF;
+    -- Only an accept may reword; a rejection takes a reason (review of Prompt 107, L1).
+    IF NEW.status = 'REJECTED' AND (NEW.finding, NEW.action, NEW.owner_team, NEW.priority)
+       IS DISTINCT FROM (OLD.finding, OLD.action, OLD.owner_team, OLD.priority) THEN
+      RAISE EXCEPTION 'aar item: a rejection changes nothing but the reason';
+    END IF;
     PERFORM 1 FROM app_user u WHERE u.id = NEW.decided_by AND u.tenant_id = NEW.tenant_id;
     IF NOT FOUND THEN
       RAISE EXCEPTION 'aar item: no such user';
@@ -201,3 +214,15 @@ END;
 $$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
 CREATE TRIGGER aar_item_guard BEFORE INSERT OR UPDATE OR DELETE ON aar_item
   FOR EACH ROW EXECUTE FUNCTION aar_item_guard();
+
+-- Row triggers do not fire on TRUNCATE, which the owner holds; refused too, as audit_log's
+-- (review of Prompt 107, L2).
+CREATE FUNCTION aar_no_truncate_guard() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'after-action review: reviews and items are kept';
+END;
+$$ LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp;
+CREATE TRIGGER aar_review_no_truncate BEFORE TRUNCATE ON after_action_review
+  FOR EACH STATEMENT EXECUTE FUNCTION aar_no_truncate_guard();
+CREATE TRIGGER aar_item_no_truncate BEFORE TRUNCATE ON aar_item
+  FOR EACH STATEMENT EXECUTE FUNCTION aar_no_truncate_guard();

@@ -1,8 +1,9 @@
 import uuid
 from datetime import date, datetime
+from types import MappingProxyType
 from typing import Any
 
-from sqlalchemy import Date, DateTime, ForeignKey, Text, text
+from sqlalchemy import Date, DateTime, FetchedValue, ForeignKey, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,24 +14,33 @@ def _user(nullable: bool) -> Mapped[Any]:
     return mapped_column(UUID(as_uuid=True), ForeignKey("app_user.id"), nullable=nullable)
 
 
+def _written() -> Mapped[datetime | None]:
+    """A time the guard writes on insert or update (review of Prompt 107, L4)."""
+    return mapped_column(
+        DateTime(timezone=True), server_default=FetchedValue(), server_onupdate=FetchedValue()
+    )
+
+
 class AfterActionReview(Base):
     """One review per incident (PC-49, AAR-01, AAR-06): DRAFT, then FINAL once, with the metrics
     frozen. The database writes the reference from the incident's and the times."""
 
     __tablename__ = "after_action_review"
+    __mapper_args__ = MappingProxyType({"eager_defaults": True})  # read what the guard writes
 
     id: Mapped[uuid.UUID] = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = tenant_fk()
     incident_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("incident.id"), nullable=False, unique=True
     )
-    reference: Mapped[str] = mapped_column(Text, nullable=False)  # AAR-<year>-<n>
+    # AAR-<year>-<n>, written by the guard from the incident's
+    reference: Mapped[str] = mapped_column(Text, nullable=False, server_default=FetchedValue())
     status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'DRAFT'"))
     metrics: Mapped[dict[str, Any] | None] = mapped_column(JSONB)  # frozen when FINAL
     started_by: Mapped[uuid.UUID] = _user(nullable=False)
     started_at: Mapped[datetime] = created_at()
     finalised_by: Mapped[uuid.UUID | None] = _user(nullable=True)
-    finalised_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finalised_at: Mapped[datetime | None] = _written()
 
 
 class AarItem(Base):
@@ -38,6 +48,7 @@ class AarItem(Base):
     or a reviewer's own, accepted when added. DRAFT → ACCEPTED or REJECTED, ACCEPTED → DONE."""
 
     __tablename__ = "aar_item"
+    __mapper_args__ = MappingProxyType({"eager_defaults": True})  # read what the guard writes
 
     id: Mapped[uuid.UUID] = uuid_pk()
     tenant_id: Mapped[uuid.UUID] = tenant_fk()
@@ -56,7 +67,7 @@ class AarItem(Base):
     due_on: Mapped[date | None] = mapped_column(Date)
     reason: Mapped[str | None] = mapped_column(Text)  # for a rejection
     decided_by: Mapped[uuid.UUID | None] = _user(nullable=True)
-    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    decided_at: Mapped[datetime | None] = _written()
     done_by: Mapped[uuid.UUID | None] = _user(nullable=True)
-    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    done_at: Mapped[datetime | None] = _written()
     created_at: Mapped[datetime] = created_at()

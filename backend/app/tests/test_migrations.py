@@ -1083,6 +1083,6 @@ def test_downgrading_0016_restores_0015_exactly(fresh: DbUrls) -> None:
     assert at_head["policies"] == 2
     assert at_head["search_paths"] == [
         (name, '{"search_path=pg_catalog, public, pg_temp"}')
-        for name in ("aar_item_guard", "aar_review_guard")
+        for name in ("aar_item_guard", "aar_no_truncate_guard", "aar_review_guard")
     ]
     command.upgrade(cfg, "head")

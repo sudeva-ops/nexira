@@ -157,6 +157,7 @@ As Executive's briefing:
   - item transitions as §6, and only DONE on a FINAL review;
   - `started_at`, `finalised_at`, `decided_at` and `done_at` written by the database;
   - the reference written by the database from the incident's (`INC-2026-1042` → `AAR-2026-1042`), and finalising refused while an item is still a draft (Prompt 107);
+  - after the review of Prompt 107: finalising only at READ COMMITTED (M1), a rejection rewords nothing and drafts and rejections carry no due date (L1), TRUNCATE refused (L2);
   - finding, rule code, evidence and review frozen once decided.
 - **Tests (as `nexira_api`):** isolation, every refusal, the backup role reads, and the downgrade restores 0015 exactly.
 

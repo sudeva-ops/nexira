@@ -6,6 +6,7 @@ nothing else; a final review takes no new item and no decision but DONE; the dat
 times; every reference is to the same tenant, even for a role that bypasses RLS; nothing is
 deleted (docs/plan-pilot-aar.md §6, §11)."""
 
+import asyncio
 import json
 import uuid
 from datetime import UTC, date, datetime
@@ -14,6 +15,8 @@ from typing import Any
 import asyncpg
 import pytest
 
+from app.core.db import create_engine, tenant_session
+from app.modules.aar.models import AarItem, AfterActionReview
 from app.tests.conftest import DbUrls, create_tenant, set_tenant
 
 REFUSED = asyncpg.RaiseError  # the trigger's RAISE EXCEPTION (P0001)
@@ -401,7 +404,7 @@ async def test_accepting_needs_a_due_date_and_rejecting_a_reason(world: World) -
         world.user,
     )
     for status in ("DRAFT", "ACCEPTED", "DONE"):
-        with pytest.raises((REFUSED, CHECK)):
+        with pytest.raises(REFUSED, match="ACCEPTED → DONE only"):
             await world.conn.execute(
                 f"UPDATE aar_item SET status = '{status}', reason = NULL, due_on = $2, "
                 "done_by = CASE WHEN $3 THEN decided_by END WHERE id = $1",
@@ -435,8 +438,17 @@ async def test_every_frozen_item_column(
         await world.conn.execute(
             f"UPDATE aar_item SET {column} = {value} WHERE id = $1", world.draft
         )
-    with pytest.raises(REFUSED, match=r"the review, rule and evidence are fixed|no such review"):
+    # A tenant or review that matches no review of the tenant is refused one step earlier.
+    refused = "no such review" if column in ("tenant_id", "review_id") else "are fixed"
+    with pytest.raises(REFUSED, match=refused):
         await owner.execute(f"UPDATE aar_item SET {column} = {value} WHERE id = $1", world.draft)
+
+
+async def test_an_item_stays_on_its_review(world: World, owner: asyncpg.Connection) -> None:
+    """Review of Prompt 107, L3: moved to a real second review of the same tenant."""
+    second = await world.start(await incident(world.conn, 1090))
+    with pytest.raises(REFUSED, match="the review, rule and evidence are fixed"):
+        await owner.execute("UPDATE aar_item SET review_id = $2 WHERE id = $1", world.draft, second)
 
 
 async def test_a_final_review_takes_only_done(world: World) -> None:
@@ -574,3 +586,188 @@ async def test_the_backup_role_reads_the_review_tables(db: DbUrls) -> None:
         ("aar_item", True, False),
         ("after_action_review", True, False),
     ]
+
+
+# --- review of Prompt 107 --------------------------------------------------------------------
+
+
+async def test_a_rejection_changes_nothing_but_the_reason(world: World) -> None:
+    """L1: only an accept may reword; the reviewer chooses the due date when accepting."""
+    for column, value in (
+        ("finding", "'Reworded'"),
+        ("action", "'Reworded'"),
+        ("owner_team", "'IT'"),
+        ("priority", "'LOW'"),
+    ):
+        with pytest.raises(REFUSED, match="a rejection changes nothing but the reason"):
+            await world.conn.execute(
+                f"UPDATE aar_item SET status = 'REJECTED', reason = 'No', decided_by = $2, "
+                f"{column} = {value} WHERE id = $1",
+                world.draft,
+                world.user,
+            )
+    with pytest.raises(CHECK):
+        await world.conn.execute(
+            "UPDATE aar_item SET status = 'REJECTED', reason = 'No', decided_by = $2, "
+            "due_on = $3 WHERE id = $1",
+            world.draft,
+            world.user,
+            DUE,
+        )
+    with pytest.raises(CHECK):
+        await world.item("FLEET_ZONE", due_on=DUE)  # a draft has no due date yet
+
+
+async def test_nothing_is_truncated(world: World, owner: asyncpg.Connection) -> None:
+    """L2: row triggers do not fire on TRUNCATE, which the owner holds."""
+    for table in ("aar_item", "after_action_review"):
+        with pytest.raises(DENIED):
+            await world.conn.execute(f"TRUNCATE {table} CASCADE")
+        with pytest.raises(REFUSED, match="reviews and items are kept"):
+            await owner.execute(f"TRUNCATE {table} CASCADE")
+
+
+async def test_finalising_needs_read_committed(world: World) -> None:
+    """M1: at REPEATABLE READ the draft check would read an old snapshot."""
+    await world.accept(world.draft)
+    with pytest.raises(REFUSED, match="finalise at READ COMMITTED"):
+        async with world.conn.transaction(isolation="repeatable_read"):
+            await world.finalise()
+    with pytest.raises(REFUSED, match="finalise at READ COMMITTED"):
+        async with world.conn.transaction(isolation="serializable"):
+            await world.finalise()
+
+
+async def _second(db: DbUrls, world: World) -> asyncpg.Connection:
+    conn = await asyncpg.connect(db.api_plain)
+    await set_tenant(conn, await world.conn.fetchval("SELECT current_tenant_id()"))
+    return conn
+
+
+async def test_a_finalise_waits_for_an_item_being_added(db: DbUrls, world: World) -> None:
+    """M1: an item added in an open transaction holds the review; the finalise waits for it and
+    is then refused, since the new item is a draft."""
+    await world.accept(world.draft)
+    other = await _second(db, world)
+    try:
+        adding = other.transaction()
+        await adding.start()
+        await other.execute(
+            "INSERT INTO aar_item (tenant_id, review_id, rule_code, finding, action, owner_team, "
+            "priority) VALUES (current_tenant_id(), $1, 'SITE_FAULT', 'F', 'A', 'FACILITIES', "
+            "'HIGH')",
+            world.review,
+        )
+        finalise = asyncio.ensure_future(world.finalise())
+        await asyncio.sleep(0.3)
+        assert not finalise.done()  # blocked on the item's FOR SHARE
+        await adding.commit()
+        with pytest.raises(REFUSED, match="drafts are still to be decided"):
+            await finalise
+    finally:
+        await other.close()
+
+
+async def test_an_item_waits_for_a_finalise_and_is_refused(db: DbUrls, world: World) -> None:
+    """M1, the other order: a finalise in an open transaction holds the review; an item added
+    meanwhile waits and is then refused, since the review is final."""
+    await world.accept(world.draft)
+    other = await _second(db, world)
+    try:
+        finalising = world.conn.transaction()
+        await finalising.start()
+        await world.finalise()
+        adding = asyncio.ensure_future(
+            other.execute(
+                "INSERT INTO aar_item (tenant_id, review_id, rule_code, finding, action, "
+                "owner_team, priority) VALUES (current_tenant_id(), $1, 'FLEET_ZONE', 'F', 'A', "
+                "'FLEET', 'MEDIUM')",
+                world.review,
+            )
+        )
+        await asyncio.sleep(0.3)
+        assert not adding.done()
+        await finalising.commit()
+        with pytest.raises(REFUSED, match="the review is final"):
+            await adding
+    finally:
+        await other.close()
+
+
+async def test_the_guards_compare_tenants_on_every_decision(db: DbUrls, world: World) -> None:
+    """L3: as a role that bypasses RLS, a user of another tenant cannot finalise, decide or mark
+    done."""
+    mine = await world.conn.fetchval("SELECT current_tenant_id()")
+    await set_tenant(world.conn, await create_tenant(db, "Outside"))
+    stranger = await user(world.conn, "stranger")
+    await set_tenant(world.conn, mine)
+    second = await world.item("SUPPLY_IMPACT", owner_team="LOGISTICS")
+    await world.accept(world.draft)
+    conn = await asyncpg.connect(DbUrls.plain(db.admin))
+    try:
+        with pytest.raises(REFUSED, match="aar item: no such user"):
+            await conn.execute(
+                "UPDATE aar_item SET status = 'REJECTED', reason = 'x', decided_by = $2 "
+                "WHERE id = $1",
+                second,
+                stranger,
+            )
+        with pytest.raises(REFUSED, match="aar item: no such user"):
+            await conn.execute(
+                "UPDATE aar_item SET status = 'DONE', done_by = $2 WHERE id = $1",
+                world.draft,
+                stranger,
+            )
+        await world.conn.execute(
+            "UPDATE aar_item SET status = 'REJECTED', reason = 'x', decided_by = $2 WHERE id = $1",
+            second,
+            world.user,
+        )
+        with pytest.raises(REFUSED, match="after-action review: no such user"):
+            await conn.execute(
+                "UPDATE after_action_review SET status = 'FINAL', metrics = $2::jsonb, "
+                "finalised_by = $3 WHERE id = $1",
+                world.review,
+                METRICS,
+                stranger,
+            )
+    finally:
+        await conn.close()
+
+
+async def test_the_orm_reads_what_the_guard_writes(db: DbUrls, world: World) -> None:
+    """L4: the reference and the times the guards write are read back after a flush."""
+    tenant = await world.conn.fetchval("SELECT current_tenant_id()")
+    other = await incident(world.conn, 1099, "CLOSED")
+    engine = create_engine(db.api)
+    try:
+        async with tenant_session(tenant, engine) as session:
+            review = AfterActionReview(
+                tenant_id=tenant,
+                incident_id=other,
+                started_by=world.user,  # the guard writes reference
+            )
+            session.add(review)
+            await session.flush()
+            assert review.reference == "AAR-2026-1099"
+            own = AarItem(
+                tenant_id=tenant,
+                review_id=review.id,
+                finding="F",
+                action="A",
+                owner_team="HR",
+                priority="LOW",
+                status="ACCEPTED",
+                due_on=DUE,
+                decided_by=world.user,
+            )
+            session.add(own)
+            await session.flush()
+            assert own.decided_at is not None
+            own.status = "DONE"
+            own.done_by = world.user
+            await session.flush()
+            assert own.done_at is not None
+            await session.rollback()
+    finally:
+        await engine.dispose()

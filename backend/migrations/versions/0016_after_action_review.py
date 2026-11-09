@@ -44,5 +44,6 @@ def downgrade() -> None:
         DROP FUNCTION aar_item_guard();
         DROP TABLE after_action_review;
         DROP FUNCTION aar_review_guard();
+        DROP FUNCTION aar_no_truncate_guard();
         """
     )
