@@ -116,8 +116,9 @@ describe("realtime client (PLT-05)", () => {
   });
 
   it("maps events to the queries they make stale", () => {
-    // The Executive Overview's refresh is checked on its own below.
-    const staleKeys = (e: RealtimeEvent) => moduleStaleKeys(e).filter((k) => k[0] !== "executive");
+    // The Executive Overview's and Predictive Risk's refreshes are checked on their own below.
+    const staleKeys = (e: RealtimeEvent) =>
+      moduleStaleKeys(e).filter((k) => k[0] !== "executive" && k[0] !== "predictive");
     expect(staleKeys(event("SIGNAL_INGESTED"))).toEqual([["signals"], ["operations-summary"]]);
     expect(staleKeys(event("EXPOSURE_COMPUTED", { incident_id: "i1" }))).toContainEqual([
       "incident",
@@ -194,6 +195,14 @@ describe("realtime client (PLT-05)", () => {
     }
     for (const type of ["FLIGHT_POSITIONS", "WEATHER_UPDATED", "SITE_UPDATED"]) {
       expect(moduleStaleKeys(event(type)), type).not.toContainEqual(["executive"]);
+    }
+  });
+  it("refreshes Predictive Risk on the events that move an index or a forecast (D-46)", () => {
+    for (const type of ["PREDICTIVE_UPDATED", "INCIDENT_CREATED", "EXPOSURE_COMPUTED", "HEALTH_ADVISORY_UPDATED", "WEATHER_UPDATED"]) {
+      expect(moduleStaleKeys(event(type, { incident_id: "i1" })), type).toContainEqual(["predictive"]);
+    }
+    for (const type of ["FLIGHT_POSITIONS", "CHECKIN_UPDATED", "SUPPLY_UPDATED"]) {
+      expect(moduleStaleKeys(event(type)), type).not.toContainEqual(["predictive"]);
     }
   });
 
