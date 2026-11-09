@@ -36,10 +36,12 @@ export const SCREENS: readonly Screen[] = [
   // D-43: under RESPOND, after Assistance Partners (§68 Q8).
   { path: "/twin", title: "Site Twin", subtitle: "Sites · Floor plan, occupancy & sensors", icon: "grid-view", group: "RESPOND", builtIn: "Prompt 87" },
   { path: "/checkin", title: "Safety Check-in", subtitle: "Workflows · Personnel accountability", icon: "tick-circle", group: "RESPOND", builtIn: "Prompt 11" },
-  // Plan-pilot-dx G-9: PLAN & INSIGHT, as the design; Predictive Risk and Executive Overview join it later.
+  // Plan-pilot-dx G-9: PLAN & INSIGHT, as the design.
   { path: "/documents", title: "Document Expiry", subtitle: "Compliance · Passports, visas & clearances", icon: "document", group: "PLAN & INSIGHT", builtIn: "Prompt 51" },
   // D-44 (§73 Q8): after Document Expiry; icon box, since Fleet uses truck.
   { path: "/supply", title: "Supply Chain Risk", subtitle: "Third parties · Vendors & logistics routes", icon: "box", group: "PLAN & INSIGHT", builtIn: "Prompt 93" },
+  // D-46 (§83 Q8): before Executive Overview, as the design.
+  { path: "/predictive", title: "Predictive Risk", subtitle: "Analytics · 14-day risk forecast", icon: "trending-up", group: "PLAN & INSIGHT", builtIn: "Prompt 104" },
   // D-45 (§78 Q7): last under PLAN & INSIGHT, as the design.
   { path: "/executive", title: "Executive Overview", subtitle: "Dashboard · Leadership view", icon: "chart", group: "PLAN & INSIGHT", builtIn: "Prompt 97" },
   { path: "/audit", title: "Audit", subtitle: "Admin · Hash-chained audit log", icon: "history", group: "ADMIN", builtIn: "Prompt 3" },

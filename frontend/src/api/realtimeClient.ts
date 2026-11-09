@@ -4,6 +4,7 @@ import { checkinKeys } from "./checkin";
 import { documentKeys } from "./documents";
 import { evacuationKeys } from "./evacuations";
 import { executiveKeys } from "./executive";
+import { predictiveKeys } from "./predictive";
 import { fleetKeys } from "./fleet";
 import { supplyKeys } from "./supply";
 import { twinKeys } from "./twin";
@@ -49,10 +50,23 @@ const EXECUTIVE_EVENTS = new Set([
   "SUPPLY_UPDATED",
 ]);
 
+// The events that move a mission's risk index or forecast (plan-pilot-prd §9).
+const PREDICTIVE_EVENTS = new Set([
+  "PREDICTIVE_UPDATED", // a snapshot, or a calendar entry added
+  "INCIDENT_CREATED",
+  "INCIDENT_UPDATED",
+  "EXPOSURE_COMPUTED",
+  "HEALTH_ADVISORY_UPDATED",
+  "WEATHER_UPDATED",
+]);
+
 /** The cached queries an event makes stale. */
 export function staleKeys(event: RealtimeEvent): QueryKey[] {
-  const keys = moduleKeys(event);
-  return EXECUTIVE_EVENTS.has(event.event) ? [...keys, executiveKeys.all] : keys;
+  return [
+    ...moduleKeys(event),
+    ...(EXECUTIVE_EVENTS.has(event.event) ? [executiveKeys.all] : []),
+    ...(PREDICTIVE_EVENTS.has(event.event) ? [predictiveKeys.all] : []),
+  ];
 }
 
 function moduleKeys(event: RealtimeEvent): QueryKey[] {

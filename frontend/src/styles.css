@@ -2830,6 +2830,48 @@ tr.nx-flash-b > td {
   gap: 8px;
 }
 
+/* Predictive Risk (PRD-07): the chart and calendar on the left, rising risk and actions right. */
+.nx-prd-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 8px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .nx-prd-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nx-prd-chart {
+  width: 100%;
+  height: 230px;
+  display: block;
+}
+
+.nx-prd-events,
+.nx-prd-actions {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.nx-prd-events {
+  list-style: none;
+}
+
+.nx-prd-events li {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+}
+
+.nx-prd-actions {
+  padding-left: 18px;
+}
+
 /* The print-ready board briefing (EXE-03): white, one A4 page; the actions do not print. */
 .nx-brief {
   min-height: 100vh;
