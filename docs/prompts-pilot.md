@@ -952,3 +952,57 @@ recommended actions. Tests: Vitest.
 Playwright, real stack (requirements-pilot.md §82). Report the real output; make
 acceptance (all specs) still passes.
 ```
+
+## Pilot module 17 · After-Action Review (approved 2026-11-09, PR #134)
+
+Sources: D-47, `docs/requirements-pilot.md` §84–88 (AAR-01..09), PC-49..50. Built from the platform record; rules draft, people decide; roles, not names.
+
+### Prompt 106 · Read and plan (no code)
+```
+Read D-05, D-19, D-20, D-29, D-30, D-45, D-47, requirements-pilot.md §1-6 and §84-88, the
+incident timeline, playbook runs and gates, campaigns, check-in, proposals and decisions, and
+what evacuations, fleet, site twin, supply and documents record at a mission. Write
+docs/plan-pilot-aar.md: the timeline's sources and order, each metric's formula and target,
+each drafting rule with its evidence, owner team and priority, the reviewer roles, the state
+rules (draft, final, items), the export, the screen, what changes in the acceptance specs,
+gaps with proposed answers, and the migration for PC-49..50 (only after approval). No code.
+```
+
+### Prompt 107 · Review tables (migration) 🔒
+```
+PC-49, PC-50, once approved. A new migration: after_action_review and aar_item with FORCE RLS,
+tenant_isolation and the grants as proposed; the guards (same-tenant references, the status
+transitions, nothing but done on a final review, times written by the database, frozen
+columns); pinned search_path. Tests (as nexira_api): isolation; every refusal; the backup role
+reads them; the downgrade restores the previous revision exactly.
+```
+
+### Prompt 108 · The timeline, the metrics and the drafting rules
+```
+AAR-02, AAR-03, AAR-04. app/modules/aar: the reconstructed timeline and the metrics worked out
+on read, and the drafting rules, each firing only when the record shows it, with evidence and
+no names. Tests against real PostgreSQL as nexira_api: each source in the timeline, each metric
+and its "—", each rule firing and not firing, no name in any output.
+```
+
+### Prompt 109 · Start, decide, finalise and export (API)
+```
+AAR-01, AAR-05, AAR-06, AAR-07. Start (MONITORING or CLOSED only, one per incident), accept,
+reject, add, mark done, finalise (metrics frozen), export (audited). Role checks through
+app/core/approvals.py; every change through app/core/audit.py; realtime AAR_UPDATED (ids only).
+Tests: each role and refusal, every audited action, the frozen metrics, the Viewer reads only.
+```
+
+### Prompt 110 · After-Action Review screen and print-ready review
+```
+AAR-08. The screen (as the design, Blueprint dark) under PLAN & INSIGHT after Predictive Risk;
+the KPIs, metrics, timeline, lessons and actions with Accept, Reject, Add and Done; Finalise;
+"Export review" opening a standalone print-ready page; "Start after-action review" on the
+Incidents screen. Tests: Vitest.
+```
+
+### Prompt 111 · After-Action Review acceptance
+```
+Playwright, real stack (requirements-pilot.md §87), after the Phase 1 run. Report the real
+output; make acceptance (all specs) still passes.
+```
