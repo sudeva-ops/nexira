@@ -23,6 +23,7 @@ from app.modules.partners.service import PartnerIn, ensure_partners
 from app.modules.people import location
 from app.modules.people.service import add_observations, ensure_mission, load_persons, load_sites
 from app.modules.playbooks.service import StepIn, ensure_playbook, retire_older_versions
+from app.modules.predictive import service as predictive
 from app.modules.scenarios.service import ensure_scenario
 from app.modules.supply import service as supply
 from app.modules.tenancy.service import ensure_reference_counter
@@ -40,7 +41,7 @@ from app.modules.vip import service as vip
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
-from nexira_sim.scenarios import add_visit, nbo_fleet, nbo_site, nbo_supply
+from nexira_sim.scenarios import add_forecast, add_visit, nbo_fleet, nbo_site, nbo_supply
 from nexira_sim.scenarios import dac_cyclone as dac
 from nexira_sim.scenarios import fra_national_protests as fra
 from nexira_sim.scenarios import mnl_tropical_storm as mnl
@@ -324,6 +325,17 @@ async def seed_all(
         report["supply"] = await supply.ensure_register(
             session, *_supply(w, mission_ids, scenario_date)
         )
+        # Predictive Risk (D-46, plan-pilot-prd §3, §7): the illustrative 30-day history and the
+        # calm calendar, relative to the scenario date.
+        report["risk_history"] = await predictive.ensure_history(session, scenario_date)
+        report["calendar"] = await predictive.ensure_calendar(
+            session,
+            [
+                predictive.EventIn(code, kind, title, day, weight, days)
+                for code, kind, title, day, weight, days in data.PREDICTIVE_CALENDAR
+            ],
+            scenario_date,
+        )
 
         # VIP & Delegation Protection (D-42, plan-pilot-vip §2): the restricted TRP-8834 and
         # VV-<year>-031, after the identities (G-7).
@@ -463,6 +475,14 @@ async def seed_all(
             name=nbo_supply.NAME,
             description=nbo_supply.DESCRIPTION,
             events=nbo_supply.build_events(w, tenant_id),
+        )
+        report["scenario_forecast"] = await ensure_scenario(
+            session,
+            scenario_id=seed_id(tenant_id, "scenario", add_forecast.CODE),
+            code=add_forecast.CODE,
+            name=add_forecast.NAME,
+            description=add_forecast.DESCRIPTION,
+            events=add_forecast.build_events(w, tenant_id),
         )
         report["scenario_fleet"] = await ensure_scenario(
             session,

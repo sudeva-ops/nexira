@@ -78,6 +78,12 @@ export const SCENE_SCREEN: Record<DemoScenario, Record<number, string>> = {
     2: "/supply",
     3: "/supply",
   },
+  // D-46 (PRD-08): the rally plays on Predictive Risk (Prompt 104); the advice is then dismissed
+  // in the Decision Queue.
+  "ADD-FORECAST": {
+    0: "/predictive",
+    1: "/predictive",
+  },
   // D-42 (VIP-08): the visit plays on VIP Protection (Prompt 81).
   "ADD-VISIT": {
     0: "/vip",

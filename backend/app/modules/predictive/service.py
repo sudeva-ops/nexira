@@ -463,3 +463,164 @@ async def mission(session: AsyncSession, mission_id: uuid.UUID) -> schemas.Missi
             if e.starts_on <= today + timedelta(days=HORIZON)
         ],
     )
+
+
+# --- the calendar and the seed (PRD-01, PRD-05; §3, §7) ----------------------------------------
+
+
+@dataclass(frozen=True)
+class EventIn:
+    """A calendar entry; dates are offsets from a day (the seed's date, or today when played)."""
+
+    mission_code: str
+    kind: str
+    title: str
+    starts_in_days: int
+    weight: int
+    days: int = 1
+    place_label: str | None = None
+    lat: float | None = None
+    lon: float | None = None
+    attendance: int | None = None
+
+
+_INSERT_EVENT = text(
+    """
+    INSERT INTO mission_event (tenant_id, mission_id, kind, title, place_label, location,
+                               starts_on, ends_on, attendance, weight)
+    VALUES (current_tenant_id(), :mission, :kind, :title, :place,
+            CASE WHEN CAST(:lat AS float8) IS NULL THEN NULL
+                 ELSE ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography END,
+            :starts, :ends, :attendance, :weight)
+    RETURNING id
+    """
+)
+
+
+async def add_event(
+    session: AsyncSession,
+    e: EventIn,
+    from_day: date,
+    actor: Actor = SNAPSHOT,
+    *,
+    audited: bool = True,
+) -> tuple[uuid.UUID, uuid.UUID] | None:
+    """Add a calendar entry (fixed once added, PC-47). None for an unknown mission or when the
+    same entry is already there (a replay). Returns (event id, mission id); audited."""
+    mission_id = await session.scalar(select(Mission.id).where(Mission.code == e.mission_code))
+    if mission_id is None:
+        return None
+    starts = from_day + timedelta(days=e.starts_in_days)
+    exists = await session.scalar(
+        select(MissionEvent.id).where(
+            MissionEvent.mission_id == mission_id,
+            MissionEvent.title == e.title,
+            MissionEvent.starts_on == starts,
+        )
+    )
+    if exists is not None:
+        return None
+    event_id: uuid.UUID = (
+        await session.execute(
+            _INSERT_EVENT,
+            {
+                "mission": mission_id,
+                "kind": e.kind,
+                "title": e.title,
+                "place": e.place_label,
+                "lat": e.lat,
+                "lon": e.lon,
+                "starts": starts,
+                "ends": starts + timedelta(days=e.days - 1),
+                "attendance": e.attendance,
+                "weight": e.weight,
+            },
+        )
+    ).scalar_one()
+    if audited:
+        await audit.write(
+            session,
+            actor_type=actor.type,
+            actor_id=actor.id,
+            action="PREDICTIVE.EVENT",
+            entity_type="mission_event",
+            entity_id=str(event_id),
+            details={"mission": e.mission_code, "kind": e.kind, "starts_on": starts.isoformat()},
+        )
+    return event_id, mission_id
+
+
+def event_added(tenant_id: uuid.UUID, event_id: uuid.UUID, mission_id: uuid.UUID) -> Event:
+    """For the Forecast agent (PRD-06) and the screen; ids only."""
+    return Event(
+        type="MISSION_EVENT_ADDED",
+        tenant_id=tenant_id,
+        payload={"event_id": str(event_id), "mission_id": str(mission_id)},
+        source="predictive",
+    )
+
+
+async def ensure_calendar(
+    session: AsyncSession, events: list[EventIn], from_day: date, actor: Actor = SNAPSHOT
+) -> int:
+    """Seed the calendar relative to the scenario date; existing entries are kept (§7). Audited
+    once for the batch, as the other bulk loads (G-20)."""
+    added = 0
+    for e in events:
+        added += int(await add_event(session, e, from_day, actor, audited=False) is not None)
+    if added:
+        await audit.write(
+            session,
+            actor_type=actor.type,
+            actor_id=actor.id,
+            action="PREDICTIVE.CALENDAR_SEED",
+            entity_type="mission_event",
+            details={"events": added, "from": from_day.isoformat()},
+        )
+    return added
+
+
+_HISTORY = text(
+    """
+    INSERT INTO risk_index (tenant_id, mission_id, day, value, components, source)
+    VALUES (current_tenant_id(), :mission, :day, :value, CAST(:components AS jsonb),
+            'ILLUSTRATIVE')
+    ON CONFLICT (mission_id, day) DO NOTHING
+    RETURNING id
+    """
+)
+
+
+async def ensure_history(
+    session: AsyncSession, until: date, days: int = HISTORY_DAYS, actor: Actor = SNAPSHOT
+) -> int:
+    """The labelled illustrative history (§3, G-3): each mission's baseline with a seeded wobble
+    of up to ±4 that fades into the day before `until`, so the line meets today without a jump.
+    Deterministic; days already there are kept. Audited once."""
+    added = 0
+    for r in await session.execute(_MISSIONS):
+        base = BASELINE[r.risk_level]
+        seed = sum(ord(ch) for ch in r.code)
+        for d in range(days, 0, -1):
+            wobble = ((seed * 7 + d * 13) % 9 - 4) * min(1.0, d / 10)
+            value = max(0, min(100, round(base + wobble)))
+            row = await session.scalar(
+                _HISTORY,
+                {
+                    "mission": r.id,
+                    "day": until - timedelta(days=d),
+                    "value": value,
+                    "components": json.dumps({"illustrative": value}),
+                },
+            )
+            added += int(row is not None)
+    if added:
+        await audit.write(
+            session,
+            actor_type=actor.type,
+            actor_id=actor.id,
+            action="PREDICTIVE.HISTORY",
+            entity_type="risk_index",
+            details={"rows": added, "until": until.isoformat(), "source": "ILLUSTRATIVE"},
+        )
+    return added
