@@ -1097,3 +1097,46 @@ lives in the tab. Tests: Vitest.
 Playwright, real stack (requirements-pilot.md §97; plan §7), in make acceptance's second command
 before the After-Action Review spec. Report the real output; make acceptance (all specs) still passes.
 ```
+
+## Pilot modules 20–21 · Incident Replay and Site Twin camera coverage (D-51)
+
+Requirements RPL-01..07 and TWN-08..11 (`docs/requirements-pilot.md` §99–108); plan `docs/plan-pilot-rpl.md`. None of these prompts is 🔒.
+
+### Prompt 122 · Replay payload (API)
+```
+RPL-01, RPL-04, RPL-05. app/modules/replay: GET /api/incidents/{id}/replay (plan §2), for the
+Incidents readers; the window per G-1 and G-2; AAR-02's timeline reused (G-6) with sensor and
+site_id on SITE entries; people with no name or id; trips counted, restricted ones never (G-4);
+tally_end from the Safety Check-in's function. Tests on real Postgres: the window, the state
+inputs, no name anywhere in the payload, the Viewer, an exercise incident, a restricted trip.
+```
+
+### Prompt 123 · Replay screen
+```
+RPL-02, RPL-03, RPL-06, RPL-07. /incidents/replay (plan §3): ReplayMap on the self-hosted tiles,
+the figures, the timeline, the bar with marks, speeds and keys; state at t as a pure function
+(screens/replay/state.ts) checked against tally_end; reduced motion steps entry to entry; links
+from Incidents, After-Action Review and Exercise & Training; t in the address. Tests: Vitest.
+```
+
+### Prompt 124 · Camera mounts (migration and API)
+```
+TWN-08, PC-53. Migration 0018: the five site_sensor columns, existing CCTV rows filled (plan §4),
+then the CHECK; the same mounts in the seed; the twin API's sensor carries them. Tests on real
+Postgres: the CHECK both ways, nexira_api cannot update them, the API returns them.
+```
+
+### Prompt 125 · Coverage on the plan, handoff and KPI
+```
+TWN-09..11. screens/twin/coverage.ts (plan §5): clipped cones, the grid, the KPI, the uncovered
+list; the "Camera coverage" toggle; red dashed cones for cameras that are down; place → camera
+from the plan, Sensors & systems and the incident's SITE entries (/twin?site=…&camera=…, G-8).
+Tests: Vitest, including the seeded gap and CAM-07 offline.
+```
+
+### Prompt 126 · Acceptance
+```
+Playwright, real stack (§102, §107; plan §6): rpl-acceptance.spec.ts after the After-Action Review
+spec; the coverage checks in twn-acceptance.spec.ts. Report the real output; make acceptance (all
+specs) still passes.
+```
