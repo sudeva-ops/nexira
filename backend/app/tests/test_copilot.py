@@ -21,8 +21,8 @@ from app.tests.intel_helpers import ingest, signal
 from app.tests.test_checkin import World, answer, make_world
 
 
-@pytest.fixture
-async def world(client: AsyncClient, idp: Idp) -> World:
+async def copilot_world(client: AsyncClient, idp: Idp) -> World:
+    """The check-in tests' Nairobi world, with the city named and two answers recorded."""
     w = await make_world(idp)
     async with tenant_session(idp.tenant_id, idp.engine) as session:
         await session.execute(text("UPDATE mission SET city = 'Nairobi' WHERE code = 'NBO'"))
@@ -30,6 +30,11 @@ async def world(client: AsyncClient, idp: Idp) -> World:
     assert await answer(client, idp, w, "Peter", "SAFE") == 201
     assert await answer(client, idp, w, "Grace", "NEED_HELP") == 201
     return w
+
+
+@pytest.fixture
+async def world(client: AsyncClient, idp: Idp) -> World:
+    return await copilot_world(client, idp)
 
 
 async def ask(client: AsyncClient, idp: Idp, question: str, sub: str = "duty") -> dict[str, Any]:

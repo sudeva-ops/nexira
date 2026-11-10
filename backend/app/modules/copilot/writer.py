@@ -27,15 +27,15 @@ EXAMPLES = (
 LABELS = {"CIVIL_UNREST": "civil unrest", "TRANSPORT_STRIKE": "transport strike"}
 
 
-def _plural(n: int, one: str, many: str | None = None) -> str:
+def plural(n: int, one: str, many: str | None = None) -> str:
     return f"{n} {one if n == 1 else (many or one + 's')}"
 
 
-def _names(names: list[str]) -> str:
+def names(names: list[str]) -> str:
     return names[0] if len(names) == 1 else ", ".join(names[:-1]) + f" and {names[-1]}"
 
 
-def _incident(i: IncidentFact) -> str:
+def incident_phrase(i: IncidentFact) -> str:
     what = LABELS.get(i.category, i.category.replace("_", " ").lower())
     drill = " (exercise)" if i.exercise else ""
     return f"{i.reference}{drill}, {what} at {i.place or 'an unknown place'}"
@@ -44,25 +44,25 @@ def _incident(i: IncidentFact) -> str:
 def _about(i: IncidentFact) -> Sentence:
     confidence = f", confidence {i.confidence}%" if i.confidence is not None else ""
     return Sentence(
-        f"{_incident(i)}: {i.severity}, {i.status.lower()}{confidence}, from "
-        f"{_plural(i.sources_named, 'intelligence source')}.",
+        f"{incident_phrase(i)}: {i.severity}, {i.status.lower()}{confidence}, from "
+        f"{plural(i.sources_named, 'intelligence source')}.",
         (i.source,),
     )
 
 
-def _exposure(i: IncidentFact) -> Sentence | None:
+def exposure_sentence(i: IncidentFact) -> Sentence | None:
     e = i.exposed
     if not e or not e.get("people"):
         return None
     return Sentence(
-        f"{_plural(e['people'], 'person', 'people')} are in the impact zone: "
+        f"{plural(e['people'], 'person', 'people')} are in the impact zone: "
         f"{e['staff']} staff, {e['delegates']} delegates and {e['citizens']} citizens; "
-        f"{_plural(e['sites'], 'mission site')} and {_plural(e['trips'], 'trip')}.",
+        f"{plural(e['sites'], 'mission site')} and {plural(e['trips'], 'trip')}.",
         (i.source,),
     )
 
 
-def _checkin(c: CheckinFact) -> list[Sentence]:
+def checkin_sentences(c: CheckinFact) -> list[Sentence]:
     p, ci = c.personnel, c.citizens
     out = [
         Sentence(
@@ -74,9 +74,9 @@ def _checkin(c: CheckinFact) -> list[Sentence]:
         )
     ]
     if c.need_help:
-        out.append(Sentence(f"Asked for help: {_names(c.need_help)}.", (c.source,)))
+        out.append(Sentence(f"Asked for help: {names(c.need_help)}.", (c.source,)))
     if c.pending:
-        out.append(Sentence(f"Not yet answered: {_names(c.pending)}.", (c.source,)))
+        out.append(Sentence(f"Not yet answered: {names(c.pending)}.", (c.source,)))
     return out
 
 
@@ -120,21 +120,21 @@ class TemplateWriter:
                         f"No check-in has been sent for {incident.reference}.", (incident.source,)
                     )
                 ]
-            return _checkin(facts.checkins[0])
+            return checkin_sentences(facts.checkins[0])
         if kind is Kind.TRAVEL:
             return self._travel(facts, incident)
         if kind is Kind.REPORT:
             return [
                 Sentence(
-                    f"Here is a draft situation report for {_incident(incident)}.",
+                    f"Here is a draft situation report for {incident_phrase(incident)}.",
                     (incident.source,),
                 )
             ]
         out = [_about(incident)]
-        if (e := _exposure(incident)) is not None:
+        if (e := exposure_sentence(incident)) is not None:
             out.append(e)
         for c in facts.checkins:
-            out.extend(_checkin(c)[:1])
+            out.extend(checkin_sentences(c)[:1])
         for r in facts.runs:
             waiting = f"; waiting for approval: {r.waiting}" if r.waiting else ""
             out.append(
@@ -149,17 +149,17 @@ class TemplateWriter:
     def _overview(self, facts: Facts) -> list[Sentence]:
         out = [
             Sentence(
-                f"{_plural(len(facts.incidents), 'incident')} active, the worst first.",
+                f"{plural(len(facts.incidents), 'incident')} active, the worst first.",
                 tuple(i.source for i in facts.incidents),
             )
         ]
         checkins = {c.source.reference: c for c in facts.checkins}
         for i in facts.incidents:
             out.append(_about(i))
-            if (e := _exposure(i)) is not None:
+            if (e := exposure_sentence(i)) is not None:
                 out.append(e)
         for c in checkins.values():
-            out.extend(_checkin(c)[:1])
+            out.extend(checkin_sentences(c)[:1])
         return out
 
     def _travel(self, facts: Facts, incident: IncidentFact) -> list[Sentence]:
@@ -168,7 +168,7 @@ class TemplateWriter:
                 Sentence(f"No trip is in the zone of {incident.reference}.", (incident.source,))
             ]
         trips = ", ".join(
-            f"{t.reference} to {t.destination} ({_plural(t.travellers, 'traveller')})"
+            f"{t.reference} to {t.destination} ({plural(t.travellers, 'traveller')})"
             for t in facts.trips
         )
         return [
@@ -184,7 +184,7 @@ class TemplateWriter:
         mine = sum(d.can_decide for d in facts.decisions)
         out = [
             Sentence(
-                f"{_plural(len(facts.decisions), 'decision')} waiting, the nearest deadline first; "
+                f"{plural(len(facts.decisions), 'decision')} waiting, the nearest deadline first; "
                 f"you can decide {mine}.",
                 tuple(d.source for d in facts.decisions),
             )

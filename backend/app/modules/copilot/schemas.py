@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -26,3 +27,27 @@ class AnswerOut(BaseModel):
     sources: list[SourceOut]  # every source cited, once
     incident_id: uuid.UUID | None  # the incident a REPORT is about
     label: str  # simulated, always (COP-05)
+
+
+class ReportIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    incident_id: uuid.UUID
+
+
+class SectionOut(BaseModel):
+    heading: str
+    sentences: list[SentenceOut]
+    note: str | None  # how it was made, when not plain fact (the rule-based recommendations)
+
+
+class ReportOut(BaseModel):
+    """COP-04: a draft from the record; exported for print, never sent (§98 Q6)."""
+
+    incident_id: uuid.UUID
+    reference: str
+    title: str
+    as_of: datetime
+    sections: list[SectionOut]
+    sources: list[SourceOut]
+    label: str
