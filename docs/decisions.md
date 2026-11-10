@@ -195,6 +195,7 @@ Record each sign-off in the PR.
 | 16. **Predictive Risk** (PRD), illustrative model and simulated calendar (D-46) | |
 | 17. **After-Action Review** (AAR), from the platform record (D-47) | |
 | 18. **Exercise & Training** (EXR), scored from the platform record (D-48) | |
+| 19. **AI Risk Copilot** (COP), *proposed*: grounded on the platform record, rule-based wording until a local model (D-50) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -304,6 +305,11 @@ Rules:
 - **Readiness from exercises.** A mission's readiness is its latest completed exercise's score; the seeded illustrative history keeps today's figures until a real exercise replaces them.
 
 **D-49 · Wellbeing removed.** Decided by the product owner on 2026-11-10. Wellbeing & Family Liaison (master spec §5.25, WEL-01..03) is removed from the requirements and from the module plan. It gets no requirements, prompts, schema or screen, and the demo's Wellbeing screen stays out of scope. No welfare cases, counselling referrals or family contacts are stored. The welfare service of Assistance Partners (AS-01, PC-21) is unchanged: it is a partner's service, not a welfare record.
+
+**D-50 · AI Risk Copilot, simulated (proposed).** *Awaiting the product owner's approval.* Requirements COP-01 to COP-08 in `docs/requirements-pilot.md` §94–98, with the defaults in §98. Amends D-30, which kept the Copilot waiting for a local model server: the Copilot is built now with real grounding and simulated wording.
+- **Grounded, cited, scoped.** Answers come only from the platform's read functions, run as the person asking (RLS, `approvals.py`); every statement cites its record; names appear only where that role sees them today.
+- **Simulated wording.** A deterministic composer behind `app/core/llm.py` writes the answer from stated templates, labelled simulated. A local model later replaces only the wording (AGR-08). No external AI API, ever.
+- **Nothing stored.** The conversation stays in the browser; each question is audited with its type and citations, not its text. A situation report is a draft with an audited export; sending it is a later decision.
 
 ---
 
