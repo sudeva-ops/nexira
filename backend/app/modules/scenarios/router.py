@@ -91,6 +91,8 @@ async def command(
     before = {"status": player.status.value, "scene": player.current_scene}
 
     if command == "reset":
+        if run.mode == "EXERCISE":  # plan-pilot-exr §6: the exercise ends through its own API
+            raise HTTPException(status.HTTP_409_CONFLICT, "End or abandon the exercise first")
         run.status = Status.FINISHED.value
         await session.flush()
         run = await service.active_run(session, scenario.id, user.id)

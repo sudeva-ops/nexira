@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import audit
 from app.core.events import Event
+from app.modules.intel import queries as intel_queries
 from app.modules.notifications.channels import CHANNELS, Recipient, adapter_for
 from app.modules.notifications.models import NotificationCampaign, NotificationDelivery
 from app.modules.people.models import Person
@@ -247,33 +248,83 @@ async def demo_started_at(session: AsyncSession) -> datetime | None:
     return started
 
 
-async def scenario_escalate_after_s(session: AsyncSession) -> int | None:
+_ESCALATE_AFTER = text(
+    """
+    SELECT CASE
+             WHEN r.current_scene >= COALESCE((e.payload ->> 'checkin_clock_scene')::int, 0)
+             THEN (e.payload ->> 'checkin_escalate_after_s')::int
+           END
+      FROM scenario_run r
+      JOIN scenario_event e ON e.scenario_id = r.scenario_id
+     WHERE r.mode = :mode AND r.status = ANY(:running)
+       AND (CAST(:run AS uuid) IS NULL OR r.id = CAST(:run AS uuid))
+       AND e.event_type = 'SCENARIO_SETTINGS'
+       AND e.payload ? 'checkin_escalate_after_s'
+     ORDER BY r.started_at DESC NULLS LAST
+     LIMIT 1
+    """
+)
+
+
+async def scenario_escalate_after_s(
+    session: AsyncSession, incident_id: uuid.UUID | None = None
+) -> int | None:
     """The check-in escalation time while a demo scenario is running
     (SCENARIO_SETTINGS, Prompt 5: 20 s for NBO-CIVIL-UNREST). Otherwise None, and
-    the campaign keeps its own value. Pilot tenants have no scenario runs.
+    the campaign keeps its own value. Pilot tenants have no demo runs.
 
     Before the run reaches checkin_clock_scene (scene 4 for NBO-CIVIL-UNREST) it is
     None too: that scene's CHECKIN_CLOCK event starts the clock (checkin.start_clock),
-    so a presenter who stays on scene 3 does not see escalation early."""
+    so a presenter who stays on scene 3 does not see escalation early.
+
+    An exercise incident's check-in takes its own running exercise's setting, and only that
+    (plan-pilot-exr §7, decided A): a live check-in during an exercise keeps its value."""
+    runs = await intel_queries.exercise_runs(session, [incident_id]) if incident_id else {}
+    run = runs.get(incident_id) if incident_id else None
     value = await session.scalar(
-        text(
-            """
-            SELECT CASE
-                     WHEN r.current_scene >= COALESCE((e.payload ->> 'checkin_clock_scene')::int, 0)
-                     THEN (e.payload ->> 'checkin_escalate_after_s')::int
-                   END
-              FROM scenario_run r
-              JOIN scenario_event e ON e.scenario_id = r.scenario_id
-             WHERE r.mode = 'DEMO' AND r.status = ANY(:running)
-               AND e.event_type = 'SCENARIO_SETTINGS'
-               AND e.payload ? 'checkin_escalate_after_s'
-             ORDER BY r.started_at DESC NULLS LAST
-             LIMIT 1
-            """
-        ),
-        {"running": list(DEMO_RUNNING)},
+        _ESCALATE_AFTER,
+        {
+            "mode": "EXERCISE" if run else "DEMO",
+            "run": run,
+            "running": list(EXERCISE_RUNNING if run else DEMO_RUNNING),
+        },
     )
     return int(value) if value is not None else None
+
+
+# An exercise's run is going from its launch (IDLE at scene 0) until it ends (plan §6).
+EXERCISE_RUNNING = ("IDLE", "PLAYING", "PAUSED")
+
+_SOURCE_RUN = text(
+    "SELECT id, started_at FROM scenario_run "
+    "WHERE id = :run AND mode = 'EXERCISE' AND status = ANY(:running)"
+)
+
+
+@dataclass(frozen=True)
+class ExerciseRun:
+    id: uuid.UUID
+    started_at: datetime | None
+    incidents: list[uuid.UUID]  # the incidents its signals opened
+
+
+async def exercise_run(session: AsyncSession, source: str) -> ExerciseRun | None:
+    """The running exercise run that published a scenario event (source
+    "scenario:<code>:<run>"), or None. Its simulated answers and check-in clock count for its
+    own incidents' check-ins only (plan-pilot-exr §7)."""
+    if not source.startswith("scenario:"):
+        return None
+    try:
+        run_id = uuid.UUID(source.rsplit(":", 1)[-1])
+    except ValueError:
+        return None
+    row = (
+        await session.execute(_SOURCE_RUN, {"run": run_id, "running": list(EXERCISE_RUNNING)})
+    ).one_or_none()
+    if row is None:
+        return None
+    runs = await intel_queries.exercise_runs(session)
+    return ExerciseRun(row.id, row.started_at, [i for i, r in runs.items() if r == row.id])
 
 
 async def create_campaign(
@@ -300,7 +351,7 @@ async def create_campaign(
     recipients = await resolve_audience(session, incident_id, campaign.audience)
     escalate_after_s = campaign.escalate_after_s
     if campaign.campaign_type == "CHECKIN":
-        escalate_after_s = await scenario_escalate_after_s(session) or escalate_after_s
+        escalate_after_s = await scenario_escalate_after_s(session, incident_id) or escalate_after_s
     reference = await session.scalar(text("SELECT next_reference('NTF', false)"))
     row = NotificationCampaign(
         tenant_id=session.info["tenant_id"],

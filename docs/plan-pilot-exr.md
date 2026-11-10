@@ -169,3 +169,11 @@ As `docs/prompts-pilot.md` Prompts 113–117. Prompt 115 also covers the player'
 
 - G-3: option A. An EXERCISE run uses the scenario's check-in escalation setting (20 s for NBO-CIVIL-UNREST) for its own incidents' campaigns only; live check-ins keep the platform default (600 s, D-07).
 - G-1, G-2, G-4..G-9: as proposed.
+
+## 14. Found while building Prompt 115
+
+- **Next inject is on the exercises API** (`POST /api/exercises/{id}/next`). The scenario API is mounted in demo environments only (D-21), and an exercise runs on the live engine in every environment (D-48). The endpoint does what the scenario API's `next` does and is audited the same way (`SCENARIO.NEXT`, with the exercise's id), so the screen never reads a scene's `expect`.
+- **The marker counts only from its own run.** Ingestion refuses a signal carrying `exercise_run_id` unless the event's source is that run (`scenario:<code>:<run>`) and the run is in EXERCISE mode (`RAW_SIGNAL.REJECT`). Without this, a live signal carrying a marker would leave leadership figures.
+- **Simulated answers and the check-in clock in an exercise.** Both were accepted only while a DEMO run is going. They are now also accepted from a running exercise run, for the check-ins of the incidents that run opened only (as G-3: A). A live check-in is never answered or timed by an exercise.
+- **The hazard clock stays demo-only.** `DEMO_CLOCK` events move the clock that armed playbook runs use, live ones included, so an exercise does not move it. DAC-CYCLONE and MNL-TROPICAL-STORM still run as exercises, but their clock scenes are refused (`SCENARIO.CLOCK_REJECT`) and an armed run is not brought forward.
+- **What is left out.** Executive leaves exercise incidents out of the figures in §4, of the mission posture (display risk) and of the hazard drivers. Global Operations still shows them, labelled. Executive's supply, fleet and shelter drivers and Predictive's signal component are not filtered. They read their own modules' state, which an exercise rarely changes.

@@ -8,7 +8,7 @@ from decimal import Decimal
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field, ValidationError
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -96,6 +96,18 @@ class RawSignalIn(BaseModel):
     occurred_at: datetime | None = None  # defaults to the event envelope's time
     # D-38: a natural hazard's measure (hazards.MEASURED); validated by the normaliser.
     hazard: dict[str, Any] | None = None
+    exercise_run_id: uuid.UUID | None = None  # queries.EXERCISE_MARKER, added by the player
+
+
+# The marker counts only on its own run's events: a live signal carrying one would leave
+# leadership figures (plan §4). The player's source is "scenario:<code>:<run>".
+_EXERCISE_RUN = text("SELECT 1 FROM scenario_run WHERE id = :run AND mode = 'EXERCISE'")
+
+
+async def _marker_refused(session: AsyncSession, event: Event, run: uuid.UUID) -> bool:
+    if not event.source.startswith("scenario:") or event.source.rsplit(":", 1)[-1] != str(run):
+        return True
+    return await session.scalar(_EXERCISE_RUN, {"run": run}) is None
 
 
 Outcome = Literal["REJECTED", "DUPLICATE", "DISCARDED", "NORMALISED", "FUSED"]
@@ -119,6 +131,10 @@ async def ingest_signal(session: AsyncSession, event: Event, actor: Actor = FUSI
         item = RawSignalIn.model_validate(event.payload)
     except ValidationError as e:
         return await _reject(session, event, actor, f"invalid payload: {e.error_count()} errors")
+    if item.exercise_run_id is not None and await _marker_refused(
+        session, event, item.exercise_run_id
+    ):
+        return await _reject(session, event, actor, "exercise marker outside its exercise run")
     source = await session.scalar(select(IntelSource).where(IntelSource.code == item.source_code))
     if source is None:
         return await _reject(session, event, actor, f"unknown source {item.source_code!r}")

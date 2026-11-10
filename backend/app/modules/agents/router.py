@@ -35,6 +35,7 @@ from app.modules.agents.schemas import (
     RejectIn,
 )
 from app.modules.audit.models import AuditLog
+from app.modules.intel import queries as intel_queries
 from app.modules.intel.models import Incident
 from app.modules.tenancy.models import AppUser
 from app.modules.tenancy.service import ROLES
@@ -76,6 +77,7 @@ async def proposal_out(
         )
     )
     incidents: dict[uuid.UUID, str] = {row.id: row.reference for row in found}
+    exercises = await intel_queries.exercise_runs(session, list(incidents))
     decider = aliased(AppUser)
     steps: dict[uuid.UUID, list[ApprovalStepOut]] = {}
     for row, name in await session.execute(
@@ -103,6 +105,7 @@ async def proposal_out(
                 agent_code=agent.code if agent else "UNKNOWN",
                 agent_name=agent.name if agent else "Unknown",
                 incident_reference=incidents.get(p.incident_id) if p.incident_id else None,
+                exercise=p.incident_id in exercises,
                 approvals=steps.get(p.id, []),
                 can_decide=await proposals.can_decide(session, user, p),
                 can_edit=await proposals.can_edit(session, user, p),

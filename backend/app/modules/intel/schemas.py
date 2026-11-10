@@ -50,6 +50,7 @@ class IncidentOut(BaseModel):
     last_signal_at: datetime
     signal_count: int
     sources: list[SourceRef]
+    exercise: bool = False  # EXR-03: from a scenario run in EXERCISE mode (D-48)
 
 
 class IncidentEventOut(BaseModel):

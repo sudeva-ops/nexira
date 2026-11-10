@@ -26,6 +26,7 @@ from app.modules.checkin.schemas import (
     SummaryOut,
     TallyOut,
 )
+from app.modules.intel import queries as intel_queries
 from app.modules.notifications.models import NotificationCampaign
 from app.modules.tenancy.service import ROLES, Actor
 
@@ -73,6 +74,10 @@ async def summary(campaign_id: uuid.UUID, _user: Reader, session: Db) -> Summary
         campaign_id=campaign.id,
         reference=campaign.reference,
         incident_id=campaign.incident_id,
+        exercise=bool(
+            campaign.incident_id
+            and await intel_queries.exercise_runs(session, [campaign.incident_id])
+        ),
         status=campaign.status,
         sent_at=campaign.sent_at,
         escalate_after_s=campaign.escalate_after_s,

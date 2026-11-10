@@ -9,6 +9,7 @@ class CampaignOut(BaseModel):
     id: uuid.UUID
     reference: str
     incident_id: uuid.UUID | None
+    exercise: bool = False  # EXR-03: its incident is an exercise's (D-48)
     campaign_type: str  # ALERT, CHECKIN, ADVISORY, TEST
     message: str
     translations: dict[str, str]  # D-15

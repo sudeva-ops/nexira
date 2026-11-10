@@ -18,6 +18,7 @@ from app.core.approvals import require_roles
 from app.core.config import Settings, get_settings
 from app.core.events import Event, Publisher, get_publisher
 from app.core.security import CurrentUser, get_db
+from app.modules.intel import queries as intel_queries
 from app.modules.intel.models import Incident
 from app.modules.notifications import compose, templates
 from app.modules.notifications.models import (
@@ -60,6 +61,9 @@ async def campaigns_out(
     funnel: dict[uuid.UUID, dict[str, dict[str, int]]] = {}
     recipients: dict[uuid.UUID, int] = {}
     names: dict[str, str] = {}
+    exercises = await intel_queries.exercise_runs(
+        session, {c.incident_id for c in campaigns if c.incident_id}
+    )
     if ids:
         rows = await session.execute(
             select(
@@ -107,6 +111,7 @@ async def campaigns_out(
             "simulated",
             "created_by_name",
             "approved_by_name",
+            "exercise",
         )
         fields: dict[str, Any] = {
             k: getattr(c, k) for k in CampaignOut.model_fields if k not in computed
@@ -117,6 +122,7 @@ async def campaigns_out(
                 recipients=recipients.get(c.id, 0),
                 deliveries=counts.get(c.id, {}),
                 funnel=funnel.get(c.id, {}),
+                exercise=c.incident_id in exercises,
                 simulated=True,
                 created_by_name=names.get(c.created_by or "")
                 if c.created_by_type == "USER"

@@ -77,6 +77,7 @@ class ReviewOut(BaseModel):
     incident_reference: str
     incident_title: str
     incident_status: str
+    exercise: bool = False  # EXR-03: its incident is an exercise's (D-48)
     status: str  # DRAFT, FINAL
     started_at: datetime
     finalised_at: datetime | None
@@ -92,6 +93,7 @@ class ReviewOut(BaseModel):
 class ReviewSummaryOut(BaseModel):
     id: uuid.UUID
     reference: str
+    incident_id: uuid.UUID
     incident_reference: str
     incident_title: str
     status: str
@@ -99,6 +101,7 @@ class ReviewSummaryOut(BaseModel):
     accepted: int  # ACCEPTED or DONE
     drafts: int
     items: int
+    exercise: bool = False  # EXR-03: its incident is an exercise's (D-48)
 
 
 class ReadyOut(BaseModel):
@@ -109,6 +112,7 @@ class ReadyOut(BaseModel):
     title: str
     status: str
     can_start: bool
+    exercise: bool = False  # EXR-03: its incident is an exercise's (D-48)
 
 
 class ReviewsOut(BaseModel):
