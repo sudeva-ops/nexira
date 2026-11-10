@@ -1,6 +1,6 @@
 import { Button, HTMLSelect, InputGroup, NonIdealState } from "@blueprintjs/core";
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { ApiError } from "../../api/client";
 import {
@@ -283,6 +283,13 @@ function Breakdown({ x }: { x: Exercise }) {
         {x.source === "ILLUSTRATIVE"
           ? "Illustrative: seeded history, not a recorded exercise."
           : `${x.incident_reference ?? "No incident"} · ${x.participants ?? 0} took part · frozen ${formatStamp(x.ended_at ?? x.started_at)}`}
+        {/* RPL-06 (D-51): the exercise's incident, played back. */}
+        {x.incident_id && (
+          <>
+            {" · "}
+            <Link to={`/incidents/replay?id=${x.incident_id}`}>Replay</Link>
+          </>
+        )}
       </div>
     </div>
   );

@@ -97,6 +97,7 @@ On the plan: online cones translucent blue; OFFLINE, FAULT or DEGRADED cones red
 | G-6 | AAR-02's `timeline()` takes the AAR `Incident` dataclass | Reused as it is through `aar.service.incident()`; no copy of the query. The replay module imports from aar, not the other way round |
 | G-7 | Coverage area as an exact polygon union is heavy in the browser | The 5-unit grid (§5): exact enough to show the gap, and testable |
 | G-8 | TWN-10's SITE entries exist on the Incidents timeline (with `data.sensor`), but AAR-02's text-only timeline drops the data | Links from the Incidents timeline and the replay's timeline (which carries `sensor`, §2); the AAR screen's timeline stays text |
+| G-9 | **Found while building (Prompt 123); deviation, for the product owner's approval.** After the Phase 1 run, two agent escalations arrive an hour after INC-<year>-1042 went to MONITORING. Under G-2 (A) they end the window, so at 60 s for the whole window the two minutes of response play in two seconds | The play axis shortens every quiet stretch longer than 30 s of record to 30 s; the bar shows each as a hatched break ("Quiet for 57:00; shortened"), and the elapsed time stays the record's. With no quiet stretch, 60 s at 1× is unchanged |
 
 ## 8. Prompts
 

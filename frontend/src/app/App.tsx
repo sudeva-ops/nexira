@@ -28,6 +28,7 @@ import { CopilotScreen } from "../screens/copilot/CopilotScreen";
 import { ExercisesScreen } from "../screens/exercises/ExercisesScreen";
 import { ExecutiveScreen } from "../screens/executive/ExecutiveScreen";
 import { PredictiveScreen } from "../screens/predictive/PredictiveScreen";
+import { ReplayScreen } from "../screens/replay/ReplayScreen";
 import { SupplyScreen } from "../screens/supply/SupplyScreen";
 import { TwinScreen } from "../screens/twin/TwinScreen";
 import { VipScreen } from "../screens/vip/VipScreen";
@@ -91,6 +92,7 @@ export function App({ onLogout }: Props) {
             }
           />
         ))}
+        <Route path="/incidents/replay" element={<ReplayScreen />} />
         <Route path="*" element={<NonIdealState icon="search" title="Page not found" />} />
       </Route>
     </Routes>
