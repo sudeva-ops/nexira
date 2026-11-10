@@ -3299,12 +3299,12 @@ tr.nx-flash-b > td {
 /* The map's credit stays (OpenStreetMap, Protomaps) but in the intro's colours. */
 .nx-intro .maplibregl-ctrl-attrib,
 .nx-intro .maplibregl-ctrl-attrib-button {
-  background-color: rgba(7, 9, 13, 0.55) !important;
-  color: #738091;
+  background-color: rgba(7, 9, 13, 0.75) !important;
+  color: #abb3bf;
 }
 
 .nx-intro .maplibregl-ctrl-attrib a {
-  color: #8f99a8;
+  color: #c5cbd3;
 }
 
 /* How long is left: a thin line along the bottom. */
