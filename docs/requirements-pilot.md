@@ -1097,3 +1097,68 @@ Playwright on the real stack, run on its own after a demo reset:
 11. **Screen:** "Exercise & Training" (icon `target`) under PLAN & INSIGHT before After-Action Review, as the design. Every role reads it. *Default: yes.*
 12. **Demo:** the Nairobi civil-unrest exercise is launched from the screen on a freshly reset demo; its acceptance spec runs on its own after a reset; the Phase 1 run is unchanged. *Default: yes.*
 13. **🔒 prompts:** the migration (PC-51, PC-52: RLS, grants, guards) needs your named sign-off (D-29). The launch and end role checks only call `approvals.py`. *Default: yes.*
+
+## 94. Purpose and starting point (AI Risk Copilot, simulated)
+
+Let people ask the platform questions in plain language and get short, sourced answers, and draft a situation report for leadership, without a language model yet. Master spec §5.15 (AI Risk Copilot, COP-01..04); the design's AI Risk Copilot screen. **Proposed, awaiting the product owner's approval.**
+
+The Copilot has two parts:
+- **Grounding** (real): what an answer says comes only from the platform's own read functions, run as the person asking, with their roles and mission scope (RLS, `approvals.py`). Every statement cites the record it came from.
+- **Wording** (simulated): a deterministic composer turns the grounded facts into sentences from stated templates, behind `app/core/llm.py`. It is labelled "Simulated copilot · rule-based wording". A local model (vLLM or Ollama, AGR-08) later replaces only this part, given the same facts and the same citation rule (COP-04).
+
+| Exists today | Where |
+|---|---|
+| Read functions for incidents, exposure, people and sites, check-ins, playbook runs, proposals, trips, readiness, the risk forecast, the Executive figures | intel, people, checkin, playbooks, agents, travel, exercises, predictive, executive |
+| Role and mission scope checks; RLS per tenant | `approvals.py` (D-05), D-01, D-02 |
+| `LLM` protocol with `StubLLM`; no model is called | `app/core/llm.py` (AGT-09) |
+| Print-ready exports, audited (After-Action Review, the Executive briefing) | aar, executive |
+| No conversation, no question answering, no situation report | — |
+
+## 95. Requirements: AI Risk Copilot (COP)
+
+| ID | Requirement | Master | Pri. |
+|---|---|---|---|
+| COP-01 | **Ask in plain language.** A person types a question or picks a suggestion. The Copilot recognises what is asked from a stated list of question types (§98 Q2), each answered from the platform's read functions as that person:<br>· **situation**: active incidents, the worst first, with exposure and check-in figures;<br>· **an incident** by reference or place ("What is happening in Nairobi?");<br>· **our people**: exposed, accounted and not yet answered for an incident's check-in;<br>· **decisions waiting** in the Decision Queue;<br>· **missions at risk**: display risk and the 14-day forecast's rising missions;<br>· **travel**: trips and travellers in an incident's zone (never a restricted trip, D-33);<br>· **readiness**: a mission's latest exercise;<br>· **help**: what it can answer, with examples.<br>Anything else gets "I can't answer that yet" and the list, never a guess. | COP-01 | M |
+| COP-02 | **Cited answers.** Every sentence of an answer cites at least one source: an incident, check-in, playbook run, proposal, trip, exercise or forecast, by reference, linking to its screen. An answer whose facts come back empty says so ("No active incidents"). | COP-03 | M |
+| COP-03 | **Role-based access.** The Copilot sees only what the person asking may see on the screens, through the same read functions and RLS. Names of people appear only where that role sees them today (for example the check-in list). A restricted trip never appears. Nothing is cached across people. | COP-03 | M |
+| COP-04 | **Situation report.** "Draft a situation report" for an incident builds, from the record, a report with the design's headings: summary, our people, actions taken, related risks and recommendations, and sources. The **recommendations** are stated rules from the record (for example "Reassess at the next check-in"), labelled as such. It is a draft, shown in the conversation. It is exported as a print-ready page (PDF by the browser), and the export is audited. Sending it to anyone is out of this module (§98 Q6). | COP-02 | M |
+| COP-05 | **Simulated, and said so.** Every answer and report carries "Simulated copilot · rule-based wording · simulated data" (D-19). The composer runs behind `app/core/llm.py`'s interface, so a local model can replace it without changing grounding, citations or access. No external AI API is called, ever (AGENTS.md). | COP-04 | M |
+| COP-06 | **Audited, not recorded.** Each question is audited (`COPILOT.ASK`) with its question type and the references cited, not the question's text (§98 Q4). Each report export is audited (`COPILOT.REPORT_EXPORT`). The conversation lives in the browser tab and is gone when it closes; nothing else is stored. | — | M |
+| COP-07 | **AI Risk Copilot screen**, as the design, Blueprint dark, under RESPOND after Safety Check-in (§98 Q8):<br>· the conversation, with the suggestions and the composer ("Ask NEXIRA anything…");<br>· **Grounding context**: what the platform holds now (active incidents, check-ins, playbook runs, missions), each lit when present;<br>· **Guardrails**: sovereign infrastructure, every answer cites its sources, role-based access, human approval before distribution;<br>· after a report, **Export as PDF**.<br>Every role can use it. | — | M |
+| COP-08 | **The demo.** In the Phase 1 run, after scene 4, "Summarise the Nairobi situation" answers from INC-<year>-1042: the exposure (229 people), check-in (15 safe, 1 needs help, 1 pending) and PB-07's steps, each cited. "Draft a situation report" produces the report; "Who has not responded to the check-in?" names the pending person to a Duty Officer and only counts them for a role that does not see names. | — | M |
+
+### Not in this module
+- A language model of any kind: the wording is templates now; a local model is a later decision (AGR-08, COP-04);
+- sending a report or answer to anyone (it would go through Mass Notification or a proposal, with approval);
+- free-form reasoning, predictions or advice beyond the stated rules;
+- documents, uploads or searching text outside the platform's records;
+- stored conversations (`copilot_session`) and shared conversations;
+- the Briefing agent (master spec Phase 2).
+
+## 96. Data changes
+
+None. No table is added: the conversation stays in the browser, and the audit log holds what is asked and cited (COP-06). Nothing here is 🔒 under D-29, since it changes no RLS, grants, security, approvals, audit code, agent engine or channel adapter.
+
+## 97. Acceptance for the module
+
+Playwright on the real stack, inside the Phase 1 run (after scene 4) or on its own after a demo reset:
+- **Situation:** "Summarise the Nairobi situation" cites INC-<year>-1042 and states 229 exposed and 15 / 1 / 1 on the check-in, matching the Incidents and Safety Check-in screens.
+- **Names by role:** "Who has not responded to the check-in?" names the pending person for the Duty Officer, and gives only the count for the Viewer.
+- **Unknown question:** answered "I can't answer that yet" with the list, and no source.
+- **Report:** the situation report has every heading and cites its sources; its export is audited.
+- **Audit:** `COPILOT.ASK` rows hold the question type and references, never the text; the chain verifies.
+- **Label:** every answer is labelled simulated; no request leaves the stack.
+- `make acceptance` (all existing specs) still passes.
+
+## 98. Questions for the product owner (proposed defaults)
+
+1. **Simulated now:** rule-based wording behind `llm.py`, labelled; a local model later replaces only the wording. *Default: yes.*
+2. **Question types:** the eight in COP-01; anything else is declined with the list. *Default: yes.*
+3. **Matching:** keywords and references (incident numbers, mission names and codes), deterministic and tested; no fuzzy guessing. *Default: yes.*
+4. **Audit:** question type and cited references, not the text, which could hold personal data. *Default: yes.*
+5. **Names:** only where the asker's role sees them on the screens today. *Default: yes.*
+6. **Situation report:** draft and print-ready export; sending (for example to a leadership list) is a later decision. *Default: export only.*
+7. **Who may use it:** every role, each seeing only what they may. *Default: yes.*
+8. **Screen:** "AI Risk Copilot" (icon `chat`), subtitle "Grounded on live platform data" (not the design's "AIP", D-19), under RESPOND after Safety Check-in, as the design. *Default: yes.*
+9. **Demo:** asked inside the Phase 1 acceptance run after scene 4, so the record matches the design; no new scenario. *Default: yes.*
+10. **🔒:** none (§96). *Default: yes.*
