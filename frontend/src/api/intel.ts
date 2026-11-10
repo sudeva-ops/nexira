@@ -50,6 +50,7 @@ export interface Incident {
   last_signal_at: string;
   signal_count: number;
   sources: SourceRef[];
+  exercise?: boolean; // EXR-03: from a scenario run in EXERCISE mode (D-48); the API always sends it
 }
 
 export interface ExposureSummary {

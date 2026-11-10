@@ -14,6 +14,7 @@ export interface NtfCampaign {
   id: string;
   reference: string;
   incident_id: string | null;
+  exercise?: boolean; // EXR-03: from a scenario run in EXERCISE mode (D-48); the API always sends it
   campaign_type: CampaignKind | "TEST";
   message: string;
   translations: Record<string, string>;

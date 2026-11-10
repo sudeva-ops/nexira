@@ -1,6 +1,7 @@
 import { Icon, Tag } from "@blueprintjs/core";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
+import { useRunning } from "../api/exercises";
 import { useAgents, usePendingCount } from "../api/proposals";
 import { PresenterBar } from "../presenter/PresenterBar";
 import { RealtimeProvider } from "../api/realtime";
@@ -61,6 +62,19 @@ function DecisionsPill() {
   );
 }
 
+/** EXR-08 (plan §4): while any exercise runs, beside SIMULATED DATA. */
+function ExerciseBanner() {
+  const running = useRunning().data ?? [];
+  if (!running.length) return null;
+  return (
+    <Link to="/exercises" className="nx-exr-banner" aria-label="Exercise running">
+      <Tag intent="danger">
+        SIMULATED EXERCISE · {running.map((e) => `${e.name} (${e.mission_code})`).join(", ")}
+      </Tag>
+    </Link>
+  );
+}
+
 interface Props {
   onLogout: () => void;
 }
@@ -93,6 +107,7 @@ export function AppShell({ onLogout }: Props) {
           <Tag intent="warning" minimal>
             SIMULATED DATA
           </Tag>
+          <ExerciseBanner />
           <LastEvent />
           <LiveIndicator />
           <Clock />

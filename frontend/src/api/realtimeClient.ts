@@ -4,6 +4,7 @@ import { aarKeys } from "./aar";
 import { checkinKeys } from "./checkin";
 import { documentKeys } from "./documents";
 import { evacuationKeys } from "./evacuations";
+import { exerciseKeys } from "./exercises";
 import { executiveKeys } from "./executive";
 import { predictiveKeys } from "./predictive";
 import { fleetKeys } from "./fleet";
@@ -171,6 +172,10 @@ function moduleKeys(event: RealtimeEvent): QueryKey[] {
       return [weatherKeys.all];
     case "AAR_UPDATED": // a review started, decided or finalised; its id only (D-47)
       return [aarKeys.all];
+    case "EXERCISE_UPDATED": // launched, a scene, ended or abandoned; its id only (D-48)
+      // An end sets the embassy's readiness on People & Sites, Site Twin and the Executive
+      // Overview (EXR-07); the presenter bar follows the template's run.
+      return [exerciseKeys.all, peopleKeys.sites, twinKeys.all, executiveKeys.all, ["scenario"]];
     case "DOCUMENT_UPDATED": // the register, its KPIs, and the trip warnings (DX-04, DX-06)
       return [documentKeys.all, tripKeys.all];
     default:

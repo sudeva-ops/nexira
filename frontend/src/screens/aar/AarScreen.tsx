@@ -28,7 +28,7 @@ import {
 } from "../../api/aar";
 import { ApiError } from "../../api/client";
 import { formatStamp } from "../../app/time";
-import { Card, Kpi } from "../../ui/primitives";
+import { Card, ExerciseTag, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { REJECT_REASONS } from "../queue/format";
 import { inDays, metricTarget, metricValue } from "./format";
@@ -418,6 +418,7 @@ function ReviewView({ r }: { r: Review }) {
             After-action review {r.reference} · {r.incident_reference} ·{" "}
             {r.incident_title}.
           </b>{" "}
+          <ExerciseTag on={r.exercise} />{" "}
           {r.status === "FINAL"
             ? `Final since ${formatStamp(r.finalised_at ?? r.started_at)}: the metrics are frozen.`
             : "Built from the platform record; the metrics stay live until the review is finalised."}{" "}
@@ -501,6 +502,7 @@ export function AarScreen() {
                 >
                   <div className="nx-row">
                     <b>{s.reference}</b>
+                    <ExerciseTag on={s.exercise} />
                     <span className="nx-grow" />
                     <span
                       className={`nx-sev ${s.status === "FINAL" ? "ok" : "med"}`}
@@ -527,6 +529,7 @@ export function AarScreen() {
                 <li key={r.incident_id} data-incident={r.reference}>
                   <div className="nx-row">
                     <b>{r.reference}</b>
+                    <ExerciseTag on={r.exercise} />
                     <span className="nx-dim">{r.status}</span>
                     <span className="nx-grow" />
                     {r.can_start && (

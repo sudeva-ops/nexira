@@ -40,6 +40,7 @@ describe("app shell", () => {
       "Document Expiry", // pilot module 7 (D-30, D-37), under PLAN & INSIGHT (plan-pilot-dx G-9)
       "Supply Chain Risk", // pilot module 14 (D-30, D-44), after Document Expiry
       "Predictive Risk", // pilot module 16 (D-30, D-46), before Executive Overview
+      "Exercise & Training", // pilot module 18 (D-48), before After-Action Review
       "After-Action Review", // pilot module 17 (D-30, D-47), after Predictive Risk
       "Executive Overview", // pilot module 15 (D-30, D-45), last under PLAN & INSIGHT
       "Audit",

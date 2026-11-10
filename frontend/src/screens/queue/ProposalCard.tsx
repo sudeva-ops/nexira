@@ -9,6 +9,7 @@ import { roleLabel } from "../../ui/format";
 import { Ring } from "../../ui/Ring";
 import { remaining, ringTone } from "../../ui/spark";
 import { useNow } from "../../ui/useNow";
+import { ExerciseTag } from "../../ui/primitives";
 import { countdown, nextStep, REJECT_REASONS } from "./format";
 
 const STATUS_BADGE: Partial<Record<Proposal["status"], [string, string]>> = {
@@ -90,6 +91,7 @@ export function ProposalCard({ p }: { p: Proposal }) {
           {LEVELS[level]}
         </span>
         <b className="nx-grow">{p.title}</b>
+        <ExerciseTag on={p.exercise} />
         {pending ? (
           <span className={`nx-deadline${countdown(p.deadline_at, now) === "OVERDUE" ? " over" : ""}`}>
             {level !== 4 && p.deadline_at && (

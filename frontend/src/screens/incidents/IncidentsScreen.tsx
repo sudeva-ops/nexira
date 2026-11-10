@@ -5,7 +5,7 @@ import { useSearchParams } from "react-router-dom";
 import { type IncidentStatus, useIncidents } from "../../api/intel";
 import { ago } from "../../app/time";
 import { FlashRow } from "../../ui/motion";
-import { Card, Sev } from "../../ui/primitives";
+import { Card, ExerciseTag, Sev } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { IncidentDetail } from "./IncidentDetail";
 
@@ -76,7 +76,7 @@ export function IncidentsScreen() {
                 >
                   <td className="nx-dim nx-mono">{i.reference}</td>
                   <td>
-                    <b>{i.title}</b>
+                    <b>{i.title}</b> <ExerciseTag on={i.exercise} />
                     <div className="nx-dim">
                       {i.place_label} · {ago(i.opened_at)}
                     </div>

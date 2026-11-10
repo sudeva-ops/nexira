@@ -35,6 +35,7 @@ export interface Proposal {
   agent_name: string;
   incident_id: string | null;
   incident_reference: string | null;
+  exercise?: boolean; // EXR-03: from a scenario run in EXERCISE mode (D-48); the API always sends it
   proposal_key: string;
   action_type: string;
   title: string;

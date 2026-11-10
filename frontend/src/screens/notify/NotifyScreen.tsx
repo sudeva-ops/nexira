@@ -11,7 +11,7 @@ import {
 import { useMissions } from "../../api/people";
 import { formatStamp } from "../../app/time";
 import { FlashRow } from "../../ui/motion";
-import { Card, Kpi } from "../../ui/primitives";
+import { Card, ExerciseTag, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { CampaignDetail } from "./CampaignDetail";
 import { Composer } from "./Composer";
@@ -156,7 +156,9 @@ export function NotifyScreen() {
                       className={c.id === selectedId ? "on" : undefined}
                       onClick={() => select(c.id)}
                     >
-                      <td className="nx-mono nx-dim nx-nowrap">{c.reference}</td>
+                      <td className="nx-mono nx-dim nx-nowrap">
+                        {c.reference} <ExerciseTag on={c.exercise} />
+                      </td>
                       <td>
                         <button type="button" className="nx-linkbtn" onClick={() => select(c.id)}>
                           {c.message}

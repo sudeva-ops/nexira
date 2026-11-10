@@ -16,7 +16,7 @@ import { canAddIncidentNote, canChangeIncidentStatus } from "../../api/permissio
 import { formatStamp } from "../../app/time";
 import { SEVERITY_COLOUR } from "../../map/geo";
 import { categoryLabel } from "../../ui/format";
-import { Card, Sev, SourceChip } from "../../ui/primitives";
+import { Card, ExerciseTag, Sev, SourceChip } from "../../ui/primitives";
 
 const STATUSES: IncidentStatus[] = ["ACTIVE", "MONITORING", "CLOSED"];
 
@@ -156,6 +156,7 @@ export function IncidentDetail({ incidentId }: { incidentId: string }) {
         <div className="nx-bd">
           <div className="nx-row nx-dim nx-mono nx-meta">
             <span>{incident.reference}</span>
+            <ExerciseTag on={incident.exercise} />
             <span>{incident.place_label}</span>
             <span>Mission: {incident.mission_code ?? "not yet assigned"}</span>
             <span>Status: {incident.status}</span>
