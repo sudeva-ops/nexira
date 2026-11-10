@@ -103,7 +103,7 @@ The export (`POST /api/copilot/report/export`) returns the same report for a pri
 
 | # | Gap | Proposed answer |
 |---|---|---|
-| G-1 | **Needs a decision.** Today every role, the Viewer included, sees names on the check-in list (`GET /api/checkin/{id}/people`). So COP-03 ("names only where that role sees them today") would show names to the Viewer, which contradicts COP-08 and §97 ("only counts for a role that does not see names") | **A (proposed):** the Copilot names people only to roles that may record answers (`RESPOND_ROLES`: Duty Officer, Security Officer, Consular Officer, Head of Mission, HQ Crisis Director). Everyone else gets counts. It is stricter than the screen and matches §97. **B:** as the screens, so the Viewer gets names, and §97's Viewer line is dropped |
+| G-1 | **Decided: A** (PR #152). Today every role, the Viewer included, sees names on the check-in list (`GET /api/checkin/{id}/people`). So COP-03 ("names only where that role sees them today") would show names to the Viewer, which contradicts COP-08 and §97 ("only counts for a role that does not see names") | **A (proposed):** the Copilot names people only to roles that may record answers (`RESPOND_ROLES`: Duty Officer, Security Officer, Consular Officer, Head of Mission, HQ Crisis Director). Everyone else gets counts. It is stricter than the screen and matches §97. **B:** as the screens, so the Viewer gets names, and §97's Viewer line is dropped |
 | G-2 | "The Nairobi situation" has no reference in it | Mission code or city matched to the mission's incident (§2) |
 | G-3 | §98 Q9 puts the Copilot inside the Phase 1 run, but `acceptance.spec.ts` is long and moves on to scenes 5–6 | A separate spec after the first batch, reading the record the Phase 1 run left (MONITORING, check-in 15 / 1 / 1). The figures are the same as after scene 4 |
 | G-4 | "Related risks" in the design names cyber cases (CPX), which the pilot does not have | The mission's drivers that exist (§4). No cyber line |
@@ -113,3 +113,8 @@ The export (`POST /api/copilot/report/export`) returns the same report for a pri
 ## 9. Prompts
 
 As `docs/prompts-pilot.md` Prompts 118–121. None is 🔒.
+
+## 10. Decisions by the product owner (2026-11-10, PR #152: "approved a")
+
+- G-1: option A. The Copilot names people only to the roles that may record check-in answers (`RESPOND_ROLES`); every other role gets counts.
+- G-2..G-6: as proposed.
