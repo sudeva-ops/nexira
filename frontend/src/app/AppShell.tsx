@@ -114,7 +114,7 @@ export function AppShell({ onLogout }: Props) {
           <UserMenu onLogout={onLogout} />
         </header>
         <Ticker />
-        <section className={`nx-view${current?.path === "/operations" ? " full" : ""}`}>
+        <section key={pathname} className={`nx-view${current?.path === "/operations" ? " full" : ""}`}>
           <Outlet />
         </section>
         <PresenterBar />

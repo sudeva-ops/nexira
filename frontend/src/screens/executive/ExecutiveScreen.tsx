@@ -6,6 +6,7 @@ import {
   duration,
   type Overview,
   POSTURE_COLOUR,
+  readinessDetail,
   RISK_SEV,
   useOverview,
 } from "../../api/executive";
@@ -66,13 +67,15 @@ export function Figures({ o }: { o: Overview }) {
         icon="tick-circle"
         label="Mission readiness"
         value={o.readiness.mean === null ? "—" : `${o.readiness.mean}/100`}
-        detail="Mean embassy score · illustrative until Exercises"
+        detail={readinessDetail(o.readiness)}
       />
     </div>
   );
 }
 
 /** EXE-02: incidents as an area over a faint bar per day of raw signals. */
+
+
 function Trend({ trend }: { trend: Overview["trend"] }) {
   const w = 300;
   const h = 80;

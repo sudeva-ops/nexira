@@ -84,6 +84,15 @@ body {
   color: var(--nx-tx2);
   font-weight: 500;
   text-decoration: none;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.nx-nav:focus-visible {
+  outline: 2px solid #8abbff;
+  outline-offset: -2px;
 }
 
 .nx-nav:hover {
@@ -96,6 +105,7 @@ body {
 .nx-nav-active:hover {
   background: var(--nx-active);
   color: #fff;
+  box-shadow: inset 3px 0 0 #8abbff; /* where you are, at a glance */
 }
 
 .nx-main {
@@ -149,6 +159,42 @@ body {
 .nx-view {
   min-height: 0;
   overflow: auto;
+  animation: nx-view-in 0.22s ease both; /* each page eases in (the section remounts per page) */
+}
+
+@keyframes nx-view-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* Thin dark scrollbars, as the theme (Windows draws thick light ones by default). */
+.nx-app * {
+  scrollbar-width: thin;
+  scrollbar-color: #404854 transparent;
+}
+
+.nx-app ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.nx-app ::-webkit-scrollbar-thumb {
+  background: #404854;
+  border-radius: 4px;
+}
+
+.nx-app ::-webkit-scrollbar-thumb:hover {
+  background: #5f6b7c;
+}
+
+/* Keyboard focus is always visible on our own controls. */
+.nx-linkbtn:focus-visible,
+tr.click:focus-visible,
+.nx-pill:focus-visible {
+  outline: 2px solid #8abbff;
+  outline-offset: 2px;
 }
 
 .nx-user {
@@ -271,6 +317,14 @@ body {
 
 .nx-kpi {
   padding: 8px 10px;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.nx-kpi:hover {
+  border-color: #404854;
+  transform: translateY(-1px);
 }
 
 .nx-kpi .l {

@@ -21,7 +21,7 @@ import {
   useNextInject,
   useTemplates,
 } from "../../api/exercises";
-import { formatStamp } from "../../app/time";
+import { formatDate, formatStamp } from "../../app/time";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { measuredText } from "./format";
@@ -122,7 +122,7 @@ function Recent({
             <td>{e.mission_code}</td>
             <td>{kindLabel(e.kind)}</td>
             <td className="nx-mono nx-dim nx-nowrap">
-              {formatStamp(e.ended_at ?? e.started_at).slice(0, 11)}
+              {formatDate(e.ended_at ?? e.started_at)}
             </td>
             <td>
               {e.overall_score === null ? (

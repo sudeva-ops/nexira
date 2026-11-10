@@ -154,6 +154,7 @@ describe("Exercise & Training", () => {
     const table = screen.getByRole("table", { name: "Recent exercises" });
     const paris = table.querySelector('[data-exercise="x-paris"]') as HTMLElement;
     expect(paris).toHaveTextContent("Illustrative");
+    expect(paris).toHaveTextContent("19 Oct 2026"); // the date alone, never a cut-off time
     expect(paris.querySelector(".nx-bar > i")).toHaveClass("warn"); // 72: amber below 80
     expect(table.querySelector('[data-exercise="x-done"] .nx-bar > i')).not.toHaveClass("warn");
 
