@@ -12,6 +12,7 @@ from app.modules.aar.router import router as aar_router
 from app.modules.agents.router import router as agents_router
 from app.modules.audit.router import router as audit_router
 from app.modules.checkin.router import router as checkin_router
+from app.modules.copilot.router import router as copilot_router
 from app.modules.documents.router import router as documents_router
 from app.modules.evacuations.router import router as evacuations_router
 from app.modules.executive.router import router as executive_router
@@ -81,6 +82,7 @@ def create_app(app_env: str) -> FastAPI:
         predictive_router,
         aar_router,
         exercises_router,
+        copilot_router,
         checkin_router,
         agents_router,
         travel_router,
