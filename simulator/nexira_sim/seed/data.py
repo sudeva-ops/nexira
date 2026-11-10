@@ -1552,3 +1552,10 @@ PREDICTIVE_CALENDAR: list[tuple[str, str, str, int, int, int]] = [
     ("MNL", "RALLY", "Election rally", 11, 10, 1),
     ("DAC", "OTHER", "General strike (hartal)", 3, 12, 1),
 ]
+
+
+# Exercise & Training (D-48, plan-pilot-exr §5): the seeded illustrative history. Offsets sum to 0
+# and stay within +2, so the five scores' mean is the embassy's readiness (70..98).
+EXERCISE_THEMES = ("Civil unrest", "Natural hazard", "Health", "Cyber-physical", "Evacuation")
+EXERCISE_KINDS = ("TABLETOP", "FUNCTIONAL", "FULL_SCALE")
+EXERCISE_OFFSETS = (2, -1, 1, -3, 1)

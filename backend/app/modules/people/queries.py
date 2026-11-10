@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.exercises import queries as exercise_queries
 from app.modules.people.schemas import MissionOut, PersonOut, SiteOut
 
 _MISSIONS = text(
@@ -136,7 +137,7 @@ _SITES = text(
        WHERE i.status = 'ACTIVE' AND e.subject_type = :subject_type
        ORDER BY e.subject_id, severity_rank(i.severity) DESC, i.opened_at DESC
     )
-    SELECT s.id, s.name, s.site_type, m.code AS mission_code, m.city,
+    SELECT s.id, s.mission_id, s.name, s.site_type, m.code AS mission_code, m.city,
            ST_Y(s.location::geometry) AS lat, ST_X(s.location::geometry) AS lon,
            s.readiness_score, s.last_drill_on,
            z.subject_id IS NOT NULL AS in_zone
@@ -151,6 +152,22 @@ _SITES = text(
 )
 
 
+def _with_drill(
+    site: SiteOut, mission_id: Any, drills: dict[Any, exercise_queries.Readiness]
+) -> SiteOut:
+    """The embassy's readiness and last drill from its mission's latest exercise (EXR-07)."""
+    drill = drills.get(mission_id) if site.site_type == "EMBASSY" else None
+    if drill is None:
+        return site
+    return site.model_copy(
+        update={
+            "readiness_score": drill.score,
+            "last_drill_on": drill.drilled_on,
+            "readiness_source": drill.source,
+        }
+    )
+
+
 async def list_sites(
     session: AsyncSession, *, q: str | None, mission: str | None
 ) -> tuple[int, int, list[SiteOut]]:
@@ -158,5 +175,6 @@ async def list_sites(
     rows = await session.execute(
         _SITES, {"q": _like(q), "mission": mission, "subject_type": "SITE"}
     )
-    sites = [SiteOut(**r._asdict()) for r in rows]
+    drills = await exercise_queries.readiness(session)
+    sites = [_with_drill(SiteOut(**r._asdict()), r.mission_id, drills) for r in rows]
     return len(sites), sum(s.site_type != "HOTEL" for s in sites), sites

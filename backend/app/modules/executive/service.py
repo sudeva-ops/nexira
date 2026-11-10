@@ -21,6 +21,7 @@ from app.core import audit
 from app.core.security import CurrentUser
 from app.modules.checkin import service as checkin
 from app.modules.executive import schemas
+from app.modules.exercises import queries as exercise_queries
 from app.modules.fleet import service as fleet
 from app.modules.hazards import service as hazards
 from app.modules.health_intel import service as health
@@ -323,7 +324,10 @@ async def overview(
     active = list(await session.execute(_ACTIVE))
     current = active[0] if active else None
     latest = max(active, key=lambda r: r.opened_at) if active else None
-    readiness = {r.mission_id: r.readiness_score for r in await session.execute(_READINESS)}
+    # Each embassy's readiness: its mission's latest exercise, else the seeded value (EXR-07).
+    seeded = {r.mission_id: r.readiness_score for r in await session.execute(_READINESS)}
+    drills = await exercise_queries.readiness(session)
+    readiness = {**seeded, **{m: d.score for m, d in drills.items() if m in seeded}}
     drivers = await _drivers(session, user, today, active, missions)
     attention = [
         schemas.AttentionOut(
@@ -348,7 +352,10 @@ async def overview(
         detection=await _detection(session, now, current),
         accounted=await _accounted(session),
         readiness=schemas.ReadinessOut(
-            mean=round(sum(scores) / len(scores)) if scores else None, sites=len(scores)
+            mean=round(sum(scores) / len(scores)) if scores else None,
+            sites=len(scores),
+            from_exercises=sum(m in drills for m in readiness),
+            illustrative=sum(m not in drills or drills[m].source != "EXERCISE" for m in readiness),
         ),
         trend=await _trend(session, today),
         regions=regions(missions),

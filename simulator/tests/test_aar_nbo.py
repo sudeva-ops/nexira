@@ -13,6 +13,8 @@ from app.core.events import Event
 from app.modules.aar import rules, service
 from app.modules.checkin import service as checkin
 from app.modules.checkin.consumer import clock_handler, response_handler
+from app.modules.exercises import queries as exercise_queries
+from app.modules.exercises import service as exercises
 from app.modules.intel import service as intel
 from app.modules.intel.models import Incident
 from app.modules.notifications.consumer import dispatch_all
@@ -97,6 +99,10 @@ async def test_the_review_of_the_nairobi_unrest(db: DbUrls) -> None:
             metrics = {m.key: m for m in await service.metrics(session, found, now)}
             drafts = await rules.draft(session, found, now)
             users = list(await session.scalars(text("SELECT display_name FROM app_user")))
+            # Exercise & Training scores the same record with the same metrics (D-48, EXR-05).
+            scored = await exercises.score(session, incident_id, now)
+            drills = await exercise_queries.readiness(session)
+            nairobi = await session.scalar(text("SELECT id FROM mission WHERE code = 'NBO'"))
     finally:
         await engine.dispose()
 
@@ -118,3 +124,20 @@ async def test_the_review_of_the_nairobi_unrest(db: DbUrls) -> None:
     assert drafts[0].finding.endswith("and was escalated.")
     assert drafts[1].evidence["low"] == 1  # the cultural attaché, located from calendar data
     assert "GATE_WAIT" not in codes  # step 7 was approved within seconds (plan G-2)
+
+    by = {s.dimension: s for s in scored.scores}
+    notified = metrics["detection_to_notification"].value
+    assert notified is not None
+    assert by["DETECTION"].score == min(100, service.half_up(100 * 120 / max(notified, 1.0)))
+    assert by["ACCOUNTABILITY"].score == metrics["personnel_accounted"].value == 94
+    assert by["ACCOUNTABILITY"].measured["answered"] == 16
+    assert by["DECISION_SPEED"].score == 100  # every decision within 5 minutes
+    assert by["COMMUNICATION"].measured["exposed"] == 229
+    assert by["PLAN_ADHERENCE"].measured["steps"] == by["PLAN_ADHERENCE"].measured["done"] == 8
+    assert by["PLAN_ADHERENCE"].score == 100
+    assert scored.overall == exercises.overall([s.score for s in scored.scores])
+    assert scored.participants == 16  # 15 safe and 1 needing help, staff and delegates only
+    assert not [name for name in [*PEOPLE, *users] if name and name in repr(scored)]
+    # The seeded history: Nairobi's latest exercise is the illustrative one at its readiness.
+    assert drills[nairobi].score == 79
+    assert drills[nairobi].source == "ILLUSTRATIVE"

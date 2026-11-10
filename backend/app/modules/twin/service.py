@@ -27,6 +27,7 @@ from app.core import approvals, audit
 from app.core.events import Event
 from app.core.security import CurrentUser
 from app.modules.evacuations import service as evacuations
+from app.modules.exercises import queries as exercise_queries
 from app.modules.fleet import service as fleet
 from app.modules.fleet.models import FleetAsset
 from app.modules.intel.models import IncidentEvent
@@ -230,8 +231,18 @@ async def _readiness(
             detail=", ".join(f"{s.label}: {s.detail or s.status.lower()}" for s in down) or None,
         )
     )
+    # The embassy's readiness is its mission's latest exercise (EXR-07; plan-pilot-exr §5).
+    drill = (
+        (await exercise_queries.readiness(session)).get(site.mission_id)
+        if site.site_type == "EMBASSY"
+        else None
+    )
+    if drill is None:
+        return schemas.ReadinessOut(
+            score=site.readiness_score, last_drill_on=site.last_drill_on, items=items
+        )
     return schemas.ReadinessOut(
-        score=site.readiness_score, last_drill_on=site.last_drill_on, items=items
+        score=drill.score, last_drill_on=drill.drilled_on, source=drill.source, items=items
     )
 
 

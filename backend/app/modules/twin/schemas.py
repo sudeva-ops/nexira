@@ -84,8 +84,9 @@ class ReadinessItemOut(BaseModel):
 
 
 class ReadinessOut(BaseModel):
-    score: int | None  # site.readiness_score (plan G-1)
+    score: int | None  # the embassy's latest exercise (EXR-07), else site.readiness_score
     last_drill_on: date | None
+    source: str | None = None  # EXERCISE, ILLUSTRATIVE; None: the seeded site value
     items: list[ReadinessItemOut]
 
 

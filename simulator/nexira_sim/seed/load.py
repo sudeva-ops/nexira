@@ -13,6 +13,7 @@ from app.core.db import tenant_session
 from app.modules.agents.service import AgentIn, PolicyIn, ensure_agents, ensure_policies
 from app.modules.documents.service import ensure_documents, start_renewals
 from app.modules.evacuations import service as evacuations
+from app.modules.exercises import service as exercises
 from app.modules.fleet import service as fleet
 from app.modules.hazards.service import ensure_climate
 from app.modules.health_intel import service as health
@@ -336,6 +337,11 @@ async def seed_all(
             ],
             scenario_date,
         )
+        # Exercise & Training (D-48, plan-pilot-exr §5): one illustrative past exercise per
+        # mission, matching its embassy's seeded readiness and last drill.
+        report["exercise_history"] = await exercises.ensure_history(
+            session, _exercise_history(w, tenant_id)
+        )
 
         # VIP & Delegation Protection (D-42, plan-pilot-vip §2): the restricted TRP-8834 and
         # VV-<year>-031, after the identities (G-7).
@@ -498,6 +504,41 @@ async def seed_all(
 
 GST = timezone(timedelta(hours=4))  # the home zone (plan Q2)
 EAT = timezone(timedelta(hours=3))  # Addis Ababa (plan-pilot-vip §2)
+
+
+def _exercise_history(w: world.World, tenant_id: uuid.UUID) -> list[exercises.HistoryIn]:
+    """Plan §5: dated on the embassy's last drill, scored at its readiness; five dimension scores
+    around it with a mean equal to it; 75-90% of the mission's personnel took part."""
+    personnel: dict[uuid.UUID, int] = {}
+    for p in w.persons:
+        if p.mission_id is not None and p.person_type != "CITIZEN":
+            personnel[p.mission_id] = personnel.get(p.mission_id, 0) + 1
+    latest = datetime.now(UTC) - timedelta(minutes=1)
+    rows = []
+    embassies = [s for s in w.sites if s.site_type == "EMBASSY"]
+    for i, site in enumerate(embassies):
+        if site.readiness_score is None or site.last_drill_on is None:
+            continue
+        theme = data.EXERCISE_THEMES[i % len(data.EXERCISE_THEMES)]
+        offsets = (
+            data.EXERCISE_OFFSETS[i % len(data.EXERCISE_OFFSETS) :]
+            + (data.EXERCISE_OFFSETS[: i % len(data.EXERCISE_OFFSETS)])
+        )
+        ended = min(datetime.combine(site.last_drill_on, time(10), UTC), latest)
+        a, b, c, d, e = (max(0, min(100, site.readiness_score + o)) for o in offsets)
+        rows.append(
+            exercises.HistoryIn(
+                id=seed_id(tenant_id, "exercise", str(site.mission_id)),
+                mission_id=site.mission_id,
+                name=f"{theme} drill",
+                kind=data.EXERCISE_KINDS[i % len(data.EXERCISE_KINDS)],
+                started_at=ended - timedelta(hours=2),
+                ended_at=ended,
+                scores=(a, b, c, d, e),
+                participants=round(personnel.get(site.mission_id, 0) * (75 + (i * 7) % 16) / 100),
+            )
+        )
+    return rows
 
 
 def _twin(w: world.World, tenant_id: uuid.UUID, officer: uuid.UUID) -> twin.PlanIn:
