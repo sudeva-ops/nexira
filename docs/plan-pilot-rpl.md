@@ -90,7 +90,7 @@ On the plan: online cones translucent blue; OFFLINE, FAULT or DEGRADED cones red
 | # | Gap | Proposed answer |
 |---|---|---|
 | G-1 | A signal has `occurred_at` (from the provider) and `received_at` (by the platform) | `received_at`: the replay shows what the platform knew and when, as AAR-02 and AAR-03 do |
-| G-2 | RPL-01 ends the window at "now" while not closed. INC-<year>-1042 stays at MONITORING after the Phase 1 run, so its replay would end hours later in silence | **Needs a decision. A (proposed):** ACTIVE → now; MONITORING or CLOSED → the last thing the record holds (the latest timeline entry or check-in answer), or `closed_at` if later. **B:** as written, now until closed |
+| G-2 | **Decided: A** (PR #159). RPL-01 ends the window at "now" while not closed. INC-<year>-1042 stays at MONITORING after the Phase 1 run, so its replay would end hours later in silence | **A (chosen):** ACTIVE → now; MONITORING or CLOSED → the last thing the record holds (the latest timeline entry or check-in answer), or `closed_at` if later. **B:** as written, now until closed |
 | G-3 | Which check-in figures: the check-in has personnel and other groups | Personnel, as the Safety Check-in summary and the Copilot (15 / 1 / 1) |
 | G-4 | A trip has no current position of its own on the map, and restricted trips must never show (D-33) | Trips are a count in the figures, excluding restricted ones as the travel API does; not drawn |
 | G-5 | An ACTIVE incident keeps changing while it is replayed | The payload is a snapshot when opened; a "Refresh" button reloads it and keeps *t* |
@@ -102,6 +102,7 @@ On the plan: online cones translucent blue; OFFLINE, FAULT or DEGRADED cones red
 
 As `docs/prompts-pilot.md` Prompts 122–126. None is 🔒.
 
-## 9. Decisions by the product owner
+## 9. Decisions by the product owner (2026-11-10, PR #159: "A")
 
-Waiting.
+- G-2: option A. An ACTIVE incident replays to now; a MONITORING or CLOSED one ends at the last thing the record holds, or `closed_at` if later.
+- G-1, G-3..G-8: as proposed.
