@@ -23,6 +23,8 @@ import { DecisionQueueScreen } from "../screens/queue/DecisionQueueScreen";
 import { BriefingScreen } from "../screens/executive/BriefingScreen";
 import { AarPrint } from "../screens/aar/AarPrint";
 import { AarScreen } from "../screens/aar/AarScreen";
+import { CopilotReportPrint } from "../screens/copilot/CopilotReportPrint";
+import { CopilotScreen } from "../screens/copilot/CopilotScreen";
 import { ExercisesScreen } from "../screens/exercises/ExercisesScreen";
 import { ExecutiveScreen } from "../screens/executive/ExecutiveScreen";
 import { PredictiveScreen } from "../screens/predictive/PredictiveScreen";
@@ -51,6 +53,7 @@ const BUILT: Record<string, ReactElement> = {
   "/partners": <PartnersScreen />,
   "/twin": <TwinScreen />,
   "/checkin": <CheckinScreen />,
+  "/copilot": <CopilotScreen />,
   "/documents": <DocumentsScreen />,
   "/supply": <SupplyScreen />,
   "/predictive": <PredictiveScreen />,
@@ -71,6 +74,7 @@ export function App({ onLogout }: Props) {
       <Route path="/executive/briefing" element={<BriefingScreen />} />
       {/* AAR-07: the print-ready review stands alone too. */}
       <Route path="/aar/:id/print" element={<AarPrint />} />
+      <Route path="/copilot/report/:id/print" element={<CopilotReportPrint />} />
       <Route element={<AppShell onLogout={onLogout} />}>
         {SCREENS.map((s) => (
           <Route

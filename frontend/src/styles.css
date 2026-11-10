@@ -3510,3 +3510,257 @@ tr.nx-flash-b > td {
   text-transform: uppercase;
   color: #738091;
 }
+
+/* --- AI Risk Copilot (COP-07, D-50): the design's chat beside grounding and guardrails ----- */
+.nx-cop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1000px) {
+  .nx-cop {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+}
+
+.nx-cop-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.nx-cop-msgs {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+
+.nx-cop-msgs .bp6-non-ideal-state {
+  height: 100%;
+}
+
+.nx-cop-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+  animation: nx-view-in 0.25s ease both;
+}
+
+.nx-cop-q {
+  align-self: flex-end;
+  max-width: 75%;
+  padding: 7px 11px;
+  border-radius: 12px 12px 2px 12px;
+  background: #2d72d2;
+  color: #fff;
+  font-size: 12.5px;
+}
+
+.nx-cop-a {
+  display: flex;
+  gap: 9px;
+  max-width: 92%;
+  padding: 9px 12px;
+  border: 1px solid #2f343c;
+  border-radius: 2px 12px 12px 12px;
+  background: linear-gradient(180deg, rgba(76, 144, 240, 0.07), rgba(76, 144, 240, 0.02));
+}
+
+.nx-cop-avatar {
+  flex: none;
+  margin-top: 2px;
+  color: #8abbff;
+}
+
+.nx-cop-sentences {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.nx-cop-sentences li + li {
+  margin-top: 4px;
+}
+
+.nx-cop-cites {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.nx-cop-src {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 5px;
+  border: 1px solid #2d72d2;
+  border-radius: 3px;
+  background: rgba(45, 114, 210, 0.15);
+  color: #8abbff;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 10px;
+  line-height: 16px;
+  text-decoration: none;
+}
+
+.nx-cop-src:hover {
+  background: rgba(45, 114, 210, 0.35);
+  color: #fff;
+  text-decoration: none;
+}
+
+.nx-cop-label {
+  margin-top: 8px;
+  color: var(--nx-tx3);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.nx-cop-typing {
+  display: inline-flex;
+  gap: 4px;
+  padding: 6px 0;
+}
+
+.nx-cop-typing i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8abbff;
+  animation: nx-cop-dot 1s ease-in-out infinite;
+}
+
+.nx-cop-typing i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.nx-cop-typing i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes nx-cop-dot {
+  50% {
+    opacity: 0.25;
+    transform: translateY(-2px);
+  }
+}
+
+.nx-cop-report {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-left: 3px solid #4c90f0;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.nx-cop-report h4 {
+  margin: 0 0 2px;
+  font-size: 13px;
+}
+
+.nx-cop-report h5 {
+  margin: 10px 0 4px;
+  color: #8abbff;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.nx-cop-report-actions {
+  margin-top: 10px;
+  gap: 10px;
+}
+
+.nx-cop-sugs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px 0;
+  border-top: 1px solid var(--nx-line);
+}
+
+.nx-cop-sug {
+  padding: 4px 10px;
+  border: 1px solid #404854;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--nx-tx2);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.nx-cop-sug:hover:not(:disabled) {
+  border-color: #4c90f0;
+  color: var(--nx-tx);
+}
+
+.nx-cop-sug:focus-visible {
+  outline: 2px solid #8abbff;
+  outline-offset: 2px;
+}
+
+.nx-cop-composer {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px 12px;
+}
+
+.nx-cop-composer .bp6-input-group {
+  flex: 1;
+}
+
+.nx-cop-ground,
+.nx-cop-guard {
+  list-style: none;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.nx-cop-ground li,
+.nx-cop-guard li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--nx-tx3);
+}
+
+.nx-cop-ground li.on {
+  color: var(--nx-tx);
+}
+
+.nx-cop-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #404854;
+}
+
+.nx-cop-ground li.on .nx-cop-dot {
+  background: #32a467;
+  box-shadow: 0 0 6px rgba(50, 164, 103, 0.7);
+}
+
+.nx-cop-guard .bp6-icon {
+  color: #72ca9b;
+}
+
+.nx-cop-sim {
+  padding: 8px 10px;
+  border: 1px dashed #404854;
+  color: var(--nx-tx3);
+  font-size: 10.5px;
+}

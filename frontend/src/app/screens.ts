@@ -36,6 +36,8 @@ export const SCREENS: readonly Screen[] = [
   // D-43: under RESPOND, after Assistance Partners (§68 Q8).
   { path: "/twin", title: "Site Twin", subtitle: "Sites · Floor plan, occupancy & sensors", icon: "grid-view", group: "RESPOND", builtIn: "Prompt 87" },
   { path: "/checkin", title: "Safety Check-in", subtitle: "Workflows · Personnel accountability", icon: "tick-circle", group: "RESPOND", builtIn: "Prompt 11" },
+  // D-50 (§98 Q8): after Safety Check-in, as the design; not the design's "AIP" wording (D-19).
+  { path: "/copilot", title: "AI Risk Copilot", subtitle: "Grounded on live platform data", icon: "chat", group: "RESPOND", builtIn: "Prompt 120" },
   // Plan-pilot-dx G-9: PLAN & INSIGHT, as the design.
   { path: "/documents", title: "Document Expiry", subtitle: "Compliance · Passports, visas & clearances", icon: "document", group: "PLAN & INSIGHT", builtIn: "Prompt 51" },
   // D-44 (§73 Q8): after Document Expiry; icon box, since Fleet uses truck.
