@@ -73,6 +73,10 @@ acceptance: env reset-demo up
 	  e2e/twn-acceptance.spec.ts e2e/sup-acceptance.spec.ts \
 	  e2e/exe-acceptance.spec.ts e2e/prd-acceptance.spec.ts
 	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/aar-acceptance.spec.ts
+	# Exercise & Training (§92, §93 Q12): on its own, after a second reset.
+	$(MAKE) reset-demo
+	$(COMPOSE) restart backend worker
+	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/exr-acceptance.spec.ts
 
 lint: lint-backend lint-simulator lint-frontend
 
