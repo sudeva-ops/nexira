@@ -1162,3 +1162,121 @@ Playwright on the real stack, inside the Phase 1 run (after scene 4) or on its o
 8. **Screen:** "AI Risk Copilot" (icon `chat`), subtitle "Grounded on live platform data" (not the design's "AIP", D-19), under RESPOND after Safety Check-in, as the design. *Default: yes.*
 9. **Demo:** asked inside the Phase 1 acceptance run after scene 4, so the record matches the design; no new scenario. *Default: yes.*
 10. **🔒:** none (§96). *Default: yes.*
+
+## 99. Purpose and starting point (Incident Replay)
+
+**Status: proposed on 2026-11-10; awaiting the product owner's approval.** Idea taken from an open-source globe viewer (God's Eye View, MIT), which replays an event on a timeline you can scrub. Only the idea is reused, not its code, stack or data feeds.
+
+Play an incident back on the map, from its first signal to now (or to its close): the signals as they arrived, the impact zone, the people exposed changing colour as they answer the check-in, and each step of the response in the timeline beside it. It is for the After-Action Review, an exercise debrief and the demo. It is worked out on read from what the platform already records. Nothing is typed in again and nothing new is stored.
+
+| Exists today | Where |
+|---|---|
+| Signals with time and place (`raw_signal.occurred_at`, `location`), linked to the incident | intel (`incident_signal`) |
+| The incident's centre, impact radius, opened and closed times | `incident` |
+| Who was exposed, and when that was computed | `incident_exposure` (`computed_at`) |
+| Every check-in answer, with its time (history kept, D-07) | `checkin_response` |
+| The reconstructed timeline: events, playbook steps, notifications, decisions, status changes, linked modules | `aar/service.py` `timeline()` (AAR-02) |
+| People's current places (no history of where they were) | `person_location_current` |
+| The Global Operations map (MapLibre, self-hosted tiles, D-24) | `map/OperationsMap.tsx` |
+| No replay | — |
+
+## 100. Requirements: Incident Replay (RPL)
+
+| ID | Requirement | Pri. |
+|---|---|---|
+| RPL-01 | **Replay from the record.** `GET /api/incidents/{id}/replay` returns, for any incident the person may read (RLS, mission scope as the Incidents screen): the window (first linked signal → closed at, or now while open); the signals with time and place; the incident's centre and radius with its opened time; the people and sites exposed, each with when exposure was computed; each exposed person's check-in answers with their times; and the reconstructed timeline (AAR-02's, roles and references only). Worked out on read; nothing is stored. A restricted trip never appears (D-33). | M |
+| RPL-02 | **The map at any moment.** For a chosen time *t*, the map shows: the signals that had arrived by *t*; the impact zone from when the incident opened; the exposed people as dots from when exposure was computed, coloured by their check-in state at *t* (not asked, waiting, safe, needs help); the exposed sites. People are drawn at their current place, and the screen says so ("Positions as now; the platform keeps no location history"). | M |
+| RPL-03 | **Play, pause and scrub.** A timeline bar under the map with play/pause, a scrubber and speeds 0.5×, 1×, 2× and 4×. At 1× the whole window plays in 60 seconds (§103 Q3). Timeline entries are marked on the bar. Clicking a mark or a timeline entry jumps there, and the entry for the current moment is highlighted. Arrow keys step from one entry to the next. Under reduced motion, playback steps from entry to entry with no animation. | M |
+| RPL-04 | **Figures at the moment.** Beside the map, for *t*: time since the first signal, signals received, people exposed, and the check-in tally (safe / needs help / waiting). At the end of the window, these agree with the Incidents and Safety Check-in screens. | M |
+| RPL-05 | **No names.** Dots, counts, roles and references only. A person's name is never shown in the replay, even to a role that may see names elsewhere (§103 Q4). | M |
+| RPL-06 | **Where it opens.** A "Replay" link on the incident detail (Incidents), on the After-Action Review for its incident, and on an exercise run (Exercise & Training). Each opens the full-width replay screen (`/incidents/replay?id=…`), which is not in the sidebar. Every role that can read the incident can open it. An exercise incident carries the exercise banner, as elsewhere (EXR). | M |
+| RPL-07 | **Shareable moment.** The address holds the incident and the time (`&t=…`), so a link opens the replay at that moment for anyone who may read the incident. Opening a replay is not audited: it is a read, like the Incidents screen (§103 Q6). | S |
+
+### Not in this module
+- Location history for people, vehicles or travellers (no table is added; positions are as now);
+- replaying a site's floor plan (Site Twin) or the camera wall;
+- exporting the replay as a video;
+- comparing two incidents, or replaying several at once;
+- editing anything from the replay.
+
+## 101. Data changes
+
+None. RPL-01 reads existing tables through the existing read functions. Nothing here is 🔒 under D-29: it changes no RLS, grants, security, approvals, audit code, agent engine or channel adapter.
+
+## 102. Acceptance for the module
+
+Playwright on the real stack, after the Phase 1 run (INC-<year>-1042 at MONITORING):
+- **Opens** from the incident detail and from AAR-<year>-1042 at the same incident.
+- **Start of the window:** before the incident opened, only the first signal shows; no impact zone and no people.
+- **End of the window:** 229 exposed and the check-in at 15 safe, 1 needs help, 1 waiting, matching the Incidents and Safety Check-in screens.
+- **Scrub:** jumping to the check-in entry shows the answers given by then, and no later ones.
+- **No names:** no person's name appears on the replay screen, for the Duty Officer or the Viewer.
+- **Link:** a link with `&t=` opens at that moment.
+- **Stays on the stack:** no request leaves it.
+- `make acceptance` (all existing specs) still passes.
+
+## 103. Questions for the product owner (defaults proposed)
+
+1. **Scope:** one incident at a time, from its record; nothing stored. *Default: yes.*
+2. **Positions:** people at their current place, said on screen; no location history is added. *Default: yes.*
+3. **Speed:** the window fits 60 s at 1×, with 0.5×, 1×, 2× and 4×. *Default: yes.*
+4. **Names:** none in the replay, for any role. *Default: yes.*
+5. **Where:** links from Incidents, After-Action Review and Exercise & Training; no sidebar entry. *Default: yes.*
+6. **Audit:** opening a replay is a read and is not audited. *Default: yes.*
+7. **Demo:** no new scenario; INC-<year>-1042 is replayed after the Phase 1 run; its acceptance spec runs with the After-Action Review spec. *Default: yes.*
+8. **🔒:** none (§101). *Default: yes.*
+
+## 104. Purpose and starting point (Site Twin: camera coverage)
+
+**Status: proposed on 2026-11-10; awaiting the product owner's approval.** Idea taken from the same open-source viewer, which draws what each camera can see and switches from a tracked item to the nearest camera.
+
+Show on the Site Twin floor plan what each CCTV camera covers, and what no working camera covers. When a camera goes offline, its view turns red and the gap it leaves shows. Selecting a zone or a sensor opens the camera that watches it. This answers a real question in a crisis: what can't we see right now?
+
+| Exists today | Where |
+|---|---|
+| The floor plan's zones as rectangles in plan units (790 × 455) | `site_zone` (TWN-01) |
+| 16 CCTV cameras, each with a zone and a status (`CAM-01`..`CAM-16`) | `site_sensor` (TWN-03) |
+| The CCTV wall: one live view per camera, offline shows NO SIGNAL; a camera opens enlarged | `screens/twin/CctvWall.tsx` |
+| SITE entries on the incident timeline when a sensor faults (TWN-03) | twin consumer |
+| Where a camera is mounted and where it points | — (not stored) |
+
+## 105. Requirements: camera coverage (TWN-08..TWN-11)
+
+| ID | Requirement | Pri. |
+|---|---|---|
+| TWN-08 | **Where each camera points.** Each CCTV camera has a mount point on the plan (`x`, `y`, plan units), a heading (degrees, 0 = up the plan, clockwise), a field of view (degrees) and a range (plan units). Seeded for the Nairobi embassy so the 16 cameras cover the gates, lobby, consular hall, courtyard and corridors as a real installation would, with at least one corner no camera sees (the plan shows the installation as it is, gaps included). Read-only in the pilot. | M |
+| TWN-09 | **Coverage on the plan.** A "Camera coverage" toggle on the floor plan draws each camera's view as a cone from its mount, clipped to its own zone's walls (no line-of-sight model beyond the zone rectangle; §108 Q3). Online cones are translucent blue; an offline or faulted camera's cone is drawn red and dashed. A zone with no online camera covering it is hatched and listed under the plan ("Not covered now: Gate 2"). The toggle is remembered for the tab. | M |
+| TWN-10 | **From a place to its camera.** Clicking a zone on the plan (with coverage on), a camera in "Sensors & systems", or a SITE entry on an incident's timeline opens the camera that watches it, enlarged, as the CCTV wall does: the online camera covering that zone, else its offline one with NO SIGNAL, else "No camera covers this zone". A SITE timeline entry links to `/twin?site=…&camera=…`. | M |
+| TWN-11 | **Coverage figures.** A KPI "Camera coverage": the share of the plan's zone area covered by at least one online camera, as a percentage, worked out on the client from TWN-08's geometry and the live statuses. It falls when a camera goes offline and recovers with it. | S |
+
+### Not in this module
+- Line of sight through walls, doors or furniture, or several floors;
+- editing camera positions from the screen;
+- video analytics of any kind: no detection, counting or tracking of people or vehicles from the cameras (§108 Q5);
+- recording or storing video.
+
+## 106. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-53 · `site_sensor` camera mount**: five nullable columns, `mount_x`, `mount_y` (integers, plan units), `heading_deg` (0–359) and `fov_deg` (10–180), and `range_u` (integer, plan units, > 0); a check that they are all set for a CCTV sensor and all null for any other kind. Seeded, then read-only: the existing `UPDATE (status, detail)` grant is unchanged, so no grant or RLS policy changes. Backups include them like every other column (D-21).
+
+Nothing here is 🔒 under D-29: no RLS, grant, security, approvals, audit, agent or channel change. The migration still waits for your approval of PC-53, as every schema change does (AGENTS.md).
+
+## 107. Acceptance for the module
+
+Playwright on the real stack, on a freshly reset demo and during NBO-SITE:
+- **Before the unrest:** coverage on shows 16 blue cones; the KPI is below 100% (the seeded blind corner) and the uncovered list names it.
+- **During NBO-SITE scene 1:** the offline camera's cone is red and dashed, the KPI falls, and if no other camera covers its zone, that zone is listed as not covered.
+- **Scene 3:** the camera recovers; the cone and the KPI return.
+- **Handoff:** clicking Gate 2 on the plan opens a Gate 2 camera enlarged; the SITE entry on INC-<year>-1042's timeline opens the faulted camera's view.
+- **The Viewer** sees the same coverage (no names are involved).
+- `make acceptance` (all existing specs) still passes.
+
+## 108. Questions for the product owner (defaults proposed)
+
+1. **Camera mounts stored:** five seeded columns on `site_sensor` (PC-53), not worked out from the zone. *Default: store them.*
+2. **A seeded gap:** the Nairobi installation has one corner no camera sees, so the feature shows something true and useful. *Default: yes.*
+3. **Geometry:** a cone clipped to the camera's zone rectangle; no wall or line-of-sight model. *Default: yes.*
+4. **Handoff:** from the plan, "Sensors & systems" and the incident timeline's SITE entries. *Default: yes.*
+5. **No video analytics:** nothing is detected or counted from the views; occupancy stays from access control and Wi-Fi presence (TWN-02). *Default: yes.*
+6. **Who sees it:** every role that sees the Site Twin. *Default: yes.*
+7. **🔒:** none; PC-53 still needs your approval as a schema change. *Default: yes.*
