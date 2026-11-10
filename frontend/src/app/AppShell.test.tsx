@@ -37,6 +37,7 @@ describe("app shell", () => {
       "Assistance Partners", // pilot module 5 (D-30, D-36)
       "Site Twin", // pilot module 13 (D-30, D-43), after Assistance Partners
       "Safety Check-in",
+      "AI Risk Copilot", // pilot module 19 (D-50), after Safety Check-in
       "Document Expiry", // pilot module 7 (D-30, D-37), under PLAN & INSIGHT (plan-pilot-dx G-9)
       "Supply Chain Risk", // pilot module 14 (D-30, D-44), after Document Expiry
       "Predictive Risk", // pilot module 16 (D-30, D-46), before Executive Overview
@@ -45,7 +46,8 @@ describe("app shell", () => {
       "Executive Overview", // pilot module 15 (D-30, D-45), last under PLAN & INSIGHT
       "Audit",
     ]);
-    for (const outOfScope of ["Copilot", "Integrations", "OSINT"]) {
+    // The Copilot is in scope since D-50.
+    for (const outOfScope of ["Integrations", "OSINT"]) {
       expect(within(nav).queryByText(new RegExp(outOfScope, "i"))).toBeNull();
     }
   });

@@ -14,6 +14,9 @@ import { SCREENS, type Screen } from "./screens";
 import { Ticker } from "./Ticker";
 import { UserMenu } from "./UserMenu";
 
+// Screens that fill the view and scroll inside themselves.
+const FULL = new Set(["/operations", "/copilot"]);
+
 function NavList() {
   const vip = useVipAccess().data?.visible ?? false;
   let group: Screen["group"] | null = null;
@@ -122,7 +125,7 @@ export function AppShell({ onLogout }: Props) {
           <UserMenu onLogout={onLogout} />
         </header>
         <Ticker />
-        <section key={pathname} className={`nx-view${current?.path === "/operations" ? " full" : ""}`}>
+        <section key={pathname} className={`nx-view${FULL.has(current?.path ?? "") ? " full" : ""}`}>
           <Outlet />
         </section>
         <PresenterBar />
