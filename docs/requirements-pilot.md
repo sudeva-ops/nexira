@@ -1100,7 +1100,7 @@ Playwright on the real stack, run on its own after a demo reset:
 
 ## 94. Purpose and starting point (AI Risk Copilot, simulated)
 
-Let people ask the platform questions in plain language and get short, sourced answers, and draft a situation report for leadership, without a language model yet. Master spec §5.15 (AI Risk Copilot, COP-01..04); the design's AI Risk Copilot screen. **Proposed, awaiting the product owner's approval.**
+Let people ask the platform questions in plain language and get short, sourced answers, and draft a situation report for leadership, without a language model yet. Master spec §5.15 (AI Risk Copilot, COP-01..04); the design's AI Risk Copilot screen. Approved by the product owner on 2026-11-10 (PR #151), with the defaults in §98.
 
 The Copilot has two parts:
 - **Grounding** (real): what an answer says comes only from the platform's own read functions, run as the person asking, with their roles and mission scope (RLS, `approvals.py`). Every statement cites the record it came from.
@@ -1150,7 +1150,7 @@ Playwright on the real stack, inside the Phase 1 run (after scene 4) or on its o
 - **Label:** every answer is labelled simulated; no request leaves the stack.
 - `make acceptance` (all existing specs) still passes.
 
-## 98. Questions for the product owner (proposed defaults)
+## 98. Questions answered by the product owner (2026-11-10: "approved")
 
 1. **Simulated now:** rule-based wording behind `llm.py`, labelled; a local model later replaces only the wording. *Default: yes.*
 2. **Question types:** the eight in COP-01; anything else is declined with the list. *Default: yes.*

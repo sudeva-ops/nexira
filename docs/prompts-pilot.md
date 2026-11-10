@@ -1063,3 +1063,37 @@ incident appears. Tests: Vitest.
 Playwright, real stack (requirements-pilot.md §92), run on its own after a demo reset. Report
 the real output; make acceptance (all specs) still passes.
 ```
+
+## Pilot module 19 · AI Risk Copilot, simulated (D-50)
+
+Requirements COP-01..08 (`docs/requirements-pilot.md` §94–98); plan `docs/plan-pilot-cop.md`. None of these prompts is 🔒.
+
+### Prompt 118 · Questions, grounding and citations (API)
+```
+COP-01..03, COP-05, COP-06. app/modules/copilot: the question types (plan §2), facts from the
+platform's read functions as the asker with a source each (§3), the Writer protocol in
+app/core/llm.py with TemplateWriter (§5); POST /api/copilot/ask; names per plan G-1; restricted
+trips never; COPILOT.ASK audited with type and references, never the text. Tests: every type,
+every sentence cited, the Viewer and a scoped Head of Mission, unknown declined, no network import.
+```
+
+### Prompt 119 · Situation report and export (API)
+```
+COP-04. The report's sections from the record, rule-based recommendations labelled (plan §4);
+POST /api/copilot/report and /report/export (COPILOT.REPORT_EXPORT). Tests: every heading,
+every sentence cited, the rules, the export audited, names per G-1.
+```
+
+### Prompt 120 · AI Risk Copilot screen
+```
+COP-07. /copilot under RESPOND after Safety Check-in (plan §6), as the design, Blueprint dark:
+the conversation with suggestions and the composer, source chips linking to records, the
+simulated label, Grounding context, Guardrails, Export as PDF after a report; the conversation
+lives in the tab. Tests: Vitest.
+```
+
+### Prompt 121 · AI Risk Copilot acceptance
+```
+Playwright, real stack (requirements-pilot.md §97; plan §7), in make acceptance's second command
+before the After-Action Review spec. Report the real output; make acceptance (all specs) still passes.
+```
