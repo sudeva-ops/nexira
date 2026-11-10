@@ -1,4 +1,4 @@
-import type { FeatureCollection, LineString } from "geojson";
+import type { FeatureCollection, LineString, Point } from "geojson";
 import { type GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 import { useEffect, useRef } from "react";
 
@@ -17,6 +17,7 @@ const SPIN_DEG_PER_S = 9;
 const ARC_DELAY_MS = 90; // one arc after another
 const ARC_DRAW_MS = 1_100;
 const PULSE_MS = 1_800;
+const COMET_MS = 2_400; // a light runs the length of each arc this often
 const START: [number, number] = [20, 15]; // where Global Operations opens
 
 function arcs(missions: Mission[], elapsed: number): FeatureCollection<LineString> {
@@ -31,7 +32,33 @@ function arcs(missions: Mission[], elapsed: number): FeatureCollection<LineStrin
   };
 }
 
-export function IntroGlobe({ missions, descend }: { missions: Mission[]; descend: boolean }) {
+/** A light running along each drawn arc, each starting at its own point. */
+function comets(missions: Mission[], elapsed: number): FeatureCollection<Point> {
+  return {
+    type: "FeatureCollection",
+    features: arcPairs(missions).flatMap(([a, b], i) => {
+      if (elapsed < i * ARC_DELAY_MS + ARC_DRAW_MS) return [];
+      const line = greatCircle([a.lat, a.lon], [b.lat, b.lon], 40);
+      const f = ((elapsed + i * 613) % COMET_MS) / COMET_MS;
+      const at = line[Math.min(line.length - 1, Math.floor(f * line.length))] ?? line[0];
+      return at ? [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: at } }] : [];
+    }),
+  };
+}
+
+export function IntroGlobe({
+  missions,
+  descend,
+  onTurn,
+}: {
+  missions: Mission[];
+  descend: boolean;
+  onTurn?: (lon: number, lat: number) => void; // the HUD's readout
+}) {
+  const turned = useRef(onTurn);
+  useEffect(() => {
+    turned.current = onTurn;
+  });
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const data = useRef(missions);
@@ -62,6 +89,7 @@ export function IntroGlobe({ missions, descend }: { missions: Mission[]; descend
         applyProjection(m, true);
         m.addSource("arcs", { type: "geojson", data: arcs([], 0), lineMetrics: true });
         m.addSource("missions", { type: "geojson", data: missionFeatures(data.current) });
+        m.addSource("comets", { type: "geojson", data: comets([], 0) });
         m.addLayer({
           id: "arcs-glow",
           type: "line",
@@ -73,6 +101,19 @@ export function IntroGlobe({ missions, descend }: { missions: Mission[]; descend
           type: "line",
           source: "arcs",
           paint: { "line-color": "#8ABBFF", "line-width": 1.2, "line-opacity": 0.8 },
+        });
+        m.addLayer({
+          id: "comets",
+          type: "circle",
+          source: "comets",
+          paint: {
+            "circle-color": "#D6E8FF",
+            "circle-radius": 2.4,
+            "circle-blur": 0.6,
+            "circle-stroke-color": "#4C90F0",
+            "circle-stroke-width": 3,
+            "circle-stroke-opacity": 0.35,
+          },
         });
         m.addLayer({
           id: "pulse",
@@ -101,6 +142,9 @@ export function IntroGlobe({ missions, descend }: { missions: Mission[]; descend
             m.setCenter([c.lng + (SPIN_DEG_PER_S * (now - last)) / 1000, c.lat]);
           }
           last = now;
+          const centre = m.getCenter();
+          turned.current?.(centre.lng, centre.lat);
+          (m.getSource("comets") as GeoJSONSource | undefined)?.setData(comets(data.current, elapsed));
           const p = (elapsed % PULSE_MS) / PULSE_MS;
           m.setPaintProperty("pulse", "circle-radius", 4 + 14 * p);
           m.setPaintProperty("pulse", "circle-opacity", 0.7 * (1 - p));

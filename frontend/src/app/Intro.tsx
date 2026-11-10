@@ -30,7 +30,15 @@ function Typed({ text, startMs }: { text: string; startMs: number }) {
   );
 }
 
+/** "015°E · 12°N", the globe's centre as it turns. */
+function bearingText(lon: number, lat: number): string {
+  const wrap = ((((lon + 180) % 360) + 360) % 360) - 180;
+  const deg = (v: number, pad: number) => String(Math.abs(Math.round(v))).padStart(pad, "0");
+  return `${deg(wrap, 3)}°${wrap < 0 ? "W" : "E"} · ${deg(lat, 2)}°${lat < 0 ? "S" : "N"}`;
+}
+
 function Playing({ onDone }: { onDone: () => void }) {
+  const [centre, setCentre] = useState("020°E · 15°N");
   const missions = useMissions().data ?? [];
   const summary = useOperationsSummary().data;
   const agents = useAgents().data?.agents.length ?? 0;
@@ -73,8 +81,24 @@ function Playing({ onDone }: { onDone: () => void }) {
       aria-label="NEXIRA"
       onClick={() => done.current()}
     >
-      <IntroGlobe missions={missions} descend={phase !== "spin"} />
+      <div className="nx-intro-stars" aria-hidden="true" />
+      <div className={`nx-intro-halo${phase === "spin" ? "" : " centred"}`} aria-hidden="true" />
+      <IntroGlobe
+        missions={missions}
+        descend={phase !== "spin"}
+        onTurn={(lon, lat) => setCentre(bearingText(lon, lat))}
+      />
       <div className="nx-intro-veil" aria-hidden="true" />
+      <div className={`nx-intro-hud${phase === "spin" ? "" : " away"}`} aria-hidden="true">
+        <i className="tl" />
+        <i className="tr" />
+        <i className="bl" />
+        <i className="br" />
+        <span className="nx-intro-hud-top">Secure session · in-country · simulated data</span>
+        <span className="nx-intro-hud-scan">
+          Global scan <b>{centre}</b>
+        </span>
+      </div>
       <div className={`nx-intro-copy${phase === "spin" ? "" : " away"}`}>
         <div className="nx-intro-mark">
           <svg viewBox="0 0 40 40" aria-hidden="true">
@@ -114,8 +138,11 @@ function Playing({ onDone }: { onDone: () => void }) {
           <Typed text={status} startMs={1_300} />
         </p>
       </div>
+      <div className="nx-intro-progress" aria-hidden="true">
+        <i style={{ animationDuration: `${INTRO_MS.fade}ms` }} />
+      </div>
       <div className="nx-intro-skip" aria-hidden="true">
-        Simulated data · press any key to skip
+        Press any key to skip
       </div>
     </div>
   );
