@@ -1165,7 +1165,7 @@ Playwright on the real stack, inside the Phase 1 run (after scene 4) or on its o
 
 ## 99. Purpose and starting point (Incident Replay)
 
-**Status: proposed on 2026-11-10; awaiting the product owner's approval.** Idea taken from an open-source globe viewer (God's Eye View, MIT), which replays an event on a timeline you can scrub. Only the idea is reused, not its code, stack or data feeds.
+Approved by the product owner on 2026-11-10 (PR #158; D-51), with the defaults in §103. Idea taken from an open-source globe viewer (God's Eye View, MIT), which replays an event on a timeline you can scrub. Only the idea is reused, not its code, stack or data feeds.
 
 Play an incident back on the map, from its first signal to now (or to its close): the signals as they arrived, the impact zone, the people exposed changing colour as they answer the check-in, and each step of the response in the timeline beside it. It is for the After-Action Review, an exercise debrief and the demo. It is worked out on read from what the platform already records. Nothing is typed in again and nothing new is stored.
 
@@ -1215,7 +1215,7 @@ Playwright on the real stack, after the Phase 1 run (INC-<year>-1042 at MONITORI
 - **Stays on the stack:** no request leaves it.
 - `make acceptance` (all existing specs) still passes.
 
-## 103. Questions for the product owner (defaults proposed)
+## 103. Questions answered by the product owner (2026-11-10: "approved")
 
 1. **Scope:** one incident at a time, from its record; nothing stored. *Default: yes.*
 2. **Positions:** people at their current place, said on screen; no location history is added. *Default: yes.*
@@ -1228,7 +1228,7 @@ Playwright on the real stack, after the Phase 1 run (INC-<year>-1042 at MONITORI
 
 ## 104. Purpose and starting point (Site Twin: camera coverage)
 
-**Status: proposed on 2026-11-10; awaiting the product owner's approval.** Idea taken from the same open-source viewer, which draws what each camera can see and switches from a tracked item to the nearest camera.
+Approved by the product owner on 2026-11-10 (PR #158; D-51), with the defaults in §108. Idea taken from the same open-source viewer, which draws what each camera can see and switches from a tracked item to the nearest camera.
 
 Show on the Site Twin floor plan what each CCTV camera covers, and what no working camera covers. When a camera goes offline, its view turns red and the gap it leaves shows. Selecting a zone or a sensor opens the camera that watches it. This answers a real question in a crisis: what can't we see right now?
 
@@ -1271,7 +1271,7 @@ Playwright on the real stack, on a freshly reset demo and during NBO-SITE:
 - **The Viewer** sees the same coverage (no names are involved).
 - `make acceptance` (all existing specs) still passes.
 
-## 108. Questions for the product owner (defaults proposed)
+## 108. Questions answered by the product owner (2026-11-10: "approved")
 
 1. **Camera mounts stored:** five seeded columns on `site_sensor` (PC-53), not worked out from the zone. *Default: store them.*
 2. **A seeded gap:** the Nairobi installation has one corner no camera sees, so the feature shows something true and useful. *Default: yes.*

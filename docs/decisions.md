@@ -196,6 +196,8 @@ Record each sign-off in the PR.
 | 17. **After-Action Review** (AAR), from the platform record (D-47) | |
 | 18. **Exercise & Training** (EXR), scored from the platform record (D-48) | |
 | 19. **AI Risk Copilot** (COP): grounded on the platform record, rule-based wording until a local model (D-50) | |
+| 20. **Incident Replay** (RPL), from the platform record (D-51) | |
+| 21. **Site Twin camera coverage** (TWN-08..11), seeded camera mounts (D-51) | |
 
 Rules:
 - **Requirements before code.** Each module gets requirements in `docs/requirements-pilot.md` and prompts in `docs/prompts-pilot.md`, approved by the product owner before any code is written. Only Mass Notification is written so far.
@@ -310,6 +312,10 @@ Rules:
 - **Grounded, cited, scoped.** Answers come only from the platform's read functions, run as the person asking (RLS, `approvals.py`); every statement cites its record; names appear only where that role sees them today.
 - **Simulated wording.** A deterministic composer behind `app/core/llm.py` writes the answer from stated templates, labelled simulated. A local model later replaces only the wording (AGR-08). No external AI API, ever.
 - **Nothing stored.** The conversation stays in the browser; each question is audited with its type and citations, not its text. A situation report is a draft with an audited export; sending it is a later decision.
+
+**D-51 · Incident Replay and Site Twin camera coverage.** Approved by the product owner on 2026-11-10 (PR #158). Requirements RPL-01 to RPL-07 (§99–103) and TWN-08 to TWN-11 (§104–108) in `docs/requirements-pilot.md`, with the defaults in §103 and §108. The ideas come from an open-source globe viewer (God's Eye View, MIT); none of its code, stack or live feeds is used.
+- **Replay from the record.** An incident is played back from what the platform already holds; nothing is stored and no schema changes. People are drawn at their current place, and the screen says so. No names, for any role.
+- **Coverage from seeded mounts.** Each CCTV camera gets a seeded mount, heading, field of view and range (PC-53, not 🔒). Coverage is a cone clipped to the camera's zone; no line-of-sight model. No video analytics of any kind.
 
 ---
 
