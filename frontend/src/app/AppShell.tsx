@@ -8,6 +8,7 @@ import { RealtimeProvider } from "../api/realtime";
 import { useVipAccess } from "../api/vip";
 
 import { Clock } from "./Clock";
+import { Intro } from "./Intro";
 import { LastEvent, LiveIndicator } from "./Heartbeat";
 import { SCREENS, type Screen } from "./screens";
 import { Ticker } from "./Ticker";
@@ -127,6 +128,7 @@ export function AppShell({ onLogout }: Props) {
         <PresenterBar />
       </main>
     </div>
+    <Intro />
     </RealtimeProvider>
   );
 }
