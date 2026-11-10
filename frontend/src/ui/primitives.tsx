@@ -17,6 +17,15 @@ export function Sev({ severity, label }: { severity: Severity; label?: string })
   return <span className={`nx-sev ${SEV_CLASS[severity]}`}>{label ?? severity}</span>;
 }
 
+/** EXR-03: on anything an exercise produced (plan-pilot-exr §8). */
+export function ExerciseTag({ on }: { on: boolean | undefined }) {
+  return on ? (
+    <span className="nx-sev crit nx-exr-tag" aria-label="Exercise">
+      EXERCISE
+    </span>
+  ) : null;
+}
+
 export function SourceChip({ source }: { source: Pick<SourceRef, "name" | "simulated"> }) {
   return <span className="nx-src">{sourceLabel(source)}</span>;
 }

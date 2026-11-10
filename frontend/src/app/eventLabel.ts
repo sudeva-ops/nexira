@@ -29,6 +29,7 @@ const EVENT_LABEL: Record<string, string> = {
   SUPPLY_UPDATED: "Supply chain updated",
   PREDICTIVE_UPDATED: "Risk forecast updated",
   AAR_UPDATED: "After-action review updated",
+  EXERCISE_UPDATED: "Exercise updated",
   PROPOSAL_CREATED: "New proposal",
   PROPOSAL_UPDATED: "Proposal decided",
   PROPOSAL_EXPIRED: "Proposal expired",

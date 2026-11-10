@@ -71,6 +71,7 @@ export interface Review {
   incident_reference: string;
   incident_title: string;
   incident_status: string;
+  exercise?: boolean; // EXR-03: from a scenario run in EXERCISE mode (D-48); the API always sends it
   status: "DRAFT" | "FINAL";
   started_at: string;
   finalised_at: string | null;
@@ -93,6 +94,7 @@ export interface ReviewSummary {
   accepted: number;
   drafts: number;
   items: number;
+  exercise?: boolean; // EXR-03: from a scenario run in EXERCISE mode (D-48); the API always sends it
 }
 
 export interface Ready {
@@ -101,6 +103,7 @@ export interface Ready {
   title: string;
   status: string;
   can_start: boolean;
+  exercise?: boolean; // EXR-03: from a scenario run in EXERCISE mode (D-48); the API always sends it
 }
 
 export interface Reviews {

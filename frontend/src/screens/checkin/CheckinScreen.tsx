@@ -15,7 +15,7 @@ import { useMe } from "../../api/me";
 import { canRecordCheckin, canRequestPartner } from "../../api/permissions";
 import { formatTime, HOME_TZ } from "../../app/time";
 import { initials, personTypeLabel } from "../../ui/format";
-import { Card, Kpi } from "../../ui/primitives";
+import { Card, ExerciseTag, Kpi } from "../../ui/primitives";
 import { Donut } from "./Donut";
 import { escalationText } from "./escalation";
 import { type RequestFor, RequestDialog } from "../partners/RequestDialog";
@@ -60,8 +60,14 @@ export function CheckinScreen() {
           aria-label="Check-in"
           value={campaign.id}
           onChange={(e) => setParams({ campaign: e.currentTarget.value })}
-          options={checkins.map((x) => ({ value: x.id, label: `${x.reference} · ${x.recipients} recipients` }))}
+          options={checkins.map((x) => ({ value: x.id, label: `${x.reference} · ${x.recipients} recipients${x.exercise ? " · EXERCISE" : ""}` }))}
         />
+      )}
+      {summary.exercise && (
+        <div className="nx-row nx-mb">
+          <ExerciseTag on />
+          <span className="nx-dim">This check-in belongs to an exercise; it is left out of leadership figures.</span>
+        </div>
       )}
       <div className="nx-g4" aria-label="Personnel figures">
         <Kpi

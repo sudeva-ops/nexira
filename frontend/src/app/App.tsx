@@ -23,6 +23,7 @@ import { DecisionQueueScreen } from "../screens/queue/DecisionQueueScreen";
 import { BriefingScreen } from "../screens/executive/BriefingScreen";
 import { AarPrint } from "../screens/aar/AarPrint";
 import { AarScreen } from "../screens/aar/AarScreen";
+import { ExercisesScreen } from "../screens/exercises/ExercisesScreen";
 import { ExecutiveScreen } from "../screens/executive/ExecutiveScreen";
 import { PredictiveScreen } from "../screens/predictive/PredictiveScreen";
 import { SupplyScreen } from "../screens/supply/SupplyScreen";
@@ -53,6 +54,7 @@ const BUILT: Record<string, ReactElement> = {
   "/documents": <DocumentsScreen />,
   "/supply": <SupplyScreen />,
   "/predictive": <PredictiveScreen />,
+  "/exercises": <ExercisesScreen />,
   "/aar": <AarScreen />,
   "/executive": <ExecutiveScreen />,
   "/audit": <AuditScreen />,

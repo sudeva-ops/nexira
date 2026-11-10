@@ -6,6 +6,7 @@ export interface Campaign {
   id: string;
   reference: string;
   incident_id: string | null;
+  exercise?: boolean; // EXR-03: from a scenario run in EXERCISE mode (D-48); the API always sends it
   campaign_type: "ALERT" | "CHECKIN" | "ADVISORY" | "TEST";
   message: string;
   channels: string[];
@@ -31,6 +32,7 @@ export interface CheckinSummary {
   campaign_id: string;
   reference: string;
   incident_id: string | null;
+  exercise?: boolean; // EXR-03: from a scenario run in EXERCISE mode (D-48); the API always sends it
   status: string;
   sent_at: string | null;
   escalate_after_s: number;

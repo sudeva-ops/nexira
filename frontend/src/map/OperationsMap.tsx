@@ -272,8 +272,9 @@ export function OperationsMap({
       el.style.setProperty("--c", SEVERITY_COLOUR[incident.severity]);
       el.style.setProperty("--pulse", PULSE_BY_SEVERITY[incident.severity] ?? "2.4s");
       el.classList.toggle("nx-hazard", isHazard(incident.category)); // its own icon (HZ-09)
-      el.setAttribute("aria-label", `${incident.reference} · ${incident.severity} · ${incident.title}`);
-      el.title = `${incident.reference} · ${incident.title}`;
+      const drill = incident.exercise ? " · EXERCISE" : ""; // EXR-03
+      el.setAttribute("aria-label", `${incident.reference} · ${incident.severity} · ${incident.title}${drill}`);
+      el.title = `${incident.reference} · ${incident.title}${drill}`;
     }
     for (const [id, marker] of markers.current) {
       if (!seen.has(id)) {

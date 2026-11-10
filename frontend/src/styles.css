@@ -3033,3 +3033,40 @@ tr.nx-flash-b > td {
     padding: 0;
   }
 }
+
+/* Exercise & Training (EXR-08, plan-pilot-exr §8): the design's 1.3fr / 1fr split. */
+.nx-exr {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .nx-exr {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nx-exr-score {
+  gap: 6px;
+}
+
+.nx-exr-dim {
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.nx-exr-launch {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nx-exr-tag {
+  margin-left: 4px;
+  vertical-align: middle;
+}
+
+.nx-exr-banner {
+  text-decoration: none;
+}
