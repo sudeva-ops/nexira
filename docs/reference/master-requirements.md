@@ -100,7 +100,7 @@ NEXIRA is a sovereign, AI-assisted, modular resilience platform that turns scatt
 |---|---|---|---|---|
 | 1 | Phase 1 · MVP | Core loop on simulated data | Platform & admin, Decision Queue, AI Agents (4), Global Operations, Incidents, People & Sites, Playbooks, Safety Check-in, Scenario engine | 12 weeks |
 | 2 | Phase 2 · Pilot | Real data and travel | Real connectors (1 intel feed, HR, SMS/email, IdP), Journey Management, Air Travel Tracking, Mass Notification, Local-Language OSINT, Assistance Partners, AI Risk Copilot, Integrations console, agents: Travel & Air, Briefing | 10–12 weeks |
-| 3 | Phase 3 · Response | Crisis operations depth | Evacuation, Consular Crisis Portal, VIP & Delegation, Fleet & Assets, Site Twin, Health Intelligence, Natural Hazards & Climate, Cyber-Physical, Wellbeing & Family Liaison, agents: Evacuation, Cyber-Physical | 12–16 weeks |
+| 3 | Phase 3 · Response | Crisis operations depth | Evacuation, Consular Crisis Portal, VIP & Delegation, Fleet & Assets, Site Twin, Health Intelligence, Natural Hazards & Climate, Cyber-Physical, agents: Evacuation, Cyber-Physical | 12–16 weeks |
 | 4 | Phase 4 · Insight | Prevention, compliance, learning | Predictive Risk, Supply Chain, Continuity & Compliance, Document Expiry, Exercise & Training, After-Action Review, Executive Overview, Deployment & Security console, agents: Forecast, Compliance & Readiness | 10–12 weeks |
 
 Durations are planning estimates for 1–2 developers using AI coding tools, with part-time product, security and design support; not a commercial commitment.
@@ -118,7 +118,7 @@ Durations are planning estimates for 1–2 developers using AI coding tools, wit
 | 7 | Travel Desk | Trip approvals, flight diversions, rebooking | 2 |
 | 8 | Consular Officer | Citizen communications, crisis portal, family enquiries | 2 |
 | 9 | Protocol Officer | VIP visit programmes | 3 |
-| 10 | HR / Welfare Officer | Documents, welfare referrals, next of kin | 3 |
+| 10 | HR Officer | Documents | 3 |
 | 11 | Fleet / Logistics Officer | Vehicles, fuel, suppliers | 3 |
 | 12 | BCM Owner | Continuity plans, drills, compliance | 4 |
 | 13 | Executive | Leadership dashboards and briefings | 4 |
@@ -158,7 +158,7 @@ Priority: M = Must, S = Should, C = Could. Requirement IDs follow <module code>-
 | 21 | HLT | Health Intelligence | 3 | Medical risk including WHO advisories. |
 | 22 | HAZ | Natural Hazards & Climate | 3 | Live hazards and long-term exposure. |
 | 23 | CPX | Cyber-Physical Correlation | 3 | Link cyber and physical security events. |
-| 24 | WEL | Wellbeing & Family Liaison | 3 | Post-incident welfare. |
+| 24 | — | *Removed: Wellbeing & Family Liaison (D-49, 2026-11-10)* | — | — |
 | 25 | PRD | Predictive Risk | 4 | Forecast risk before it materialises. |
 | 26 | SUP | Supply Chain & Third-Party Risk | 4 | Suppliers and logistics routes. |
 | 27 | BCM | Continuity & Compliance | 4 | Plans, drills and duty of care. |
@@ -499,17 +499,9 @@ Link cyber and physical security events.
 
 Data: security_event, cpx_case   ·   Integrations: SIEM, email gateway, access control, VMS
 
-## 5.25 Wellbeing & Family Liaison (WEL) · Phase 3
+## 5.25 Removed
 
-Post-incident welfare.
-
-| # | ID | Requirement | Pri. |
-|---|---|---|---|
-| 1 | WEL-01 | Welfare status of affected staff; confidential counselling referral with consent | M |
-| 2 | WEL-02 | Family liaison log and next-of-kin contact | M |
-| 3 | WEL-03 | Welfare data restricted to HR welfare role | M |
-
-Data: welfare_case, family_contact   ·   Integrations: Welfare partner
+Wellbeing & Family Liaison (WEL-01..03) was removed by the product owner on 2026-11-10 (`docs/decisions.md` D-49). The section number is kept so later references stay valid.
 
 ## 5.26 Predictive Risk (PRD) · Phase 4
 
@@ -658,7 +650,7 @@ Data: (ops data)   ·   Integrations: Monitoring
 |---|---|---|
 | 1 | Sovereignty | Deployable on-premise, sovereign cloud, hybrid or air-gapped; no runtime dependency on public SaaS |
 | 2 | Security | OIDC + MFA; TLS 1.3; AES-256 at rest; customer-managed keys (HSM); secrets vault; OWASP ASVS L2 target; annual penetration test |
-| 3 | Privacy | Data minimisation; role-restricted welfare, medical and family data; consent for referrals; retention policies |
+| 3 | Privacy | Data minimisation; role-restricted medical data; retention policies |
 | 4 | Audit | Append-only, hash-chained audit; default retention 7 years |
 | 5 | Performance | Signal → fused incident ≤ 5 s; exposure ≤ 5 s; UI update ≤ 2 s; notification to handset median < 10 s |
 | 6 | Scale | Phase 1: 50 users, 10k people, 1k signals/h. Production: 500 users, 100k people, 50k signals/h, 1M SIEM events/day |
@@ -720,7 +712,7 @@ Phase 1 tables are fully defined in nexira_schema.sql. Later-phase entities are 
 | 16 | Sites | site_floor, site_zone, sensor | 3 |
 | 17 | Health & hazards | health_advisory, medical_facility, hazard_event, climate_exposure | 3 |
 | 18 | Cyber-physical | security_event, cpx_case | 3 |
-| 19 | Welfare | welfare_case, family_contact | 3 |
+| 19 | — | *Removed (D-49)* | — |
 | 20 | Prediction | risk_index, forecast | 4 |
 | 21 | Supply chain | supplier, logistics_route | 4 |
 | 22 | Continuity | bcp_plan, bcp_function, drill | 4 |
