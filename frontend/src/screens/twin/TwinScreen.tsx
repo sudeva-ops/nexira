@@ -18,6 +18,7 @@ import {
 } from "../../api/twin";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { CctvWall } from "./CctvWall";
 
 const KINDS: OccupantKind[] = ["STAFF", "GUARD", "VISITOR"];
 const ACCESS = new Set(["GATE", "BADGE_READER"]);
@@ -332,15 +333,18 @@ export function TwinScreen() {
           <Banner twin={shown} />
           <Kpis twin={shown} />
           <div className="nx-twn-grid">
-            <Card
-              icon="grid-view"
-              title={`${shown.site.name} · ground floor`}
-              sub="Live occupancy from access control + Wi-Fi presence (simulated)"
-            >
-              <div className="nx-bd nx-twn-canvas">
-                <Plan twin={shown} />
-              </div>
-            </Card>
+            <div className="nx-col">
+              <Card
+                icon="grid-view"
+                title={`${shown.site.name} · ground floor`}
+                sub="Live occupancy from access control + Wi-Fi presence (simulated)"
+              >
+                <div className="nx-bd nx-twn-canvas">
+                  <Plan twin={shown} />
+                </div>
+              </Card>
+              <CctvWall twin={shown} />
+            </div>
             <div className="nx-col">
               <SensorsCard twin={shown} />
               <OccupancyCard twin={shown} />

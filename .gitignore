@@ -16,6 +16,10 @@ backups/
 infra/helm/.rendered.yaml
 # tiles (built by `make tiles`)
 infra/tiles/
+# CCTV clips (built by `make cctv-clips`; free stock video, never committed)
+infra/cctv-cache/
+frontend/public/cctv/*.mp4
+frontend/public/cctv/CREDITS.md
 # os / editor
 .DS_Store
 .idea/
