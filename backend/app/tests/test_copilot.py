@@ -103,6 +103,7 @@ async def test_names_only_for_roles_that_record_answers_at_the_mission(
 ) -> None:
     body = await ask(client, idp, "Who has not responded to the check-in?", sub)
     said = texts(body)
+    assert said.startswith("About INC-")  # which incident, before the figures
     assert "of 3 personnel, 1 safe, 1 need help and 1 not yet answered" in said
     assert ("Not yet answered: Hana." in said) is named
     assert ("Asked for help: Grace." in said) is named
@@ -171,7 +172,8 @@ async def test_each_question_is_audited_without_its_text(
         ).one()
     assert row.actor_type == "USER"
     assert row.details["kind"] == "PEOPLE"
-    assert row.details["references"] == [world.reference]
+    incident, checkin = row.details["references"]  # which incident, then its check-in
+    assert (incident[:4], checkin) == ("INC-", world.reference)
     assert "Hana" not in str(row.details)
     assert question not in str(row.details)
 

@@ -125,15 +125,18 @@ test("AI Risk Copilot acceptance: situation, names by role, unknown, report, aud
   ).toHaveAttribute("href", `/incidents?id=${incident.id}`);
 
   // --- 2. Names for the Duty Officer, counts for the Viewer (COP-03; plan G-1: A) --------------
-  await page
-    .getByRole("button", { name: "Who has not responded to the check-in?" })
-    .click();
+  // Named by reference: after the pilot specs the latest check-in is another incident's, which
+  // is what the bare suggestion answers (and the answer says which incident it is about).
+  const people = `Who has not responded to the check-in for ${INCIDENT}?`;
+  await page.getByLabel("Question").fill(people);
+  await page.keyboard.press("Enter");
   const second = answers.nth(1);
+  await expect(second).toContainText(`About ${INCIDENT}`);
   for (const name of [...pending, ...needHelp])
     await expect(second).toContainText(name);
   const asViewer = (await (
     await viewer.post("/api/copilot/ask", {
-      question: "Who has not responded to the check-in?",
+      question: people,
     })
   ).json()) as Answer;
   const viewerText = asViewer.sentences.map((s) => s.text).join(" ");
