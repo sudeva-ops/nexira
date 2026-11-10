@@ -181,6 +181,23 @@ async def _systems(
     return out
 
 
+MOUNT_COLUMNS = ("mount_x", "mount_y", "heading_deg", "fov_deg", "range_u")  # PC-53
+
+
+def _mount(s: SiteSensor) -> schemas.MountOut | None:
+    if (
+        s.mount_x is None
+        or s.mount_y is None
+        or s.heading_deg is None
+        or s.fov_deg is None
+        or s.range_u is None
+    ):
+        return None  # not a camera: the database keeps all five or none
+    return schemas.MountOut(
+        x=s.mount_x, y=s.mount_y, heading_deg=s.heading_deg, fov_deg=s.fov_deg, range_u=s.range_u
+    )
+
+
 def _counts(
     zones: list[SiteZone], occupants: list[SitePresence], sensors: list[SiteSensor]
 ) -> schemas.CountsOut:
@@ -317,6 +334,7 @@ async def twin(session: AsyncSession, user: CurrentUser, site_id: uuid.UUID) -> 
                 detail=s.detail,
                 status_at=s.status_at,
                 online=s.status in ONLINE,
+                mount=_mount(s),
             )
             for s in sensors
         ],
@@ -607,6 +625,10 @@ class RouteIn:
     exit_zone: str
 
 
+# (x, y, heading, field of view, range) in plan units (PC-53).
+Mount = tuple[int, int, int, int, int]
+
+
 @dataclass(frozen=True)
 class SensorIn:
     code: str
@@ -614,6 +636,7 @@ class SensorIn:
     label: str
     zone: str | None
     detail: str | None = None
+    mount: Mount | None = None  # CCTV only
 
 
 @dataclass(frozen=True)
@@ -677,6 +700,7 @@ async def ensure_plan(session: AsyncSession, plan: PlanIn, actor: Actor = SYSTEM
                 kind=s.kind,
                 label=s.label,
                 detail=s.detail,
+                **(dict(zip(MOUNT_COLUMNS, s.mount, strict=True)) if s.mount else {}),
             )
         )
     for label, done_by in plan.items:

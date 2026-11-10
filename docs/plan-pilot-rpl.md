@@ -61,7 +61,7 @@ Migration 0018: the five columns and the CHECK (all set for CCTV, all null other
 | CAM-07 | Consular hall | 317, 267 | 120 | 90 | 280 |
 | CAM-08 | Consular hall | 573, 383 | 300 | 90 | 280 |
 | CAM-09 | Chancery | 132, 32 | 135 | 90 | 220 |
-| CAM-10 | Chancery | 132, 248 | 60 | 70 | 200 |
+| CAM-10 | Chancery | 132, 248 | 70 | 70 | 280 |
 | CAM-11 | Conference | 417, 157 | 125 | 100 | 190 |
 | CAM-12 | Comms / IT | 768, 32 | 235 | 100 | 200 |
 | CAM-13 | Safe room | 592, 147 | 125 | 100 | 210 |
@@ -70,6 +70,8 @@ Migration 0018: the five columns and the CHECK (all set for CCTV, all null other
 | CAM-16 | Ambassador suite | 417, 32 | 125 | 100 | 200 |
 
 The seeded gap (§108 Q2): the chancery's north-east corner, which neither CAM-09 nor CAM-10 reaches. Prompt 124 tunes these numbers if the measured coverage differs, and the test states the result.
+
+**Tuned in Prompt 124:** as first planned (heading 60, range 200), CAM-10 left the chancery's whole east strip uncovered, not just its north-east corner. At heading 70 and range 280 the gap is the corner (about 7% of the chancery). Measured on the §5 grid: the site 96% covered, 95% with CAM-07 offline, the consular hall still covered by CAM-08.
 
 ## 5. Coverage (TWN-09, TWN-11)
 

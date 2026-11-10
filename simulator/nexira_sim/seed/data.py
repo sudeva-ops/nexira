@@ -1438,14 +1438,34 @@ TWIN_CAMERA_ZONES = ["g1", "g1", "g2", "g2", "lob", "lob", "cons", "cons",
 TWIN_DOOR_ZONES = ["ch", "ch", "ch", "amb", "conf", "comms", "comms", "safe",
                    "safe", "lob", "lob", "cons", "cons", "must", "g1", "g2"]  # fmt: skip
 TWIN_ALARM_ZONES = ["ch", "amb", "conf", "comms", "safe", "lob", "cons", "must"]
-# (code, kind, label, zone, detail)
-TWIN_SENSORS: list[tuple[str, str, str, str | None, str | None]] = [
-    ("G1-MAIN", "GATE", "Gate 1 · main", "g1", "Open · screening"),
-    ("G2-READER", "BADGE_READER", "Gate 2 · badge reader", "g2", "Online"),
-    ("SAFE-ROOM", "SAFE_ROOM", "Safe room", "safe", "Ready"),
-    *[(f"CAM-{n:02d}", "CCTV", f"Camera {n}", z, None) for n, z in enumerate(TWIN_CAMERA_ZONES, 1)],
-    *[(f"DOOR-{n:02d}", "ACCESS", f"Door {n}", z, None) for n, z in enumerate(TWIN_DOOR_ZONES, 1)],
-    *[(f"PANIC-{n:02d}", "ALARM", f"Panic alarm {n}", z, None)
+# Where each camera is mounted and points (PC-53, TWN-08; docs/plan-pilot-rpl.md §4), in the
+# order of TWIN_CAMERA_ZONES: (x, y, heading, field of view, range) in plan units, heading 0 up
+# the plan and clockwise. Migration 0018 fills the same values into a database seeded before it.
+# The chancery's north-east corner is the one blind spot (§108 Q2).
+TWIN_CAMERA_MOUNTS: list[tuple[int, int, int, int, int]] = [
+    (22, 322, 135, 90, 120), (113, 383, 315, 90, 120),    # Gate 1
+    (682, 342, 120, 80, 110), (768, 383, 290, 80, 110),   # Gate 2
+    (132, 267, 135, 90, 200), (298, 383, 315, 90, 200),   # Lobby
+    (317, 267, 120, 90, 280), (573, 383, 300, 90, 280),   # Consular hall
+    (132, 32, 135, 90, 220), (132, 248, 70, 70, 280),     # Chancery
+    (417, 157, 125, 100, 190),                            # Conference
+    (768, 32, 235, 100, 200),                             # Comms / IT
+    (592, 147, 125, 100, 210),                            # Safe room
+    (592, 267, 105, 90, 190), (768, 323, 285, 90, 190),   # Muster
+    (417, 32, 125, 100, 200),                             # Ambassador suite
+]  # fmt: skip
+# (code, kind, label, zone, detail, camera mount)
+TWIN_SENSORS: list[
+    tuple[str, str, str, str | None, str | None, tuple[int, int, int, int, int] | None]
+] = [
+    ("G1-MAIN", "GATE", "Gate 1 · main", "g1", "Open · screening", None),
+    ("G2-READER", "BADGE_READER", "Gate 2 · badge reader", "g2", "Online", None),
+    ("SAFE-ROOM", "SAFE_ROOM", "Safe room", "safe", "Ready", None),
+    *[(f"CAM-{n:02d}", "CCTV", f"Camera {n}", z, None, m)
+      for n, (z, m) in enumerate(zip(TWIN_CAMERA_ZONES, TWIN_CAMERA_MOUNTS, strict=True), 1)],
+    *[(f"DOOR-{n:02d}", "ACCESS", f"Door {n}", z, None, None)
+      for n, z in enumerate(TWIN_DOOR_ZONES, 1)],
+    *[(f"PANIC-{n:02d}", "ALARM", f"Panic alarm {n}", z, None, None)
       for n, z in enumerate(TWIN_ALARM_ZONES, 1)],
 ]  # fmt: skip
 # (label, seeded done by the seeded Security Officer: G-7). The fourth stays open (G-6).

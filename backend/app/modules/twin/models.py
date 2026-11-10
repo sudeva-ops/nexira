@@ -71,7 +71,8 @@ class SitePresence(Base):
 
 
 class SiteSensor(Base):
-    """A sensor or system of a site (PC-42, TWN-03); only status and detail change."""
+    """A sensor or system of a site (PC-42, TWN-03); only status and detail change. A camera
+    carries its mount (PC-53, TWN-08)."""
 
     __tablename__ = "site_sensor"
 
@@ -90,6 +91,12 @@ class SiteSensor(Base):
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
     created_at: Mapped[datetime] = created_at()
+    # PC-53 (TWN-08): a camera's mount, in plan units; all set for CCTV, all null otherwise.
+    mount_x: Mapped[int | None] = mapped_column(Integer)
+    mount_y: Mapped[int | None] = mapped_column(Integer)
+    heading_deg: Mapped[int | None] = mapped_column(Integer)  # 0 = up the plan, clockwise
+    fov_deg: Mapped[int | None] = mapped_column(Integer)
+    range_u: Mapped[int | None] = mapped_column(Integer)
 
 
 class SiteReadinessItem(Base):

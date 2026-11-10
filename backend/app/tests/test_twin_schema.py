@@ -382,13 +382,60 @@ async def test_a_sensor_changes_only_status_and_detail(
         await world.sensor()
 
 
+MOUNT = {"mount_x": 132, "mount_y": 32, "heading_deg": 135, "fov_deg": 90, "range_u": 220}
+
+
+async def test_a_camera_has_a_mount_and_nothing_else_does(world: World) -> None:
+    """PC-53 (TWN-08): all five set for CCTV, all null otherwise; within range."""
+    assert await world.sensor("CAM-01", kind="CCTV", zone_id=world.chancery, **MOUNT)
+    with pytest.raises(CHECK, match="site_sensor_mount_check"):
+        await world.sensor("CAM-02", kind="CCTV", zone_id=world.chancery)
+    with pytest.raises(CHECK, match="site_sensor_mount_check"):
+        await world.sensor(
+            "CAM-03", kind="CCTV", zone_id=world.chancery, **{**MOUNT, "fov_deg": None}
+        )
+    with pytest.raises(CHECK, match="site_sensor_mount_check"):
+        await world.sensor("DOOR-01", kind="ACCESS", **MOUNT)
+    with pytest.raises(CHECK, match="site_sensor_mount_check"):
+        await world.sensor("PANIC-01", kind="ALARM", heading_deg=90)
+    for column, bad in (
+        ("mount_x", -1),
+        ("mount_y", 10001),
+        ("heading_deg", 360),
+        ("fov_deg", 9),
+        ("fov_deg", 181),
+        ("range_u", 0),
+    ):
+        with pytest.raises(CHECK, match=f"site_sensor_{column}_check"):
+            await world.sensor(
+                "CAM-04", kind="CCTV", zone_id=world.chancery, **{**MOUNT, column: bad}
+            )
+
+
+async def test_a_mount_is_fixed_once_seeded(world: World, owner: asyncpg.Connection) -> None:
+    """The app has no grant on the mount; the owner is refused by the guard (defence in depth).
+    The status still changes."""
+    await world.sensor("CAM-01", kind="CCTV", zone_id=world.chancery, **MOUNT)
+    for column in MOUNT:
+        with pytest.raises(DENIED):
+            await world.conn.execute(f"UPDATE site_sensor SET {column} = {column} + 1")
+        with pytest.raises(REFUSED, match="only the status and detail change"):
+            await owner.execute(f"UPDATE site_sensor SET {column} = {column} + 1")
+    await world.conn.execute("UPDATE site_sensor SET status = 'OFFLINE', detail = 'Cable cut'")
+    row = await world.conn.fetchrow(
+        "SELECT status, mount_x, mount_y, heading_deg, fov_deg, range_u FROM site_sensor"
+    )
+    assert row is not None
+    assert tuple(row) == ("OFFLINE", *MOUNT.values())
+
+
 async def test_a_sensor_belongs_to_this_site(db: DbUrls, world: World) -> None:
     with pytest.raises((FK, REFUSED)):
-        await world.sensor("CAM-01", kind="CCTV", zone_id=world.elsewhere)
+        await world.sensor("CAM-01", kind="CCTV", zone_id=world.elsewhere, **MOUNT)
     assert await world.sensor("ALARM-01", kind="ALARM", zone_id=None)  # site-wide
     theirs, _, _ = await _other_tenant(db, world)
     with pytest.raises(REFUSED, match="site sensor: no such site"):
-        await world.sensor("CAM-02", kind="CCTV", site_id=theirs, zone_id=None)
+        await world.sensor("CAM-02", kind="CCTV", site_id=theirs, zone_id=None, **MOUNT)
 
 
 async def test_a_readiness_item_is_done_once_by_someone_of_this_tenant(
@@ -522,7 +569,7 @@ async def test_the_database_writes_every_time_even_when_forged(
         )
         sensor_id = await world.conn.fetchval(
             "INSERT INTO site_sensor (tenant_id, site_id, code, kind, label, status_at, "
-            "created_at) VALUES (current_tenant_id(), $1, 'CAM-01', 'CCTV', 'Camera 1', "
+            "created_at) VALUES (current_tenant_id(), $1, 'PANIC-01', 'ALARM', 'Panic alarm 1', "
             "$2::timestamptz, $2::timestamptz) RETURNING id",
             world.site,
             forged,
