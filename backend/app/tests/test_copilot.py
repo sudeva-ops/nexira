@@ -6,6 +6,7 @@ PostgreSQL, as nexira_api, on the check-in tests' Nairobi world."""
 
 import ast
 import pathlib
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
@@ -16,6 +17,7 @@ from app.core.db import tenant_session
 from app.modules.audit.models import AuditLog
 from app.modules.copilot.intents import Kind, classify
 from app.tests.auth_helpers import Idp
+from app.tests.intel_helpers import ingest, signal
 from app.tests.test_checkin import World, answer, make_world
 
 
@@ -100,6 +102,22 @@ async def test_names_only_for_roles_that_record_answers_at_the_mission(
     assert ("Not yet answered: Hana." in said) is named
     assert ("Asked for help: Grace." in said) is named
     assert all(s["sources"] for s in body["sentences"])
+
+
+async def test_people_without_a_place_go_to_the_latest_check_in(
+    client: AsyncClient, idp: Idp, world: World
+) -> None:
+    """A newer ACTIVE incident with no check-in (found on the demo stack: the Paris strike) must
+    not take the question."""
+    paris = signal("DATAMINR", "High", where=(48.86, 2.35), place="Paris")
+    paris.payload["occurred_at"] = datetime.now(UTC).isoformat()
+    fused = (await ingest(idp.engine, idp.tenant_id, paris)).fused
+    assert fused is not None
+    assert fused.created
+    said = texts(await ask(client, idp, "Who has not responded to the check-in?"))
+    assert f"Check-in {world.reference}: of 3 personnel" in said
+    overview = texts(await ask(client, idp, "Tell me about the situation"))
+    assert overview.startswith("2 incidents active, the worst first.")
 
 
 async def test_unknown_and_help_are_answered_without_a_source(

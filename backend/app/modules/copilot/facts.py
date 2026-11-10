@@ -161,7 +161,9 @@ async def find_incident(
     session: AsyncSession, q: Question, missions: list[MissionOut], *, fallback: bool
 ) -> IncidentOut | None:
     """By reference; else the incident at a named mission (the worst ACTIVE, else the latest);
-    else, with fallback, the worst ACTIVE incident, then the one with the latest check-in."""
+    else, with fallback, the worst ACTIVE incident, then the one with the latest check-in. A
+    question about people goes to the latest check-in's incident first: an incident with no
+    check-in cannot answer it."""
     every = await _incidents(session)
     if q.reference:
         return next((i for i in every if i.reference == q.reference), None)
@@ -173,10 +175,12 @@ async def find_incident(
         return (active or latest)[0] if at else None
     if not fallback:
         return None
+    latest = await session.scalar(_LATEST_CHECKIN)
+    if q.kind is Kind.PEOPLE and latest is not None:
+        return next((i for i in every if i.id == latest), None)
     active = [i for i in every if i.status == "ACTIVE"]
     if active:
         return active[0]  # list_incidents is worst first
-    latest = await session.scalar(_LATEST_CHECKIN)
     return next((i for i in every if i.id == latest), None)
 
 
