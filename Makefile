@@ -72,6 +72,8 @@ acceptance: env reset-demo up
 	  e2e/hl-acceptance.spec.ts e2e/hz-acceptance.spec.ts e2e/vip-acceptance.spec.ts \
 	  e2e/twn-acceptance.spec.ts e2e/sup-acceptance.spec.ts \
 	  e2e/exe-acceptance.spec.ts e2e/prd-acceptance.spec.ts
+	# The Copilot reads the record the specs above left, before After-Action Review changes it.
+	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/cop-acceptance.spec.ts
 	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/aar-acceptance.spec.ts
 	# Exercise & Training (§92, §93 Q12): on its own, after a second reset.
 	$(MAKE) reset-demo

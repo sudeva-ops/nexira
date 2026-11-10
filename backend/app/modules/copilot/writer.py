@@ -120,7 +120,9 @@ class TemplateWriter:
                         f"No check-in has been sent for {incident.reference}.", (incident.source,)
                     )
                 ]
-            return checkin_sentences(facts.checkins[0])
+            # Which incident: with several, the latest check-in's may not be the one in mind.
+            about = Sentence(f"About {incident_phrase(incident)}.", (incident.source,))
+            return [about, *checkin_sentences(facts.checkins[0])]
         if kind is Kind.TRAVEL:
             return self._travel(facts, incident)
         if kind is Kind.REPORT:
