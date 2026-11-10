@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import type { Occupant, Sensor, Twin, Zone } from "../../api/twin";
@@ -83,7 +83,7 @@ describe("the CCTV wall", () => {
   it("counts who is in view, says NO SIGNAL when offline, and enlarges a camera", async () => {
     render(<CctvWall twin={twin()} />);
     const feed = (code: string) => document.querySelector(`.nx-cctv-tile [data-camera="${code}"]`) as HTMLElement;
-    expect(feed("CAM-05")).toHaveTextContent("2 in view");
+    expect(feed("CAM-05")).toHaveTextContent("2 in zone");
     expect(feed("CAM-05")).toHaveTextContent("CAM-05 · LOBBY & RECEPTION");
     expect(feed("CAM-07")).toHaveTextContent("NO SIGNAL");
     expect(feed("CAM-07")).not.toHaveTextContent("REC");
@@ -91,6 +91,23 @@ describe("the CCTV wall", () => {
     const dialog = await screen.findByRole("dialog");
     expect(within(dialog).getByText("CAM-05 · Lobby & reception")).toBeInTheDocument();
     expect(dialog.querySelector(".nx-cctv-feed.large")).toHaveTextContent(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC/);
+  });
+
+  it("plays each zone kind's clip, mirrors a zone's second camera, and draws when a clip is missing", async () => {
+    render(<CctvWall twin={twin()} />);
+    const video = (code: string) =>
+      document.querySelector(`.nx-cctv-tile [data-camera="${code}"] video`) as HTMLVideoElement | null;
+    expect(video("CAM-01")?.getAttribute("src")).toBe("/cctv/gate.mp4");
+    expect(video("CAM-05")?.getAttribute("src")).toBe("/cctv/lobby.mp4");
+    expect(video("CAM-01")?.muted).toBe(true);
+    expect(video("CAM-07")).toBeNull(); // offline: static, no clip
+    await userEvent.click(screen.getByRole("button", { name: "Show all 8" }));
+    expect(video("CAM-08")).toHaveClass("mirrored"); // the consular hall's second camera
+    expect(video("CAM-01")).not.toHaveClass("mirrored");
+    expect(video("CAM-03")).toHaveClass("mirrored"); // the second gate: the same clip, flipped
+    fireEvent.error(video("CAM-05") as HTMLVideoElement);
+    expect(video("CAM-05")).toBeNull(); // no lobby clip: the generated view
+    expect(document.querySelector('.nx-cctv-tile [data-camera="CAM-05"] canvas')).not.toBeNull();
   });
 
   it("falls back to the first cameras when none is at a key zone, and hides without cameras", () => {

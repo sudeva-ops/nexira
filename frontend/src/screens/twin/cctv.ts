@@ -43,21 +43,43 @@ const AREA: Record<ZoneKind, [number, number, number, number]> = {
 };
 
 /** How much people move: guards hold their post, visitors drift, staff work. */
-const RESTLESS: Record<OccupantKind, number> = { GUARD: 0.15, STAFF: 0.45, VISITOR: 0.8 };
+const RESTLESS: Record<OccupantKind, number> = {
+  GUARD: 0.15,
+  STAFF: 0.45,
+  VISITOR: 0.8,
+};
 
-export function walkers(seed: string, zone: ZoneKind, kinds: OccupantKind[]): Walker[] {
+export function walkers(
+  seed: string,
+  zone: ZoneKind,
+  kinds: OccupantKind[],
+): Walker[] {
   const r = rng(seed);
   const [u0, u1, v0, v1] = AREA[zone];
   const at = () => [u0 + r() * (u1 - u0), v0 + r() * (v1 - v0)] as const;
   return kinds.slice(0, 24).map((kind) => {
     const [u, v] = at();
     const [tu, tv] = at();
-    return { kind, u, v, tu, tv, speed: 0.05 + r() * 0.06, pause: r() * 3, phase: r() * 6 };
+    return {
+      kind,
+      u,
+      v,
+      tu,
+      tv,
+      speed: 0.05 + r() * 0.06,
+      pause: r() * 3,
+      phase: r() * 6,
+    };
   });
 }
 
 /** Move everyone on by dt seconds: walk to a point, stand a while, pick another. */
-export function step(people: Walker[], zone: ZoneKind, dt: number, r: () => number): void {
+export function step(
+  people: Walker[],
+  zone: ZoneKind,
+  dt: number,
+  r: () => number,
+): void {
   const [u0, u1, v0, v1] = AREA[zone];
   for (const p of people) {
     if (p.pause > 0) {
@@ -91,13 +113,24 @@ export function step(people: Walker[], zone: ZoneKind, dt: number, r: () => numb
 const BACK = { x0: W * 0.27, x1: W * 0.73, y0: H * 0.1, y1: H * 0.46 }; // the far wall
 
 /** A floor point (u across, v from the back wall to the camera) to the screen, with its scale. */
-export function floor(u: number, v: number): { x: number; y: number; s: number } {
+export function floor(
+  u: number,
+  v: number,
+): { x: number; y: number; s: number } {
   const left = BACK.x0 + (0 - BACK.x0) * v;
   const right = BACK.x1 + (W - BACK.x1) * v;
-  return { x: left + (right - left) * u, y: BACK.y1 + (H - BACK.y1) * v, s: 0.38 + 0.62 * v };
+  return {
+    x: left + (right - left) * u,
+    y: BACK.y1 + (H - BACK.y1) * v,
+    s: 0.38 + 0.62 * v,
+  };
 }
 
-function poly(ctx: CanvasRenderingContext2D, pts: [number, number][], fill: string): void {
+function poly(
+  ctx: CanvasRenderingContext2D,
+  pts: [number, number][],
+  fill: string,
+): void {
   ctx.beginPath();
   pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
   ctx.closePath();
@@ -122,13 +155,62 @@ function box(
   ctx.fillRect(a.x, a.y - h, b.x - a.x, Math.max(1, 3 * a.s));
 }
 
-function room(ctx: CanvasRenderingContext2D, wall: string, floorColour: string): void {
+function room(
+  ctx: CanvasRenderingContext2D,
+  wall: string,
+  floorColour: string,
+): void {
   const { x0, x1, y0, y1 } = BACK;
-  poly(ctx, [[0, 0], [W, 0], [x1, y0], [x0, y0]], "#2b2f35"); // ceiling
-  poly(ctx, [[0, 0], [x0, y0], [x0, y1], [0, H]], "#565c64"); // left wall
-  poly(ctx, [[W, 0], [x1, y0], [x1, y1], [W, H]], "#4c525a"); // right wall
-  poly(ctx, [[x0, y0], [x1, y0], [x1, y1], [x0, y1]], wall); // far wall
-  poly(ctx, [[x0, y1], [x1, y1], [W, H], [0, H]], floorColour); // floor
+  poly(
+    ctx,
+    [
+      [0, 0],
+      [W, 0],
+      [x1, y0],
+      [x0, y0],
+    ],
+    "#2b2f35",
+  ); // ceiling
+  poly(
+    ctx,
+    [
+      [0, 0],
+      [x0, y0],
+      [x0, y1],
+      [0, H],
+    ],
+    "#565c64",
+  ); // left wall
+  poly(
+    ctx,
+    [
+      [W, 0],
+      [x1, y0],
+      [x1, y1],
+      [W, H],
+    ],
+    "#4c525a",
+  ); // right wall
+  poly(
+    ctx,
+    [
+      [x0, y0],
+      [x1, y0],
+      [x1, y1],
+      [x0, y1],
+    ],
+    wall,
+  ); // far wall
+  poly(
+    ctx,
+    [
+      [x0, y1],
+      [x1, y1],
+      [W, H],
+      [0, H],
+    ],
+    floorColour,
+  ); // floor
   ctx.strokeStyle = "rgba(0,0,0,0.18)";
   ctx.lineWidth = 1;
   for (let i = 0; i <= 8; i += 1) {
@@ -179,7 +261,16 @@ function gate(ctx: CanvasRenderingContext2D): void {
     ctx.lineTo(x, BACK.y1);
     ctx.stroke();
   }
-  poly(ctx, [[0, BACK.y1], [W, BACK.y1], [W, H], [0, H]], "#5a5f65"); // the forecourt
+  poly(
+    ctx,
+    [
+      [0, BACK.y1],
+      [W, BACK.y1],
+      [W, H],
+      [0, H],
+    ],
+    "#5a5f65",
+  ); // the forecourt
   ctx.fillStyle = "#e9e3c8"; // road markings
   for (let v = 0.1; v < 1; v += 0.22) {
     const p = floor(0.5, v);
@@ -196,7 +287,16 @@ function muster(ctx: CanvasRenderingContext2D): void {
   ctx.fillRect(0, 0, W, H);
   ctx.fillStyle = "#7c838a";
   ctx.fillRect(0, H * 0.18, W, BACK.y1 - H * 0.18);
-  poly(ctx, [[0, BACK.y1], [W, BACK.y1], [W, H], [0, H]], "#8d9399");
+  poly(
+    ctx,
+    [
+      [0, BACK.y1],
+      [W, BACK.y1],
+      [W, H],
+      [0, H],
+    ],
+    "#8d9399",
+  );
   ctx.fillStyle = "#59705c"; // planters
   for (const u of [0.08, 0.92]) {
     const p = floor(u, 0.2);
@@ -219,7 +319,11 @@ function muster(ctx: CanvasRenderingContext2D): void {
 export function scene(ctx: CanvasRenderingContext2D, zone: ZoneKind): void {
   if (zone === "GATE") return gate(ctx);
   if (zone === "MUSTER") return muster(ctx);
-  room(ctx, zone === "SAFE_ROOM" ? "#71777e" : "#8a9097", zone === "SAFE_ROOM" ? "#555a60" : "#666c73");
+  room(
+    ctx,
+    zone === "SAFE_ROOM" ? "#71777e" : "#8a9097",
+    zone === "SAFE_ROOM" ? "#555a60" : "#666c73",
+  );
   switch (zone) {
     case "CONSULAR": // the counter with its windows
       box(ctx, 0.05, 0.95, 0.22, 34, "#5b6168");
@@ -248,11 +352,13 @@ export function scene(ctx: CanvasRenderingContext2D, zone: ZoneKind): void {
       door(ctx, 0.15);
       break;
     case "COMMS": // the racks
-      for (const u of [0.05, 0.2, 0.68, 0.83]) box(ctx, u, u + 0.12, 0.25, 70, "#2f3338");
+      for (const u of [0.05, 0.2, 0.68, 0.83])
+        box(ctx, u, u + 0.12, 0.25, 70, "#2f3338");
       ctx.fillStyle = "#9fe0a6";
       for (const u of [0.07, 0.22, 0.7, 0.85]) {
         const a = floor(u, 0.25);
-        for (let i = 0; i < 5; i += 1) ctx.fillRect(a.x + 2, a.y - (60 - i * 10) * a.s, 2, 2);
+        for (let i = 0; i < 5; i += 1)
+          ctx.fillRect(a.x + 2, a.y - (60 - i * 10) * a.s, 2, 2);
       }
       break;
     case "SAFE_ROOM": // benches and the hardened door
@@ -279,7 +385,10 @@ const TONE: Record<OccupantKind, [string, string]> = {
 };
 
 /** The people, back to front so nearer figures overlap farther ones. */
-export function people(ctx: CanvasRenderingContext2D, walkersNow: Walker[]): void {
+export function people(
+  ctx: CanvasRenderingContext2D,
+  walkersNow: Walker[],
+): void {
   for (const p of [...walkersNow].sort((a, b) => a.v - b.v)) {
     const { x, y, s } = floor(p.u, p.v);
     const [body, skin] = TONE[p.kind];
@@ -303,7 +412,12 @@ export function people(ctx: CanvasRenderingContext2D, walkersNow: Walker[]): voi
 }
 
 /** Sensor grain: a noise tile drawn at a new offset each frame. */
-export function grain(ctx: CanvasRenderingContext2D, noise: HTMLCanvasElement, r: () => number, alpha: number): void {
+export function grain(
+  ctx: CanvasRenderingContext2D,
+  noise: HTMLCanvasElement,
+  r: () => number,
+  alpha: number,
+): void {
   ctx.globalAlpha = alpha;
   ctx.drawImage(noise, -r() * 60, -r() * 60, W + 60, H + 60);
   ctx.globalAlpha = 1;
@@ -326,3 +440,16 @@ export function noiseTile(r: () => number): HTMLCanvasElement {
   ctx.putImageData(img, 0, 0);
   return c;
 }
+
+/** The clip each zone kind plays: frontend/public/cctv/<name>.mp4. */
+export const CLIP: Record<ZoneKind, string> = {
+  GATE: "gate",
+  LOBBY: "lobby",
+  CONSULAR: "consular",
+  OFFICE: "office",
+  CONFERENCE: "conference",
+  COMMS: "comms",
+  SAFE_ROOM: "safe-room",
+  SUITE: "suite",
+  MUSTER: "muster",
+};

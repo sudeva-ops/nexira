@@ -5,18 +5,59 @@ import type { Sensor, Twin, Zone } from "../../api/twin";
 import { Card } from "../../ui/primitives";
 import { useNow } from "../../ui/useNow";
 import { useReducedMotion } from "../../ui/useMotion";
-import { grain, H, noiseTile, people, rng, scene, step, W, walkers } from "./cctv";
+import { CLIP, grain, H, noiseTile, people, rng, scene, step, W, walkers } from "./cctv";
 
-// TWN-03 (simulated): the site's CCTV as generated live views, one per camera, peopled from
-// the twin's occupancy. Six key cameras, all on request; an offline camera shows NO SIGNAL.
-// Nothing is filmed or stored. Under reduced motion each view is a still frame.
+// TWN-03 (simulated): the site's CCTV, one view per camera. A camera plays its zone kind's
+// clip from /cctv/ (self-hosted, looped, muted; frontend/public/cctv/README.md), each camera at
+// its own point in the loop and a zone's second camera mirrored, so the wall looks live. With no
+// clip, it draws a generated view peopled from the twin's occupancy. Six key cameras, all on
+// request; an offline camera shows NO SIGNAL. Nothing is filmed or stored. Under reduced motion
+// each view is a still frame.
 
 const FPS = 12; // a CCTV cadence, and light on the machine
 const KEY_ZONES = ["GATE", "LOBBY", "CONSULAR", "SAFE_ROOM", "MUSTER"] as const;
 
+
 interface Camera {
   sensor: Sensor;
   zone: Zone;
+  // Cameras sharing a clip start at evenly spaced points in its loop (slot, 0..1), and every
+  // second one is mirrored, so no two tiles show the same picture.
+  slot: number;
+  mirrored: boolean;
+}
+
+/** A clip, looping from this camera's own point in it; paused off screen and in a hidden tab. */
+function Clip({ camera, still, onMissing }: { camera: Camera; still: boolean; onMissing: () => void }) {
+  const video = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const el = video.current;
+    if (!el || typeof IntersectionObserver !== "function") return undefined;
+    const seen = new IntersectionObserver(([e]) => {
+      if (still || !e?.isIntersecting || document.hidden) el.pause();
+      else void el.play().catch(() => undefined);
+    });
+    seen.observe(el);
+    return () => seen.disconnect();
+  }, [still]);
+  return (
+    <video
+      ref={video}
+      className={camera.mirrored ? "mirrored" : undefined}
+      src={`/cctv/${CLIP[camera.zone.kind]}.mp4`}
+      muted
+      loop
+      playsInline
+      autoPlay={!still}
+      preload="metadata"
+      aria-hidden="true"
+      onLoadedMetadata={(e) => {
+        const el = e.currentTarget;
+        if (Number.isFinite(el.duration)) el.currentTime = camera.slot * el.duration;
+      }}
+      onError={onMissing}
+    />
+  );
 }
 
 /** The camera's clock: the time on a tile, the date too when enlarged. */
@@ -33,6 +74,7 @@ function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; lar
   const canvas = useRef<HTMLCanvasElement>(null);
   const reduced = useReducedMotion();
   const offline = !camera.sensor.online;
+  const [drawn, setDrawn] = useState(false); // no clip for this zone kind: draw the view
   const kinds = useMemo(
     () => twin.occupants.filter((o) => o.zone_code === camera.zone.code).map((o) => o.kind),
     [twin.occupants, camera.zone.code],
@@ -87,22 +129,26 @@ function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; lar
       cancelAnimationFrame(frame);
       seen?.disconnect();
     };
-  }, [camera.sensor.code, camera.zone.kind, kinds, offline, reduced]);
+  }, [camera.sensor.code, camera.zone.kind, kinds, offline, reduced, drawn]);
 
   const now = useNow(!reduced);
   return (
     <div
-      className={`nx-cctv-feed${offline ? " off" : ""}${large ? " large" : ""}`}
+      className={`nx-cctv-feed${offline ? " off" : ""}${offline || drawn ? "" : " clip"}${large ? " large" : ""}`}
       data-camera={camera.sensor.code}
     >
-      <canvas ref={canvas} width={W} height={H} aria-hidden="true" />
+      {offline || drawn ? (
+        <canvas ref={canvas} width={W} height={H} aria-hidden="true" />
+      ) : (
+        <Clip camera={camera} still={reduced} onMissing={() => setDrawn(true)} />
+      )}
       <div className="nx-cctv-hud">
         <span className="tl">
           {camera.sensor.code} · {camera.zone.name.toUpperCase()}
         </span>
         <span className="tr">{stamp(now, large)}</span>
         <span className="bl">{offline ? "" : <><i className="rec" /> REC</>}</span>
-        <span className="br">{offline ? "" : `${kinds.length} in view`}</span>
+        <span className="br">{offline ? "" : `${kinds.length} in zone`}</span>
       </div>
       {offline && (
         <div className="nx-cctv-nosignal">
@@ -121,7 +167,12 @@ export function CctvWall({ twin }: { twin: Twin }) {
     const zones = new Map(twin.zones.map((z) => [z.code, z]));
     return twin.sensors
       .filter((s) => s.kind === "CCTV" && s.zone_code && zones.has(s.zone_code))
-      .map((s) => ({ sensor: s, zone: zones.get(s.zone_code ?? "") as Zone }));
+      .map((s) => ({ sensor: s, zone: zones.get(s.zone_code ?? "") as Zone }))
+      .map((c, _, all) => {
+        const same = all.filter((o) => CLIP[o.zone.kind] === CLIP[c.zone.kind]);
+        const i = same.indexOf(c);
+        return { ...c, slot: i / same.length, mirrored: i % 2 === 1 };
+      });
   }, [twin.sensors, twin.zones]);
   if (!cameras.length) return null;
   // One camera per key zone (the first, or the one that is offline), then the rest.
