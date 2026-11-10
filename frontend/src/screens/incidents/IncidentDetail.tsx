@@ -141,16 +141,25 @@ export function IncidentDetail({ incidentId }: { incidentId: string }) {
           </span>
         }
         actions={
-          incident.status === "ACTIVE" ? (
+          <span className="nx-row">
+            {/* RPL-06 (D-51): play the incident back from its record. */}
             <Button
               size="small"
-              icon="globe"
-              text="Open in map"
-              onClick={() => void navigate(`/operations?incident=${incident.id}`)}
+              icon="play"
+              text="Replay"
+              onClick={() => void navigate(`/incidents/replay?id=${incident.id}`)}
             />
-          ) : (
-            <ReviewLink incident={incident} />
-          )
+            {incident.status === "ACTIVE" ? (
+              <Button
+                size="small"
+                icon="globe"
+                text="Open in map"
+                onClick={() => void navigate(`/operations?incident=${incident.id}`)}
+              />
+            ) : (
+              <ReviewLink incident={incident} />
+            )}
+          </span>
         }
       >
         <div className="nx-bd">

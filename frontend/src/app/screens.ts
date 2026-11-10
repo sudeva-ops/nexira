@@ -52,3 +52,9 @@ export const SCREENS: readonly Screen[] = [
   { path: "/executive", title: "Executive Overview", subtitle: "Dashboard · Leadership view", icon: "chart", group: "PLAN & INSIGHT", builtIn: "Prompt 97" },
   { path: "/audit", title: "Audit", subtitle: "Admin · Hash-chained audit log", icon: "history", group: "ADMIN", builtIn: "Prompt 3" },
 ];
+
+// Screens reached from another screen, not from the sidebar: the header still names them.
+export const SUB_SCREENS: readonly Screen[] = [
+  // RPL-06 (D-51): from Incidents, After-Action Review and Exercise & Training.
+  { path: "/incidents/replay", title: "Incident Replay", subtitle: "Played back from the record", icon: "play", group: "MONITOR", builtIn: "Prompt 123" },
+];

@@ -10,12 +10,12 @@ import { useVipAccess } from "../api/vip";
 import { Clock } from "./Clock";
 import { Intro } from "./Intro";
 import { LastEvent, LiveIndicator } from "./Heartbeat";
-import { SCREENS, type Screen } from "./screens";
+import { type Screen, SCREENS, SUB_SCREENS } from "./screens";
 import { Ticker } from "./Ticker";
 import { UserMenu } from "./UserMenu";
 
 // Screens that fill the view and scroll inside themselves.
-const FULL = new Set(["/operations", "/copilot"]);
+const FULL = new Set(["/operations", "/copilot", "/incidents/replay"]);
 
 function NavList() {
   const vip = useVipAccess().data?.visible ?? false;
@@ -85,7 +85,7 @@ interface Props {
 
 export function AppShell({ onLogout }: Props) {
   const { pathname } = useLocation();
-  const current = SCREENS.find((s) => s.path === pathname);
+  const current = [...SCREENS, ...SUB_SCREENS].find((s) => s.path === pathname);
 
   return (
     <RealtimeProvider>

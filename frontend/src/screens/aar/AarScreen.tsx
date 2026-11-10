@@ -425,6 +425,11 @@ function ReviewView({ r }: { r: Review }) {
           Simulated data.
         </div>
         <Button
+          icon="play"
+          text="Replay"
+          onClick={() => void navigate(`/incidents/replay?id=${r.incident_id}`)}
+        />
+        <Button
           icon="document-share"
           text="Export review"
           onClick={() => void navigate(`/aar/${r.id}/print`)}

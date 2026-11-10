@@ -3942,3 +3942,140 @@ tr.nx-flash-b > td {
 .nx-cctv-dialog {
   width: min(960px, 92vw);
 }
+
+/* Incident Replay (RPL-02, RPL-03; plan-pilot-rpl §3): map and side panel over the bar. */
+.nx-rpl-page {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.nx-rpl-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.nx-rpl {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 1fr 360px;
+  grid-template-rows: 1fr auto;
+  gap: 8px;
+  min-height: 0;
+  outline: none;
+}
+
+.nx-rpl-map {
+  position: relative;
+}
+
+.nx-rpl-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.nx-rpl-kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.nx-rpl-tl {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.nx-rpl-tl .nx-tl {
+  overflow-y: auto;
+}
+
+.nx-rpl-tl .nx-tl div.ahead {
+  opacity: 0.4;
+}
+
+.nx-rpl-tl .nx-tl div.current {
+  color: var(--nx-tx);
+}
+
+.nx-rpl-tl .nx-tl div.current::before {
+  box-shadow: 0 0 0 3px rgba(76, 144, 240, 0.35);
+}
+
+.nx-rpl-entry {
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.nx-rpl-entry:hover,
+.nx-rpl-entry:focus-visible {
+  color: var(--nx-tx);
+  text-decoration: underline;
+}
+
+.nx-rpl-bar {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+}
+
+.nx-rpl-track {
+  position: relative;
+  flex: 1;
+  height: 28px;
+}
+
+.nx-rpl-track input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  accent-color: #4c90f0;
+}
+
+.nx-rpl-mark {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 7px;
+  transform: translateX(-1px);
+  pointer-events: none;
+}
+
+.nx-rpl-time {
+  min-width: 64px;
+  font-family: ui-monospace, Consolas, monospace;
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  .nx-rpl {
+    grid-template-columns: 1fr;
+    grid-template-rows: 50vh auto auto;
+  }
+}
+
+/* A quiet stretch of the record, shortened on the play axis (plan-pilot-rpl G-9). */
+.nx-rpl-quiet {
+  position: absolute;
+  top: 0;
+  height: 7px;
+  background: repeating-linear-gradient(135deg, rgba(171, 179, 191, 0.35) 0 3px, transparent 3px 6px);
+  pointer-events: none;
+}
