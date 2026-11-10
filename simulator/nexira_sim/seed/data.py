@@ -1440,7 +1440,8 @@ TWIN_DOOR_ZONES = ["ch", "ch", "ch", "amb", "conf", "comms", "comms", "safe",
 TWIN_ALARM_ZONES = ["ch", "amb", "conf", "comms", "safe", "lob", "cons", "must"]
 # Where each camera is mounted and points (PC-53, TWN-08; docs/plan-pilot-rpl.md §4), in the
 # order of TWIN_CAMERA_ZONES: (x, y, heading, field of view, range) in plan units, heading 0 up
-# the plan and clockwise. Migration 0018 fills the same values into a database seeded before it.
+# the plan and clockwise. Migrations 0018 and 0019 fill the same values into a database seeded
+# before them.
 # The chancery's north-east corner is the one blind spot (§108 Q2).
 TWIN_CAMERA_MOUNTS: list[tuple[int, int, int, int, int]] = [
     (22, 322, 135, 90, 120), (113, 383, 315, 90, 120),    # Gate 1
@@ -1448,11 +1449,11 @@ TWIN_CAMERA_MOUNTS: list[tuple[int, int, int, int, int]] = [
     (132, 267, 135, 90, 200), (298, 383, 315, 90, 200),   # Lobby
     (317, 267, 120, 90, 280), (573, 383, 300, 90, 280),   # Consular hall
     (132, 32, 135, 90, 220), (132, 248, 70, 70, 280),     # Chancery
-    (417, 157, 125, 100, 190),                            # Conference
-    (768, 32, 235, 100, 200),                             # Comms / IT
-    (592, 147, 125, 100, 210),                            # Safe room
+    (417, 157, 130, 110, 190),                            # Conference
+    (768, 32, 225, 110, 205),                             # Comms / IT
+    (592, 147, 130, 110, 210),                            # Safe room
     (592, 267, 105, 90, 190), (768, 323, 285, 90, 190),   # Muster
-    (417, 32, 125, 100, 200),                             # Ambassador suite
+    (417, 32, 130, 110, 200),                             # Ambassador suite
 ]  # fmt: skip
 # (code, kind, label, zone, detail, camera mount)
 TWIN_SENSORS: list[

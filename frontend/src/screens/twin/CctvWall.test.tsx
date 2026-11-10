@@ -9,7 +9,7 @@ const zone = (code: string, name: string, kind: Zone["kind"], count: number): Zo
   id: `z-${code}`, code, name, kind, x: 0, y: 0, w: 100, h: 100, capacity: null, count,
 }); // prettier-ignore
 const camera = (code: string, zone_code: string, change: Partial<Sensor> = {}): Sensor => ({
-  code, kind: "CCTV", label: code, zone_code, status: "OK", detail: null, status_at: "2026-11-10T08:00:00Z", online: true, ...change,
+  code, kind: "CCTV", label: code, zone_code, status: "OK", detail: null, status_at: "2026-11-10T08:00:00Z", online: true, mount: null, ...change,
 }); // prettier-ignore
 const person = (id: string, kind: Occupant["kind"], zone_code: string): Occupant => ({
   id, kind, zone_code, name: null, label: null, since: "2026-11-10T08:00:00Z",

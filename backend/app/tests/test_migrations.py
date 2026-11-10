@@ -1,6 +1,7 @@
 """Prompt 2 (a): the initial migration reproduces the schema file and downgrades cleanly."""
 
 import asyncio
+from collections.abc import Sequence
 from pathlib import Path
 from typing import cast
 
@@ -1160,6 +1161,74 @@ async def _sensor_shape(admin_url: str) -> dict[str, object]:
     }
 
 
+async def _seed_sensors(admin_url: str, sensors: Sequence[tuple[object, ...]]) -> None:
+    """A tenant with one site and zone, and these sensors in it, as the superuser: (code, kind,
+    label, then the mount columns when the migration has them)."""
+    conn = await asyncpg.connect(admin_url)
+    try:
+        tenant = await conn.fetchval(
+            "INSERT INTO tenant (name, oidc_issuer) VALUES ('Mounts', 'https://idp.test/m') "
+            "RETURNING id"
+        )
+        mission = await conn.fetchval(
+            "INSERT INTO mission (tenant_id, code, city, country_code, location) "
+            "VALUES ($1, 'NBO', 'Nairobi', 'KE', 'SRID=4326;POINT(36.8 -1.3)') RETURNING id",
+            tenant,
+        )
+        site = await conn.fetchval(
+            "INSERT INTO site (tenant_id, mission_id, site_type, name, location) VALUES "
+            "($1, $2, 'EMBASSY', 'Embassy', 'SRID=4326;POINT(36.8 -1.3)') RETURNING id",
+            tenant,
+            mission,
+        )
+        zone = await conn.fetchval(
+            "INSERT INTO site_zone (tenant_id, site_id, code, name, kind, x, y, w, h) "
+            "VALUES ($1, $2, 'cons', 'Consular hall', 'CONSULAR', 315, 265, 260, 120) "
+            "RETURNING id",
+            tenant,
+            site,
+        )
+        for row in sensors:
+            columns = ["code", "kind", "label", *MOUNT_COLUMNS][: len(row)]
+            values = ", ".join(f"${n}" for n in range(4, len(row) + 4))
+            await conn.execute(
+                f"INSERT INTO site_sensor (tenant_id, site_id, zone_id, {', '.join(columns)}) "
+                f"VALUES ($1, $2, $3, {values})",
+                tenant,
+                site,
+                zone,
+                *row,
+            )
+    finally:
+        await conn.close()
+
+
+async def _mounts(admin_url: str) -> list[tuple[object, ...]]:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        rows = await conn.fetch(
+            f"SELECT code, {', '.join(MOUNT_COLUMNS)} FROM site_sensor ORDER BY code"
+        )
+    finally:
+        await conn.close()
+    return [tuple(r) for r in rows]
+
+
+async def _clean_sensors(admin_url: str) -> None:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        # The guards keep the plan and the sensors, so the superuser skips triggers.
+        await conn.execute("SET session_replication_role = replica")
+        for table in ("site_sensor", "site_zone", "site", "mission"):
+            await conn.execute(f"DELETE FROM {table}")
+        await conn.execute("DELETE FROM tenant WHERE name = 'Mounts'")
+    finally:
+        await conn.close()
+
+
+MOUNT_COLUMNS = ("mount_x", "mount_y", "heading_deg", "fov_deg", "range_u")
+
+
 def test_0018_mounts_the_seeded_cameras_and_downgrades_to_0017_exactly(fresh: DbUrls) -> None:
     """PC-53 (D-51): a camera seeded before 0018 gets the plan's mount (plan-pilot-rpl §4), other
     sensors none; no grant changes; the downgrade restores 0017, the guard character for
@@ -1169,85 +1238,71 @@ def test_0018_mounts_the_seeded_cameras_and_downgrades_to_0017_exactly(fresh: Db
     command.downgrade(cfg, "base")
     command.upgrade(cfg, "0017")
     at_0017 = asyncio.run(_sensor_shape(admin))
-
-    async def seed() -> None:
-        conn = await asyncpg.connect(admin)
-        try:
-            tenant = await conn.fetchval(
-                "INSERT INTO tenant (name, oidc_issuer) VALUES ('Mounts', 'https://idp.test/m') "
-                "RETURNING id"
-            )
-            mission = await conn.fetchval(
-                "INSERT INTO mission (tenant_id, code, city, country_code, location) "
-                "VALUES ($1, 'NBO', 'Nairobi', 'KE', 'SRID=4326;POINT(36.8 -1.3)') RETURNING id",
-                tenant,
-            )
-            site = await conn.fetchval(
-                "INSERT INTO site (tenant_id, mission_id, site_type, name, location) VALUES "
-                "($1, $2, 'EMBASSY', 'Embassy', 'SRID=4326;POINT(36.8 -1.3)') RETURNING id",
-                tenant,
-                mission,
-            )
-            zone = await conn.fetchval(
-                "INSERT INTO site_zone (tenant_id, site_id, code, name, kind, x, y, w, h) "
-                "VALUES ($1, $2, 'cons', 'Consular hall', 'CONSULAR', 315, 265, 260, 120) "
-                "RETURNING id",
-                tenant,
-                site,
-            )
-            await conn.executemany(
-                "INSERT INTO site_sensor (tenant_id, site_id, zone_id, code, kind, label) "
-                "VALUES ($1, $2, $3, $4, $5, $6)",
-                [
-                    (tenant, site, zone, "CAM-07", "CCTV", "Camera 7"),
-                    (tenant, site, zone, "DOOR-12", "ACCESS", "Door 12"),
-                ],
-            )
-        finally:
-            await conn.close()
-
-    async def mounts() -> list[tuple[object, ...]]:
-        conn = await asyncpg.connect(admin)
-        try:
-            rows = await conn.fetch(
-                "SELECT code, mount_x, mount_y, heading_deg, fov_deg, range_u FROM site_sensor "
-                "ORDER BY code"
-            )
-        finally:
-            await conn.close()
-        return [tuple(r) for r in rows]
-
-    async def clean() -> None:
-        conn = await asyncpg.connect(admin)
-        try:
-            # The guards keep the plan and the sensors, so the superuser skips triggers.
-            await conn.execute("SET session_replication_role = replica")
-            for table in ("site_sensor", "site_zone", "site", "mission"):
-                await conn.execute(f"DELETE FROM {table}")
-            await conn.execute("DELETE FROM tenant WHERE name = 'Mounts'")
-        finally:
-            await conn.close()
-
-    asyncio.run(seed())
+    asyncio.run(
+        _seed_sensors(admin, [("CAM-07", "CCTV", "Camera 7"), ("DOOR-12", "ACCESS", "Door 12")])
+    )
     try:
         command.upgrade(cfg, "0018")
-        assert asyncio.run(mounts()) == [
+        assert asyncio.run(_mounts(admin)) == [
             ("CAM-07", 317, 267, 120, 90, 280),
             ("DOOR-12", None, None, None, None, None),
         ]
     finally:
-        asyncio.run(clean())
+        asyncio.run(_clean_sensors(admin))
     at_0018 = asyncio.run(_sensor_shape(admin))
     # No grant or RLS change (PC-53): the app still updates only the status and detail.
     for key in ("tables", "columns", "policies", "search_paths"):
         assert at_0018[key] == at_0017[key], key
-    assert [c for c, _ in cast(list[tuple[str, str]], at_0018["site_sensor"])][-5:] == [
-        "mount_x",
-        "mount_y",
-        "heading_deg",
-        "fov_deg",
-        "range_u",
-    ]
+    assert [c for c, _ in cast(list[tuple[str, str]], at_0018["site_sensor"])][-5:] == list(
+        MOUNT_COLUMNS
+    )
     command.downgrade(cfg, "0017")
     assert asyncio.run(_sensor_shape(admin)) == at_0017
     command.upgrade(cfg, "head")
+
+
+def test_0019_re_aims_four_cameras_and_keeps_the_guard(fresh: DbUrls) -> None:
+    """Data only (plan-pilot-rpl §4): CAM-11, 12, 13 and 16 re-aimed, the rest untouched; the
+    guard and FORCE RLS are back on afterwards; the downgrade restores 0018's aims."""
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0018")
+    at_0018 = asyncio.run(_sensor_shape(admin))
+    before = [
+        ("CAM-07", "CCTV", "Camera 7", 317, 267, 120, 90, 280),
+        ("CAM-11", "CCTV", "Camera 11", 417, 157, 125, 100, 190),
+        ("CAM-12", "CCTV", "Camera 12", 768, 32, 235, 100, 200),
+        ("CAM-13", "CCTV", "Camera 13", 592, 147, 125, 100, 210),
+        ("CAM-16", "CCTV", "Camera 16", 417, 32, 125, 100, 200),
+    ]
+    asyncio.run(_seed_sensors(admin, before))
+    try:
+        command.upgrade(cfg, "0019")
+        assert asyncio.run(_mounts(admin)) == [
+            ("CAM-07", 317, 267, 120, 90, 280),
+            ("CAM-11", 417, 157, 130, 110, 190),
+            ("CAM-12", 768, 32, 225, 110, 205),
+            ("CAM-13", 592, 147, 130, 110, 210),
+            ("CAM-16", 417, 32, 130, 110, 200),
+        ]
+        assert asyncio.run(_sensor_shape(admin)) == at_0018
+        assert asyncio.run(_guard_on(admin)) == (b"O", True)  # enabled; RLS forced
+        command.downgrade(cfg, "0018")
+        assert asyncio.run(_mounts(admin)) == [(r[0], *r[3:]) for r in before]
+        assert asyncio.run(_guard_on(admin)) == (b"O", True)  # enabled; RLS forced
+    finally:
+        asyncio.run(_clean_sensors(admin))
+    command.upgrade(cfg, "head")
+
+
+async def _guard_on(admin_url: str) -> tuple[object, ...]:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        row = await conn.fetchrow(
+            "SELECT t.tgenabled, c.relforcerowsecurity FROM pg_trigger t "
+            "JOIN pg_class c ON c.oid = t.tgrelid WHERE t.tgname = 'site_sensor_guard'"
+        )
+    finally:
+        await conn.close()
+    return tuple(row or ())

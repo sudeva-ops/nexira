@@ -50,6 +50,16 @@ export interface Occupant {
   since: string;
 }
 
+/** Where a camera is mounted and points, in plan units (TWN-08, PC-53); heading 0 is up the
+ * plan, clockwise, and the field of view is centred on it. */
+export interface Mount {
+  x: number;
+  y: number;
+  heading_deg: number;
+  fov_deg: number;
+  range_u: number;
+}
+
 export interface Sensor {
   code: string;
   kind: string;
@@ -59,6 +69,7 @@ export interface Sensor {
   detail: string | null;
   status_at: string;
   online: boolean;
+  mount: Mount | null; // CCTV only
 }
 
 export interface SiteSystem {

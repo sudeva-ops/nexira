@@ -81,4 +81,24 @@ describe("Incident Replay screen (RPL-02, RPL-03, RPL-06, RPL-07)", () => {
     renderApp("/incidents/replay");
     expect(await screen.findByText("No incident chosen")).toBeInTheDocument();
   });
+
+  it("a SITE entry links to the camera watching that place (TWN-10, G-8)", async () => {
+    mockServer({
+      "GET /api/me": { body: DUTY_OFFICER },
+      "GET /api/proposals": { body: [] },
+      "GET /api/incidents/inc-1042/replay": {
+        body: {
+          ...REPLAY,
+          timeline: [
+            ...REPLAY.timeline,
+            { at: REPLAY.window.end, source: "SITE", text: "Embassy Nairobi · Camera 7: OFFLINE", site_id: "s-nbo", sensor: "CAM-07" },
+          ],
+        },
+      },
+    });
+    renderApp("/incidents/replay?id=inc-1042");
+    const links = await screen.findAllByRole("link", { name: "View camera" });
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveAttribute("href", "/twin?site=s-nbo&camera=CAM-07");
+  });
 });

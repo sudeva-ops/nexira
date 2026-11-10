@@ -2628,6 +2628,87 @@ tr.nx-flash-b > td {
   max-height: 520px;
 }
 
+/* Camera coverage (TWN-09, TWN-10, D-51) */
+.nx-twn-switch {
+  margin: 0;
+  font-size: 12px;
+}
+
+.nx-twn-pick {
+  cursor: pointer;
+  outline: none;
+}
+
+.nx-twn-pick:hover rect,
+.nx-twn-pick:focus-visible rect {
+  stroke: #8abbff;
+  stroke-width: 1.8;
+}
+
+.nx-twn-coverage {
+  pointer-events: none; /* clicks reach the zone under a cone */
+}
+
+.nx-twn-cover {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  padding: 6px 10px 8px;
+  border-top: 1px solid #252a31;
+  font-size: 12px;
+}
+
+.nx-twn-uncovered {
+  color: #fa999c;
+  font-weight: 600;
+}
+
+.nx-twn-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #abb3bf;
+}
+
+.nx-twn-key i {
+  display: inline-block;
+  width: 12px;
+  height: 8px;
+  margin-left: 6px;
+}
+
+.nx-twn-key i.on {
+  background: rgba(76, 144, 240, 0.3);
+  border: 1px solid #4c90f0;
+}
+
+.nx-twn-key i.down {
+  border: 1px dashed #e76a6e;
+}
+
+.nx-twn-key i.gap {
+  background: repeating-linear-gradient(45deg, rgba(231, 106, 110, 0.6) 0 1.5px, transparent 1.5px 4px);
+}
+
+.nx-twn-camlink {
+  all: unset;
+  cursor: pointer;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 12px;
+}
+
+.nx-twn-camlink:hover,
+.nx-twn-camlink:focus-visible {
+  color: #8abbff;
+  text-decoration: underline;
+}
+
+.nx-twn-list li.nx-twn-cam {
+  padding-left: 12px;
+}
+
 .nx-twn-list {
   list-style: none;
   margin: 0;
@@ -4025,6 +4106,12 @@ tr.nx-flash-b > td {
 .nx-rpl-entry:focus-visible {
   color: var(--nx-tx);
   text-decoration: underline;
+}
+
+.nx-rpl-camera {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
 }
 
 .nx-rpl-bar {

@@ -62,16 +62,18 @@ Migration 0018: the five columns and the CHECK (all set for CCTV, all null other
 | CAM-08 | Consular hall | 573, 383 | 300 | 90 | 280 |
 | CAM-09 | Chancery | 132, 32 | 135 | 90 | 220 |
 | CAM-10 | Chancery | 132, 248 | 70 | 70 | 280 |
-| CAM-11 | Conference | 417, 157 | 125 | 100 | 190 |
-| CAM-12 | Comms / IT | 768, 32 | 235 | 100 | 200 |
-| CAM-13 | Safe room | 592, 147 | 125 | 100 | 210 |
+| CAM-11 | Conference | 417, 157 | 130 | 110 | 190 |
+| CAM-12 | Comms / IT | 768, 32 | 225 | 110 | 205 |
+| CAM-13 | Safe room | 592, 147 | 130 | 110 | 210 |
 | CAM-14 | Muster | 592, 267 | 105 | 90 | 190 |
 | CAM-15 | Muster | 768, 323 | 285 | 90 | 190 |
-| CAM-16 | Ambassador suite | 417, 32 | 125 | 100 | 200 |
+| CAM-16 | Ambassador suite | 417, 32 | 130 | 110 | 200 |
 
 The seeded gap (§108 Q2): the chancery's north-east corner, which neither CAM-09 nor CAM-10 reaches. Prompt 124 tunes these numbers if the measured coverage differs, and the test states the result.
 
 **Tuned in Prompt 124:** as first planned (heading 60, range 200), CAM-10 left the chancery's whole east strip uncovered, not just its north-east corner. At heading 70 and range 280 the gap is the corner (about 7% of the chancery). Measured on the §5 grid: the site 96% covered, 95% with CAM-07 offline, the consular hall still covered by CAM-08.
+
+**Re-aimed in Prompt 125 (migration 0019, data only):** CAM-11, CAM-12, CAM-13 and CAM-16 covered 50° either side of a heading that left the wall below their mount unseen, so four rooms showed a thin uncovered strip (4–5% each) and would have been listed beside the real blind corner. With 110° and the headings above, every zone but the chancery is fully covered: the site 97%, 96% with CAM-07 offline.
 
 ## 5. Coverage (TWN-09, TWN-11)
 
@@ -81,6 +83,11 @@ The seeded gap (§108 Q2): the chancery's north-east corner, which neither CAM-0
 - KPI = covered points / all zone points, rounded down to a whole percentage; "Not covered now" lists zones with no covered point. A zone partly covered is not listed; its uncovered part is hatched.
 
 On the plan: online cones translucent blue; OFFLINE, FAULT or DEGRADED cones red and dashed; uncovered cells hatched. The toggle is kept in `sessionStorage` (`nexira.twin.coverage`), in a try/catch.
+
+**As built in Prompt 125** (each a deviation for approval in its PR):
+- A DEGRADED camera counts as covering and its cone stays blue, as the twin counts it online (plan-pilot-twn G-2); only OFFLINE and FAULT cones are red and dashed. Otherwise the KPI would count a camera the plan draws as down.
+- Under the plan, "Not covered now" names the zones with no covered point (TWN-09), and a second line, "Blind spots", names partly covered zones with the share no camera sees ("Chancery offices (7%)"), so the seeded corner is named as §107 expects.
+- The handoff also takes `?zone=` (a zone clicked on the plan), beside `?camera=` (TWN-10); a `camera` that is not a camera, such as a gate from a SITE entry, opens the camera watching its zone.
 
 ## 6. Acceptance (§102, §107)
 
