@@ -53,8 +53,8 @@ ROUTES = (
 SENSORS = (
     SensorIn("G1-MAIN", "GATE", "Gate 1 · main", "g1", "Open · screening"),
     SensorIn("G2-READER", "BADGE_READER", "Gate 2 · badge reader", "g2", "Online"),
-    SensorIn("CAM-01", "CCTV", "Camera 1", "ch"),
-    SensorIn("CAM-02", "CCTV", "Camera 2", "cons"),
+    SensorIn("CAM-01", "CCTV", "Camera 1", "ch", mount=(132, 32, 135, 90, 220)),
+    SensorIn("CAM-02", "CCTV", "Camera 2", "cons", mount=(317, 267, 120, 90, 280)),
     SensorIn("SAFE-01", "SAFE_ROOM", "Safe room", "safe", "Ready"),
 )
 
@@ -255,6 +255,18 @@ async def test_the_plan_with_counts_sensors_systems_and_readiness(world: World) 
         "detail": None,
     }
     assert out["simulated"] is True
+
+
+async def test_a_camera_carries_its_mount(world: World) -> None:
+    """TWN-08 (PC-53): where each camera is mounted and points; other sensors have none."""
+    out = await world.twin()
+    assert {s["code"]: s["mount"] for s in out["sensors"]} == {
+        "G1-MAIN": None,
+        "G2-READER": None,
+        "CAM-01": {"x": 132, "y": 32, "heading_deg": 135, "fov_deg": 90, "range_u": 220},
+        "CAM-02": {"x": 317, "y": 267, "heading_deg": 120, "fov_deg": 90, "range_u": 280},
+        "SAFE-01": None,
+    }
 
 
 async def test_only_sites_with_a_plan_are_listed(world: World) -> None:

@@ -40,6 +40,16 @@ class OccupantOut(BaseModel):
     since: datetime
 
 
+class MountOut(BaseModel):
+    """Where a camera is mounted and points, in plan units (PC-53, TWN-08)."""
+
+    x: int
+    y: int
+    heading_deg: int  # 0 = up the plan, clockwise
+    fov_deg: int  # centred on the heading
+    range_u: int
+
+
 class SensorOut(BaseModel):
     code: str
     kind: str
@@ -49,6 +59,7 @@ class SensorOut(BaseModel):
     detail: str | None
     status_at: datetime
     online: bool  # OK or DEGRADED (plan G-2)
+    mount: MountOut | None = None  # CCTV only
 
 
 class SystemOut(BaseModel):

@@ -1134,3 +1134,120 @@ def test_downgrading_0017_restores_0016_exactly(fresh: DbUrls) -> None:
         )
     ]
     command.upgrade(cfg, "head")
+
+
+async def _sensor_shape(admin_url: str) -> dict[str, object]:
+    conn = await asyncpg.connect(admin_url)
+    try:
+        columns = await conn.fetch(
+            "SELECT column_name, data_type FROM information_schema.columns "
+            "WHERE table_name = 'site_sensor' ORDER BY ordinal_position"
+        )
+        checks = await conn.fetch(
+            "SELECT conname, pg_get_constraintdef(oid) AS def FROM pg_constraint "
+            "WHERE conrelid = 'site_sensor'::regclass ORDER BY conname"
+        )
+        guard = await conn.fetchval(
+            "SELECT prosrc FROM pg_proc WHERE proname = 'site_sensor_guard'"
+        )
+    finally:
+        await conn.close()
+    return {
+        **await _shape(admin_url, ("site_sensor",), "site_sensor_guard"),
+        "site_sensor": [tuple(c) for c in columns],
+        "checks": [tuple(c) for c in checks],
+        "guard": guard,
+    }
+
+
+def test_0018_mounts_the_seeded_cameras_and_downgrades_to_0017_exactly(fresh: DbUrls) -> None:
+    """PC-53 (D-51): a camera seeded before 0018 gets the plan's mount (plan-pilot-rpl §4), other
+    sensors none; no grant changes; the downgrade restores 0017, the guard character for
+    character."""
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0017")
+    at_0017 = asyncio.run(_sensor_shape(admin))
+
+    async def seed() -> None:
+        conn = await asyncpg.connect(admin)
+        try:
+            tenant = await conn.fetchval(
+                "INSERT INTO tenant (name, oidc_issuer) VALUES ('Mounts', 'https://idp.test/m') "
+                "RETURNING id"
+            )
+            mission = await conn.fetchval(
+                "INSERT INTO mission (tenant_id, code, city, country_code, location) "
+                "VALUES ($1, 'NBO', 'Nairobi', 'KE', 'SRID=4326;POINT(36.8 -1.3)') RETURNING id",
+                tenant,
+            )
+            site = await conn.fetchval(
+                "INSERT INTO site (tenant_id, mission_id, site_type, name, location) VALUES "
+                "($1, $2, 'EMBASSY', 'Embassy', 'SRID=4326;POINT(36.8 -1.3)') RETURNING id",
+                tenant,
+                mission,
+            )
+            zone = await conn.fetchval(
+                "INSERT INTO site_zone (tenant_id, site_id, code, name, kind, x, y, w, h) "
+                "VALUES ($1, $2, 'cons', 'Consular hall', 'CONSULAR', 315, 265, 260, 120) "
+                "RETURNING id",
+                tenant,
+                site,
+            )
+            await conn.executemany(
+                "INSERT INTO site_sensor (tenant_id, site_id, zone_id, code, kind, label) "
+                "VALUES ($1, $2, $3, $4, $5, $6)",
+                [
+                    (tenant, site, zone, "CAM-07", "CCTV", "Camera 7"),
+                    (tenant, site, zone, "DOOR-12", "ACCESS", "Door 12"),
+                ],
+            )
+        finally:
+            await conn.close()
+
+    async def mounts() -> list[tuple[object, ...]]:
+        conn = await asyncpg.connect(admin)
+        try:
+            rows = await conn.fetch(
+                "SELECT code, mount_x, mount_y, heading_deg, fov_deg, range_u FROM site_sensor "
+                "ORDER BY code"
+            )
+        finally:
+            await conn.close()
+        return [tuple(r) for r in rows]
+
+    async def clean() -> None:
+        conn = await asyncpg.connect(admin)
+        try:
+            # The guards keep the plan and the sensors, so the superuser skips triggers.
+            await conn.execute("SET session_replication_role = replica")
+            for table in ("site_sensor", "site_zone", "site", "mission"):
+                await conn.execute(f"DELETE FROM {table}")
+            await conn.execute("DELETE FROM tenant WHERE name = 'Mounts'")
+        finally:
+            await conn.close()
+
+    asyncio.run(seed())
+    try:
+        command.upgrade(cfg, "0018")
+        assert asyncio.run(mounts()) == [
+            ("CAM-07", 317, 267, 120, 90, 280),
+            ("DOOR-12", None, None, None, None, None),
+        ]
+    finally:
+        asyncio.run(clean())
+    at_0018 = asyncio.run(_sensor_shape(admin))
+    # No grant or RLS change (PC-53): the app still updates only the status and detail.
+    for key in ("tables", "columns", "policies", "search_paths"):
+        assert at_0018[key] == at_0017[key], key
+    assert [c for c, _ in cast(list[tuple[str, str]], at_0018["site_sensor"])][-5:] == [
+        "mount_x",
+        "mount_y",
+        "heading_deg",
+        "fov_deg",
+        "range_u",
+    ]
+    command.downgrade(cfg, "0017")
+    assert asyncio.run(_sensor_shape(admin)) == at_0017
+    command.upgrade(cfg, "head")
