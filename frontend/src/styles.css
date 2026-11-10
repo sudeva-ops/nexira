@@ -53,6 +53,7 @@ body {
 .nx-brand svg {
   width: 20px;
   height: 20px;
+  filter: drop-shadow(0 0 6px rgba(76, 144, 240, 0.55));
 }
 
 .nx-brand b {
@@ -66,6 +67,45 @@ body {
   min-height: 0;
   overflow: auto;
   padding-bottom: 6px;
+}
+
+/* Where it runs (the design's tenant block, without naming a customer). */
+.nx-aside-foot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  padding: 9px 12px;
+  border-top: 1px solid var(--nx-line);
+  background: linear-gradient(180deg, transparent, rgba(76, 144, 240, 0.06));
+  color: var(--nx-tx3);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.nx-aside-foot b {
+  color: var(--nx-tx2);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.nx-aside-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: #32a467;
+  box-shadow: 0 0 0 0 rgba(50, 164, 103, 0.6);
+  animation: nx-aside-ping 2.4s ease-out infinite;
+}
+
+@keyframes nx-aside-ping {
+  70% {
+    box-shadow: 0 0 0 6px rgba(50, 164, 103, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(50, 164, 103, 0);
+  }
 }
 
 .nx-nav-group {
@@ -128,8 +168,9 @@ body {
 
 .nx-header h1 {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .nx-crumb {
@@ -296,6 +337,10 @@ tr.click:focus-visible,
   border-bottom: 1px solid var(--nx-line);
 }
 
+.nx-card-hd > .bp6-icon {
+  color: #8abbff; /* the card's subject, picked out */
+}
+
 .nx-card-hd h3 {
   margin: 0;
   font-size: 12px;
@@ -392,6 +437,7 @@ tr.click:focus-visible,
 .nx-sev.crit {
   background: #cd4246;
   color: #fff;
+  box-shadow: 0 0 10px rgba(205, 66, 70, 0.45);
 }
 
 .nx-sev.high {
