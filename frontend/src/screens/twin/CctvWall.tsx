@@ -1,0 +1,179 @@
+import { Button, Dialog, DialogBody } from "@blueprintjs/core";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import type { Sensor, Twin, Zone } from "../../api/twin";
+import { Card } from "../../ui/primitives";
+import { useNow } from "../../ui/useNow";
+import { useReducedMotion } from "../../ui/useMotion";
+import { grain, H, noiseTile, people, rng, scene, step, W, walkers } from "./cctv";
+
+// TWN-03 (simulated): the site's CCTV as generated live views, one per camera, peopled from
+// the twin's occupancy. Six key cameras, all on request; an offline camera shows NO SIGNAL.
+// Nothing is filmed or stored. Under reduced motion each view is a still frame.
+
+const FPS = 12; // a CCTV cadence, and light on the machine
+const KEY_ZONES = ["GATE", "LOBBY", "CONSULAR", "SAFE_ROOM", "MUSTER"] as const;
+
+interface Camera {
+  sensor: Sensor;
+  zone: Zone;
+}
+
+/** The camera's clock: the time on a tile, the date too when enlarged. */
+function stamp(now: number, withDate: boolean): string {
+  const d = new Date(now);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const time = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())} UTC`;
+  return withDate
+    ? `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${time}`
+    : time;
+}
+
+function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; large?: boolean }) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const reduced = useReducedMotion();
+  const offline = !camera.sensor.online;
+  const kinds = useMemo(
+    () => twin.occupants.filter((o) => o.zone_code === camera.zone.code).map((o) => o.kind),
+    [twin.occupants, camera.zone.code],
+  );
+
+  useEffect(() => {
+    const el = canvas.current;
+    const ctx = el?.getContext("2d");
+    if (!el || !ctx) return undefined; // no canvas (tests): the overlay still says what it is
+    const r = rng(camera.sensor.code);
+    const noise = noiseTile(r);
+    const still = document.createElement("canvas");
+    still.width = W;
+    still.height = H;
+    const sctx = still.getContext("2d");
+    if (sctx) scene(sctx, camera.zone.kind);
+    const crowd = walkers(camera.sensor.code, camera.zone.kind, kinds);
+    let visible = true;
+    let frame = 0;
+    let last = performance.now();
+    const draw = (now: number) => {
+      const dt = Math.min(0.25, (now - last) / 1000);
+      if (offline) {
+        ctx.fillStyle = "#101214";
+        ctx.fillRect(0, 0, W, H);
+        grain(ctx, noise, r, 0.55);
+        return;
+      }
+      step(crowd, camera.zone.kind, dt, r);
+      ctx.drawImage(still, 0, 0);
+      people(ctx, crowd);
+      grain(ctx, noise, r, 0.07);
+    };
+    const tick = (now: number) => {
+      if (visible && !document.hidden && now - last >= 1000 / FPS) {
+        draw(now);
+        last = now;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    draw(last);
+    if (!reduced) frame = requestAnimationFrame(tick);
+    // Off screen, a view stops drawing (jsdom has no IntersectionObserver).
+    const seen =
+      typeof IntersectionObserver === "function"
+        ? new IntersectionObserver(([e]) => {
+            visible = e?.isIntersecting ?? true;
+          })
+        : null;
+    seen?.observe(el);
+    return () => {
+      cancelAnimationFrame(frame);
+      seen?.disconnect();
+    };
+  }, [camera.sensor.code, camera.zone.kind, kinds, offline, reduced]);
+
+  const now = useNow(!reduced);
+  return (
+    <div
+      className={`nx-cctv-feed${offline ? " off" : ""}${large ? " large" : ""}`}
+      data-camera={camera.sensor.code}
+    >
+      <canvas ref={canvas} width={W} height={H} aria-hidden="true" />
+      <div className="nx-cctv-hud">
+        <span className="tl">
+          {camera.sensor.code} · {camera.zone.name.toUpperCase()}
+        </span>
+        <span className="tr">{stamp(now, large)}</span>
+        <span className="bl">{offline ? "" : <><i className="rec" /> REC</>}</span>
+        <span className="br">{offline ? "" : `${kinds.length} in view`}</span>
+      </div>
+      {offline && (
+        <div className="nx-cctv-nosignal">
+          <b>NO SIGNAL</b>
+          <span>{camera.sensor.detail ?? camera.sensor.status}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function CctvWall({ twin }: { twin: Twin }) {
+  const [all, setAll] = useState(false);
+  const [open, setOpen] = useState<Camera | null>(null);
+  const cameras = useMemo(() => {
+    const zones = new Map(twin.zones.map((z) => [z.code, z]));
+    return twin.sensors
+      .filter((s) => s.kind === "CCTV" && s.zone_code && zones.has(s.zone_code))
+      .map((s) => ({ sensor: s, zone: zones.get(s.zone_code ?? "") as Zone }));
+  }, [twin.sensors, twin.zones]);
+  if (!cameras.length) return null;
+  // One camera per key zone (the first, or the one that is offline), then the rest.
+  const key: Camera[] = [];
+  for (const kind of KEY_ZONES) {
+    for (const z of twin.zones.filter((zone) => zone.kind === kind)) {
+      const here = cameras.filter((c) => c.zone.code === z.code);
+      const pick = here.find((c) => !c.sensor.online) ?? here[0];
+      if (pick && key.length < 6) key.push(pick);
+    }
+  }
+  if (!key.length) key.push(...cameras.slice(0, 6)); // no camera at a key zone: the first six
+  const shown = all ? cameras : key;
+  const online = cameras.filter((c) => c.sensor.online).length;
+  return (
+    <Card
+      icon="mobile-video"
+      title="CCTV"
+      sub={`${online} / ${cameras.length} online · generated views (simulated); nothing is recorded`}
+      actions={
+        cameras.length > key.length ? (
+          <Button
+            size="small"
+            minimal
+            text={all ? "Key cameras" : `Show all ${cameras.length}`}
+            onClick={() => setAll((a) => !a)}
+          />
+        ) : undefined
+      }
+    >
+      <div className="nx-bd nx-cctv-wall" aria-label="CCTV cameras">
+        {shown.map((c) => (
+          <button
+            key={c.sensor.code}
+            type="button"
+            className="nx-cctv-tile"
+            aria-label={`${c.sensor.code} · ${c.zone.name}${c.sensor.online ? "" : " · offline"}`}
+            onClick={() => setOpen(c)}
+          >
+            <Feed camera={c} twin={twin} />
+          </button>
+        ))}
+      </div>
+      <Dialog
+        isOpen={open !== null}
+        onClose={() => setOpen(null)}
+        title={open ? `${open.sensor.code} · ${open.zone.name}` : ""}
+        icon="mobile-video"
+        className="nx-cctv-dialog bp6-dark"
+      >
+        <DialogBody>{open && <Feed camera={open} twin={twin} large />}</DialogBody>
+      </Dialog>
+    </Card>
+  );
+}
