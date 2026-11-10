@@ -1,6 +1,7 @@
 """Read queries for the intel API (tenant-scoped by RLS like every other read)."""
 
 import uuid
+from collections.abc import Collection
 from dataclasses import asdict
 from typing import Any
 
@@ -26,6 +27,29 @@ from app.modules.intel.schemas import (
 )
 from app.modules.people import queries as people_queries
 from app.modules.people.models import Mission
+
+# The player adds this to every RAW_SIGNAL of an EXERCISE run (plan §4); ingestion accepts it only
+# from that run. An incident is an exercise incident when its first signal carries it, and fusion
+# joins only like with like (G-2), so every signal of an incident carries the same run.
+EXERCISE_MARKER = "exercise_run_id"
+
+EXERCISE_RUN = text(
+    """
+    SELECT DISTINCT ON (x.incident_id) x.incident_id,
+           CAST(s.payload ->> 'exercise_run_id' AS uuid) AS run_id
+      FROM incident_signal x JOIN raw_signal s ON s.id = x.signal_id
+     WHERE CAST(:ids AS uuid[]) IS NULL OR x.incident_id = ANY(CAST(:ids AS uuid[]))
+     ORDER BY x.incident_id, x.signal_id
+    """
+)
+
+
+async def exercise_runs(
+    session: AsyncSession, ids: Collection[uuid.UUID] | None = None
+) -> dict[uuid.UUID, uuid.UUID]:
+    """The exercise incidents among ids (every incident when None), each with its run."""
+    rows = await session.execute(EXERCISE_RUN, {"ids": None if ids is None else list(ids)})
+    return {r.incident_id: r.run_id for r in rows if r.run_id is not None}
 
 
 def _signals() -> Select[Any]:
@@ -132,6 +156,11 @@ def _incident_fields(row: Any) -> dict[str, Any]:
     }
 
 
+async def _labelled(session: AsyncSession, fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    runs = await exercise_runs(session, [f["id"] for f in fields])
+    return [{**f, "exercise": f["id"] in runs} for f in fields]
+
+
 async def list_incidents(
     session: AsyncSession, *, status: str | None, limit: int
 ) -> list[IncidentOut]:
@@ -146,7 +175,8 @@ async def list_incidents(
     )
     if status is not None:
         query = query.where(Incident.status == status)
-    return [IncidentOut(**_incident_fields(r)) for r in await session.execute(query)]
+    fields = [_incident_fields(r) for r in await session.execute(query)]
+    return [IncidentOut(**f) for f in await _labelled(session, fields)]
 
 
 _EXPOSURE = text(
@@ -187,7 +217,7 @@ async def get_incident(
     row = (await session.execute(_incidents().where(Incident.id == incident_id))).one_or_none()
     if row is None:
         return None
-    fields = _incident_fields(row)
+    (fields,) = await _labelled(session, [_incident_fields(row)])
     fields["mission_code"] = (
         await session.scalar(select(Mission.code).where(Mission.id == fields["mission_id"]))
         if fields["mission_id"]

@@ -199,6 +199,7 @@ async def player_for(
             clock=clock,
             current_scene=run.current_scene,
             on_scene_done=scene_done_callback(engine, tenant_id),
+            exercise=run.mode == "EXERCISE",
         )
         players.put(player)
     return player

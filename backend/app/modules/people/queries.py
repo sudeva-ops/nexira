@@ -1,6 +1,8 @@
 """Read queries for missions, people and sites (OPS-01, PPL-01..04). RLS scopes
 every query to the caller's tenant."""
 
+import uuid
+from collections.abc import Collection
 from typing import Any
 
 from sqlalchemy import text
@@ -15,6 +17,7 @@ _MISSIONS = text(
       SELECT DISTINCT ON (mission_id) mission_id, id, reference, severity
         FROM incident
        WHERE status = 'ACTIVE' AND mission_id IS NOT NULL
+         AND NOT id = ANY(CAST(:leave_out AS uuid[]))
        ORDER BY mission_id, severity_rank(severity) DESC, opened_at DESC
     ), people AS (
       SELECT mission_id,
@@ -41,8 +44,13 @@ _MISSIONS = text(
 )
 
 
-async def list_missions(session: AsyncSession) -> list[MissionOut]:
-    return [MissionOut(**r._asdict()) for r in await session.execute(_MISSIONS)]
+async def list_missions(
+    session: AsyncSession, leave_out: Collection[uuid.UUID] = ()
+) -> list[MissionOut]:
+    """leave_out: incidents whose severity does not raise a mission's display risk (the
+    Executive Overview's exercise incidents, plan-pilot-exr §4)."""
+    rows = await session.execute(_MISSIONS, {"leave_out": list(leave_out)})
+    return [MissionOut(**r._asdict()) for r in rows]
 
 
 def _like(q: str | None) -> str | None:

@@ -20,6 +20,7 @@ class ProposalOut(BaseModel):
     agent_name: str
     incident_id: uuid.UUID | None
     incident_reference: str | None
+    exercise: bool = False  # EXR-03: its incident is an exercise's (D-48)
     proposal_key: str
     action_type: str
     title: str

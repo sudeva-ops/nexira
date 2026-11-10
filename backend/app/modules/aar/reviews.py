@@ -27,6 +27,7 @@ from app.modules.aar.schemas import (
     ReviewsOut,
     ReviewSummaryOut,
 )
+from app.modules.intel import queries as intel_queries
 
 REVIEWERS = "SECURITY_OFFICER|DUTY_OFFICER|HQ_CRISIS_DIRECTOR|HEAD_OF_MISSION"  # §5
 FINALISERS = "SECURITY_OFFICER|HQ_CRISIS_DIRECTOR"
@@ -115,7 +116,8 @@ def _item_out(item: AarItem) -> ItemOut:
 
 _SUMMARIES = text(
     """
-    SELECT r.id, r.reference, i.reference AS incident_reference, i.title AS incident_title,
+    SELECT r.id, r.reference, r.incident_id, i.reference AS incident_reference,
+           i.title AS incident_title,
            r.status, r.started_at,
            count(a.id) FILTER (WHERE a.status IN ('ACCEPTED', 'DONE')) AS accepted,
            count(a.id) FILTER (WHERE a.status = 'DRAFT') AS drafts,
@@ -139,7 +141,11 @@ _READY = text(
 
 
 async def list_reviews(session: AsyncSession, user: CurrentUser) -> ReviewsOut:
-    reviews = [ReviewSummaryOut(**r._mapping) for r in await session.execute(_SUMMARIES)]
+    exercises = await intel_queries.exercise_runs(session)
+    reviews = [
+        ReviewSummaryOut(**r._mapping, exercise=r.incident_id in exercises)
+        for r in await session.execute(_SUMMARIES)
+    ]
     ready = [
         ReadyOut(
             incident_id=r.id,
@@ -147,6 +153,7 @@ async def list_reviews(session: AsyncSession, user: CurrentUser) -> ReviewsOut:
             title=r.title,
             status=r.status,
             can_start=await _may(session, user, REVIEWERS, r.mission_id),
+            exercise=r.id in exercises,
         )
         for r in await session.execute(_READY)
     ]
@@ -178,6 +185,7 @@ async def detail(
         incident_reference=found.reference,
         incident_title=found.title,
         incident_status=found.status,
+        exercise=bool(await intel_queries.exercise_runs(session, [found.id])),
         status=review.status,
         started_at=review.started_at,
         finalised_at=review.finalised_at,

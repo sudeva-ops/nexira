@@ -17,6 +17,7 @@ class SummaryOut(BaseModel):
     campaign_id: uuid.UUID
     reference: str
     incident_id: uuid.UUID | None
+    exercise: bool = False  # EXR-03: its incident is an exercise's (D-48)
     status: str
     sent_at: datetime | None
     escalate_after_s: int

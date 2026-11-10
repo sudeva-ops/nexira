@@ -6,6 +6,9 @@ their offsets, scene by scene.
 - next:  move to the next scene and play it.
 - reset: back to scene 0, nothing played (scenario state only; D-21).
 
+In an EXERCISE run (D-48) every signal also carries the run (intel.queries.EXERCISE_MARKER),
+so the incidents it opens are labelled and kept apart from live ones (plan-pilot-exr §4).
+
 The player only publishes events. It never writes business tables: signals and
 check-in responses go through the same ingestion paths as real data.
 
@@ -24,6 +27,7 @@ from enum import StrEnum
 from typing import Any, Protocol
 
 from app.core.events import Event, Publisher
+from app.modules.intel.queries import EXERCISE_MARKER
 
 
 class Clock(Protocol):
@@ -74,10 +78,12 @@ class Player:
         clock: Clock | None = None,
         current_scene: int = 0,
         on_scene_done: SceneDone | None = None,
+        exercise: bool = False,
     ) -> None:
         self.code = code
         self.tenant_id = tenant_id
         self.run_id = run_id
+        self.exercise = exercise
         # A scene's SCENE_START marker always comes first; then offset, then a stable id.
         self._events = sorted(
             events,
@@ -175,6 +181,8 @@ class Player:
             # instead of being dropped as duplicates (raw_signal is unique on it).
             payload["external_id"] = f"{payload['external_id']}:{self.run_id}"
             payload.setdefault("occurred_at", self._clock.now().isoformat())
+            if self.exercise:
+                payload[EXERCISE_MARKER] = str(self.run_id)
         return Event(
             type=event.event_type,
             tenant_id=self.tenant_id,

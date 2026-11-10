@@ -253,6 +253,20 @@ async def escalate_due(session: AsyncSession, now: datetime) -> list[Escalated]:
     return done
 
 
+async def for_incidents(
+    session: AsyncSession, campaign_id: uuid.UUID, incidents: list[uuid.UUID]
+) -> bool:
+    """Whether the campaign is a check-in of one of these incidents."""
+    found = await session.scalar(
+        select(NotificationCampaign.id).where(
+            NotificationCampaign.id == campaign_id,
+            NotificationCampaign.campaign_type == "CHECKIN",
+            NotificationCampaign.incident_id.in_(incidents),
+        )
+    )
+    return found is not None
+
+
 async def start_clock(
     session: AsyncSession,
     *,
@@ -260,6 +274,7 @@ async def start_clock(
     since: datetime | None,
     now: datetime,
     actor: Actor,
+    incidents: list[uuid.UUID] | None = None,
 ) -> list[NotificationCampaign]:
     """A demo scene starts the check-in clock: each open check-in created since the
     run started escalates escalate_in_s from now (escalate_after_s still counts from
@@ -275,6 +290,8 @@ async def start_clock(
     )
     if since is not None:
         query = query.where(NotificationCampaign.created_at >= since)
+    if incidents is not None:  # an exercise times its own incidents' check-ins only
+        query = query.where(NotificationCampaign.incident_id.in_(incidents))
     campaigns = list(await session.scalars(query))
     started = set(
         await session.scalars(

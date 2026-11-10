@@ -6,7 +6,9 @@ A normalised signal joins an ACTIVE incident when all of these hold:
   location; it never moves): 3 km, or the weather and hazard sizes (WX-04, HZ-02);
 - occurred_at within the category's fusion window of incident.last_signal_at, either
   side: 60 minutes, longer for slow hazards (plan-pilot-hz G-3);
-- the source takes part in fusion (checked by the caller, see service.py).
+- the source takes part in fusion (checked by the caller, see service.py);
+- both are from the same exercise run, or neither is (plan-pilot-exr G-2): an exercise never
+  merges into a live incident, nor a live signal into an exercise.
 Otherwise it opens a new incident, with the category's impact radius (5 km, or the
 sizes in hazards.py; an earthquake's from its magnitude). If several incidents match,
 it joins the nearest.
@@ -21,9 +23,10 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from sqlalchemy import func, literal, select, text, update
+from sqlalchemy import Text, func, literal, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core import audit
 from app.modules.intel import hazards
@@ -36,6 +39,7 @@ from app.modules.intel.models import (
     RawSignal,
 )
 from app.modules.intel.normalise import max_severity, severity_rank
+from app.modules.intel.queries import EXERCISE_MARKER
 from app.modules.tenancy.service import Actor
 
 MAX_CONFIDENCE = 99
@@ -98,6 +102,17 @@ async def fuse(
     await session.execute(
         text("SELECT pg_advisory_xact_lock(hashtext('nexira:fusion:' || current_tenant_id()))")
     )
+    first, link = aliased(RawSignal), aliased(IncidentSignal)
+    first_run = (
+        select(first.payload[EXERCISE_MARKER].astext)
+        .join(link, link.signal_id == first.id)
+        .where(link.incident_id == Incident.id)
+        .order_by(link.signal_id)
+        .limit(1)
+        .correlate(Incident)
+        .scalar_subquery()
+    )
+    run = signal.payload.get(EXERCISE_MARKER)
     match = await session.scalar(
         select(Incident)
         .join(RawSignal, RawSignal.id == signal.id)
@@ -109,6 +124,7 @@ async def fuse(
             ),
             func.abs(func.extract("epoch", RawSignal.occurred_at - Incident.last_signal_at))
             <= hazards.fusion_window_min(category) * 60,
+            first_run.is_not_distinct_from(literal(None if run is None else str(run), Text)),
         )
         .order_by(func.ST_Distance(Incident.location, RawSignal.location), Incident.opened_at)
         .limit(1)

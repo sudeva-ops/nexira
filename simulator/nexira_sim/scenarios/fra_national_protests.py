@@ -130,6 +130,14 @@ TITLES = {
 }
 
 
+# An exercise template (plan-pilot-exr §2, G-1): scene 0's marker names the mission.
+TEMPLATE = {"mission": "PAR", "theme": "Civil unrest"}
+
+
+def _marker(n: int, name: str, expect: str) -> dict[str, object]:
+    return {"name": name, "expect": expect, **({"template": TEMPLATE} if n == 0 else {})}
+
+
 def build_events(_w: World, tenant_id: uuid.UUID) -> list[EventIn]:
     """The scenario's events. The world is unused (no check-in answers), but the
     signature matches the other scenarios so the seed loads them the same way."""
@@ -139,7 +147,7 @@ def build_events(_w: World, tenant_id: uuid.UUID) -> list[EventIn]:
             scene_no=n,
             offset_ms=0,
             event_type="SCENE_START",
-            payload={"name": name, "expect": expect},
+            payload=_marker(n, name, expect),
         )
         for n, name, expect in SCENES
     ]

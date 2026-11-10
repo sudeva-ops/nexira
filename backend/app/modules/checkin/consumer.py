@@ -11,6 +11,10 @@ person's newest open CHECKIN campaign (Prompt 5).
 CHECKIN_CLOCK events (a demo scene, NBO-CIVIL-UNREST scene 4) start the check-in
 clock: the run's open check-ins escalate "escalate_in_s" later. Also accepted only
 while a demo scenario is running.
+
+In an exercise (D-48) both come from its own running run, and count only for the check-ins
+of the incidents that run opened (plan-pilot-exr §7): a live check-in is never answered or
+timed by an exercise.
 """
 
 import logging
@@ -26,7 +30,7 @@ from app.core.events import Event, Handler, Publisher
 from app.modules.checkin import service
 from app.modules.notifications.channels import CHANNELS
 from app.modules.notifications.models import NotificationCampaign
-from app.modules.notifications.service import demo_running, demo_started_at
+from app.modules.notifications.service import demo_running, demo_started_at, exercise_run
 from app.modules.tenancy.service import Actor
 
 log = logging.getLogger(__name__)
@@ -44,7 +48,9 @@ def response_handler(engine: AsyncEngine, publisher: Publisher) -> Handler:
             if await service.already_recorded(session, str(event.id)):
                 return
             try:
-                if not await demo_running(session):
+                demo = await demo_running(session)
+                exercise = None if demo else await exercise_run(session, event.source)
+                if not (demo or exercise):
                     raise service.CheckinError("simulated answers need a running demo scenario")
                 person_id = uuid.UUID(str(payload["person_id"]))
                 raw = str(payload["status"])
@@ -65,6 +71,10 @@ def response_handler(engine: AsyncEngine, publisher: Publisher) -> Handler:
                 )
                 if campaign_id is None:
                     raise service.CheckinError("no open check-in for this person")
+                if exercise is not None and not await service.for_incidents(
+                    session, campaign_id, exercise.incidents
+                ):
+                    raise service.CheckinError("an exercise answers its own check-ins only")
                 await service.record_response(
                     session,
                     campaign_id=campaign_id,
@@ -106,8 +116,10 @@ def clock_handler(
     async def handle(event: Event) -> None:
         async with tenant_session(event.tenant_id, engine) as session:
             seconds = event.payload.get("escalate_in_s")
+            demo = await demo_running(session)
+            exercise = None if demo else await exercise_run(session, event.source)
             if (
-                not await demo_running(session)
+                not (demo or exercise)
                 or not isinstance(seconds, int)
                 or not 0 < seconds <= CLOCK_MAX_S
             ):
@@ -125,9 +137,10 @@ def clock_handler(
             changed = await service.start_clock(
                 session,
                 escalate_in_s=seconds,
-                since=await demo_started_at(session),
+                since=exercise.started_at if exercise else await demo_started_at(session),
                 now=now(),
                 actor=SCENARIO_CLOCK,
+                incidents=exercise.incidents if exercise else None,
             )
             await session.commit()
         for campaign in changed:

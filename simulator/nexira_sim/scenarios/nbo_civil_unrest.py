@@ -72,10 +72,18 @@ def _event(
     )
 
 
+# An exercise template (plan-pilot-exr §2, G-1): scene 0's marker names the mission.
+TEMPLATE = {"mission": "NBO", "theme": "Civil unrest"}
+
+
+def _marker(n: int, name: str, expect: str) -> dict[str, object]:
+    return {"name": name, "expect": expect, **({"template": TEMPLATE} if n == 0 else {})}
+
+
 def build_events(w: World, tenant_id: uuid.UUID) -> list[EventIn]:
     rng = random.Random(42)
     events = [
-        _event(tenant_id, f"scene:{n}", n, 0, "SCENE_START", {"name": name, "expect": expect})
+        _event(tenant_id, f"scene:{n}", n, 0, "SCENE_START", _marker(n, name, expect))
         for n, name, expect in SCENES
     ]
     events.append(

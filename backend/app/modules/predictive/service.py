@@ -24,6 +24,7 @@ from app.core import audit
 from app.core.events import Event
 from app.modules.hazards import service as hazards
 from app.modules.health_intel import service as health
+from app.modules.intel import queries as intel_queries
 from app.modules.people.models import Mission
 from app.modules.predictive import schemas
 from app.modules.predictive.models import MissionEvent, RiskIndex
@@ -150,6 +151,7 @@ _INCIDENTS = text(
     """
     SELECT DISTINCT ON (mission_id) mission_id, reference, title, severity FROM incident
      WHERE status = 'ACTIVE' AND mission_id IS NOT NULL
+       AND NOT id = ANY(CAST(:leave_out AS uuid[]))  -- not an exercise's (plan-pilot-exr §4)
      ORDER BY mission_id, severity_rank(severity) DESC, opened_at DESC
     """
 )
@@ -178,7 +180,8 @@ async def components(session: AsyncSession, today: date) -> dict[uuid.UUID, Comp
         for r in await session.execute(_MISSIONS)
     }
     by_code = {c.code: c for c in out.values()}
-    for r in await session.execute(_INCIDENTS):
+    exercises = list(await intel_queries.exercise_runs(session))
+    for r in await session.execute(_INCIDENTS, {"leave_out": exercises}):
         if r.mission_id in out:
             out[r.mission_id].incident = (r.reference, r.title, r.severity)
     for r in await session.execute(_SIGNALS, {"radius": SIGNAL_RADIUS_M}):

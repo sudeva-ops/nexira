@@ -6,6 +6,9 @@
   place (§4).
 - Aggregates and references only: no person's name, in the figures or the timeline (EXE-04,
   G-11). The export is audited (EXE-03).
+- Exercise incidents (D-48) are left out of every incident figure: active incidents, posture,
+  detection, personnel accounted, evacuations, the trend and the timeline (plan-pilot-exr §4).
+  Each query takes them as :leave_out.
 """
 
 import uuid
@@ -25,6 +28,7 @@ from app.modules.exercises import queries as exercise_queries
 from app.modules.fleet import service as fleet
 from app.modules.hazards import service as hazards
 from app.modules.health_intel import service as health
+from app.modules.intel import queries as intel_queries
 from app.modules.people.queries import list_missions
 from app.modules.people.schemas import MissionOut
 from app.modules.supply import service as supply
@@ -81,7 +85,7 @@ def regions(missions: list[MissionOut]) -> list[schemas.RegionOut]:
 _ACTIVE = text(
     """
     SELECT id, reference, title, severity, opened_at FROM incident
-     WHERE status = 'ACTIVE'
+     WHERE status = 'ACTIVE' AND NOT id = ANY(CAST(:leave_out AS uuid[]))
      ORDER BY severity_rank(severity) DESC, opened_at DESC, reference DESC
     """
 )
@@ -96,7 +100,7 @@ _DETECTION = text(
                   JOIN raw_signal s ON s.id = x.signal_id WHERE x.incident_id = i.id)
            )) AS seconds
       FROM incident i
-     WHERE i.opened_at >= :since
+     WHERE i.opened_at >= :since AND NOT i.id = ANY(CAST(:leave_out AS uuid[]))
     """
 )
 
@@ -104,9 +108,13 @@ _TREND = text(
     """
     SELECT d::date AS day,
            (SELECT count(*) FROM raw_signal s
-             WHERE s.received_at >= d AND s.received_at < d + interval '1 day') AS signals,
+             WHERE s.received_at >= d AND s.received_at < d + interval '1 day'
+               AND NOT EXISTS (SELECT 1 FROM incident_signal x WHERE x.signal_id = s.id
+                                  AND x.incident_id = ANY(CAST(:leave_out AS uuid[]))))
+             AS signals,
            (SELECT count(*) FROM incident i
-             WHERE i.opened_at >= d AND i.opened_at < d + interval '1 day') AS incidents
+             WHERE i.opened_at >= d AND i.opened_at < d + interval '1 day'
+               AND NOT i.id = ANY(CAST(:leave_out AS uuid[]))) AS incidents
       FROM generate_series(CAST(:first AS timestamptz), CAST(:last AS timestamptz),
                            interval '1 day') AS d
      ORDER BY d
@@ -118,6 +126,7 @@ _CHECKINS = text(
     SELECT DISTINCT ON (c.incident_id) c.id, i.reference
       FROM notification_campaign c JOIN incident i ON i.id = c.incident_id
      WHERE c.campaign_type = 'CHECKIN' AND i.status = 'ACTIVE'
+       AND NOT i.id = ANY(CAST(:leave_out AS uuid[]))
      ORDER BY c.incident_id, c.created_at DESC
     """
 )
@@ -127,7 +136,10 @@ _READINESS = text(
     "WHERE site_type = 'EMBASSY' AND readiness_score IS NOT NULL"
 )
 
-_EVACUATIONS = text("SELECT mission_id, reference FROM evacuation WHERE status = 'ACTIVE'")
+_EVACUATIONS = text(
+    "SELECT mission_id, reference FROM evacuation WHERE status = 'ACTIVE' "
+    "AND (incident_id IS NULL OR NOT incident_id = ANY(CAST(:leave_out AS uuid[])))"
+)
 
 _TIMELINE = text(
     """
@@ -140,10 +152,11 @@ _TIMELINE = text(
 _RECENT = text(
     """
     SELECT reference, title, 'OPENED' AS change, opened_at AS at FROM incident
-     WHERE opened_at >= :since
+     WHERE opened_at >= :since AND NOT id = ANY(CAST(:leave_out AS uuid[]))
     UNION ALL
     SELECT reference, title, 'CLOSED', closed_at FROM incident
      WHERE closed_at IS NOT NULL AND closed_at >= :since
+       AND NOT id = ANY(CAST(:leave_out AS uuid[]))
      ORDER BY at DESC LIMIT :limit
     """
 )
@@ -156,11 +169,12 @@ def _ref(row: Any) -> schemas.IncidentRefOut:
 
 
 async def _detection(
-    session: AsyncSession, now: datetime, current: Any | None
+    session: AsyncSession, now: datetime, current: Any | None, leave_out: list[uuid.UUID]
 ) -> schemas.DetectionOut:
+    since = now - timedelta(days=TREND_DAYS)
     times = {
         r.id: int(r.seconds)
-        for r in await session.execute(_DETECTION, {"since": now - timedelta(days=TREND_DAYS)})
+        for r in await session.execute(_DETECTION, {"since": since, "leave_out": leave_out})
         if r.seconds is not None and r.seconds >= 0
     }
     return schemas.DetectionOut(
@@ -171,10 +185,10 @@ async def _detection(
     )
 
 
-async def _accounted(session: AsyncSession) -> schemas.AccountedOut:
+async def _accounted(session: AsyncSession, leave_out: list[uuid.UUID]) -> schemas.AccountedOut:
     answered = asked = 0
     references: list[str] = []
-    for row in await session.execute(_CHECKINS):
+    for row in await session.execute(_CHECKINS, {"leave_out": leave_out}):
         personnel = (await checkin.tally(session, row.id))["personnel"]
         answered += personnel.safe + personnel.need_help
         asked += personnel.recipients
@@ -187,13 +201,13 @@ async def _accounted(session: AsyncSession) -> schemas.AccountedOut:
     )
 
 
-async def _trend(session: AsyncSession, today: date) -> list[schemas.TrendDayOut]:
+async def _trend(
+    session: AsyncSession, today: date, leave_out: list[uuid.UUID]
+) -> list[schemas.TrendDayOut]:
     first = datetime.combine(today - timedelta(days=TREND_DAYS - 1), datetime.min.time(), UTC)
     last = datetime.combine(today, datetime.min.time(), UTC)
-    return [
-        schemas.TrendDayOut(day=r.day, signals=r.signals, incidents=r.incidents)
-        for r in await session.execute(_TREND, {"first": first, "last": last})
-    ]
+    rows = await session.execute(_TREND, {"first": first, "last": last, "leave_out": leave_out})
+    return [schemas.TrendDayOut(day=r.day, signals=r.signals, incidents=r.incidents) for r in rows]
 
 
 async def _drivers(
@@ -202,6 +216,7 @@ async def _drivers(
     today: date,
     active: list[Any],
     missions: list[MissionOut],
+    leave_out: list[uuid.UUID],
 ) -> dict[uuid.UUID, list[schemas.DriverOut]]:
     """Each mission's drivers from the modules' own read functions (§4)."""
     drivers: dict[uuid.UUID, list[schemas.DriverOut]] = defaultdict(list)
@@ -223,7 +238,7 @@ async def _drivers(
                 )
             )
     seen = {d.reference for found in drivers.values() for d in found}
-    for row in await session.execute(_EVACUATIONS):
+    for row in await session.execute(_EVACUATIONS, {"leave_out": leave_out}):
         drivers[row.mission_id].append(
             schemas.DriverOut(kind="EVACUATION", label="Evacuation active", reference=row.reference)
         )
@@ -244,7 +259,12 @@ async def _drivers(
             )
         )
     for event in (await hazards.list_hazards(session)).events:
-        if event.status != "ACTIVE" or not event.within_range or event.reference in seen:
+        if (
+            event.status != "ACTIVE"
+            or not event.within_range
+            or event.reference in seen
+            or event.incident_id in leave_out
+        ):
             continue
         mission_id = by_code.get(event.nearest_mission_code or "")
         if mission_id is not None:
@@ -286,11 +306,12 @@ def timeline_summary(event_type: str, summary: str) -> str:
 
 
 async def _timeline(
-    session: AsyncSession, current: Any | None, now: datetime
+    session: AsyncSession, current: Any | None, now: datetime, leave_out: list[uuid.UUID]
 ) -> schemas.TimelineOut:
     if current is None:
+        since = now - timedelta(days=RECENT_DAYS)
         rows = await session.execute(
-            _RECENT, {"since": now - timedelta(days=RECENT_DAYS), "limit": RECENT_MAX}
+            _RECENT, {"since": since, "limit": RECENT_MAX, "leave_out": leave_out}
         )
         return schemas.TimelineOut(
             incident=None,
@@ -320,15 +341,16 @@ async def overview(
 ) -> schemas.OverviewOut:
     now = now or datetime.now(UTC)
     today = now.date()
-    missions = await list_missions(session)
-    active = list(await session.execute(_ACTIVE))
+    leave_out = list(await intel_queries.exercise_runs(session))
+    missions = await list_missions(session, leave_out)
+    active = list(await session.execute(_ACTIVE, {"leave_out": leave_out}))
     current = active[0] if active else None
     latest = max(active, key=lambda r: r.opened_at) if active else None
     # Each embassy's readiness: its mission's latest exercise, else the seeded value (EXR-07).
     seeded = {r.mission_id: r.readiness_score for r in await session.execute(_READINESS)}
     drills = await exercise_queries.readiness(session)
     readiness = {**seeded, **{m: d.score for m, d in drills.items() if m in seeded}}
-    drivers = await _drivers(session, user, today, active, missions)
+    drivers = await _drivers(session, user, today, active, missions, leave_out)
     attention = [
         schemas.AttentionOut(
             mission_id=m.id,
@@ -349,18 +371,18 @@ async def overview(
         posture=posture(missions, len(active)),
         active_incidents=len(active),
         latest_incident=_ref(latest) if latest else None,
-        detection=await _detection(session, now, current),
-        accounted=await _accounted(session),
+        detection=await _detection(session, now, current, leave_out),
+        accounted=await _accounted(session, leave_out),
         readiness=schemas.ReadinessOut(
             mean=round(sum(scores) / len(scores)) if scores else None,
             sites=len(scores),
             from_exercises=sum(m in drills for m in readiness),
             illustrative=sum(m not in drills or drills[m].source != "EXERCISE" for m in readiness),
         ),
-        trend=await _trend(session, today),
+        trend=await _trend(session, today, leave_out),
         regions=regions(missions),
         attention=attention,
-        timeline=await _timeline(session, current, now),
+        timeline=await _timeline(session, current, now, leave_out),
         generated_at=now,
     )
 
