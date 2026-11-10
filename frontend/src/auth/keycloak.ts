@@ -1,5 +1,7 @@
 import Keycloak from "keycloak-js";
 
+import { resetIntro } from "../app/introRules";
+
 // OIDC login (D-04). The token is used only to call the API; the UI never reads
 // roles from it. Roles come from GET /api/me.
 /** The IdP's URL: absolute, or a path on the app's own origin ("/auth"), so one built image
@@ -32,5 +34,6 @@ export async function getToken(): Promise<string> {
 }
 
 export function logout(): Promise<void> {
+  resetIntro(); // the next sign-in in this tab plays the intro again
   return keycloak.logout({ redirectUri: window.location.origin });
 }

@@ -3070,3 +3070,164 @@ tr.nx-flash-b > td {
 .nx-exr-banner {
   text-decoration: none;
 }
+
+/* The sign-in intro (app/Intro.tsx): the globe of monitored missions, then Global Operations. */
+.nx-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: radial-gradient(ellipse at 60% 45%, #10233f 0%, #0b1424 45%, #07090d 100%);
+  color: #f6f7f9;
+  cursor: pointer;
+  opacity: 1;
+  transition: opacity 0.8s ease;
+  animation: nx-intro-in 0.6s ease both;
+}
+
+.nx-intro.out {
+  opacity: 0;
+}
+
+@keyframes nx-intro-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Sized, not inset: MapLibre's own CSS makes its container position: relative. */
+.nx-intro-globe {
+  width: 100%;
+  height: 100%;
+}
+
+.nx-intro-globe .maplibregl-canvas {
+  outline: none;
+}
+
+.nx-intro-veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(7, 9, 13, 0.92) 0%, rgba(7, 9, 13, 0.55) 34%, rgba(7, 9, 13, 0) 60%),
+    radial-gradient(ellipse at center, transparent 55%, rgba(7, 9, 13, 0.75) 100%);
+}
+
+.nx-intro-copy {
+  position: absolute;
+  left: clamp(24px, 7vw, 120px);
+  top: 50%;
+  transform: translateY(-50%);
+  max-width: min(560px, 86vw);
+  transition:
+    opacity 0.6s ease,
+    transform 0.9s ease;
+}
+
+.nx-intro-copy.away {
+  opacity: 0;
+  transform: translate(-24px, -50%);
+}
+
+.nx-intro-mark {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  animation: nx-intro-rise 0.9s 0.2s ease both;
+}
+
+.nx-intro-mark svg {
+  width: 44px;
+  height: 44px;
+  filter: drop-shadow(0 0 12px rgba(76, 144, 240, 0.7));
+}
+
+.nx-intro-mark h1 {
+  margin: 0;
+  font-size: clamp(40px, 6vw, 68px);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  background: linear-gradient(90deg, #f6f7f9 0%, #8abbff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.nx-intro-tagline {
+  margin: 10px 0 28px;
+  font-size: clamp(14px, 1.6vw, 18px);
+  color: #abb3bf;
+  animation: nx-intro-rise 0.9s 0.5s ease both;
+}
+
+.nx-intro-counts {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  justify-content: start;
+  gap: 8px 32px;
+  margin: 0 0 24px;
+  animation: nx-intro-rise 0.9s 0.8s ease both;
+}
+
+.nx-intro-counts dd {
+  margin: 0;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: clamp(22px, 2.6vw, 32px);
+  font-weight: 600;
+  color: #f6f7f9;
+}
+
+.nx-intro-counts dt {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8f99a8;
+}
+
+@media (max-width: 640px) {
+  .nx-intro-counts {
+    grid-template-columns: repeat(2, auto);
+  }
+}
+
+.nx-intro-status {
+  margin: 0;
+  min-height: 1.5em;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 13px;
+  color: #72ca9b;
+}
+
+.nx-intro-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: #72ca9b;
+  animation: nx-intro-blink 1s steps(1) infinite;
+}
+
+@keyframes nx-intro-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes nx-intro-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+.nx-intro-skip {
+  position: absolute;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #738091;
+}
