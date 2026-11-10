@@ -24,6 +24,9 @@ class TimelineEntryOut(BaseModel):
     at: datetime
     source: SOURCES
     text: str
+    # A SITE entry's site and sensor code, so a screen can open that camera (TWN-10, D-51).
+    site_id: str | None = None
+    sensor: str | None = None
 
 
 class MetricOut(BaseModel):

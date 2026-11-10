@@ -145,6 +145,14 @@ _CAMPAIGNS = text(
 def _event_line(row: Any) -> TimelineEntryOut | None:
     data: dict[str, Any] = row.data or {}
     at = row.occurred_at
+    if row.event_type == "SITE":
+        return TimelineEntryOut(
+            at=at,
+            source="SITE",
+            text=row.summary,
+            site_id=data.get("site_id"),
+            sensor=data.get("sensor"),
+        )
     if row.event_type in COPIED:
         return TimelineEntryOut(at=at, source=COPIED[row.event_type], text=row.summary)
     campaign = row.campaign or "the check-in"
