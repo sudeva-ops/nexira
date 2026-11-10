@@ -7,13 +7,13 @@ import { CctvWall } from "./CctvWall";
 
 const zone = (code: string, name: string, kind: Zone["kind"], count: number): Zone => ({
   id: `z-${code}`, code, name, kind, x: 0, y: 0, w: 100, h: 100, capacity: null, count,
-});  // prettier-ignore
+}); // prettier-ignore
 const camera = (code: string, zone_code: string, change: Partial<Sensor> = {}): Sensor => ({
   code, kind: "CCTV", label: code, zone_code, status: "OK", detail: null, status_at: "2026-11-10T08:00:00Z", online: true, ...change,
-});  // prettier-ignore
+}); // prettier-ignore
 const person = (id: string, kind: Occupant["kind"], zone_code: string): Occupant => ({
   id, kind, zone_code, name: null, label: null, since: "2026-11-10T08:00:00Z",
-});  // prettier-ignore
+}); // prettier-ignore
 
 const ZONES = [
   zone("g1", "Gate 1", "GATE", 1),
@@ -28,7 +28,11 @@ const CAMERAS = [
   camera("CAM-01", "g1"),
   camera("CAM-03", "g2"),
   camera("CAM-05", "lob"),
-  camera("CAM-07", "cons", { status: "OFFLINE", online: false, detail: "Offline" }),
+  camera("CAM-07", "cons", {
+    status: "OFFLINE",
+    online: false,
+    detail: "Offline",
+  }),
   camera("CAM-08", "cons"),
   camera("CAM-13", "safe"),
   camera("CAM-14", "must"),
@@ -37,7 +41,14 @@ const CAMERAS = [
 
 function twin(sensors: Sensor[] = CAMERAS): Twin {
   return {
-    site: { id: "s", name: "Embassy Nairobi", site_type: "EMBASSY", mission_id: "m", mission_code: "NBO", city: "Nairobi" },
+    site: {
+      id: "s",
+      name: "Embassy Nairobi",
+      site_type: "EMBASSY",
+      mission_id: "m",
+      mission_code: "NBO",
+      city: "Nairobi",
+    },
     zones: ZONES,
     occupants: [
       person("o1", "GUARD", "g1"),
@@ -49,9 +60,22 @@ function twin(sensors: Sensor[] = CAMERAS): Twin {
       person("o7", "STAFF", "cons"),
       person("o8", "STAFF", "ch"),
     ],
-    sensors: [...sensors, { ...camera("G2-READER", "g2"), kind: "BADGE_READER" }],
+    sensors: [
+      ...sensors,
+      { ...camera("G2-READER", "g2"), kind: "BADGE_READER" },
+    ],
     systems: [],
-    counts: { on_site: 8, staff: 3, guards: 2, visitors: 3, safe_room: 0, safe_room_capacity: 20, sensors_online: 8, sensors: 9, faults: 1 },
+    counts: {
+      on_site: 8,
+      staff: 3,
+      guards: 2,
+      visitors: 3,
+      safe_room: 0,
+      safe_room_capacity: 20,
+      sensors_online: 8,
+      sensors: 9,
+      faults: 1,
+    },
     shelter: null,
     route: null,
     readiness: { score: 79, last_drill_on: null, items: [] },
@@ -64,7 +88,10 @@ describe("the CCTV wall", () => {
   it("shows one camera per key zone, the offline one where it is, and all on request", async () => {
     render(<CctvWall twin={twin()} />);
     const wall = screen.getByLabelText("CCTV cameras");
-    const tiles = () => within(wall).getAllByRole("button").map((b) => b.getAttribute("aria-label"));
+    const tiles = () =>
+      within(wall)
+        .getAllByRole("button")
+        .map((b) => b.getAttribute("aria-label"));
     expect(tiles()).toEqual([
       "CAM-01 · Gate 1",
       "CAM-03 · Gate 2",
@@ -73,7 +100,11 @@ describe("the CCTV wall", () => {
       "CAM-13 · Safe room (hardened)",
       "CAM-14 · Muster point",
     ]);
-    expect(screen.getByText(/7 \/ 8 online · generated views \(simulated\); nothing is recorded/)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /7 \/ 8 online · simulated feeds; nothing is recorded/,
+      ),
+    ).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Show all 8" }));
     expect(tiles()).toHaveLength(8);
     await userEvent.click(screen.getByRole("button", { name: "Key cameras" }));
@@ -82,21 +113,32 @@ describe("the CCTV wall", () => {
 
   it("counts who is in view, says NO SIGNAL when offline, and enlarges a camera", async () => {
     render(<CctvWall twin={twin()} />);
-    const feed = (code: string) => document.querySelector(`.nx-cctv-tile [data-camera="${code}"]`) as HTMLElement;
+    const feed = (code: string) =>
+      document.querySelector(
+        `.nx-cctv-tile [data-camera="${code}"]`,
+      ) as HTMLElement;
     expect(feed("CAM-05")).toHaveTextContent("2 in zone");
     expect(feed("CAM-05")).toHaveTextContent("CAM-05 · LOBBY & RECEPTION");
     expect(feed("CAM-07")).toHaveTextContent("NO SIGNAL");
     expect(feed("CAM-07")).not.toHaveTextContent("REC");
-    await userEvent.click(screen.getByRole("button", { name: "CAM-05 · Lobby & reception" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "CAM-05 · Lobby & reception" }),
+    );
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("CAM-05 · Lobby & reception")).toBeInTheDocument();
-    expect(dialog.querySelector(".nx-cctv-feed.large")).toHaveTextContent(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC/);
+    expect(
+      within(dialog).getByText("CAM-05 · Lobby & reception"),
+    ).toBeInTheDocument();
+    expect(dialog.querySelector(".nx-cctv-feed.large")).toHaveTextContent(
+      /\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} UTC/,
+    );
   });
 
   it("plays each zone kind's clip, mirrors a zone's second camera, and draws when a clip is missing", async () => {
     render(<CctvWall twin={twin()} />);
     const video = (code: string) =>
-      document.querySelector(`.nx-cctv-tile [data-camera="${code}"] video`) as HTMLVideoElement | null;
+      document.querySelector(
+        `.nx-cctv-tile [data-camera="${code}"] video`,
+      ) as HTMLVideoElement | null;
     expect(video("CAM-01")?.getAttribute("src")).toBe("/cctv/gate.mp4");
     expect(video("CAM-05")?.getAttribute("src")).toBe("/cctv/lobby.mp4");
     expect(video("CAM-01")?.muted).toBe(true);
@@ -107,12 +149,32 @@ describe("the CCTV wall", () => {
     expect(video("CAM-03")).toHaveClass("mirrored"); // the second gate: the same clip, flipped
     fireEvent.error(video("CAM-05") as HTMLVideoElement);
     expect(video("CAM-05")).toBeNull(); // no lobby clip: the generated view
-    expect(document.querySelector('.nx-cctv-tile [data-camera="CAM-05"] canvas')).not.toBeNull();
+    expect(
+      document.querySelector('.nx-cctv-tile [data-camera="CAM-05"] canvas'),
+    ).not.toBeNull();
+  });
+
+  it("frames four cameras on one clip four ways: plain, mirrored, tight, both", async () => {
+    const gates = ["CAM-01", "CAM-02", "CAM-03", "CAM-04"].map((c, i) =>
+      camera(c, i < 2 ? "g1" : "g2"),
+    );
+    render(<CctvWall twin={twin(gates)} />);
+    await userEvent.click(screen.getByRole("button", { name: "Show all 4" }));
+    const classes = gates.map(
+      (g) =>
+        document.querySelector(`.nx-cctv-tile [data-camera="${g.code}"] video`)
+          ?.className ?? "",
+    );
+    expect(classes).toEqual(["", "mirrored", "tight", "mirrored tight"]);
   });
 
   it("falls back to the first cameras when none is at a key zone, and hides without cameras", () => {
-    const { unmount } = render(<CctvWall twin={twin([camera("CAM-09", "ch")])} />);
-    expect(screen.getByRole("button", { name: "CAM-09 · Chancery offices" })).toBeInTheDocument();
+    const { unmount } = render(
+      <CctvWall twin={twin([camera("CAM-09", "ch")])} />,
+    );
+    expect(
+      screen.getByRole("button", { name: "CAM-09 · Chancery offices" }),
+    ).toBeInTheDocument();
     unmount();
     const { container } = render(<CctvWall twin={twin([])} />);
     expect(container).toBeEmptyDOMElement();
@@ -123,7 +185,9 @@ describe("the generated scene", () => {
   it("places one figure per person, the same way each time, and keeps them on the floor", () => {
     const a = walkers("CAM-07", "CONSULAR", ["STAFF", "VISITOR", "VISITOR"]);
     expect(a).toHaveLength(3);
-    expect(walkers("CAM-07", "CONSULAR", ["STAFF", "VISITOR", "VISITOR"])).toEqual(a);
+    expect(
+      walkers("CAM-07", "CONSULAR", ["STAFF", "VISITOR", "VISITOR"]),
+    ).toEqual(a);
     const r = rng("x");
     for (let i = 0; i < 400; i += 1) step(a, "CONSULAR", 0.1, r);
     for (const p of a) {

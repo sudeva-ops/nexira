@@ -21,10 +21,11 @@ const KEY_ZONES = ["GATE", "LOBBY", "CONSULAR", "SAFE_ROOM", "MUSTER"] as const;
 interface Camera {
   sensor: Sensor;
   zone: Zone;
-  // Cameras sharing a clip start at evenly spaced points in its loop (slot, 0..1), and every
-  // second one is mirrored, so no two tiles show the same picture.
+  // Cameras sharing a clip start at evenly spaced points in its loop (slot, 0..1); every second
+  // one is mirrored, and the third and fourth are framed tighter, so no two tiles look alike.
   slot: number;
   mirrored: boolean;
+  tight: boolean;
 }
 
 /** A clip, looping from this camera's own point in it; paused off screen and in a hidden tab. */
@@ -43,7 +44,7 @@ function Clip({ camera, still, onMissing }: { camera: Camera; still: boolean; on
   return (
     <video
       ref={video}
-      className={camera.mirrored ? "mirrored" : undefined}
+      className={[camera.mirrored && "mirrored", camera.tight && "tight"].filter(Boolean).join(" ") || undefined}
       src={`/cctv/${CLIP[camera.zone.kind]}.mp4`}
       muted
       loop
@@ -171,7 +172,7 @@ export function CctvWall({ twin }: { twin: Twin }) {
       .map((c, _, all) => {
         const same = all.filter((o) => CLIP[o.zone.kind] === CLIP[c.zone.kind]);
         const i = same.indexOf(c);
-        return { ...c, slot: i / same.length, mirrored: i % 2 === 1 };
+        return { ...c, slot: i / same.length, mirrored: i % 2 === 1, tight: i % 4 >= 2 };
       });
   }, [twin.sensors, twin.zones]);
   if (!cameras.length) return null;
@@ -191,7 +192,7 @@ export function CctvWall({ twin }: { twin: Twin }) {
     <Card
       icon="mobile-video"
       title="CCTV"
-      sub={`${online} / ${cameras.length} online · generated views (simulated); nothing is recorded`}
+      sub={`${online} / ${cameras.length} online · simulated feeds; nothing is recorded`}
       actions={
         cameras.length > key.length ? (
           <Button

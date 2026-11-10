@@ -8,11 +8,11 @@ COMPOSE := docker compose --env-file $(ENV_FILE) -f infra/docker-compose.yml $(C
 APP_ENV ?= $(shell grep -E '^APP_ENV=' $(ENV_FILE) 2>/dev/null | cut -d= -f2)
 
 .PHONY: help env up down logs test test-backend test-simulator test-frontend \
-        lint lint-backend lint-simulator lint-frontend migrate seed reset-demo tiles e2e acceptance \
+        lint lint-backend lint-simulator lint-frontend migrate seed reset-demo tiles cctv-clips e2e acceptance \
         backup restore-test helm-check
 
 help:
-	@echo "up | down | logs | test | lint | e2e | acceptance | migrate | seed | reset-demo | tiles | backup | restore-test | helm-check"
+	@echo "up | down | logs | test | lint | e2e | acceptance | migrate | seed | reset-demo | tiles | cctv-clips | backup | restore-test | helm-check"
 
 env:
 	@test -f .env || (cp .env.example .env && echo "Created .env from .env.example")
@@ -115,6 +115,11 @@ reset-demo: env
 # (not committed). Downloads at build time only; the app works offline afterwards.
 tiles:
 	infra/scripts/build-tiles.sh
+
+# TWN-03: the Site Twin's CCTV loops, from free Pexels stock clips, into frontend/public/cctv/
+# (git-ignored; checked against SHA-256; the app never fetches them from the internet).
+cctv-clips:
+	infra/scripts/build-cctv-clips.sh
 
 # --- backups (Prompt 16, NFR 7; docs/runbooks/backup-restore.md) ----------------
 # A pg_dump as nexira_backup into ./backups (git-ignored).
