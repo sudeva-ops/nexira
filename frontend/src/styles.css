@@ -53,6 +53,7 @@ body {
 .nx-brand svg {
   width: 20px;
   height: 20px;
+  filter: drop-shadow(0 0 6px rgba(76, 144, 240, 0.55));
 }
 
 .nx-brand b {
@@ -66,6 +67,45 @@ body {
   min-height: 0;
   overflow: auto;
   padding-bottom: 6px;
+}
+
+/* Where it runs (the design's tenant block, without naming a customer). */
+.nx-aside-foot {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  padding: 9px 12px;
+  border-top: 1px solid var(--nx-line);
+  background: linear-gradient(180deg, transparent, rgba(76, 144, 240, 0.06));
+  color: var(--nx-tx3);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.nx-aside-foot b {
+  color: var(--nx-tx2);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.nx-aside-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: #32a467;
+  box-shadow: 0 0 0 0 rgba(50, 164, 103, 0.6);
+  animation: nx-aside-ping 2.4s ease-out infinite;
+}
+
+@keyframes nx-aside-ping {
+  70% {
+    box-shadow: 0 0 0 6px rgba(50, 164, 103, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(50, 164, 103, 0);
+  }
 }
 
 .nx-nav-group {
@@ -84,6 +124,15 @@ body {
   color: var(--nx-tx2);
   font-weight: 500;
   text-decoration: none;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.nx-nav:focus-visible {
+  outline: 2px solid #8abbff;
+  outline-offset: -2px;
 }
 
 .nx-nav:hover {
@@ -96,6 +145,7 @@ body {
 .nx-nav-active:hover {
   background: var(--nx-active);
   color: #fff;
+  box-shadow: inset 3px 0 0 #8abbff; /* where you are, at a glance */
 }
 
 .nx-main {
@@ -118,8 +168,9 @@ body {
 
 .nx-header h1 {
   margin: 0;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .nx-crumb {
@@ -149,6 +200,42 @@ body {
 .nx-view {
   min-height: 0;
   overflow: auto;
+  animation: nx-view-in 0.22s ease both; /* each page eases in (the section remounts per page) */
+}
+
+@keyframes nx-view-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* Thin dark scrollbars, as the theme (Windows draws thick light ones by default). */
+.nx-app * {
+  scrollbar-width: thin;
+  scrollbar-color: #404854 transparent;
+}
+
+.nx-app ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.nx-app ::-webkit-scrollbar-thumb {
+  background: #404854;
+  border-radius: 4px;
+}
+
+.nx-app ::-webkit-scrollbar-thumb:hover {
+  background: #5f6b7c;
+}
+
+/* Keyboard focus is always visible on our own controls. */
+.nx-linkbtn:focus-visible,
+tr.click:focus-visible,
+.nx-pill:focus-visible {
+  outline: 2px solid #8abbff;
+  outline-offset: 2px;
 }
 
 .nx-user {
@@ -250,6 +337,10 @@ body {
   border-bottom: 1px solid var(--nx-line);
 }
 
+.nx-card-hd > .bp6-icon {
+  color: #8abbff; /* the card's subject, picked out */
+}
+
 .nx-card-hd h3 {
   margin: 0;
   font-size: 12px;
@@ -271,6 +362,14 @@ body {
 
 .nx-kpi {
   padding: 8px 10px;
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.nx-kpi:hover {
+  border-color: #404854;
+  transform: translateY(-1px);
 }
 
 .nx-kpi .l {
@@ -338,6 +437,7 @@ body {
 .nx-sev.crit {
   background: #cd4246;
   color: #fff;
+  box-shadow: 0 0 10px rgba(205, 66, 70, 0.45);
 }
 
 .nx-sev.high {

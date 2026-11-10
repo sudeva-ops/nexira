@@ -58,7 +58,8 @@ export interface Overview {
     asked: number;
     incident_references: string[];
   };
-  readiness: { mean: number | null; sites: number };
+  // EXR-07: each embassy's latest exercise; illustrative while that is the seeded history.
+  readiness: { mean: number | null; sites: number; from_exercises?: number; illustrative?: number };
   trend: { day: string; signals: number; incidents: number }[];
   regions: { region: string; exposure: number; missions: number }[];
   attention: Attention[];
@@ -126,4 +127,12 @@ export function useBriefing() {
     refetchOnWindowFocus: false,
     retry: false,
   });
+}
+
+/** EXR-07: where the embassies' readiness comes from (plan-pilot-exr §5). */
+export function readinessDetail(r: { from_exercises?: number; illustrative?: number }): string {
+  if (!r.from_exercises) return "Mean embassy score · seeded values";
+  return r.illustrative
+    ? `Mean embassy score · from exercises · ${r.illustrative} illustrative`
+    : "Mean embassy score · from exercises";
 }

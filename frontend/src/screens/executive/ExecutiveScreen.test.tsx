@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
 import type { Overview } from "../../api/executive";
-import { duration } from "../../api/executive";
+import { duration, readinessDetail } from "../../api/executive";
 import { VIEWER } from "../../test/fixtures";
 import {
   DUTY_OFFICER,
@@ -232,6 +232,14 @@ describe("Executive Overview", () => {
 });
 
 describe("executive helpers", () => {
+  it("says where readiness comes from (EXR-07)", () => {
+    expect(readinessDetail({})).toBe("Mean embassy score · seeded values");
+    expect(readinessDetail({ from_exercises: 36, illustrative: 35 })).toBe(
+      "Mean embassy score · from exercises · 35 illustrative",
+    );
+    expect(readinessDetail({ from_exercises: 36, illustrative: 0 })).toBe("Mean embassy score · from exercises");
+  });
+
   it("formats durations", () => {
     expect([
       duration(null),

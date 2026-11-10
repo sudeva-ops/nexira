@@ -96,6 +96,13 @@ export function AppShell({ onLogout }: Props) {
           <b>NEXIRA</b>
         </div>
         <NavList />
+        <div className="nx-aside-foot" aria-label="Deployment">
+          <span className="nx-aside-dot" aria-hidden="true" />
+          <div>
+            <b>Sovereign deployment</b>
+            <div>In-country · no external calls</div>
+          </div>
+        </div>
       </aside>
       <main className="nx-main">
         <header className="nx-header">
@@ -115,7 +122,7 @@ export function AppShell({ onLogout }: Props) {
           <UserMenu onLogout={onLogout} />
         </header>
         <Ticker />
-        <section className={`nx-view${current?.path === "/operations" ? " full" : ""}`}>
+        <section key={pathname} className={`nx-view${current?.path === "/operations" ? " full" : ""}`}>
           <Outlet />
         </section>
         <PresenterBar />

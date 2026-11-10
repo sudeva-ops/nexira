@@ -31,6 +31,13 @@ export function formatStamp(iso: string, timeZone: string = HOME_TZ): string {
   return `${day} ${formatTime(date, timeZone)} ${timeZone === HOME_TZ ? HOME_TZ_LABEL : timeZone}`;
 }
 
+/** "10 Nov 2026", in the home time zone: a date without the time. */
+export function formatDate(iso: string, timeZone: string = HOME_TZ): string {
+  return new Intl.DateTimeFormat("en-GB", { timeZone, day: "2-digit", month: "short", year: "numeric" }).format(
+    new Date(iso),
+  );
+}
+
 function zoneOffsetMs(utcMs: number, timeZone: string): number {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat("en-GB", {
