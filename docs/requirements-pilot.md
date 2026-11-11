@@ -1474,5 +1474,5 @@ None. Every requirement is display only. UIP-07 hides a sidebar entry using the 
 1. **Screen sizes:** the polish targets 1440 × 900 and 1920 × 1080; smaller laptops (1280 × 800) are kept usable, not checked pixel by pixel. *Default: yes.*
 2. **Ticker contents:** ACTIVE and MONITORING incidents, most severe first, then events; standing still when the items fit. *Default: yes.* (Alternative: keep it ACTIVE only and just fix the edges and repetition.)
 3. **Audit in the sidebar:** hidden for roles that cannot open it. *Default: yes.* (Alternative: shown greyed with a lock, so people know it exists.)
-4. **Icons:** I pick replacements from Blueprint's set (for example `first-aid` for Health Intelligence and `people` variants for Assistance Partners) and show them in the PR's screenshots. *Default: yes.*
+4. **Icons:** I pick replacements from Blueprint's set (for example `symbol-cross` for Health Intelligence, `helper-management` for Assistance Partners and `clipboard-file` for After-Action Review) and show them in the PR's screenshots. *Default: yes.*
 5. **🔒:** none. *Default: none.*
