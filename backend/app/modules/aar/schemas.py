@@ -17,6 +17,7 @@ SOURCES = Literal[
     "SITE",
     "SUPPLY",
     "NOTIFICATION",
+    "ANNOTATION",
 ]
 
 

@@ -66,6 +66,17 @@ class ReplayCheckinOut(BaseModel):
     tally_end: TallyOut
 
 
+class ReplayAnnotationOut(BaseModel):
+    """An annotation linked to the incident, shown on the map while it stood (ANN-06). No label
+    or note: free text may name someone (RPL-05, plan-pilot-map G-4)."""
+
+    kind: Literal["MARK", "LINE", "AREA"]
+    symbol: str | None
+    shape: dict[str, object]  # GeoJSON geometry
+    created_at: datetime
+    until: datetime | None  # withdrawn or ended, whichever came first; null while it stands
+
+
 class ReplayOut(BaseModel):
     window: WindowOut
     incident: ReplayIncidentOut
@@ -75,3 +86,4 @@ class ReplayOut(BaseModel):
     trips: int
     checkin: ReplayCheckinOut | None
     timeline: list[TimelineEntryOut]
+    annotations: list[ReplayAnnotationOut]

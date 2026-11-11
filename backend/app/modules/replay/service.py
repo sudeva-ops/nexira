@@ -10,6 +10,7 @@ nothing is stored. No person's name or id leaves here: people are indexed dots.
 - The check-in is the incident's latest, personnel only (G-3); trips are a count, restricted
   ones left out (G-4, D-33)."""
 
+import json
 import uuid
 from collections import defaultdict
 from datetime import datetime
@@ -24,6 +25,7 @@ from app.modules.checkin.schemas import TallyOut
 from app.modules.intel.queries import exercise_runs
 from app.modules.replay.schemas import (
     AnswerOut,
+    ReplayAnnotationOut,
     ReplayCheckinOut,
     ReplayIncidentOut,
     ReplayOut,
@@ -79,6 +81,16 @@ _TRIPS = text(
     """
     SELECT count(*) FROM incident_exposure e JOIN trip t ON t.id = e.subject_id
      WHERE e.incident_id = :incident AND e.subject_type = 'TRIP' AND NOT t.restricted
+    """
+)
+
+_ANNOTATIONS = text(
+    """
+    SELECT kind, symbol, ST_AsGeoJSON(shape, 6) AS geojson, created_at,
+           CASE WHEN withdrawn_at IS NULL THEN ends_at
+                WHEN ends_at IS NULL THEN withdrawn_at
+                ELSE least(withdrawn_at, ends_at) END AS until
+      FROM map_annotation WHERE incident_id = :incident ORDER BY created_at, id
     """
 )
 
@@ -194,4 +206,14 @@ async def replay(session: AsyncSession, incident_id: uuid.UUID, now: datetime) -
         trips=await session.scalar(_TRIPS, params) or 0,
         checkin=out_checkin,
         timeline=timeline,
+        annotations=[
+            ReplayAnnotationOut(
+                kind=a.kind,
+                symbol=a.symbol,
+                shape=json.loads(a.geojson),
+                created_at=a.created_at,
+                until=a.until,
+            )
+            for a in await session.execute(_ANNOTATIONS, params)
+        ],
     )

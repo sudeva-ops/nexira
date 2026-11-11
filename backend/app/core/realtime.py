@@ -73,6 +73,7 @@ FORWARDED = frozenset(
         "PREDICTIVE_UPDATED",  # today's risk index refreshed; counts only (D-46)
         "AAR_UPDATED",  # a review started, decided or finalised; its id only (D-47)
         "EXERCISE_UPDATED",  # launched, a scene, ended or abandoned; its id only (D-48)
+        "ANNOTATION_UPDATED",  # added, edited or withdrawn; its id and incident only (D-52)
         "CAMPAIGN_QUEUED",
         "CAMPAIGN_UPDATED",
         "CHECKIN_UPDATED",
