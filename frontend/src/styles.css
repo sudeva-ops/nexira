@@ -341,14 +341,43 @@ tr.click:focus-visible,
   color: #8abbff; /* the card's subject, picked out */
 }
 
+/* The title keeps its room (up to 70%) and the subtitle gives way first (UIP-03). */
 .nx-card-hd h3 {
+  flex-shrink: 0;
+  max-width: 70%;
   margin: 0;
+  overflow: hidden;
   font-size: 12px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* UIP-02: a header's actions stay whole and on one line; the subtitle gives way first. */
+.nx-card-actions {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+/* Blueprint's small buttons keep 14px text; the app's text is 11-12px (UIP-02). */
+.bp6-button.bp6-small {
+  font-size: 12px;
+}
+
+/* UIP-03: one line, cut with an ellipsis, the full text in its title (ui/Clip.tsx). */
+.nx-clip {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .nx-card-sub {
+  min-width: 0;
   overflow: hidden;
   color: var(--nx-tx3);
   font-size: 11px;
@@ -990,6 +1019,10 @@ tr.click:focus-visible,
   font-weight: 600;
 }
 
+.nx-pp > .nx-grow {
+  min-width: 0;
+}
+
 .nx-pp .r {
   color: var(--nx-tx3);
   font-size: 11px;
@@ -1383,9 +1416,9 @@ tr.click:focus-visible,
 .nx-phone .ntf .h {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: #cbd5e1;
-  font-size: 11px;
+  font-size: 10px; /* UIP-05: the app's name and "now" on one line */
 }
 
 .nx-phone .ntf .ap {
@@ -1959,9 +1992,10 @@ tr.click:focus-visible,
   background: rgba(45, 114, 210, 0.15);
 }
 
+/* UIP-08: tall enough that the whole globe shows at the starting zoom. */
 .nx-air-map {
   position: relative;
-  height: 360px;
+  height: clamp(420px, calc(100vh - 330px), 640px);
 }
 
 .nx-banner.amber {
@@ -2702,6 +2736,16 @@ tr.nx-flash-b > td {
   cursor: pointer;
   font-family: ui-monospace, Consolas, monospace;
   font-size: 12px;
+}
+
+/* UIP-04: "All N cameras" closes the CCTV rows, at the right like the rows' status. */
+.nx-twn-cam-more {
+  justify-content: flex-end;
+}
+
+.nx-twn-cam-more .nx-twn-camlink {
+  font-family: inherit;
+  font-size: 11px;
 }
 
 .nx-twn-camlink:hover,

@@ -357,13 +357,10 @@ function CameraRows({ twin, onCamera }: { twin: Twin; onCamera: (code: string) =
         </li>
       ))}
       {cameras.length > 0 && (
-        <li className="nx-row nx-twn-cam">
-          <Button
-            minimal
-            size="small"
-            text={all ? "Cameras down only" : `All ${cameras.length} cameras`}
-            onClick={() => setAll((a) => !a)}
-          />
+        <li className="nx-row nx-twn-cam nx-twn-cam-more">
+          <button type="button" className="nx-twn-camlink nx-dim" onClick={() => setAll((a) => !a)}>
+            {all ? "Cameras down only" : `All ${cameras.length} cameras`}
+          </button>
         </li>
       )}
     </>
