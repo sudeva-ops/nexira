@@ -7,7 +7,9 @@ export interface Screen {
   icon: IconName;
   group: "COMMAND" | "MONITOR" | "RESPOND" | "PLAN & INSIGHT" | "ADMIN";
   builtIn: string; // prompt that builds the real screen
-  restricted?: "vip"; // in the nav only when GET /api/vip/access says visible (VIP-06)
+  // In the nav only when GET /api/vip/access says visible (VIP-06), or for administrators (UIP-07).
+  // Display only: the API enforces every check (D-04).
+  restricted?: "vip" | "admin";
 }
 
 // D-25: the Phase 1 screens, plus the pilot modules approved under D-30. Groups and subtitles follow the demo,
@@ -22,7 +24,7 @@ export const SCREENS: readonly Screen[] = [
   { path: "/journeys", title: "Journey Management", subtitle: "Travel risk · Trip approvals & itineraries", icon: "airplane", group: "MONITOR", builtIn: "Prompt 26" },
   { path: "/air", title: "Air Travel Tracking", subtitle: "Travel · Officials in the air, delays & diversions", icon: "satellite", group: "MONITOR", builtIn: "Prompt 31" },
   // §48 Q9: under MONITOR, before Natural Hazards & Climate.
-  { path: "/health", title: "Health Intelligence", subtitle: "Health · WHO advisories, outbreaks & medical facilities", icon: "heart", group: "MONITOR", builtIn: "Prompt 63" },
+  { path: "/health", title: "Health Intelligence", subtitle: "Health · WHO advisories, outbreaks & medical facilities", icon: "symbol-cross", group: "MONITOR", builtIn: "Prompt 63" },
   { path: "/hazards", title: "Natural Hazards & Climate", subtitle: "Hazards · Live events & long-term site exposure", icon: "globe-network", group: "MONITOR", builtIn: "Prompt 57" },
   { path: "/playbooks", title: "Response Playbooks", subtitle: "Workflows · Automated response", icon: "flash", group: "RESPOND", builtIn: "Prompt 11" },
   // D-40: under RESPOND, after Response Playbooks (§53 Q9).
@@ -32,7 +34,7 @@ export const SCREENS: readonly Screen[] = [
   // D-42: under RESPOND, after Fleet & Assets (§63 Q8); only for those who may see visits.
   { path: "/vip", title: "VIP Protection", subtitle: "Protection · Visits, programme risk & checklist", icon: "shield", group: "RESPOND", builtIn: "Prompt 81", restricted: "vip" },
   { path: "/notifications", title: "Mass Notification", subtitle: "Comms · Multi-channel delivery", icon: "send-message", group: "RESPOND", builtIn: "Prompt 21" },
-  { path: "/partners", title: "Assistance Partners", subtitle: "Response · Medical, evacuation & secure transport", icon: "heart", group: "RESPOND", builtIn: "Prompt 46" },
+  { path: "/partners", title: "Assistance Partners", subtitle: "Response · Medical, evacuation & secure transport", icon: "helper-management", group: "RESPOND", builtIn: "Prompt 46" },
   // D-43: under RESPOND, after Assistance Partners (§68 Q8).
   { path: "/twin", title: "Site Twin", subtitle: "Sites · Floor plan, occupancy & sensors", icon: "grid-view", group: "RESPOND", builtIn: "Prompt 87" },
   { path: "/checkin", title: "Safety Check-in", subtitle: "Workflows · Personnel accountability", icon: "tick-circle", group: "RESPOND", builtIn: "Prompt 11" },
@@ -47,10 +49,10 @@ export const SCREENS: readonly Screen[] = [
   // D-48 (§93 Q11): before After-Action Review, as the design.
   { path: "/exercises", title: "Exercise & Training", subtitle: "Readiness · Drills & scoring", icon: "target", group: "PLAN & INSIGHT", builtIn: "Prompt 116" },
   // D-47 (§88 Q10): after Predictive Risk, as the design.
-  { path: "/aar", title: "After-Action Review", subtitle: "Learning · Timeline, lessons & actions", icon: "endorsed", group: "PLAN & INSIGHT", builtIn: "Prompt 110" },
+  { path: "/aar", title: "After-Action Review", subtitle: "Learning · Timeline, lessons & actions", icon: "clipboard-file", group: "PLAN & INSIGHT", builtIn: "Prompt 110" },
   // D-45 (§78 Q7): last under PLAN & INSIGHT, as the design.
   { path: "/executive", title: "Executive Overview", subtitle: "Dashboard · Leadership view", icon: "chart", group: "PLAN & INSIGHT", builtIn: "Prompt 97" },
-  { path: "/audit", title: "Audit", subtitle: "Admin · Hash-chained audit log", icon: "history", group: "ADMIN", builtIn: "Prompt 3" },
+  { path: "/audit", title: "Audit", subtitle: "Admin · Hash-chained audit log", icon: "history", group: "ADMIN", builtIn: "Prompt 3", restricted: "admin" },
 ];
 
 // Screens reached from another screen, not from the sidebar: the header still names them.
