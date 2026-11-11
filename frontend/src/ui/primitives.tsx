@@ -49,10 +49,14 @@ export function Card({
     <section className={`nx-card ${className ?? ""}`}>
       <header className="nx-card-hd">
         {icon && <Icon icon={icon} size={13} />}
-        <h3>{title}</h3>
-        {sub && <span className="nx-card-sub">{sub}</span>}
+        <h3 title={typeof title === "string" ? title : undefined}>{title}</h3>
+        {sub && (
+          <span className="nx-card-sub" title={typeof sub === "string" ? sub : undefined}>
+            {sub}
+          </span>
+        )}
         <span className="nx-grow" />
-        {actions}
+        {actions && <span className="nx-card-actions">{actions}</span>}
       </header>
       {children}
     </section>

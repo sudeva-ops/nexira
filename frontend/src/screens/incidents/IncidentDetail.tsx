@@ -70,7 +70,8 @@ function ReviewLink({ incident }: { incident: Detail }) {
       <Button
         size="small"
         icon="endorsed"
-        text={`Open ${existing.reference}`}
+        text="Open AAR"
+        title={existing.reference}
         onClick={() => void navigate(`/aar?review=${existing.id}`)}
       />
     );

@@ -14,6 +14,7 @@ import { useIncident } from "../../api/intel";
 import { useMe } from "../../api/me";
 import { canRecordCheckin, canRequestPartner } from "../../api/permissions";
 import { formatTime, HOME_TZ } from "../../app/time";
+import { Clip } from "../../ui/Clip";
 import { initials, personTypeLabel } from "../../ui/format";
 import { Card, ExerciseTag, Kpi } from "../../ui/primitives";
 import { Donut } from "./Donut";
@@ -173,7 +174,9 @@ export function CheckinScreen() {
                     {initials(r.full_name)}
                   </div>
                   <div className="nx-grow">
-                    <div className="n">{r.full_name}</div>
+                    <div className="n">
+                      <Clip text={r.full_name} />
+                    </div>
                     <div className="r">{r.role_title ?? personTypeLabel(r.person_type)}</div>
                   </div>
                   <span className={`nx-sev ${r.status === "SAFE" ? "ok" : "crit"}`}>
@@ -182,6 +185,7 @@ export function CheckinScreen() {
                   {canRequest && r.status === "NEED_HELP" && (
                     <Button
                       size="small"
+                      minimal
                       icon="heart"
                       text="Request partner"
                       onClick={() =>

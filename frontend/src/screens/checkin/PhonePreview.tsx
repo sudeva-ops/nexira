@@ -5,6 +5,7 @@ import type { Campaign, CheckinPerson } from "../../api/checkin";
 import { useRespond } from "../../api/checkin";
 import { ApiError } from "../../api/client";
 import { formatTime, HOME_TZ } from "../../app/time";
+import { Clip } from "../../ui/Clip";
 
 /** D-28: what staff see on their phone. Answering here records the answer for the
  *  chosen recipient through POST /api/checkin/{id}/respond, as that person would. */
@@ -59,7 +60,7 @@ export function PhonePreview({
                 <span className="ap">
                   <Icon icon="shield" size={11} />
                 </span>
-                NEXIRA · SAFETY CHECK-IN
+                <Clip text="NEXIRA · SAFETY CHECK-IN" />
                 <span className="nx-push">now</span>
               </div>
               <div className="b">⚠ {campaign.reference}</div>
