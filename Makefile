@@ -85,6 +85,8 @@ acceptance: env reset-demo up
 	$(MAKE) reset-demo
 	$(COMPOSE) restart backend worker
 	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/exr-acceptance.spec.ts
+	# Site Twin live activity (§119, D-53): last; it switches the normal day on, then off again.
+	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/twa-acceptance.spec.ts
 
 lint: lint-backend lint-simulator lint-frontend
 
