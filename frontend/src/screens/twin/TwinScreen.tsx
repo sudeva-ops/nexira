@@ -1,5 +1,5 @@
 import { Button, Dialog, DialogBody, HTMLSelect, Icon, NonIdealState, Switch } from "@blueprintjs/core";
-import { type KeyboardEvent, useMemo, useState } from "react";
+import { type KeyboardEvent, type MouseEvent, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { ApiError } from "../../api/client";
@@ -199,10 +199,15 @@ function Plan({
               tabIndex: 0,
               "aria-label": `Open the camera on ${z.name}`,
               className: "nx-twn-pick",
-              onClick: () => onZone(z.code),
-              onKeyDown: (e: KeyboardEvent) => {
+              // The zone lets go of focus so the camera's dialog takes it (and Escape closes it).
+              onClick: (e: MouseEvent<SVGGElement>) => {
+                e.currentTarget.blur();
+                onZone(z.code);
+              },
+              onKeyDown: (e: KeyboardEvent<SVGGElement>) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
+                  e.currentTarget.blur();
                   onZone(z.code);
                 }
               },

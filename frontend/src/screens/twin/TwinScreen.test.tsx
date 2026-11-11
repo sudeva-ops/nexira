@@ -259,8 +259,10 @@ describe("Camera coverage (TWN-09..11)", () => {
     setup(DUTY_OFFICER, embassy({ "CAM-07": "OFFLINE" }));
     renderApp("/twin");
     await screen.findByTestId("twin-coverage");
-    await userEvent.click(within(plan()).getByRole("button", { name: "Open the camera on Consular hall" }));
+    const zone = within(plan()).getByRole("button", { name: "Open the camera on Consular hall" });
+    await userEvent.click(zone);
     expect(await screen.findByRole("dialog")).toHaveTextContent("CAM-08 · Consular hall");
+    expect(zone).not.toHaveFocus(); // the dialog takes focus, so Escape closes it (Prompt 126)
   });
 
   it("a zone opens from the keyboard too", async () => {
@@ -271,6 +273,7 @@ describe("Camera coverage (TWN-09..11)", () => {
     within(plan()).getByRole("button", { name: "Open the camera on Gate 2" }).focus();
     await userEvent.keyboard("{Enter}");
     expect(await screen.findByRole("dialog")).toHaveTextContent(/CAM-0[34] · Gate 2/);
+    expect(within(plan()).getByRole("button", { name: "Open the camera on Gate 2" })).not.toHaveFocus();
   });
 
   it("a camera in Sensors & systems opens it; one that is down shows NO SIGNAL (TWN-10)", async () => {

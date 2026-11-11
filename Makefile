@@ -62,6 +62,8 @@ e2e: env
 # Prompt 111: then, last and on its own, the After-Action Review acceptance (requirements-pilot.md
 # §87): later specs set INC-<year>-1042 back to ACTIVE, and it needs the whole run's record
 # (plan-pilot-aar G-4).
+# Prompt 126: then the Incident Replay acceptance (requirements-pilot.md §102), which opens the
+# replay from the review the After-Action Review spec left (plan-pilot-rpl §6). It only reads.
 acceptance: env reset-demo up
 	$(COMPOSE) restart backend worker
 	cd frontend && npx playwright install chromium
@@ -75,6 +77,7 @@ acceptance: env reset-demo up
 	# The Copilot reads the record the specs above left, before After-Action Review changes it.
 	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/cop-acceptance.spec.ts
 	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/aar-acceptance.spec.ts
+	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/rpl-acceptance.spec.ts
 	# Exercise & Training (§92, §93 Q12): on its own, after a second reset.
 	$(MAKE) reset-demo
 	$(COMPOSE) restart backend worker

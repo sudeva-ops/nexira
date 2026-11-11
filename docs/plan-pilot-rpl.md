@@ -94,6 +94,12 @@ On the plan: online cones translucent blue; OFFLINE, FAULT or DEGRADED cones red
 - **Replay:** `frontend/e2e/rpl-acceptance.spec.ts`, run after the After-Action Review spec in `make acceptance` (it opens the replay from AAR-<year>-1042). It reads only.
 - **Coverage:** added to `twn-acceptance.spec.ts`, which already plays NBO-SITE scenes 1 and 3: the cones, the KPI below 100% before, falling with CAM-07 offline (the consular hall stays covered by CAM-08, so it is not listed), recovering at scene 3; the handoff from Gate 2 and from the SITE entry.
 
+**As built in Prompt 126** (each a deviation for approval in its PR):
+- **Start of the window (§102):** "before the incident opened, no impact zone" cannot be shown. The window starts at the first signal's `received_at` (G-1), and the incident's `opened_at` is that signal's `occurred_at`, a few milliseconds earlier, so the zone is drawn from t = 0. The spec checks what holds at t = 0: one signal, no one exposed, no check-in yet. No code change.
+- **End of the window:** the spec checks the replay's 229 and 15 / 1 / 1 against the Incidents screen's exposure card and the Safety Check-in screen's personnel figures for the same check-in.
+- **Scrub:** to the first "a person needs help" entry; the expected tally is worked out from the payload's answers at that moment, and differs from the end's.
+- **Found and fixed:** a zone opened from the plan kept keyboard focus, so the camera dialog never took it and Escape did not close it (the Close button did). The zone now lets go of focus on click and on Enter or Space (`TwinScreen.tsx`), with a unit test for each.
+
 ## 7. Gaps and conflicts, with proposed answers
 
 | # | Gap | Proposed answer |
