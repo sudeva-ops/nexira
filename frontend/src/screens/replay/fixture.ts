@@ -1,7 +1,8 @@
 import type { Replay } from "../../api/replay";
 
 // A small incident for the replay tests: signal at 0 s, opened at 2 s, exposed at 3 s, the
-// check-in sent at 10 s, answers at 20 s and 40 s; the window ends at 60 s.
+// check-in sent at 10 s, answers at 20 s and 40 s; a checkpoint from 15 s, withdrawn at 45 s, and
+// an area from 30 s; the window ends at 60 s.
 export const T0 = Date.parse("2026-11-10T08:00:00Z");
 export const at = (s: number) => new Date(T0 + s * 1000).toISOString();
 
@@ -40,5 +41,15 @@ export const REPLAY: Replay = {
     { at: at(2), source: "INCIDENT", text: "Incident INC-2026-1042 opened.", site_id: null, sensor: null },
     { at: at(10), source: "NOTIFICATION", text: "NTF-3101 sent: checkin, 3 recipients.", site_id: null, sensor: null },
     { at: at(40), source: "CHECKIN", text: "Check-in NTF-3101: a person needs help.", site_id: null, sensor: null },
+  ],
+  annotations: [
+    { kind: "MARK", symbol: "CHECKPOINT", shape: { type: "Point", coordinates: [36.82, -1.285] }, created_at: at(15), until: at(45) },
+    {
+      kind: "AREA",
+      symbol: null,
+      shape: { type: "Polygon", coordinates: [[[36.81, -1.28], [36.83, -1.28], [36.83, -1.3], [36.81, -1.28]]] },
+      created_at: at(30),
+      until: null,
+    },
   ],
 };

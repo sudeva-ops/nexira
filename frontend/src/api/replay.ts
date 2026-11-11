@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
+import type { Shape } from "./annotations";
 import type { Severity } from "./intel";
 import { apiGet } from "./client";
 
@@ -54,6 +55,14 @@ export interface Replay {
     tally_end: { recipients: number; safe: number; need_help: number; pending: number };
   } | null;
   timeline: TimelineEntry[];
+  // Annotations linked to the incident (ANN-06): kind and shape, never the label (G-4).
+  annotations: {
+    kind: "MARK" | "LINE" | "AREA";
+    symbol: string | null;
+    shape: Shape;
+    created_at: string;
+    until: string | null;
+  }[];
 }
 
 export const replayKeys = { one: (id: string) => ["replay", id] as const };

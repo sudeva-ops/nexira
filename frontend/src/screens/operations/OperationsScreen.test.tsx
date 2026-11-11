@@ -2,22 +2,41 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
+import type { Annotation } from "../../api/annotations";
 import type { Incident } from "../../api/intel";
 import type { Weather } from "../../api/weather";
-import { DETAIL, INCIDENT, MISSIONS, SIGNALS, SUMMARY } from "../../test/fixtures";
-import { DUTY_OFFICER, mockApi, renderApp } from "../../test/render";
+import { DETAIL, INCIDENT, MISSIONS, SIGNALS, SUMMARY, VIEWER } from "../../test/fixtures";
+import { DUTY_OFFICER, mockApi, mockServer, renderApp } from "../../test/render";
 
 // jsdom has no WebGL; the stand-in renders one button per incident marker and says how
 // many missions the weather layer shows.
+const POINTS: [number, number][] = [
+  [36.8, -1.28],
+  [36.81, -1.29],
+  [36.82, -1.28],
+];
+
+// Annotations (ANN-01..03): it says how many it shows, offers each to pick, and stands in for
+// the map's zoom, clicks and double-click.
 vi.mock("../../map/OperationsMap", () => ({
   OperationsMap: ({
     incidents,
     onSelect,
     weather,
+    annotations = [],
+    onDrawPoint,
+    onDrawFinish,
+    onPickAnnotation,
+    onZoom,
   }: {
     incidents: Incident[];
     onSelect: (i: Incident) => void;
     weather: Weather[];
+    annotations?: Annotation[];
+    onDrawPoint?: (p: [number, number]) => void;
+    onDrawFinish?: () => void;
+    onPickAnnotation?: (id: string) => void;
+    onZoom?: (z: number) => void;
   }) => (
     <div data-testid="operations-map">
       {incidents.map((i) => (
@@ -26,6 +45,23 @@ vi.mock("../../map/OperationsMap", () => ({
         </button>
       ))}
       <span>weather layer: {weather.length}</span>
+      <span>annotations: {annotations.length}</span>
+      {annotations.map((a) => (
+        <button key={a.id} type="button" onClick={() => onPickAnnotation?.(a.id)}>
+          annotation {a.label}
+        </button>
+      ))}
+      <button type="button" onClick={() => onZoom?.(8)}>
+        zoom to city
+      </button>
+      {POINTS.map((p, n) => (
+        <button key={n} type="button" onClick={() => onDrawPoint?.(p)}>
+          map point {n}
+        </button>
+      ))}
+      <button type="button" onClick={() => onDrawFinish?.()}>
+        map double-click
+      </button>
     </div>
   ),
 }));
@@ -146,5 +182,147 @@ describe("Global Operations", () => {
     await userEvent.click(screen.getByRole("button", { name: `marker ${INCIDENT.reference}` }));
     await screen.findByLabelText("Exposure summary");
     expect(screen.getByRole("table", { name: "Weather at missions" })).toBeInTheDocument();
+  });
+});
+
+const CHECKPOINT: Annotation = {
+  id: "ann-1",
+  kind: "MARK",
+  symbol: "CHECKPOINT",
+  shape: { type: "Point", coordinates: [36.817, -1.283] },
+  label: "Checkpoint · Uhuru Highway",
+  note: "Police and army",
+  incident_id: INCIDENT.id,
+  incident_reference: INCIDENT.reference,
+  mission_code: "NBO",
+  ends_at: null,
+  status: "ACTIVE",
+  reason: null,
+  role: "Duty Officer",
+  created_at: "2026-11-11T09:02:00Z",
+  updated_at: null,
+  can_edit: true,
+};
+
+function server(me = DUTY_OFFICER, canAdd = true, annotations: Annotation[] = [CHECKPOINT]) {
+  return mockServer({
+    "GET /api/me": { body: me },
+    "GET /api/operations/summary": { body: SUMMARY },
+    "GET /api/missions": { body: MISSIONS },
+    "GET /api/incidents": { body: [INCIDENT] },
+    "GET /api/signals": { body: SIGNALS },
+    "GET /api/weather": { body: WEATHER },
+    "GET /api/annotations": { body: { annotations, can_add: canAdd } },
+    "POST /api/annotations": { status: 201, body: CHECKPOINT },
+    [`POST /api/annotations/${CHECKPOINT.id}/withdraw`]: { body: { ...CHECKPOINT, status: "WITHDRAWN" } },
+  });
+}
+
+function sent(fetchMock: ReturnType<typeof server>, method: string, path: string): unknown {
+  const call = fetchMock.mock.calls.find(([url, init]) => String(url) === path && init?.method === method);
+  return call ? JSON.parse(String(call[1]?.body)) : undefined;
+}
+
+describe("Map annotations (ANN-01..04)", () => {
+  it("shows them to every role; the Viewer has no tools and no Edit", async () => {
+    server(VIEWER, false, [{ ...CHECKPOINT, can_edit: false }]); // as the API answers the Viewer
+    renderApp("/operations");
+    expect(await screen.findByText("annotations: 1")).toBeInTheDocument();
+    expect(screen.queryByRole("toolbar", { name: "Annotate" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: `annotation ${CHECKPOINT.label}` }));
+    const card = screen.getByRole("dialog", { name: `Annotation: ${CHECKPOINT.label}` });
+    expect(card).toHaveTextContent("Checkpoint");
+    expect(card).toHaveTextContent("Police and army");
+    expect(card).toHaveTextContent(`Duty Officer · `);
+    expect(card).toHaveTextContent(INCIDENT.reference);
+    expect(within(card).queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(within(card).queryByRole("button", { name: "Withdraw" })).toBeNull();
+    const layer = screen.getByRole("button", { name: "Annotations" });
+    await userEvent.click(layer);
+    expect(screen.getByText("annotations: 0")).toBeInTheDocument();
+    expect(layer).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("draws only from city zoom; a mark is placed with one click and saved from the form", async () => {
+    const fetchMock = server();
+    renderApp("/operations");
+    const tools = await screen.findByRole("toolbar", { name: "Annotate" });
+    expect(within(tools).getByText("Zoom in to draw")).toBeInTheDocument();
+    expect(within(tools).getByRole("button", { name: "Mark" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "zoom to city" }));
+    await userEvent.click(within(tools).getByRole("button", { name: "Mark" }));
+    expect(tools).toHaveTextContent("Click the map to place the mark.");
+    await userEvent.click(screen.getByRole("button", { name: "map point 1" }));
+    const form = await screen.findByRole("dialog", { name: "New mark" });
+    await userEvent.selectOptions(within(form).getByLabelText("Symbol"), "RALLY_POINT");
+    await userEvent.type(within(form).getByLabelText("Label"), "Rally point · Embassy car park");
+    await userEvent.selectOptions(within(form).getByLabelText("Incident"), INCIDENT.id);
+    await userEvent.click(within(form).getByRole("button", { name: "Add" }));
+    await vi.waitFor(() => expect(sent(fetchMock, "POST", "/api/annotations")).toBeDefined());
+    expect(sent(fetchMock, "POST", "/api/annotations")).toEqual({
+      kind: "MARK",
+      symbol: "RALLY_POINT",
+      shape: { type: "Point", coordinates: [36.81, -1.29] },
+      label: "Rally point · Embassy car park",
+      note: null,
+      incident_id: INCIDENT.id,
+      ends_at: null,
+    });
+    await vi.waitFor(() => expect(screen.queryByRole("dialog", { name: "New mark" })).toBeNull());
+  });
+
+  it("draws an area point by point, finishing on double-click; Escape cancels", async () => {
+    const fetchMock = server();
+    renderApp("/operations");
+    const tools = await screen.findByRole("toolbar", { name: "Annotate" });
+    await userEvent.click(screen.getByRole("button", { name: "zoom to city" }));
+    await userEvent.click(within(tools).getByRole("button", { name: "Line" }));
+    await userEvent.click(screen.getByRole("button", { name: "map point 0" }));
+    await userEvent.keyboard("{Escape}");
+    expect(within(tools).getByRole("button", { name: "Line" })).toBeEnabled();
+    await userEvent.click(within(tools).getByRole("button", { name: "Area" }));
+    await userEvent.click(screen.getByRole("button", { name: "map point 0" }));
+    await userEvent.click(screen.getByRole("button", { name: "map point 1" }));
+    expect(tools).toHaveTextContent("1 more needed");
+    expect(within(tools).getByRole("button", { name: "Finish" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "map point 2" }));
+    await userEvent.click(screen.getByRole("button", { name: "map double-click" }));
+    const form = await screen.findByRole("dialog", { name: "New area" });
+    expect(within(form).queryByLabelText("Symbol")).toBeNull();
+    await userEvent.type(within(form).getByLabelText("Label"), "Avoid: crowd");
+    await userEvent.click(within(form).getByRole("button", { name: "Add" }));
+    await vi.waitFor(() => expect(sent(fetchMock, "POST", "/api/annotations")).toBeDefined());
+    expect(sent(fetchMock, "POST", "/api/annotations")).toMatchObject({
+      kind: "AREA",
+      symbol: null,
+      shape: {
+        type: "Polygon",
+        coordinates: [
+          [
+            [36.8, -1.28],
+            [36.81, -1.29],
+            [36.82, -1.28],
+            [36.8, -1.28],
+          ],
+        ],
+      },
+    });
+  });
+
+  it("withdraws a picked annotation with a reason", async () => {
+    const fetchMock = server();
+    renderApp("/operations");
+    await userEvent.click(await screen.findByRole("button", { name: `annotation ${CHECKPOINT.label}` }));
+    const card = screen.getByRole("dialog", { name: `Annotation: ${CHECKPOINT.label}` });
+    await userEvent.click(within(card).getByRole("button", { name: "Withdraw" }));
+    const confirm = within(card).getByRole("button", { name: "Withdraw" });
+    expect(confirm).toBeDisabled();
+    await userEvent.type(within(card).getByLabelText("Reason"), "Cleared by police");
+    await userEvent.click(confirm);
+    await vi.waitFor(() =>
+      expect(sent(fetchMock, "POST", `/api/annotations/${CHECKPOINT.id}/withdraw`)).toEqual({
+        reason: "Cleared by police",
+      }),
+    );
   });
 });

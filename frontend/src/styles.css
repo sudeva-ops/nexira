@@ -4180,3 +4180,62 @@ tr.nx-flash-b > td {
   height: 100%;
   pointer-events: none;
 }
+
+/* Map annotations on Global Operations (ANN-01..04, D-52): the toolbar under the legend, and
+   the card of a picked annotation. */
+.nx-ann-tools {
+  position: absolute;
+  top: 42px;
+  left: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(17, 20, 24, 0.85);
+}
+
+.nx-ann-hint {
+  font-size: 12px;
+  color: #abb3bf;
+}
+
+.nx-ann-card {
+  position: absolute;
+  top: 82px;
+  left: 10px;
+  z-index: 2;
+  width: 280px;
+  padding: 10px 12px;
+  border: 1px solid #383e47;
+  border-radius: 4px;
+  background: rgba(17, 20, 24, 0.95);
+  display: grid;
+  gap: 6px;
+}
+
+.nx-ann-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.nx-ann-label {
+  font-weight: 600;
+}
+
+.nx-ann-note {
+  color: #abb3bf;
+  white-space: pre-wrap;
+}
+
+.nx-ann-actions {
+  gap: 6px;
+}
+
+.nx-ann-withdraw {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
