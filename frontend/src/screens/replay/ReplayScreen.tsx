@@ -152,6 +152,14 @@ function Player({ replay, initial }: { replay: Replay; initial: number | null })
                   <span>{clock(e.at)}</span>
                   {e.text}
                 </button>
+                {e.site_id && e.sensor && (
+                  <Link
+                    className="nx-rpl-camera"
+                    to={`/twin?${new URLSearchParams({ site: e.site_id, camera: e.sensor }).toString()}`}
+                  >
+                    View camera
+                  </Link>
+                )}
               </div>
             ))}
           </div>

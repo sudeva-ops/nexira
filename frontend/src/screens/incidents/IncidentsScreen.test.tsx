@@ -67,4 +67,24 @@ describe("Incidents", () => {
     expect(screen.queryByLabelText("Incident status") !== null).toBe(allowed);
     expect(screen.queryByLabelText("Note") !== null).toBe(allowed);
   });
+
+  it("a SITE entry links to the camera watching that place (TWN-10)", async () => {
+    const site = {
+      ...DETAIL.timeline[0],
+      id: 99,
+      event_type: "SITE",
+      summary: "Embassy Nairobi · Camera 7: OFFLINE",
+      data: { site_id: "s-nbo", sensor: "CAM-07", status: "OFFLINE" },
+    } as (typeof DETAIL.timeline)[number];
+    mockApi({
+      "/api/me": { body: DUTY_OFFICER },
+      "/api/incidents": { body: [INCIDENT] },
+      [`/api/incidents/${INCIDENT.id}`]: { body: { ...DETAIL, timeline: [...DETAIL.timeline, site] } },
+    });
+    renderApp(`/incidents?id=${INCIDENT.id}`);
+    const timeline = await screen.findByLabelText("Timeline");
+    const links = within(timeline).getAllByRole("link", { name: "View camera" });
+    expect(links).toHaveLength(1); // only the SITE entry
+    expect(links[0]).toHaveAttribute("href", "/twin?site=s-nbo&camera=CAM-07");
+  });
 });

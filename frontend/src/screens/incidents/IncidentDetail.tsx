@@ -1,6 +1,6 @@
 import { Button, Callout, HTMLSelect, Icon, NonIdealState, Spinner, TextArea } from "@blueprintjs/core";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { useReviews, useStartReview } from "../../api/aar";
 import { ApiError } from "../../api/client";
@@ -118,6 +118,18 @@ function NoteForm({ incidentId }: { incidentId: string }) {
         {add.isError && <span className="nx-error">{errorText(add.error)}</span>}
       </div>
     </form>
+  );
+}
+
+/** TWN-10: a SITE entry (a sensor fault or recovery) opens the camera watching that place. */
+function CameraLink({ data }: { data: Record<string, unknown> }) {
+  const { site_id: site, sensor } = data;
+  if (typeof site !== "string" || typeof sensor !== "string") return null;
+  return (
+    <>
+      {" · "}
+      <Link to={`/twin?${new URLSearchParams({ site, camera: sensor }).toString()}`}>View camera</Link>
+    </>
   );
 }
 
@@ -248,6 +260,7 @@ export function IncidentDetail({ incidentId }: { incidentId: string }) {
                 <span>{formatStamp(e.occurred_at)}</span>
                 <b>{e.event_type}</b> · {e.summary}
                 {e.actor_type === "USER" && <span className="nx-dim"> · by a user</span>}
+                <CameraLink data={e.data} />
               </div>
             ))}
           </div>

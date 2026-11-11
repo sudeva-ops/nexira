@@ -12,7 +12,8 @@ import { CLIP, grain, H, noiseTile, people, rng, scene, step, W, walkers } from 
 // its own point in the loop and a zone's second camera mirrored, so the wall looks live. With no
 // clip, it draws a generated view peopled from the twin's occupancy. Six key cameras, all on
 // request; an offline camera shows NO SIGNAL. Nothing is filmed or stored. Under reduced motion
-// each view is a still frame.
+// each view is a still frame. A camera opens enlarged from its tile, or from the plan, the sensor
+// list or an incident's SITE entry (TWN-10).
 
 const FPS = 12; // a CCTV cadence, and light on the machine
 const KEY_ZONES = ["GATE", "LOBBY", "CONSULAR", "SAFE_ROOM", "MUSTER"] as const;
@@ -161,9 +162,20 @@ function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; lar
   );
 }
 
-export function CctvWall({ twin }: { twin: Twin }) {
+/** The wall; `open` and `onOpen` let the screen open a camera from elsewhere (TWN-10). */
+export function CctvWall({
+  twin,
+  open: asked,
+  onOpen,
+}: {
+  twin: Twin;
+  open?: string | null;
+  onOpen?: (code: string | null) => void;
+}) {
   const [all, setAll] = useState(false);
-  const [open, setOpen] = useState<Camera | null>(null);
+  const [mine, setMine] = useState<string | null>(null);
+  const code = onOpen ? (asked ?? null) : mine;
+  const setOpen = onOpen ?? setMine;
   const cameras = useMemo(() => {
     const zones = new Map(twin.zones.map((z) => [z.code, z]));
     return twin.sensors
@@ -176,6 +188,7 @@ export function CctvWall({ twin }: { twin: Twin }) {
       });
   }, [twin.sensors, twin.zones]);
   if (!cameras.length) return null;
+  const open = cameras.find((c) => c.sensor.code === code) ?? null;
   // One camera per key zone (the first, or the one that is offline), then the rest.
   const key: Camera[] = [];
   for (const kind of KEY_ZONES) {
@@ -211,7 +224,7 @@ export function CctvWall({ twin }: { twin: Twin }) {
             type="button"
             className="nx-cctv-tile"
             aria-label={`${c.sensor.code} · ${c.zone.name}${c.sensor.online ? "" : " · offline"}`}
-            onClick={() => setOpen(c)}
+            onClick={() => setOpen(c.sensor.code)}
           >
             <Feed camera={c} twin={twin} />
           </button>

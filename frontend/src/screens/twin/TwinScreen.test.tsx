@@ -7,6 +7,7 @@ import type { Occupant, Sensor, Twin, Zone } from "../../api/twin";
 import { dotsIn, drillAgo } from "../../api/twin";
 import { VIEWER } from "../../test/fixtures";
 import { DUTY_OFFICER, mockServer, type Reply, renderApp } from "../../test/render";
+import { PLAN_ZONES, planSensors } from "./plan.fixture";
 
 const SECURITY: Me = {
   id: "u-sec",
@@ -30,7 +31,7 @@ const occupant = (id: string, kind: Occupant["kind"], zone_code: string, change:
   id, kind, zone_code, name: null, label: null, since: "2026-11-02T08:00:00Z", ...change,
 });  // prettier-ignore
 const sensor = (code: string, kind: string, label: string, zone_code: string | null, change: Partial<Sensor> = {}): Sensor => ({
-  code, kind, label, zone_code, status: "OK", detail: null, status_at: "2026-11-02T08:00:00Z", online: true, ...change,
+  code, kind, label, zone_code, status: "OK", detail: null, status_at: "2026-11-02T08:00:00Z", online: true, mount: null, ...change,
 });  // prettier-ignore
 const SENSORS = [
   sensor("G1-MAIN", "GATE", "Gate 1 · main", null, { detail: "Open · screening" }),
@@ -91,7 +92,10 @@ function sent(fetchMock: ReturnType<typeof mockServer>, method: string, path: st
     .map(([, init]) => JSON.parse(String(init?.body)) as unknown);
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  sessionStorage.clear();
+});
 
 describe("Site Twin", () => {
   it("shows the KPIs, the plan with counts and dots, sensors, occupancy and readiness (TWN-01..05)", async () => {
@@ -208,6 +212,95 @@ describe("Site Twin", () => {
     await waitFor(() => expect(within(nav).getByText("Site Twin")).toBeInTheDocument());
     const labels = within(nav).getAllByRole("link").map((a) => a.textContent);
     expect(labels.indexOf("Site Twin")).toBe(labels.indexOf("Assistance Partners") + 1);
+  });
+});
+
+describe("Camera coverage (TWN-09..11)", () => {
+  const embassy = (down: Parameters<typeof planSensors>[0] = {}) =>
+    twin({ zones: PLAN_ZONES, sensors: planSensors(down), occupants: [] });
+  const kpi = () => screen.getByText("Camera coverage", { selector: ".l" }).closest(".nx-kpi");
+  const plan = () => screen.getByRole("img", { name: "Embassy Nairobi floor plan" });
+
+  it("shows the KPI; the toggle draws 16 cones, the blind corner hatched and named, and is remembered", async () => {
+    setup(DUTY_OFFICER, embassy());
+    renderApp("/twin");
+    await screen.findByRole("img", { name: "Embassy Nairobi floor plan" });
+    expect(kpi()).toHaveTextContent("Camera coverage97%All cameras online");
+    expect(screen.queryByTestId("twin-coverage")).toBeNull(); // off on a first visit
+    expect(screen.queryByRole("button", { name: /Open the camera on/ })).toBeNull();
+    await userEvent.click(screen.getByRole("checkbox", { name: "Camera coverage" }));
+    const layer = screen.getByTestId("twin-coverage");
+    expect(layer.querySelectorAll('[data-state="online"] path')).toHaveLength(16);
+    expect(layer.querySelectorAll('[data-state="down"]')).toHaveLength(0);
+    expect(screen.getByTestId("twin-gaps").querySelectorAll("rect").length).toBeGreaterThan(0);
+    const cover = screen.getByLabelText("What the cameras see");
+    expect(cover).toHaveTextContent("Every zone has a working camera");
+    expect(cover).toHaveTextContent("Blind spots: Chancery offices (7%)");
+    expect(sessionStorage.getItem("nexira.twin.coverage")).toBe("on");
+  });
+
+  it("an offline camera's cone is red and dashed and the KPI falls; a zone with none left is listed", async () => {
+    sessionStorage.setItem("nexira.twin.coverage", "on");
+    setup(DUTY_OFFICER, embassy({ "CAM-07": "OFFLINE", "CAM-03": "OFFLINE", "CAM-04": "FAULT" }));
+    renderApp("/twin");
+    const layer = await screen.findByTestId("twin-coverage");
+    const down = layer.querySelector('[data-camera="CAM-07"]');
+    expect(down).toHaveAttribute("data-state", "down");
+    expect(down?.querySelector("path")).toHaveAttribute("stroke-dasharray", "5 4");
+    expect(layer.querySelectorAll('[data-state="down"]')).toHaveLength(3);
+    expect(kpi()).toHaveTextContent("Camera coverage94%Not covered: Gate 2");
+    expect(screen.getByLabelText("What the cameras see")).toHaveTextContent("Not covered now: Gate 2");
+    // CAM-08 still covers the consular hall: a blind spot, not "not covered".
+    expect(screen.getByLabelText("What the cameras see")).toHaveTextContent("Consular hall (");
+  });
+
+  it("a zone on the plan opens the camera that watches it, enlarged (TWN-10)", async () => {
+    sessionStorage.setItem("nexira.twin.coverage", "on");
+    setup(DUTY_OFFICER, embassy({ "CAM-07": "OFFLINE" }));
+    renderApp("/twin");
+    await screen.findByTestId("twin-coverage");
+    await userEvent.click(within(plan()).getByRole("button", { name: "Open the camera on Consular hall" }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent("CAM-08 · Consular hall");
+  });
+
+  it("a zone opens from the keyboard too", async () => {
+    sessionStorage.setItem("nexira.twin.coverage", "on");
+    setup(DUTY_OFFICER, embassy());
+    renderApp("/twin");
+    await screen.findByTestId("twin-coverage");
+    within(plan()).getByRole("button", { name: "Open the camera on Gate 2" }).focus();
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("dialog")).toHaveTextContent(/CAM-0[34] · Gate 2/);
+  });
+
+  it("a camera in Sensors & systems opens it; one that is down shows NO SIGNAL (TWN-10)", async () => {
+    setup(DUTY_OFFICER, embassy({ "CAM-07": "OFFLINE" }));
+    renderApp("/twin");
+    const list = await screen.findByRole("list", { name: "Sensors and systems" });
+    expect(within(list).getAllByRole("button", { name: /^CAM-/ }).map((b) => b.textContent)).toEqual([
+      " CAM-07 · Consular hall",
+    ]);
+    await userEvent.click(within(list).getByRole("button", { name: "All 16 cameras" }));
+    expect(within(list).getAllByRole("button", { name: /^CAM-/ })).toHaveLength(16);
+    await userEvent.click(within(list).getByRole("button", { name: /^CAM-07/ }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("CAM-07 · Consular hall");
+    expect(dialog).toHaveTextContent("NO SIGNAL");
+  });
+
+  it("opens from a link: a sensor's zone camera, or no camera (TWN-10)", async () => {
+    setup(DUTY_OFFICER, embassy());
+    renderApp("/twin?site=s-nbo&camera=G2-READER");
+    expect(await screen.findByRole("dialog")).toHaveTextContent(/CAM-0[34] · Gate 2/);
+  });
+
+  it("says when no camera covers the zone", async () => {
+    const none = embassy();
+    setup(DUTY_OFFICER, { ...none, sensors: none.sensors.filter((s) => s.zone_code !== "g2" || s.kind !== "CCTV") });
+    renderApp("/twin?site=s-nbo&zone=g2");
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent("Gate 2");
+    expect(dialog).toHaveTextContent("No camera covers this zone");
   });
 });
 
