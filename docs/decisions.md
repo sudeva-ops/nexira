@@ -317,6 +317,11 @@ Rules:
 - **Replay from the record.** An incident is played back from what the platform already holds; nothing is stored and no schema changes. People are drawn at their current place, and the screen says so. No names, for any role.
 - **Coverage from seeded mounts.** Each CCTV camera gets a seeded mount, heading, field of view and range (PC-53, not 🔒). Coverage is a cone clipped to the camera's zone; no line-of-sight model. No video analytics of any kind.
 
+**D-52 · Map annotations, Nearby and map search.** Approved by the product owner on 2026-11-11 (PR #167). Requirements ANN-01 to ANN-06, NBY-01 to NBY-06 and SRC-01 to SRC-04 (§109–115) in `docs/requirements-pilot.md`, with the defaults in §115. The ideas come from the same open-source globe viewer (God's Eye View); none of its code, stack or data feeds is used, and voice is left out.
+- **Shared marks, roles not names.** People draw marks, lines and areas on the world map (PC-54, 🔒); everyone sees them live; they are withdrawn, never deleted, and audited; the map shows the author's role and the audit log keeps who.
+- **Nearby is a read.** Worked out from current places under RLS and mission scope; names only within the people scope; restricted trips never (D-33); not audited.
+- **Search stays in the browser.** Coordinates, `geo:` URIs, platform records and a bundled public-domain gazetteer; no geocoder and no request leaves the stack (D-24).
+
 ---
 
 ## 7. Phase 1 acceptance scenario: NBO-CIVIL-UNREST
