@@ -2776,7 +2776,7 @@ tr.nx-flash-b > td {
 }
 
 /* --- The operations feed (UI 3) ----------------------------------------------------- */
-/* The live ticker under the header: ACTIVE incidents and the latest events, scrolling. Its text
+/* The live ticker under the header: the latest events and open incidents (UIP-01). Its text
    is drawn from data-text, so it is not part of the page's text (aria-hidden, see Ticker.tsx). */
 .nx-ticker {
   display: flex;
@@ -2823,6 +2823,15 @@ tr.nx-flash-b > td {
 
 .nx-ticker.still .nx-ticker-track {
   animation: none;
+}
+
+/* Standing still, the first item starts clear of the fade and the last has no trailing mark. */
+.nx-ticker.still .nx-ticker-viewport {
+  mask-image: linear-gradient(90deg, #000 92%, transparent 100%);
+}
+
+.nx-ticker.still .nx-ticker-item:last-child::after {
+  content: none;
 }
 
 .nx-ticker-item::before {

@@ -2,7 +2,8 @@ import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 
-import { DUTY_OFFICER, mockApi, renderApp } from "../test/render";
+import { ADMIN, DUTY_OFFICER, mockApi, renderApp } from "../test/render";
+import { SCREENS } from "./screens";
 import { formatTime } from "./time";
 
 beforeEach(() => {
@@ -44,12 +45,27 @@ describe("app shell", () => {
       "Exercise & Training", // pilot module 18 (D-48), before After-Action Review
       "After-Action Review", // pilot module 17 (D-30, D-47), after Predictive Risk
       "Executive Overview", // pilot module 15 (D-30, D-45), last under PLAN & INSIGHT
-      "Audit",
-    ]);
+    ]); // Audit only for administrators (UIP-07)
     // The Copilot is in scope since D-50.
     for (const outOfScope of ["Integrations", "OSINT"]) {
       expect(within(nav).queryByText(new RegExp(outOfScope, "i"))).toBeNull();
     }
+  });
+
+  it("shows Audit in the sidebar to administrators only (UIP-07)", async () => {
+    const { unmount } = renderApp("/");
+    await screen.findByTestId("user-name"); // the Duty Officer is known, and still no Audit
+    expect(within(screen.getByRole("navigation", { name: "Main" })).queryByRole("link", { name: "Audit" })).toBeNull();
+    unmount();
+    mockApi({ "/api/me": { body: ADMIN } });
+    renderApp("/");
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(await within(nav).findByRole("link", { name: "Audit" })).toHaveAttribute("href", "/audit");
+  });
+
+  it("gives every screen its own icon (UIP-06)", () => {
+    const icons = SCREENS.map((s) => s.icon);
+    expect(new Set(icons).size).toBe(icons.length);
   });
 
   it("uses the Decision Queue as the home screen", () => {

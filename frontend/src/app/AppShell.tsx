@@ -2,6 +2,7 @@ import { Icon, Tag } from "@blueprintjs/core";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 
 import { useRunning } from "../api/exercises";
+import { hasRole, useMe } from "../api/me";
 import { useAgents, usePendingCount } from "../api/proposals";
 import { PresenterBar } from "../presenter/PresenterBar";
 import { RealtimeProvider } from "../api/realtime";
@@ -19,10 +20,12 @@ const FULL = new Set(["/operations", "/copilot", "/incidents/replay"]);
 
 function NavList() {
   const vip = useVipAccess().data?.visible ?? false;
+  const admin = hasRole(useMe().data, "ADMIN");
   let group: Screen["group"] | null = null;
   const items = [];
   for (const screen of SCREENS) {
     if (screen.restricted === "vip" && !vip) continue; // VIP-06: no entry for anyone else
+    if (screen.restricted === "admin" && !admin) continue; // UIP-07: display only (D-04)
     if (screen.group !== group) {
       group = screen.group;
       items.push(
