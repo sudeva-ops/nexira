@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import type { Mission } from "../api/people";
 import { arcPairs } from "../app/introRules";
 import { registerPmtiles, tilesAvailable } from "./base";
+import { addDaylight } from "./daylight";
 import { greatCircle, missionFeatures } from "./geo";
 import { baseStyle } from "./style";
 import { applyProjection } from "./three";
@@ -70,6 +71,7 @@ export function IntroGlobe({
   useEffect(() => {
     let disposed = false;
     let frame = 0;
+    let stopDaylight = () => {};
     registerPmtiles();
     void tilesAvailable().then((available) => {
       if (disposed || !container.current) return;
@@ -87,6 +89,7 @@ export function IntroGlobe({
       m.on("load", () => {
         if (disposed) return;
         applyProjection(m, true);
+        stopDaylight = addDaylight(m);
         m.addSource("arcs", { type: "geojson", data: arcs([], 0), lineMetrics: true });
         m.addSource("missions", { type: "geojson", data: missionFeatures(data.current) });
         m.addSource("comets", { type: "geojson", data: comets([], 0) });
@@ -162,6 +165,7 @@ export function IntroGlobe({
     return () => {
       disposed = true;
       cancelAnimationFrame(frame);
+      stopDaylight();
       map.current?.remove();
       map.current = null;
     };
