@@ -25,6 +25,7 @@ interface Replay {
     tally_end: { safe: number; need_help: number; pending: number };
   } | null;
   timeline: { at: string; source: string; text: string }[];
+  annotations: { kind: string; symbol: string | null; until: string | null }[];
 }
 
 const year = new Date().getUTCFullYear();
@@ -75,6 +76,23 @@ test("Incident Replay acceptance: opens, start and end of the window, scrub, no 
   if (!incident) return;
   const replay = await duty.get<Replay>(`/api/incidents/${incident.id}/replay`);
   const body = JSON.stringify(replay);
+  // ANN-06 (Prompt 133): the map spec's checkpoint (withdrawn) and area are on the replay, by
+  // kind only: no label, no reason (plan-pilot-map G-4).
+  expect(replay.annotations.map((a) => [a.kind, a.symbol, a.until !== null])).toEqual(
+    expect.arrayContaining([
+      ["MARK", "CHECKPOINT", true],
+      ["AREA", null, false],
+    ]),
+  );
+  const marks = replay.timeline.filter((e) => e.source === "ANNOTATION").map((e) => e.text);
+  expect(marks).toEqual(
+    expect.arrayContaining([
+      "Map annotation added: Checkpoint.",
+      "Map annotation added: Area.",
+      "Map annotation withdrawn: Checkpoint.",
+    ]),
+  );
+  for (const text of ["Uhuru Highway", "crowd at the CBD", "Cleared by police"]) expect(body).not.toContain(text);
   for (const name of NAMES) expect(body, name).not.toContain(name);
   const start = ms(replay.window.start);
   const end = ms(replay.window.end);

@@ -62,6 +62,8 @@ e2e: env
 # Prompt 111: then, last and on its own, the After-Action Review acceptance (requirements-pilot.md
 # §87): later specs set INC-<year>-1042 back to ACTIVE, and it needs the whole run's record
 # (plan-pilot-aar G-4).
+# Prompt 133: the map tools acceptance (requirements-pilot.md §114) runs in the first batch,
+# after Document Expiry has set INC-<year>-1042 ACTIVE again; the replay spec checks its marks.
 # Prompt 126: then the Incident Replay acceptance (requirements-pilot.md §102), which opens the
 # replay from the review the After-Action Review spec left (plan-pilot-rpl §6). It only reads.
 acceptance: env reset-demo up
@@ -71,7 +73,8 @@ acceptance: env reset-demo up
 	  e2e/ntf-acceptance.spec.ts e2e/jrn-acceptance.spec.ts e2e/air-acceptance.spec.ts \
 	  e2e/ta-acceptance.spec.ts e2e/wx-acceptance.spec.ts e2e/ast-acceptance.spec.ts \
 	  e2e/dx-acceptance.spec.ts e2e/ev-acceptance.spec.ts e2e/flt-acceptance.spec.ts \
-	  e2e/hl-acceptance.spec.ts e2e/hz-acceptance.spec.ts e2e/vip-acceptance.spec.ts \
+	  e2e/hl-acceptance.spec.ts e2e/hz-acceptance.spec.ts e2e/map-acceptance.spec.ts \
+	  e2e/vip-acceptance.spec.ts \
 	  e2e/twn-acceptance.spec.ts e2e/sup-acceptance.spec.ts \
 	  e2e/exe-acceptance.spec.ts e2e/prd-acceptance.spec.ts
 	# The Copilot reads the record the specs above left, before After-Action Review changes it.

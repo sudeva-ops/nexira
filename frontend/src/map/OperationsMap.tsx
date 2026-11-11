@@ -595,7 +595,14 @@ export function OperationsMap({
   }, [map, selectedId]);
 
   return (
-    <div className="nx-map" ref={container} data-testid="operations-map">
+    <div
+      className="nx-map"
+      ref={container}
+      data-testid="operations-map"
+      // What the canvas draws, for the acceptance specs: annotations shown, the searched point.
+      data-annotations={annotations.length}
+      data-marked={mark ? `${mark.lat},${mark.lon}` : undefined}
+    >
       <MapToggle
         globe={globe}
         onChange={(g) => {
