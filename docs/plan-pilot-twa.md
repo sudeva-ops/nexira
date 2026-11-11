@@ -33,6 +33,12 @@ The script is deterministic: a seeded order with fixed steps. So the site stays 
 
 Scene 1 of `NBO-SITE` already resets presence to the seed, so the scenario starts from the same place whatever the day did.
 
+**As built in Prompt 134** (each a deviation for approval in its PR):
+- The script is a rule per kind of move taken in turn (admit, consult, leave, arrive, a staff meeting, a guard's round), each deterministic on the present state, rather than a fixed list of 40 moves. It cannot fall out of step with what a scenario did, and the band holds (visitors 6–11).
+- Staff move only between the chancery and the conference room; the IT team and the consular staff stay where they work.
+- The switch is read as the tenant's flag, then a deployment default (`nexira:twin:normal-day:default`, which `make reset-demo` sets `off`), then `TWIN_NORMAL_DAY`. The Helm chart sets it `false`: a cluster does not invent presence unless the presenter switches it on.
+- The switch's API is `GET`/`POST /api/scenarios/normal-day`, for the roles that drive the presenter bar (Admin, Duty Officer), in demo mode only. A change is audited as `SITE.NORMAL_DAY` on the tenant before the flag is set.
+
 ## 3. Recent movements (TWN-14)
 
 `GET /api/sites/{id}/twin/movements`, for every role that reads the twin:

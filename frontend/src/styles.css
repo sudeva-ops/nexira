@@ -4359,3 +4359,10 @@ tr.nx-flash-b > td {
 .nx-air-mapwrap .nx-search {
   top: 10px;
 }
+
+/* The presenter bar's "Normal day" switch (TWN-13, D-53). */
+.nx-presenter .nx-presenter-day {
+  margin: 0 0 0 12px;
+  font-size: 12px;
+  color: var(--nx-tx2);
+}
