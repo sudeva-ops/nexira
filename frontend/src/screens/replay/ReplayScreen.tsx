@@ -25,6 +25,7 @@ const SOURCE_COLOUR: Record<string, string> = {
   FLEET: "#2EE6D6",
   SITE: "#F5498B",
   SUPPLY: "#D1980B",
+  ANNOTATION: "#FBD065",
 };
 
 const clock = (iso: string) => new Date(iso).toISOString().slice(11, 19);

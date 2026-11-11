@@ -5,6 +5,7 @@ import { Icon } from "@blueprintjs/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
+import type { Annotation } from "../api/annotations";
 import { HAZARD_ICON, isHazard } from "../api/hazards";
 import type { Exposure, Incident } from "../api/intel";
 import type { Mission } from "../api/people";
@@ -20,6 +21,14 @@ import {
   zoneFeatures,
 } from "./geo";
 import { MapToggle } from "./MapToggle";
+import {
+  addAnnotationLayers,
+  ANNOTATION_LAYERS,
+  annotationFeatures,
+  type Draft,
+  draftFeatures,
+  type LonLat,
+} from "./annotations";
 import { registerPmtiles, tilesAvailable } from "./base";
 import { addDaylight } from "./daylight";
 import { addStars } from "./stars";
@@ -59,7 +68,17 @@ interface Props {
   onSelect: (incident: Incident) => void;
   weather: Weather[]; // WX-02: the weather layer and the popup line; empty hides the layer
   weatherAt: number; // when it was fetched: staleness is judged from then (plan G-6)
+  // Map annotations (ANN-01..03, D-52): those to show, the drawing in progress, and its events.
+  annotations?: Annotation[];
+  draft?: Draft | null;
+  onDrawPoint?: (p: LonLat) => void;
+  onDrawFinish?: () => void;
+  onPickAnnotation?: (id: string) => void;
+  onZoom?: (zoom: number) => void;
 }
+
+const NO_ANNOTATIONS: Annotation[] = [];
+const noop = () => {};
 
 export function OperationsMap({
   missions,
@@ -70,6 +89,12 @@ export function OperationsMap({
   onSelect,
   weather,
   weatherAt,
+  annotations = NO_ANNOTATIONS,
+  draft = null,
+  onDrawPoint = noop,
+  onDrawFinish = noop,
+  onPickAnnotation = noop,
+  onZoom = noop,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
@@ -87,9 +112,12 @@ export function OperationsMap({
   const known = useRef<Set<string> | null>(null); // incidents already on the map
   const [globe, setGlobe] = useState(globePreferred);
   const globeRef = useRef(globe);
+  // The map's handlers read these, so they are set once and never stale.
+  const drawing = useRef({ draft, onDrawPoint, onDrawFinish, onPickAnnotation, onZoom });
   useEffect(() => {
     onSelectRef.current = onSelect;
     weatherRef.current = new Map(weather.map((w) => [w.mission_code, w]));
+    drawing.current = { draft, onDrawPoint, onDrawFinish, onPickAnnotation, onZoom };
   });
 
   useEffect(() => {
@@ -143,6 +171,31 @@ export function OperationsMap({
             "fill-extrusion-opacity": 0.26,
           },
         });
+        // Annotations (ANN-01): above the zones, under the missions and people.
+        addAnnotationLayers(m, true);
+        m.on("click", (e) => {
+          if (drawing.current.draft) drawing.current.onDrawPoint([e.lngLat.lng, e.lngLat.lat]);
+        });
+        m.on("dblclick", (e) => {
+          if (!drawing.current.draft) return;
+          e.preventDefault(); // finishes the drawing instead of zooming in
+          drawing.current.onDrawFinish();
+        });
+        for (const layer of ANNOTATION_LAYERS) {
+          m.on("click", layer, (e) => {
+            const id: unknown = e.features?.[0]?.properties?.id;
+            if (!drawing.current.draft && typeof id === "string") drawing.current.onPickAnnotation(id);
+          });
+          m.on("mouseenter", layer, () => {
+            if (!drawing.current.draft) m.getCanvas().style.cursor = "pointer";
+          });
+          m.on("mouseleave", layer, () => {
+            if (!drawing.current.draft) m.getCanvas().style.cursor = "";
+          });
+        }
+        const zoomed = () => drawing.current.onZoom(m.getZoom());
+        m.on("zoomend", zoomed);
+        zoomed();
         // A soft glow under each mission above LOW risk, stronger the higher, so what matters
         // stands out on the dark globe.
         m.addLayer({
@@ -321,6 +374,14 @@ export function OperationsMap({
   useEffect(() => {
     (map?.getSource("exposure") as GeoJSONSource | undefined)?.setData(exposureFeatures(exposure, radius));
   }, [map, exposure, radius]);
+
+  useEffect(() => {
+    (map?.getSource("annotations") as GeoJSONSource | undefined)?.setData(annotationFeatures(annotations));
+  }, [map, annotations]);
+  useEffect(() => {
+    (map?.getSource("draft") as GeoJSONSource | undefined)?.setData(draftFeatures(draft));
+    if (map) map.getCanvas().style.cursor = draft ? "crosshair" : "";
+  }, [map, draft]);
 
   // Globe or flat (UI 2), and the slow turn of the world view while nobody touches it.
   useEffect(() => {

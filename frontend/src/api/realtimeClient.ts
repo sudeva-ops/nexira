@@ -1,6 +1,7 @@
 import type { QueryKey } from "@tanstack/react-query";
 
 import { aarKeys } from "./aar";
+import { annotationKeys } from "./annotations";
 import { checkinKeys } from "./checkin";
 import { documentKeys } from "./documents";
 import { evacuationKeys } from "./evacuations";
@@ -172,6 +173,11 @@ function moduleKeys(event: RealtimeEvent): QueryKey[] {
       return [weatherKeys.all];
     case "AAR_UPDATED": // a review started, decided or finalised; its id only (D-47)
       return [aarKeys.all];
+    case "ANNOTATION_UPDATED": {
+      // Added, edited or withdrawn (D-52): the maps, and a linked incident's timeline (ANN-06).
+      const incident = event.data.incident_id;
+      return typeof incident === "string" ? [annotationKeys.all, keys.incident(incident)] : [annotationKeys.all];
+    }
     case "EXERCISE_UPDATED": // launched, a scene, ended or abandoned; its id only (D-48)
       // An end sets the embassy's readiness on People & Sites, Site Twin and the Executive
       // Overview (EXR-07); the presenter bar follows the template's run.

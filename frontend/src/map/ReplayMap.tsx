@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { Replay } from "../api/replay";
 import { type Moment, STATE_COLOUR } from "../screens/replay/state";
+import { addAnnotationLayers, annotationColour } from "./annotations";
 import { registerPmtiles, tilesAvailable } from "./base";
 import { circlePolygon, SEVERITY_COLOUR } from "./geo";
 import { ATTRIBUTION, baseStyle } from "./style";
@@ -57,6 +58,7 @@ export function ReplayMap({ replay, moment }: { replay: Replay; moment: Moment }
           source: "zone",
           paint: { "line-color": "#E76A6E", "line-width": 1.5, "line-dasharray": [3, 2] },
         });
+        addAnnotationLayers(m, false); // no labels: free text stays off the replay (G-4)
         m.addLayer({
           id: "sites",
           type: "circle",
@@ -122,6 +124,14 @@ export function ReplayMap({ replay, moment }: { replay: Replay; moment: Moment }
     set(
       "people",
       moment.people.map((p) => point(p.lon, p.lat, { colour: STATE_COLOUR[p.state] })),
+    );
+    set(
+      "annotations",
+      moment.annotations.map((a) => ({
+        type: "Feature",
+        geometry: a.shape,
+        properties: { kind: a.kind, colour: annotationColour(a) },
+      })),
     );
   }, [map, moment, lon, lat, radius]);
 

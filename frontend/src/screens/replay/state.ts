@@ -1,4 +1,5 @@
 import type { Answer, Replay } from "../../api/replay";
+import { standing } from "../../map/annotations";
 
 // RPL-02, RPL-04 (plan-pilot-rpl §2): the incident at a moment t (ms since the epoch), from the
 // one payload. Pure, so the screen, the map and the tests agree.
@@ -28,6 +29,7 @@ export interface Moment {
   exposed: number; // people exposed by t, placed or not
   sites: Replay["sites"];
   tally: Tally | null; // null until the check-in is sent
+  annotations: Replay["annotations"]; // standing at t (ANN-06)
 }
 
 /** At 1× the whole play axis lasts this long (§103 Q3, quiet stretches shortened: G-9). */
@@ -132,6 +134,7 @@ export function stateAt(r: Replay, t: number): Moment {
     exposed: shown.length,
     sites: r.sites.filter((s) => ms(s.exposed_at) <= t),
     tally,
+    annotations: standing(r.annotations, t),
   };
 }
 

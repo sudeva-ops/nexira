@@ -58,6 +58,12 @@ The author's role is the highest of the roles that allowed the action, in the or
 - AAR-02 and the replay's timeline read "Map annotation added: Checkpoint." (G-4); the incident's own timeline has "Annotation added: Checkpoint · <label>."; the replay's `annotations` carry the kind, symbol, shape and times, and no label or note.
 - An end time must be in the future; ending one now is a withdrawal.
 
+**As built in Prompt 129** (each a deviation for approval in its PR):
+- The picked annotation opens a card in the map's corner (React, with Edit and Withdraw), not a MapLibre popup, so its buttons are ordinary, testable controls.
+- Edit on screen changes the label, note and end time; a shape is changed by withdrawing and drawing again (G-3). The API's shape edit stays for later.
+- Annotations have their own colours, apart from the severities and the people: checkpoint gold, closed road and lines rose, rally point green, hazard lilac, note grey, areas violet.
+- A mark is placed with its one click; a line or an area finishes on double-click, Enter or "Finish", and Escape cancels.
+
 ## 3. Nearby (NBY-01..06)
 
 `GET /api/nearby?lon=&lat=&radius_m=` (1,000 to 50,000) runs as the person asking, under RLS and mission scope. It returns one list per kind, nearest first:

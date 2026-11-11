@@ -83,3 +83,17 @@ describe("playing (RPL-03)", () => {
     expect(elapsed(3_723_000)).toBe("+1:02:03");
   });
 });
+
+describe("annotations on the replay (ANN-06)", () => {
+  it("shows each from when it was added until it was withdrawn, with no label", () => {
+    const kinds = (s: number) => stateAt(REPLAY, t(s)).annotations.map((a) => a.kind);
+    expect([kinds(10), kinds(15), kinds(35), kinds(45), kinds(60)]).toEqual([
+      [],
+      ["MARK"],
+      ["MARK", "AREA"],
+      ["AREA"],
+      ["AREA"],
+    ]);
+    expect(JSON.stringify(stateAt(REPLAY, t(35)).annotations)).not.toMatch(/label|note/);
+  });
+});

@@ -1,17 +1,21 @@
 import { Spinner } from "@blueprintjs/core";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import { useAnnotations } from "../../api/annotations";
 import { type Incident, useIncident, useIncidents, useOperationsSummary, useSignals } from "../../api/intel";
 import { useMissions } from "../../api/people";
 import { useWeather } from "../../api/weather";
+import { addPoint, canFinish, type Draft } from "../../map/annotations";
 import { Card, Kpi } from "../../ui/primitives";
+import { AnnotationCard, AnnotationForm, AnnotationTools } from "./Annotations";
 import { ImpactPanel } from "./ImpactPanel";
 import { LiveFeed } from "./LiveFeed";
 import { WeatherPanel } from "./WeatherPanel";
 
 const NO_EXPOSURE: never[] = [];
 const NO_WEATHER: never[] = [];
+const NO_ANNOTATIONS: never[] = [];
 
 // MapLibre is most of the bundle; load it only with this screen.
 const OperationsMap = lazy(() =>
@@ -31,6 +35,34 @@ export function OperationsScreen() {
   const weatherQuery = useWeather();
   const weather = weatherQuery.data ?? NO_WEATHER;
   const [showWeather, setShowWeather] = useState(true);
+  // Map annotations (ANN-01..04, D-52).
+  const annotationsQuery = useAnnotations();
+  const annotations = annotationsQuery.data?.annotations ?? NO_ANNOTATIONS;
+  const [showAnnotations, setShowAnnotations] = useState(true);
+  const [zoom, setZoom] = useState(0);
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [finished, setFinished] = useState<Draft | null>(null);
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const picked = annotations.find((a) => a.id === pickedId);
+  const finish = () => {
+    if (draft && canFinish(draft)) {
+      setFinished(draft);
+      setDraft(null);
+    }
+  };
+  // Enter finishes a line or an area, Escape cancels (plan G-3).
+  useEffect(() => {
+    if (!draft) return;
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDraft(null);
+      if (e.key === "Enter" && canFinish(draft)) {
+        setFinished(draft);
+        setDraft(null);
+      }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [draft]);
 
   const select = (incident: Incident) => setParams({ incident: incident.id });
   const worst = incidents.find((i) => i.severity === summary?.highest_active_severity);
@@ -102,6 +134,21 @@ export function OperationsScreen() {
             onSelect={select}
             weather={showWeather ? weather : NO_WEATHER}
             weatherAt={weatherQuery.dataUpdatedAt}
+            annotations={showAnnotations ? annotations : NO_ANNOTATIONS}
+            draft={draft}
+            onDrawPoint={(p) => {
+              const next = draft ? addPoint(draft, p) : null;
+              // A mark is done with its one click; a line or an area waits for Finish.
+              if (next?.kind === "MARK") {
+                setFinished(next);
+                setDraft(null);
+              } else {
+                setDraft(next);
+              }
+            }}
+            onDrawFinish={finish}
+            onPickAnnotation={setPickedId}
+            onZoom={setZoom}
           />
         </Suspense>
         <div className="nx-legend">
@@ -120,7 +167,37 @@ export function OperationsScreen() {
             <i style={{ background: showWeather ? "#8ABBFF" : "transparent" }} />
             Weather
           </button>
+          <button
+            type="button"
+            className="nx-chip nx-chip-toggle"
+            aria-pressed={showAnnotations}
+            onClick={() => setShowAnnotations((on) => !on)}
+          >
+            <i style={{ background: showAnnotations ? "#BD6BBD" : "transparent" }} />
+            Annotations
+          </button>
         </div>
+        {annotationsQuery.data?.can_add && (
+          <AnnotationTools
+            zoom={zoom}
+            draft={draft}
+            onStart={(kind) => {
+              setPickedId(null);
+              setDraft({ kind, points: [] });
+            }}
+            onFinish={finish}
+            onCancel={() => setDraft(null)}
+          />
+        )}
+        {picked && showAnnotations && <AnnotationCard annotation={picked} onClose={() => setPickedId(null)} />}
+        {finished && (
+          <AnnotationForm
+            draft={finished}
+            incidents={incidents}
+            incidentId={selectedId}
+            onClose={() => setFinished(null)}
+          />
+        )}
         <div className="nx-maptitle">
           {selected ? (
             <>

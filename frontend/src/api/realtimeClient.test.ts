@@ -133,6 +133,14 @@ describe("realtime client (PLT-05)", () => {
     expect(staleKeys(event("FLIGHT_POSITIONS"))).toEqual([["flights"]]);
     // D-35: every 15 minutes and on a scenario override.
     expect(staleKeys(event("WEATHER_UPDATED", { missions: 36 }))).toEqual([["weather"]]);
+    // D-52: the maps, and a linked incident's timeline (ANN-06).
+    expect(staleKeys(event("ANNOTATION_UPDATED", { annotation_id: "a1", incident_id: "i1" }))).toEqual([
+      ["annotations"],
+      ["incident", "i1"],
+    ]);
+    expect(staleKeys(event("ANNOTATION_UPDATED", { annotation_id: "a1", incident_id: null }))).toEqual([
+      ["annotations"],
+    ]);
     // D-36: a request made or moved (by a person, a playbook or the simulated partner).
     expect(staleKeys(event("PARTNER_REQUEST_UPDATED", { request_id: "r1" }))).toEqual([["partners"], ["evacuations"]]);
     // D-38: arming, disarming and the demo clock refresh the hazards screen (HZ-04, HZ-05).
