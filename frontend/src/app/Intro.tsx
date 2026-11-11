@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useOperationsSummary } from "../api/intel";
 import { useMissions } from "../api/people";
 import { useAgents, usePendingCount } from "../api/proposals";
-import { IntroGlobe } from "../map/IntroGlobe";
+import { type GlobeFrame, IntroGlobe } from "../map/IntroGlobe";
 import { CountUp } from "../ui/motion";
 import { useReducedMotion } from "../ui/useMotion";
 import { automatedBrowser, INTRO_MS, introPlayed, introTarget, markIntroPlayed, shouldPlayIntro } from "./introRules";
@@ -37,8 +37,40 @@ function bearingText(lon: number, lat: number): string {
   return `${deg(wrap, 3)}°${wrap < 0 ? "W" : "E"} · ${deg(lat, 2)}°${lat < 0 ? "S" : "N"}`;
 }
 
+const RING_GAP = 26; // between the globe's edge and the compass ring, in CSS pixels
+
+/** A thin bezel round the globe: a tick every 10° of longitude, a label every 30°, turning with
+ * the globe so the meridian under the top marker is the one facing you. */
+function CompassRing({ frame, lon, away }: { frame: GlobeFrame; lon: number; away: boolean }) {
+  const size = 2 * (frame.r + RING_GAP);
+  const ticks = Array.from({ length: 36 }, (_, i) => i * 10 - 180);
+  return (
+    <svg
+      className={`nx-intro-ring${away ? " away" : ""}`}
+      viewBox="-100 -100 200 200"
+      style={{ left: frame.x - size / 2, top: frame.y - size / 2, width: size, height: size }}
+      aria-hidden="true"
+    >
+      <circle r="97" />
+      <path className="mark" d="M0,-93 L-2.4,-99 L2.4,-99 Z" />
+      <g transform={`rotate(${-lon})`}>
+        {ticks.map((t) => (
+          <g key={t} transform={`rotate(${t})`}>
+            <line y1="-97" y2={t % 30 ? -95.4 : -93.6} />
+            {t % 30 === 0 && (
+              <text y="-89.6">{t === 0 || t === -180 ? `${Math.abs(t)}°` : `${Math.abs(t)}°${t < 0 ? "W" : "E"}`}</text>
+            )}
+          </g>
+        ))}
+      </g>
+    </svg>
+  );
+}
+
 function Playing({ onDone }: { onDone: () => void }) {
   const [centre, setCentre] = useState("020°E · 15°N");
+  const [lon, setLon] = useState(20);
+  const [frame, setFrame] = useState<GlobeFrame | null>(null);
   const missions = useMissions().data ?? [];
   const summary = useOperationsSummary().data;
   const agents = useAgents().data?.agents.length ?? 0;
@@ -81,13 +113,17 @@ function Playing({ onDone }: { onDone: () => void }) {
       aria-label="NEXIRA"
       onClick={() => done.current()}
     >
-      <div className="nx-intro-stars" aria-hidden="true" />
       <div className={`nx-intro-halo${phase === "spin" ? "" : " centred"}`} aria-hidden="true" />
       <IntroGlobe
         missions={missions}
         descend={phase !== "spin"}
-        onTurn={(lon, lat) => setCentre(bearingText(lon, lat))}
+        onTurn={(at, lat) => {
+          setLon(at);
+          setCentre(bearingText(at, lat));
+        }}
+        onFrame={setFrame}
       />
+      {frame && <CompassRing frame={frame} lon={lon} away={phase !== "spin"} />}
       <div className="nx-intro-veil" aria-hidden="true" />
       <div className={`nx-intro-hud${phase === "spin" ? "" : " away"}`} aria-hidden="true">
         <i className="tl" />

@@ -7,6 +7,7 @@ import type { Flight } from "../api/flights";
 import { useReducedMotion } from "../ui/useMotion";
 import { registerPmtiles, tilesAvailable } from "./base";
 import { addDaylight } from "./daylight";
+import { addStars } from "./stars";
 import { flightFeatures, routeFeatures } from "./geo";
 import { DASH_FRAMES, DASH_STEP_MS, GLIDE_MS, glideFlights, type LonLat, positions } from "./motion";
 import { MapToggle } from "./MapToggle";
@@ -42,6 +43,7 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
     let disposed = false;
     let created: MapLibreMap | null = null;
     let stopDaylight = () => {};
+    let stopStars = () => {};
     registerPmtiles();
     void tilesAvailable().then((available) => {
       if (disposed || !container.current) return;
@@ -59,6 +61,7 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
         if (disposed) return;
         applyProjection(m, globeRef.current);
         stopDaylight = addDaylight(m);
+        stopStars = addStars(m, () => globeRef.current);
         m.addSource("routes", { type: "geojson", data: EMPTY });
         m.addSource("flights", { type: "geojson", data: EMPTY });
         // The part of each route flown is solid; the part ahead is dashed and moves along.
@@ -145,6 +148,7 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
     return () => {
       disposed = true;
       stopDaylight();
+      stopStars();
       created?.remove();
     };
   }, []);

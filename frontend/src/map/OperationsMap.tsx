@@ -22,6 +22,7 @@ import {
 import { MapToggle } from "./MapToggle";
 import { registerPmtiles, tilesAvailable } from "./base";
 import { addDaylight } from "./daylight";
+import { addStars } from "./stars";
 import { GROW_MS, growScale } from "./motion";
 import { breath, phase, sonar } from "./plane";
 import {
@@ -95,6 +96,7 @@ export function OperationsMap({
     let disposed = false;
     let created: MapLibreMap | null = null;
     let stopDaylight = () => {};
+    let stopStars = () => {};
     registerPmtiles();
     void tilesAvailable().then((available) => {
       if (disposed || !container.current) return;
@@ -112,6 +114,7 @@ export function OperationsMap({
         if (disposed) return;
         applyProjection(m, globeRef.current);
         stopDaylight = addDaylight(m);
+        stopStars = addStars(m, () => globeRef.current);
         m.addSource("zones", { type: "geojson", data: EMPTY });
         m.addSource("missions", { type: "geojson", data: EMPTY });
         m.addSource("exposure", { type: "geojson", data: EMPTY });
@@ -138,6 +141,20 @@ export function OperationsMap({
             "fill-extrusion-color": ["get", "colour"],
             "fill-extrusion-height": ["get", "height"],
             "fill-extrusion-opacity": 0.26,
+          },
+        });
+        // A soft glow under each mission above LOW risk, stronger the higher, so what matters
+        // stands out on the dark globe.
+        m.addLayer({
+          id: "missions-glow",
+          type: "circle",
+          source: "missions",
+          filter: ["!=", ["get", "risk"], "LOW"],
+          paint: {
+            "circle-color": ["get", "colour"],
+            "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 11, 8, 20],
+            "circle-blur": 1,
+            "circle-opacity": ["match", ["get", "risk"], "CRITICAL", 0.6, "HIGH", 0.5, 0.35],
           },
         });
         // Missions with an ACTIVE incident send out a sonar ring (two, half a beat apart).
@@ -221,6 +238,7 @@ export function OperationsMap({
       placed.clear();
       wxPlaced.clear();
       stopDaylight();
+      stopStars();
       created?.remove();
     };
   }, []);
