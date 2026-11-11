@@ -1420,3 +1420,59 @@ Playwright on the real stack:
 5. **Acceptance runs:** `make acceptance` and the demo reset start with the normal day paused, so the existing specs' exact counts hold; the presenter bar gets a "Normal day" switch, on by default outside acceptance. *Default: yes.*
 6. **Who sees it:** every role that sees the Site Twin; kinds and zones only, as TWN-02. *Default: yes.*
 7. **🔒:** none, unless Q2 takes PC-55. *Default: none.*
+
+## 121. Purpose and starting point (UI polish pass)
+
+Proposed on 2026-11-11 after a screenshot sweep of all 25 screens as the Duty Officer at 1440 × 900. The Blueprint dark styling holds up; what makes the demo look unfinished is a set of small layout defects: text cut off or wrapped where it should not be, buttons out of line, a ticker that repeats one item, and icons used twice. This pass fixes those defects only. Richer graphics (resting states, charts, the globe's edge) are a later module.
+
+| Seen in the sweep | Where |
+|---|---|
+| The ticker starts mid-word ("26-1043"), repeats the one Paris incident, and leaves out the critical Nairobi incident, which is MONITORING (the ticker takes ACTIVE only) | `app/Ticker.tsx`, `tickerItems.ts` |
+| Incidents: "Open AAR-2026-1042" wraps onto two lines and is out of line with "Replay" | `screens/incidents` |
+| Site Twin: "All 16 cameras" sits as loose text between sensor rows; "Access control, CCTV and b…" is cut with no way to read it | `screens/twin` |
+| Global Operations: "xWeather (sim…" is cut; "No severe weather" wraps | `screens/operations` |
+| Safety Check-in: names wrap ("Peter / Mwangi"); "Request partner" outweighs the names; the phone notification reads "SAFETY CHECK- / IN" | `screens/checkin` |
+| Sidebar: Health Intelligence and Assistance Partners share the heart icon; Safety Check-in and After-Action Review use near-identical ticks | `app/screens.ts` |
+| Sidebar: every role sees Audit, which then says "Administrators only" | `app/screens.ts`, `AuditScreen.tsx` |
+| Air Travel Tracking: the globe sits in a short, wide box and is cut top and bottom | `screens/air` |
+
+## 122. Requirements: polish (UIP-01..UIP-08)
+
+| ID | Requirement | Pri. |
+|---|---|---|
+| UIP-01 | **A ticker that reads.** The ticker carries open incidents (ACTIVE and MONITORING), most severe first, then the latest realtime events. Its edges fade, so no item starts or ends mid-word against a hard edge. When the items fit in the strip, it stands still and shows each once; it scrolls only when they do not fit. Reduced motion keeps it still, as today. | M |
+| UIP-02 | **Header buttons stay on one line.** Buttons in panel and detail headers never wrap. On Incidents, "Replay" and "Open AAR" are the same size and in line; the AAR's reference moves to the button's tooltip. | M |
+| UIP-03 | **Nothing cut without a way to read it.** Panel subtitles and source labels that do not fit end in an ellipsis and show the full text on hover (Site Twin's sensors subtitle, Global Operations' weather source). Short status text ("No severe weather") never wraps. | M |
+| UIP-04 | **Site Twin camera row.** "All 16 cameras" becomes a small button aligned in the CCTV row, not loose text between rows. | S |
+| UIP-05 | **Safety Check-in responses.** Each name stays on one line (ellipsis and tooltip when long); "Request partner" becomes a small, quiet button that does not outweigh the person; the phone notification's header fits on one line. | S |
+| UIP-06 | **One icon per screen.** No two sidebar entries share an icon or use near-identical ones. | S |
+| UIP-07 | **The sidebar shows what the role can open.** Audit appears only for administrators, the way VIP Protection already appears only where its restriction allows. Display only: the API's checks are unchanged, and opening `/audit` directly still shows "Administrators only". | S |
+| UIP-08 | **Air Travel Tracking's globe fits.** The map is tall enough that the whole globe shows at its starting zoom at 1440 × 900. | S |
+
+### Not in this module
+- Empty and resting states (Decision Queue, Executive Overview), new charts or sparklines, the globe's night-side edge, an incident mini-map: the graphics module that follows;
+- shared panel and stat-tile components across all screens (a later consistency module);
+- any change to data, roles, permissions or the API.
+
+## 123. Data changes
+
+None. Every requirement is display only. UIP-07 hides a sidebar entry using the role the app already has from `/api/me`; it changes no permission (D-04), so no 🔒 review applies.
+
+## 124. Acceptance for the module
+
+- **Vitest:** the ticker's ordering, its still/scrolling choice and the inclusion of MONITORING incidents; the sidebar's icons are unique; Audit is in the sidebar for the administrator and not for the Duty Officer or the Viewer.
+- **Playwright on the real stack (a layout spec):** every screen, at 1440 × 900 and 1920 × 1080, as the Duty Officer:
+  - no horizontal page scroll;
+  - no button in a panel or detail header is taller than one line;
+  - every element cut with an ellipsis has its full text in a tooltip.
+  
+  Plus the specific cases: the Incidents header buttons are the same height and in line, the Safety Check-in names are on one line, and the Air Travel globe's outline is inside the map box.
+- **Unchanged:** every existing unit test and acceptance spec passes.
+
+## 125. Questions for the product owner
+
+1. **Screen sizes:** the polish targets 1440 × 900 and 1920 × 1080; smaller laptops (1280 × 800) are kept usable, not checked pixel by pixel. *Default: yes.*
+2. **Ticker contents:** ACTIVE and MONITORING incidents, most severe first, then events; standing still when the items fit. *Default: yes.* (Alternative: keep it ACTIVE only and just fix the edges and repetition.)
+3. **Audit in the sidebar:** hidden for roles that cannot open it. *Default: yes.* (Alternative: shown greyed with a lock, so people know it exists.)
+4. **Icons:** I pick replacements from Blueprint's set (for example `first-aid` for Health Intelligence and `people` variants for Assistance Partners) and show them in the PR's screenshots. *Default: yes.*
+5. **🔒:** none. *Default: none.*
