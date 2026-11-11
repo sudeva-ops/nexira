@@ -4425,3 +4425,11 @@ tr.nx-flash-b > td {
   padding: 0;
   list-style: none;
 }
+
+/* TWN-15 (D-53): the zone's people as flat figures over a clip, on a transparent layer, drawn
+   from presence and never from the picture (plan-pilot-twa G-8). */
+.nx-cctv-feed canvas.nx-cctv-figures {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}

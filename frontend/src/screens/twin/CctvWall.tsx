@@ -77,6 +77,9 @@ function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; lar
   const reduced = useReducedMotion();
   const offline = !camera.sensor.online;
   const [drawn, setDrawn] = useState(false); // no clip for this zone kind: draw the view
+  // TWN-15 (D-53, plan-pilot-twa G-8): over a clip, the zone's people as flat figures on a
+  // transparent layer; never derived from the picture (§108 Q5).
+  const overlay = !offline && !drawn;
   const kinds = useMemo(
     () => twin.occupants.filter((o) => o.zone_code === camera.zone.code).map((o) => o.kind),
     [twin.occupants, camera.zone.code],
@@ -106,6 +109,13 @@ function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; lar
         return;
       }
       step(crowd, camera.zone.kind, dt, r);
+      if (overlay) {
+        ctx.clearRect(0, 0, W, H);
+        ctx.globalAlpha = 0.72;
+        people(ctx, crowd);
+        ctx.globalAlpha = 1;
+        return;
+      }
       ctx.drawImage(still, 0, 0);
       people(ctx, crowd);
       grain(ctx, noise, r, 0.07);
@@ -131,7 +141,7 @@ function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; lar
       cancelAnimationFrame(frame);
       seen?.disconnect();
     };
-  }, [camera.sensor.code, camera.zone.kind, kinds, offline, reduced, drawn]);
+  }, [camera.sensor.code, camera.zone.kind, kinds, offline, reduced, drawn, overlay]);
 
   const now = useNow(!reduced);
   return (
@@ -139,18 +149,25 @@ function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; lar
       className={`nx-cctv-feed${offline ? " off" : ""}${offline || drawn ? "" : " clip"}${large ? " large" : ""}`}
       data-camera={camera.sensor.code}
     >
-      {offline || drawn ? (
-        <canvas ref={canvas} width={W} height={H} aria-hidden="true" />
-      ) : (
-        <Clip camera={camera} still={reduced} onMissing={() => setDrawn(true)} />
-      )}
+      {overlay && <Clip camera={camera} still={reduced} onMissing={() => setDrawn(true)} />}
+      <canvas
+        ref={canvas}
+        width={W}
+        height={H}
+        aria-hidden="true"
+        className={overlay ? "nx-cctv-figures" : undefined}
+        data-testid={overlay ? `figures-${camera.sensor.code}` : undefined}
+      />
       <div className="nx-cctv-hud">
         <span className="tl">
           {camera.sensor.code} · {camera.zone.name.toUpperCase()}
         </span>
         <span className="tr">{stamp(now, large)}</span>
         <span className="bl">{offline ? "" : <><i className="rec" /> REC</>}</span>
-        <span className="br">{offline ? "" : `${kinds.length} in zone`}</span>
+        {/* The count is presence's (access control and Wi-Fi), never the picture's (§108 Q5). */}
+        <span className="br" title="From access control and Wi-Fi presence (simulated)">
+          {offline ? "" : `${kinds.length} in zone · access control (simulated)`}
+        </span>
       </div>
       {offline && (
         <div className="nx-cctv-nosignal">
