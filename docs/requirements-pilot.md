@@ -1423,7 +1423,7 @@ Playwright on the real stack:
 
 ## 121. Purpose and starting point (UI polish pass)
 
-Proposed on 2026-11-11 after a screenshot sweep of all 25 screens as the Duty Officer at 1440 × 900. The Blueprint dark styling holds up; what makes the demo look unfinished is a set of small layout defects: text cut off or wrapped where it should not be, buttons out of line, a ticker that repeats one item, and icons used twice. This pass fixes those defects only. Richer graphics (resting states, charts, the globe's edge) are a later module.
+Approved by the product owner on 2026-11-11 (PR #183; D-54), with the defaults in §125. Proposed after a screenshot sweep of all 25 screens as the Duty Officer at 1440 × 900. The Blueprint dark styling holds up; what makes the demo look unfinished is a set of small layout defects: text cut off or wrapped where it should not be, buttons out of line, a ticker that repeats one item, and icons used twice. This pass fixes those defects only. Richer graphics (resting states, charts, the globe's edge) are a later module.
 
 | Seen in the sweep | Where |
 |---|---|
@@ -1469,7 +1469,7 @@ None. Every requirement is display only. UIP-07 hides a sidebar entry using the 
   Plus the specific cases: the Incidents header buttons are the same height and in line, the Safety Check-in names are on one line, and the Air Travel globe's outline is inside the map box.
 - **Unchanged:** every existing unit test and acceptance spec passes.
 
-## 125. Questions for the product owner
+## 125. Questions answered by the product owner (2026-11-11: "Approved", all defaults)
 
 1. **Screen sizes:** the polish targets 1440 × 900 and 1920 × 1080; smaller laptops (1280 × 800) are kept usable, not checked pixel by pixel. *Default: yes.*
 2. **Ticker contents:** ACTIVE and MONITORING incidents, most severe first, then events; standing still when the items fit. *Default: yes.* (Alternative: keep it ACTIVE only and just fix the edges and repetition.)
