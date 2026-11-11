@@ -13,7 +13,15 @@ const AVATAR: Record<string, string> = {
 };
 
 /** OPS-04: who and what is in the impact zone, with location confidence and source. */
-export function ImpactPanel({ incidentId, onClose }: { incidentId: string; onClose: () => void }) {
+export function ImpactPanel({
+  incidentId,
+  onClose,
+  onNearby,
+}: {
+  incidentId: string;
+  onClose: () => void;
+  onNearby?: (lon: number, lat: number) => void; // NBY-01: from the incident
+}) {
   const { data: incident, isPending } = useIncident(incidentId);
   if (isPending || !incident) {
     return (
@@ -32,6 +40,9 @@ export function ImpactPanel({ incidentId, onClose }: { incidentId: string; onClo
       actions={
         <>
           <span className="nx-dim nx-mono">{incident.reference}</span>
+          {onNearby && (
+            <Button size="small" icon="locate" text="What's nearby" onClick={() => onNearby(incident.lon, incident.lat)} />
+          )}
           <Button size="small" text="Feed" onClick={onClose} />
         </>
       }

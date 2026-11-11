@@ -136,10 +136,12 @@ describe("realtime client (PLT-05)", () => {
     // D-52: the maps, and a linked incident's timeline (ANN-06).
     expect(staleKeys(event("ANNOTATION_UPDATED", { annotation_id: "a1", incident_id: "i1" }))).toEqual([
       ["annotations"],
+      ["nearby"],
       ["incident", "i1"],
     ]);
     expect(staleKeys(event("ANNOTATION_UPDATED", { annotation_id: "a1", incident_id: null }))).toEqual([
       ["annotations"],
+      ["nearby"],
     ]);
     // D-36: a request made or moved (by a person, a playbook or the simulated partner).
     expect(staleKeys(event("PARTNER_REQUEST_UPDATED", { request_id: "r1" }))).toEqual([["partners"], ["evacuations"]]);
@@ -169,12 +171,14 @@ describe("realtime client (PLT-05)", () => {
       ["fleet"],
       ["twin"],
       ["supply"],
+      ["nearby"],
       ["incident", "i1"],
     ]);
     expect(staleKeys(event("FLEET_UPDATED", { asset_id: "a1", incident_ids: [] }))).toEqual([
       ["fleet"],
       ["twin"],
       ["supply"],
+      ["nearby"], // a vehicle moved (NBY-03)
     ]);
     for (const type of ["INCIDENT_UPDATED", "CHECKIN_UPDATED", "EVACUATION_UPDATED"]) {
       expect(staleKeys(event(type, { incident_id: "i1" })), type).toContainEqual(["fleet"]);

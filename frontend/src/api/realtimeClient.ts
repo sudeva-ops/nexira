@@ -2,6 +2,7 @@ import type { QueryKey } from "@tanstack/react-query";
 
 import { aarKeys } from "./aar";
 import { annotationKeys } from "./annotations";
+import { nearbyKeys } from "./nearby";
 import { checkinKeys } from "./checkin";
 import { documentKeys } from "./documents";
 import { evacuationKeys } from "./evacuations";
@@ -102,6 +103,7 @@ function moduleKeys(event: RealtimeEvent): QueryKey[] {
         peopleKeys.people,
         peopleKeys.sites,
         hazardKeys.all, // the hazards screen's exposure counts (HZ-03)
+        nearbyKeys.all, // places moved, incidents opened (NBY-03)
         ...incident,
       ];
     case "INCIDENT_NOTE_ADDED":
@@ -155,7 +157,7 @@ function moduleKeys(event: RealtimeEvent): QueryKey[] {
       const ids = Array.isArray(event.data.incident_ids) ? event.data.incident_ids : [];
       const crossed = ids.filter((id): id is string => typeof id === "string").map((id) => keys.incident(id));
       // The twin shows the generator's state; a fuel supplier its stock (plan-pilot-sup G-7).
-      return [fleetKeys.all, twinKeys.all, supplyKeys.all, ...crossed];
+      return [fleetKeys.all, twinKeys.all, supplyKeys.all, nearbyKeys.all, ...crossed];
     }
     case "SITE_UPDATED": {
       // Presence, a sensor or readiness (D-43); a fault in an ACTIVE zone adds a SITE entry to
@@ -176,7 +178,8 @@ function moduleKeys(event: RealtimeEvent): QueryKey[] {
     case "ANNOTATION_UPDATED": {
       // Added, edited or withdrawn (D-52): the maps, and a linked incident's timeline (ANN-06).
       const incident = event.data.incident_id;
-      return typeof incident === "string" ? [annotationKeys.all, keys.incident(incident)] : [annotationKeys.all];
+      const shown = [annotationKeys.all, nearbyKeys.all];
+      return typeof incident === "string" ? [...shown, keys.incident(incident)] : shown;
     }
     case "EXERCISE_UPDATED": // launched, a scene, ended or abandoned; its id only (D-48)
       // An end sets the embassy's readiness on People & Sites, Site Twin and the Executive

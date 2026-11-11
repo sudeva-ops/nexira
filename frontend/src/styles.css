@@ -4239,3 +4239,64 @@ tr.nx-flash-b > td {
   flex-wrap: wrap;
   gap: 6px;
 }
+
+/* Nearby on Global Operations (NBY-01..06, D-52). */
+.nx-near-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  flex-wrap: wrap;
+}
+
+.nx-near-body {
+  overflow-y: auto;
+  padding: 0 12px 12px;
+}
+
+.nx-near-section h4 {
+  margin: 12px 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #abb3bf;
+}
+
+.nx-near-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.nx-near-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nx-near-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 4px;
+  border: 0;
+  border-bottom: 1px solid #252a31;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nx-near-row:hover {
+  background: rgba(76, 144, 240, 0.08);
+}
+
+.nx-near-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}

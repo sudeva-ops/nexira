@@ -24,6 +24,8 @@ class NamedPersonOut(BaseModel):
     name: str
     group: Group
     distance_m: int
+    lon: float  # for the map to fly to it (NBY-05)
+    lat: float
     confidence: int
     place_label: str | None
 
@@ -34,6 +36,8 @@ class SiteOut(BaseModel):
     site_type: str
     mission_code: str
     distance_m: int
+    lon: float  # for the map to fly to it (NBY-05)
+    lat: float
 
 
 class VehicleOut(BaseModel):
@@ -42,6 +46,8 @@ class VehicleOut(BaseModel):
     type_label: str
     status: str
     distance_m: int
+    lon: float  # for the map to fly to it (NBY-05)
+    lat: float
 
 
 class TravellersOut(BaseModel):
@@ -63,6 +69,8 @@ class IncidentOut(BaseModel):
     severity: str
     category: str
     distance_m: int
+    lon: float  # for the map to fly to it (NBY-05)
+    lat: float
 
 
 class AnnotationOut(BaseModel):
@@ -71,6 +79,8 @@ class AnnotationOut(BaseModel):
     symbol: str | None
     label: str
     distance_m: int  # 0 when the point is inside an area
+    lon: float  # for the map to fly to it (NBY-05)
+    lat: float
 
 
 class NearbyOut(BaseModel):

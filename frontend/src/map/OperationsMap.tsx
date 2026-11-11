@@ -75,7 +75,15 @@ interface Props {
   onDrawFinish?: () => void;
   onPickAnnotation?: (id: string) => void;
   onZoom?: (zoom: number) => void;
+  // Nearby (NBY-01, NBY-05): the point and radius drawn, where a right-click or long press
+  // asks for it, and where the map flies to (a new object each time).
+  near?: { lon: number; lat: number; km: number } | null;
+  onNearby?: (p: LonLat) => void;
+  fly?: { lon: number; lat: number } | null;
 }
+
+const LONG_PRESS_MS = 600;
+const STILL_PX = 5; // a right-click, not a right-drag (the map's rotate gesture: plan G-10)
 
 const NO_ANNOTATIONS: Annotation[] = [];
 const noop = () => {};
@@ -95,6 +103,9 @@ export function OperationsMap({
   onDrawFinish = noop,
   onPickAnnotation = noop,
   onZoom = noop,
+  near = null,
+  onNearby = noop,
+  fly = null,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
@@ -113,11 +124,11 @@ export function OperationsMap({
   const [globe, setGlobe] = useState(globePreferred);
   const globeRef = useRef(globe);
   // The map's handlers read these, so they are set once and never stale.
-  const drawing = useRef({ draft, onDrawPoint, onDrawFinish, onPickAnnotation, onZoom });
+  const drawing = useRef({ draft, onDrawPoint, onDrawFinish, onPickAnnotation, onZoom, onNearby });
   useEffect(() => {
     onSelectRef.current = onSelect;
     weatherRef.current = new Map(weather.map((w) => [w.mission_code, w]));
-    drawing.current = { draft, onDrawPoint, onDrawFinish, onPickAnnotation, onZoom };
+    drawing.current = { draft, onDrawPoint, onDrawFinish, onPickAnnotation, onZoom, onNearby };
   });
 
   useEffect(() => {
@@ -192,6 +203,54 @@ export function OperationsMap({
           m.on("mouseleave", layer, () => {
             if (!drawing.current.draft) m.getCanvas().style.cursor = "";
           });
+        }
+        // Nearby (NBY-01): a right-click that did not drag, or a long press on a touch screen.
+        m.addSource("nearby", { type: "geojson", data: EMPTY });
+        m.addLayer({
+          id: "nearby-fill",
+          type: "fill",
+          source: "nearby",
+          filter: ["==", ["geometry-type"], "Polygon"],
+          paint: { "fill-color": "#4C90F0", "fill-opacity": 0.06 },
+        });
+        m.addLayer({
+          id: "nearby-line",
+          type: "line",
+          source: "nearby",
+          filter: ["==", ["geometry-type"], "Polygon"],
+          paint: { "line-color": "#8ABBFF", "line-width": 1.5, "line-dasharray": [4, 3] },
+        });
+        m.addLayer({
+          id: "nearby-point",
+          type: "circle",
+          source: "nearby",
+          filter: ["==", ["geometry-type"], "Point"],
+          paint: {
+            "circle-color": "#8ABBFF",
+            "circle-radius": 5,
+            "circle-stroke-color": "#111418",
+            "circle-stroke-width": 2,
+          },
+        });
+        let pressedAt: { x: number; y: number } | null = null;
+        m.on("mousedown", (e) => {
+          pressedAt = e.originalEvent.button === 2 ? { x: e.point.x, y: e.point.y } : null;
+        });
+        m.on("contextmenu", (e) => {
+          const still =
+            pressedAt !== null && Math.hypot(e.point.x - pressedAt.x, e.point.y - pressedAt.y) < STILL_PX;
+          pressedAt = null;
+          if (still && !drawing.current.draft) drawing.current.onNearby([e.lngLat.lng, e.lngLat.lat]);
+        });
+        let press = 0;
+        m.on("touchstart", (e) => {
+          window.clearTimeout(press);
+          if (e.originalEvent.touches.length !== 1 || drawing.current.draft) return;
+          const at: LonLat = [e.lngLat.lng, e.lngLat.lat];
+          press = window.setTimeout(() => drawing.current.onNearby(at), LONG_PRESS_MS);
+        });
+        for (const name of ["touchend", "touchmove", "touchcancel"] as const) {
+          m.on(name, () => window.clearTimeout(press));
         }
         const zoomed = () => drawing.current.onZoom(m.getZoom());
         m.on("zoomend", zoomed);
@@ -378,6 +437,37 @@ export function OperationsMap({
   useEffect(() => {
     (map?.getSource("annotations") as GeoJSONSource | undefined)?.setData(annotationFeatures(annotations));
   }, [map, annotations]);
+  useEffect(() => {
+    (map?.getSource("nearby") as GeoJSONSource | undefined)?.setData({
+      type: "FeatureCollection",
+      features: near
+        ? [
+            { type: "Feature", geometry: circlePolygon(near.lon, near.lat, near.km * 1000), properties: {} },
+            { type: "Feature", geometry: { type: "Point", coordinates: [near.lon, near.lat] }, properties: {} },
+          ]
+        : [],
+    });
+  }, [map, near]);
+  // The whole circle in view when Nearby opens or its radius changes (NBY-01).
+  const nearKey = near ? `${near.lon},${near.lat},${near.km}` : null;
+  useEffect(() => {
+    if (!map || !near) return;
+    const ring = circlePolygon(near.lon, near.lat, near.km * 1000).coordinates[0] ?? [];
+    const lons = ring.map((p) => p[0] ?? near.lon);
+    const lats = ring.map((p) => p[1] ?? near.lat);
+    map.fitBounds(
+      [
+        [Math.min(...lons), Math.min(...lats)],
+        [Math.max(...lons), Math.max(...lats)],
+      ],
+      { padding: 40, maxZoom: 14, pitch: 0, bearing: 0, duration: reduced ? 0 : 1200 },
+    );
+    // Only when the point or radius changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, nearKey]);
+  useEffect(() => {
+    if (map && fly) map.flyTo({ center: [fly.lon, fly.lat], zoom: Math.max(map.getZoom(), 13) });
+  }, [map, fly]);
   useEffect(() => {
     (map?.getSource("draft") as GeoJSONSource | undefined)?.setData(draftFeatures(draft));
     if (map) map.getCanvas().style.cursor = draft ? "crosshair" : "";

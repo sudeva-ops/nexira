@@ -3,6 +3,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { useAnnotations } from "../../api/annotations";
+import { DEFAULT_RADIUS_KM, type Near, nearParams, parseNear } from "../../api/nearby";
 import { type Incident, useIncident, useIncidents, useOperationsSummary, useSignals } from "../../api/intel";
 import { useMissions } from "../../api/people";
 import { useWeather } from "../../api/weather";
@@ -11,6 +12,7 @@ import { Card, Kpi } from "../../ui/primitives";
 import { AnnotationCard, AnnotationForm, AnnotationTools } from "./Annotations";
 import { ImpactPanel } from "./ImpactPanel";
 import { LiveFeed } from "./LiveFeed";
+import { NearbyPanel } from "./NearbyPanel";
 import { WeatherPanel } from "./WeatherPanel";
 
 const NO_EXPOSURE: never[] = [];
@@ -26,6 +28,10 @@ const OperationsMap = lazy(() =>
 export function OperationsScreen() {
   const [params, setParams] = useSearchParams();
   const selectedId = params.get("incident");
+  // NBY-06: the point and radius live in the address (replaced, not pushed, as they change).
+  const near = parseNear(params.get("near"), params.get("r"));
+  const [fly, setFly] = useState<{ lon: number; lat: number } | null>(null);
+  const showNear = (n: Near) => setParams(nearParams(n), { replace: true });
   const summary = useOperationsSummary().data;
   const missions = useMissions().data ?? [];
   const incidentsQuery = useIncidents("ACTIVE");
@@ -149,6 +155,9 @@ export function OperationsScreen() {
             onDrawFinish={finish}
             onPickAnnotation={setPickedId}
             onZoom={setZoom}
+            near={near}
+            onNearby={([lon, lat]) => showNear({ lon, lat, km: near?.km ?? DEFAULT_RADIUS_KM })}
+            fly={fly}
           />
         </Suspense>
         <div className="nx-legend">
@@ -222,8 +231,20 @@ export function OperationsScreen() {
         </div>
       </div>
       <div className="nx-sidecol">
-        {selectedId ? (
-          <ImpactPanel incidentId={selectedId} onClose={() => setParams({})} />
+        {near ? (
+          <NearbyPanel
+            near={near}
+            onRadius={(km) => showNear({ ...near, km })}
+            onClose={() => setParams({})}
+            onFly={(lon, lat) => setFly({ lon, lat })}
+            onIncident={(id) => setParams({ incident: id })}
+          />
+        ) : selectedId ? (
+          <ImpactPanel
+            incidentId={selectedId}
+            onClose={() => setParams({})}
+            onNearby={(lon, lat) => showNear({ lon, lat, km: DEFAULT_RADIUS_KM })}
+          />
         ) : (
           <Card icon="feed" title="Live intelligence feed" className="nx-side">
             <LiveFeed incidents={incidents} signals={signals} onSelect={select} />

@@ -36,6 +36,7 @@ _PEOPLE = text(
                 WHEN p.person_type IN ('DELEGATE', 'CITIZEN') THEN p.person_type
                 ELSE 'OTHER' END AS grp,
            round(ST_Distance(l.location, pt.g))::int AS distance_m,
+           ST_X(l.location::geometry) AS lon, ST_Y(l.location::geometry) AS lat,
            EXISTS (SELECT 1 FROM trip t JOIN trip_traveller tt ON tt.trip_id = t.id
                     WHERE tt.person_id = p.id AND t.restricted
                       AND (now() AT TIME ZONE 'UTC')::date BETWEEN t.starts_on AND t.ends_on)
@@ -49,7 +50,8 @@ _SITES = text(
     """
     WITH pt AS (SELECT ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography AS g)
     SELECT s.id, s.name, s.site_type, m.code AS mission_code,
-           round(ST_Distance(s.location, pt.g))::int AS distance_m
+           round(ST_Distance(s.location, pt.g))::int AS distance_m,
+           ST_X(s.location::geometry) AS lon, ST_Y(s.location::geometry) AS lat
       FROM pt, site s JOIN mission m ON m.id = s.mission_id
      WHERE ST_DWithin(s.location, pt.g, :radius)
      ORDER BY distance_m, s.name LIMIT :limit
@@ -59,7 +61,8 @@ _VEHICLES = text(
     """
     WITH pt AS (SELECT ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography AS g)
     SELECT a.id, a.code, a.type_label, a.status,
-           round(ST_Distance(a.location, pt.g))::int AS distance_m
+           round(ST_Distance(a.location, pt.g))::int AS distance_m,
+           ST_X(a.location::geometry) AS lon, ST_Y(a.location::geometry) AS lat
       FROM pt, fleet_asset a
      WHERE a.kind = 'VEHICLE' AND ST_DWithin(a.location, pt.g, :radius)
      ORDER BY distance_m, a.code LIMIT :limit
@@ -95,7 +98,8 @@ _INCIDENTS = text(
     """
     WITH pt AS (SELECT ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography AS g)
     SELECT i.id, i.reference, i.title, i.severity, i.category,
-           round(ST_Distance(i.location, pt.g))::int AS distance_m
+           round(ST_Distance(i.location, pt.g))::int AS distance_m,
+           ST_X(i.location::geometry) AS lon, ST_Y(i.location::geometry) AS lat
       FROM pt, incident i
      WHERE i.status = 'ACTIVE' AND ST_DWithin(i.location, pt.g, :radius)
      ORDER BY distance_m, i.reference LIMIT :limit
@@ -105,7 +109,8 @@ _ANNOTATIONS = text(
     """
     WITH pt AS (SELECT ST_SetSRID(ST_MakePoint(:lon, :lat), 4326)::geography AS g)
     SELECT a.id, a.kind, a.symbol, a.label,
-           round(ST_Distance(a.shape, pt.g))::int AS distance_m
+           round(ST_Distance(a.shape, pt.g))::int AS distance_m,
+           ST_X(ST_Centroid(a.shape::geometry)) AS lon, ST_Y(ST_Centroid(a.shape::geometry)) AS lat
       FROM pt, map_annotation a
      WHERE a.status = 'ACTIVE' AND (a.ends_at IS NULL OR a.ends_at > now())
        AND ST_DWithin(a.shape, pt.g, :radius)
@@ -136,6 +141,8 @@ async def nearby(
                         distance_m=p.distance_m,
                         confidence=p.confidence,
                         place_label=p.place_label,
+                        lon=p.lon,
+                        lat=p.lat,
                     )
                 )
         else:

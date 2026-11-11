@@ -28,6 +28,8 @@ vi.mock("../../map/OperationsMap", () => ({
     onDrawFinish,
     onPickAnnotation,
     onZoom,
+    near,
+    onNearby,
   }: {
     incidents: Incident[];
     onSelect: (i: Incident) => void;
@@ -37,6 +39,8 @@ vi.mock("../../map/OperationsMap", () => ({
     onDrawFinish?: () => void;
     onPickAnnotation?: (id: string) => void;
     onZoom?: (z: number) => void;
+    near?: { lon: number; lat: number; km: number } | null;
+    onNearby?: (p: [number, number]) => void;
   }) => (
     <div data-testid="operations-map">
       {incidents.map((i) => (
@@ -62,6 +66,10 @@ vi.mock("../../map/OperationsMap", () => ({
       <button type="button" onClick={() => onDrawFinish?.()}>
         map double-click
       </button>
+      <button type="button" onClick={() => onNearby?.([36.8219, -1.2921])}>
+        map right-click
+      </button>
+      <span>nearby circle: {near ? `${near.km} km` : "none"}</span>
     </div>
   ),
 }));
@@ -324,5 +332,85 @@ describe("Map annotations (ANN-01..04)", () => {
         reason: "Cleared by police",
       }),
     );
+  });
+});
+
+const NEARBY = {
+  lon: 36.8219,
+  lat: -1.2921,
+  radius_m: 10_000,
+  country_code: "KE",
+  mission_code: "NBO",
+  people: {
+    staff: 14,
+    delegates: 3,
+    citizens: 212,
+    others: 1,
+    confidence: 88.4,
+    named: [
+      { id: "p1", name: "Peter Mwangi", group: "STAFF", distance_m: 112, lon: 36.82, lat: -1.29, confidence: 91, place_label: null },
+    ],
+    unnamed: 0,
+  },
+  sites: [{ id: "s1", name: "Embassy Nairobi", site_type: "EMBASSY", mission_code: "NBO", distance_m: 0, lon: 36.8219, lat: -1.2921 }],
+  vehicles: [{ id: "v1", code: "VH-01", type_label: "Armoured SUV", status: "AVAILABLE", distance_m: 240, lon: 36.82, lat: -1.29 }],
+  travellers: { people: 3, trips: 1 },
+  partners: [{ id: "k1", name: "Kestrel Medical Assistance", services: ["MEDICAL"], sla_minutes: 30 }],
+  incidents: [{ ...INCIDENT, distance_m: 700 }],
+  annotations: [],
+};
+
+describe("Nearby (NBY-01..06)", () => {
+  function nearbyServer(body: unknown = NEARBY) {
+    return mockServer({
+      "GET /api/me": { body: DUTY_OFFICER },
+      "GET /api/operations/summary": { body: SUMMARY },
+      "GET /api/missions": { body: MISSIONS },
+      "GET /api/incidents": { body: [INCIDENT] },
+      "GET /api/signals": { body: SIGNALS },
+      "GET /api/weather": { body: WEATHER },
+      [`GET /api/incidents/${INCIDENT.id}`]: { body: DETAIL },
+      "GET /api/nearby": { body },
+    });
+  }
+  const asked = (fetchMock: ReturnType<typeof nearbyServer>) =>
+    fetchMock.mock.calls.map(([url]) => String(url)).filter((u) => u.startsWith("/api/nearby"));
+
+  it("opens from a right-click with what is within 10 km, nearest first", async () => {
+    const fetchMock = nearbyServer();
+    renderApp("/operations");
+    await userEvent.click(await screen.findByRole("button", { name: "map right-click" }));
+    const panel = await screen.findByLabelText("What's nearby");
+    expect(within(panel).getByText("14")).toBeInTheDocument();
+    expect(panel).toHaveTextContent("212 citizens");
+    expect(panel).toHaveTextContent("88.4% avg. confidence");
+    expect(within(panel).getByRole("button", { name: /Peter Mwangi · Staff\s*110 m/ })).toBeInTheDocument();
+    expect(panel).toHaveTextContent("Embassy Nairobi");
+    expect(panel).toHaveTextContent("VH-01 · Armoured SUV");
+    expect(panel).toHaveTextContent("3 on 1 trip");
+    expect(panel).toHaveTextContent("Partners covering KE");
+    expect(screen.getByText("nearby circle: 10 km")).toBeInTheDocument();
+    expect(asked(fetchMock).at(-1)).toBe("/api/nearby?lon=36.8219&lat=-1.2921&radius_m=10000");
+  });
+
+  it("changes the radius, and an incident in range opens its impact panel", async () => {
+    const fetchMock = nearbyServer();
+    renderApp("/operations?near=-1.2921,36.8219&r=10");
+    const panel = await screen.findByLabelText("What's nearby");
+    await userEvent.click(within(panel).getByRole("button", { name: "25 km" }));
+    await vi.waitFor(() => expect(asked(fetchMock).at(-1)).toBe("/api/nearby?lon=36.8219&lat=-1.2921&radius_m=25000"));
+    expect(screen.getByText("nearby circle: 25 km")).toBeInTheDocument();
+    await userEvent.click(await within(panel).findByRole("button", { name: new RegExp(INCIDENT.reference) }));
+    expect(await screen.findByLabelText("Exposure summary")).toBeInTheDocument();
+    expect(screen.queryByLabelText("What's nearby")).toBeNull();
+  });
+
+  it("opens from an incident's impact panel; a role without names sees counts", async () => {
+    nearbyServer({ ...NEARBY, people: { ...NEARBY.people, named: [], unnamed: 230 } });
+    renderApp(`/operations?incident=${INCIDENT.id}`);
+    await userEvent.click(await screen.findByRole("button", { name: "What's nearby" }));
+    const panel = await screen.findByLabelText("What's nearby");
+    expect(panel).toHaveTextContent("230 more not named for your role");
+    expect(panel).not.toHaveTextContent("Peter Mwangi");
   });
 });

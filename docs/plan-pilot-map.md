@@ -89,6 +89,12 @@ Each row carries its distance (`ST_Distance`) and the link to its screen. The en
 - Partners are those covering the country of the mission nearest the point, wherever it is (G-1); the response names that mission and country.
 - On the live stack, from the Nairobi embassy at 10 km: 14 staff, 3 delegates, 212 citizens (as INC-<year>-1042's exposure) and 1 other.
 
+**As built in Prompt 131** (each a deviation for approval in its PR):
+- Each row of Nearby flies the map to it (an incident opens its impact panel), so the API's rows now carry `lon` and `lat`; partners link to Assistance Partners and travellers to Journey Management. The other screens take no deep link to one record yet.
+- Nearby opens from a right-click without a drag, a long press, and the incident's impact panel ("What's nearby"). Missions and sites have only hover popups on the map today, so they are reached by right-clicking on them.
+- When Nearby opens or its radius changes, the map fits the circle.
+- It refreshes on exposure, fleet and annotation events.
+
 ## 4. Search (SRC-01..04)
 
 **Gazetteer:** `infra/scripts/build-places.py`, built as the star field is:

@@ -201,6 +201,8 @@ async def test_everything_within_ten_kilometres_nearest_first(
     assert body["travellers"] == {"people": 1, "trips": 1}  # TRP-0002 is restricted (D-33)
     assert [s["name"] for s in body["sites"]] == ["Embassy Nairobi"]
     assert body["sites"][0]["distance_m"] == 0
+    assert (body["sites"][0]["lon"], body["sites"][0]["lat"]) == EMBASSY  # to fly to (NBY-05)
+    assert people["named"][0]["lon"] == 36.8229
     assert [(v["code"], v["status"]) for v in body["vehicles"]] == [("VH-01", "AVAILABLE")]
     assert [p["name"] for p in body["partners"]] == ["Kestrel Medical"]  # covers KE (G-1)
     assert [i["reference"] for i in body["incidents"]] == ["INC-2026-1042"]  # ACTIVE only
