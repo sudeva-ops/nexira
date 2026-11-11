@@ -327,6 +327,11 @@ Rules:
 - **Nothing from the pictures.** Counts on the camera wall come from presence; stylised figures are drawn over the clips; nothing is detected or counted from video (§108 Q5).
 - **No schema change.** No capacity for every room; zones are tinted by their share of the people.
 
+**D-54 · UI polish pass.** Approved by the product owner on 2026-11-11 (PR #183). Requirements UIP-01 to UIP-08 (§121–125) in `docs/requirements-pilot.md`, with the defaults in §125.
+- **Display only.** Layout and wording fixes from a screenshot sweep of every screen; no data, API, role or permission change, so nothing is 🔒.
+- **The sidebar follows the role, the API decides.** Audit is left out of the sidebar for non-administrators as VIP Protection already is; the API's checks are unchanged (D-04).
+- **Next, graphics; the globe starts with NASA.** The graphics module that follows starts the globe's look with self-hosted NASA Blue Marble and Black Marble imagery (public domain, D-24); paid map products are considered only if that falls short.
+
 ---
 
 ## 7. Phase 1 acceptance scenario: NBO-CIVIL-UNREST

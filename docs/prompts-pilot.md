@@ -1240,3 +1240,32 @@ Playwright, real stack (§119; plan §6): twa-acceptance.spec.ts last in make ac
 normal day on; every other spec with it off. Report the real output; make acceptance (all
 specs) still passes.
 ```
+
+## Pilot module 26 · UI polish pass (D-54)
+
+Requirements UIP-01..UIP-08 (`docs/requirements-pilot.md` §121–125); plan `docs/plan-pilot-uip.md`. None of these prompts is 🔒.
+
+### Prompt 139 · Ticker and sidebar
+```
+UIP-01, UIP-06, UIP-07 (plan §1, G-1, G-2, G-5). The ticker: open incidents (ACTIVE and
+MONITORING) most severe first, then events; faded edges; still with one copy when it fits,
+scrolling only when it overflows (pure scrolls(), ResizeObserver). Sidebar: unique icons
+(symbol-cross, helper-management, clipboard-file); Audit only for ADMIN, display only. Tests:
+Vitest for the order, scrolls(), unique icons, Audit per role.
+```
+
+### Prompt 140 · Screen fixes
+```
+UIP-02..UIP-05, UIP-08 (plan §1, G-3). ui/Clip.tsx (ellipsis plus title); "Open AAR" with the
+reference as tooltip and header actions on one line; Clip on the cut subtitles and source labels;
+the Site Twin cameras button in the CCTV row; Check-in names on one line, a small minimal
+"Request partner", the phone header on one line; a taller Air Travel map. Tests: Vitest; before
+and after screenshots in the PR.
+```
+
+### Prompt 141 · Acceptance
+```
+Playwright, real stack (§124; plan G-4): uip-acceptance.spec.ts over every screen at 1440 × 900
+and 1920 × 1080 as the Duty Officer, plus the specific cases; in make acceptance before
+twa-acceptance.spec.ts. Report the real output; make acceptance (all specs) still passes.
+```
