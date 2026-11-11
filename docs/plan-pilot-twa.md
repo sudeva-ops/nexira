@@ -47,6 +47,9 @@ Scene 1 of `NBO-SITE` already resets presence to the seed, so the scenario start
 
 The strip refreshes on `SITE_UPDATED`.
 
+**As built in Prompt 135** (a deviation for approval in its PR):
+- "Today" starts at 00:00 in the platform's home time zone (`HOME_TZ`, GST), the day the rest of the app uses, not Nairobi's: missions carry no time zone, and the two differ by one hour. Zone names come from the site's plan; an audit row whose zone is no longer on the plan shows no name for it.
+
 ## 4. The plan (TWN-12, TWN-16)
 
 `screens/twin/motion.ts`, pure and tested:

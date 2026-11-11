@@ -125,3 +125,19 @@ class TwinOut(BaseModel):
     readiness: ReadinessOut
     source: str = "Access control, CCTV and building systems (simulated)"
     simulated: bool = True  # D-19
+
+
+class MovementOut(BaseModel):
+    """TWN-14: one presence move, by kind and zones only; never a person id, label or name."""
+
+    at: datetime
+    kind: str  # STAFF, GUARD, VISITOR
+    from_zone: str | None  # the zone's name; None for an arrival
+    to_zone: str | None  # None for a departure
+
+
+class MovementsOut(BaseModel):
+    movements: list[MovementOut]  # newest first, at most 20
+    arrivals_today: int  # since 00:00 in the platform's home time zone
+    departures_today: int
+    visitors_waiting: int  # in the lobby or the consular hall now
