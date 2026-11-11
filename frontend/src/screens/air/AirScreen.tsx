@@ -1,15 +1,19 @@
 import { Icon, NonIdealState } from "@blueprintjs/core";
+import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { type Flight, type FlightDetail, type FlightStatus, IN_AIR, useFlight, useFlights } from "../../api/flights";
 import { formatStamp } from "../../app/time";
 import { AirMap } from "../../map/AirMap";
 import { flightColour } from "../../map/geo";
+import { MapSearch } from "../../map/MapSearch";
+import type { Result } from "../../map/search";
 import { FlashRow, type FlashTone } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { PendingProposals } from "../queue/PendingProposals";
 
+const NO_FLIGHTS: never[] = [];
 const STATUS_LABEL: Record<string, string> = {
   SCHEDULED: "Scheduled",
   DELAYED: "Delayed",
@@ -155,7 +159,28 @@ function Detail({ flight }: { flight: FlightDetail }) {
 export function AirScreen() {
   const [params, setParams] = useSearchParams();
   const flights = useFlights();
-  const list = flights.data ?? [];
+  const list = flights.data ?? NO_FLIGHTS;
+  // SRC-02: only our travellers' flights, as the Air map has them (AT-01, D-33), then places.
+  const records = useMemo<Result[]>(
+    () =>
+      list.flatMap((f) =>
+        f.lon === null || f.lat === null
+          ? []
+          : [
+              {
+                kind: "FLIGHT" as const,
+                id: f.id,
+                label: f.flight_number,
+                detail: `${f.from_airport} → ${f.to_airport}`,
+                lon: f.lon,
+                lat: f.lat,
+                zoom: 5,
+              },
+            ],
+      ),
+    [list],
+  );
+  const [fly, setFly] = useState<{ lon: number; lat: number; zoom: number } | null>(null);
   const selectedId = params.get("flight") ?? undefined;
   const selected = useFlight(selectedId).data;
   const select = (id: string) => setParams({ flight: id });
@@ -190,7 +215,14 @@ export function AirScreen() {
       <div className="nx-air-grid">
         <div className="nx-col">
           <Card icon="globe" title="Live air picture" sub="Only flights carrying our travellers · positions simulated">
-            <AirMap flights={list} selectedId={selectedId ?? null} onSelect={select} />
+            <div className="nx-air-mapwrap">
+              <AirMap flights={list} selectedId={selectedId ?? null} onSelect={select} fly={fly} />
+              <MapSearch
+                records={records}
+                placeholder="Search flights, places or coordinates"
+                onPick={(r) => (r.kind === "FLIGHT" ? select(r.id) : setFly({ lon: r.lon, lat: r.lat, zoom: Math.min(r.zoom, 6) }))}
+              />
+            </div>
           </Card>
           <Card icon="airplane" title="Tracked flights" sub={`${list.length} shown`}>
             {flights.isLoading ? (

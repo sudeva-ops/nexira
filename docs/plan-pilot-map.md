@@ -121,6 +121,12 @@ It then matches places, by prefix and rank, accent-insensitively.
 - Each result offers "What's nearby".
 - Nothing is sent anywhere (D-24); the acceptance spec checks that no request leaves the stack.
 
+**As built in Prompt 132** (each a deviation for approval in its PR):
+- The gazetteer is Natural Earth 5.1.1's populated places (simple): 7,342 places, 368 KB, built by `infra/scripts/build-places.py` from the official zip (checked by SHA-256) with the standard library, and committed. It loads as its own chunk the first time the box gets focus.
+- A result flies to zoom 7 (a place) or 8 (anything else), not closer: the self-hosted world tiles carry detail to zoom 6 and only the Nairobi extract to 15 (D-24), so closer views elsewhere would be blank. An incident opens its impact panel instead, which fits its zone.
+- The found point is marked for 10 s; "What's nearby" is a button on each result and Shift+Enter.
+- The box sits under the legend; the annotation toolbar and card move down to make room.
+
 ## 5. Acceptance (§114)
 
 `frontend/e2e/map-acceptance.spec.ts`, run in `make acceptance` before the Copilot spec, while INC-<year>-1042 is ACTIVE:
