@@ -81,6 +81,8 @@ The strip refreshes on `SITE_UPDATED`.
 
 Each tile gets a corner label, "7 in zone · access control (simulated)", from presence. The generated views already draw walkers matching the zone's occupants (`cctv.ts` `walkers`, `people`). Over a clip, the same walkers are drawn on a transparent layer as stylised silhouettes (§120 Q3), never photographic. An offline camera still shows NO SIGNAL, with no figures.
 
+**As built in Prompt 137:** the figures over a clip are the generated views' own walkers (`cctv.ts` `walkers`, `people`) at 72% opacity on a transparent canvas, under the same camera filter as the picture; the tile's label reads "N in zone · access control (simulated)", with a tooltip saying where the count comes from. An offline camera shows NO SIGNAL with no figures and no count.
+
 ## 6. Acceptance (§119)
 
 `frontend/e2e/twa-acceptance.spec.ts` runs at the end of `make acceptance`, after the Exercise & Training run's reset, with the normal day switched on by the spec. It checks:

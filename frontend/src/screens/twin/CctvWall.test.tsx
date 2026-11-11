@@ -117,10 +117,14 @@ describe("the CCTV wall", () => {
       document.querySelector(
         `.nx-cctv-tile [data-camera="${code}"]`,
       ) as HTMLElement;
-    expect(feed("CAM-05")).toHaveTextContent("2 in zone");
+    expect(feed("CAM-05")).toHaveTextContent("2 in zone · access control (simulated)");
     expect(feed("CAM-05")).toHaveTextContent("CAM-05 · LOBBY & RECEPTION");
     expect(feed("CAM-07")).toHaveTextContent("NO SIGNAL");
     expect(feed("CAM-07")).not.toHaveTextContent("REC");
+    // TWN-15: over a clip, the zone's people as figures from presence; none on a dead camera.
+    expect(feed("CAM-05").querySelector('[data-testid="figures-CAM-05"]')).not.toBeNull();
+    expect(feed("CAM-07").querySelector("canvas.nx-cctv-figures")).toBeNull();
+    expect(feed("CAM-07")).not.toHaveTextContent("in zone");
     await userEvent.click(
       screen.getByRole("button", { name: "CAM-05 · Lobby & reception" }),
     );
