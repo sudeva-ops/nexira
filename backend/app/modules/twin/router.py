@@ -5,17 +5,20 @@ to show it."""
 
 import logging
 import uuid
+from datetime import datetime
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.approvals import require_roles
+from app.core.config import get_settings
 from app.core.events import Event, Publisher, get_publisher
 from app.core.security import CurrentUser, current_user, get_db
 from app.modules.tenancy.service import ROLES
 from app.modules.twin import service
-from app.modules.twin.schemas import SiteSummaryOut, TwinOut
+from app.modules.twin.schemas import MovementsOut, SiteSummaryOut, TwinOut
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sites", tags=["twin"])
@@ -48,6 +51,17 @@ async def sites(_user: Reader, session: Db) -> list[SiteSummaryOut]:
 async def twin(site_id: uuid.UUID, user: Reader, session: Db) -> TwinOut:
     try:
         return await service.twin(session, user, site_id)
+    except service.TwinError as e:
+        raise _http(e) from None
+
+
+@router.get("/{site_id}/twin/movements")
+async def movements(site_id: uuid.UUID, _user: Reader, session: Db) -> MovementsOut:
+    """TWN-14 (D-53): the last moves and today's figures, by kind and zones only."""
+    home = ZoneInfo(get_settings().home_tz)
+    since = datetime.now(home).replace(hour=0, minute=0, second=0, microsecond=0)
+    try:
+        return await service.movements(session, site_id, since)
     except service.TwinError as e:
         raise _http(e) from None
 

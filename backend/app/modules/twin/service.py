@@ -17,9 +17,10 @@
 
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -735,3 +736,68 @@ async def ensure_plan(session: AsyncSession, plan: PlanIn, actor: Actor = SYSTEM
         },
     )
     return True
+
+
+# --- recent movements (TWN-14, D-53; plan-pilot-twa §3, G-5) ------------------------------------
+
+MOVEMENTS = 20
+# Read from the record of presence moves: audit.py only inserts, and the app may read its rows.
+# Only the kind and the zones' codes leave this query; never a person id or a label.
+_MOVES = text(
+    """
+    SELECT occurred_at, details->>'kind' AS kind, details->>'from' AS from_code,
+           details->>'to' AS to_code
+      FROM audit_log
+     WHERE entity_type = 'site' AND entity_id = :site AND action = 'SITE.PRESENCE'
+     ORDER BY occurred_at DESC, chain_seq DESC
+     LIMIT :limit
+    """
+)
+_TODAY = text(
+    """
+    SELECT count(*) FILTER (WHERE details->>'from' IS NULL) AS arrivals,
+           count(*) FILTER (WHERE details->>'to' IS NULL) AS departures
+      FROM audit_log
+     WHERE entity_type = 'site' AND entity_id = :site AND action = 'SITE.PRESENCE'
+       AND occurred_at >= :since
+    """
+)
+
+
+async def movements(
+    session: AsyncSession, site_id: uuid.UUID, since: datetime
+) -> schemas.MovementsOut:
+    site = await session.get(Site, site_id)
+    if site is None:
+        raise TwinError(404, "Site not found")
+    zones = list(await session.scalars(select(SiteZone).where(SiteZone.site_id == site.id)))
+    if not zones:
+        raise TwinError(404, "No floor plan yet")
+    name = {z.code: z.name for z in zones}
+    params = {"site": str(site.id), "limit": MOVEMENTS, "since": since}
+    moves = [
+        schemas.MovementOut(
+            at=m.occurred_at,
+            kind=m.kind,
+            from_zone=name.get(m.from_code) if m.from_code else None,
+            to_zone=name.get(m.to_code) if m.to_code else None,
+        )
+        for m in await session.execute(_MOVES, params)
+    ]
+    today = (await session.execute(_TODAY, params)).one()
+    waiting_zones = [z.id for z in zones if z.kind in ("LOBBY", "CONSULAR")]
+    waiting = await session.scalar(
+        select(func.count())
+        .select_from(SitePresence)
+        .where(
+            SitePresence.site_id == site.id,
+            SitePresence.kind == "VISITOR",
+            SitePresence.zone_id.in_(waiting_zones),
+        )
+    )
+    return schemas.MovementsOut(
+        movements=moves,
+        arrivals_today=today.arrivals,
+        departures_today=today.departures,
+        visitors_waiting=waiting or 0,
+    )

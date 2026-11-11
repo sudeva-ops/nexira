@@ -663,3 +663,45 @@ async def test_the_route_matches_a_longer_plan_label(world: World) -> None:
         a=world.users["hom.nbo"],
     )
     assert (await world.twin())["route"]["code"] == "A"
+
+
+# --- recent movements (TWN-14, D-53; plan-pilot-twa §3) -----------------------------------------
+
+
+async def test_recent_movements_by_kind_and_zone_never_who(world: World) -> None:
+    await world.presence(str(world.staff[0]), "conf")  # a meeting
+    await world.presence("Visitor 3", "g1")  # an arrival
+    await world.presence("Visitor 1", None)  # a departure
+    response = await world.send("viewer", "GET", f"/api/sites/{world.site}/twin/movements")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [(m["kind"], m["from_zone"], m["to_zone"]) for m in body["movements"]] == [
+        ("VISITOR", "Consular hall", None),
+        ("VISITOR", None, "Gate 1"),
+        ("STAFF", "Chancery offices", "Conference room"),
+    ]
+    times = [m["at"] for m in body["movements"]]
+    assert times == sorted(times, reverse=True)
+    assert (body["arrivals_today"], body["departures_today"]) == (1, 1)
+    assert body["visitors_waiting"] == 1  # Visitor 2, still in the consular hall
+    # Nothing identifying: no person id, no label, no name (TWN-02).
+    for secret in [str(p) for p in world.staff] + [*STAFF, "Visitor", "Guard"]:
+        assert secret not in response.text, secret
+
+
+async def test_recent_movements_keep_the_last_twenty(world: World) -> None:
+    for n in range(12):
+        await world.presence(str(world.staff[n % 2]), "conf" if n % 4 < 2 else "ch")
+    for n in range(12):
+        await world.presence(f"Visitor {n + 3}", "g1")
+    body = (await world.send("duty", "GET", f"/api/sites/{world.site}/twin/movements")).json()
+    assert len(body["movements"]) == 20
+    assert body["movements"][0]["to_zone"] == "Gate 1"
+    assert body["arrivals_today"] == 12
+
+
+async def test_movements_only_for_a_site_with_a_plan(world: World) -> None:
+    residence = (await world.sql("SELECT id FROM site WHERE site_type = 'RESIDENCE'")).scalar_one()
+    for site in (residence, uuid.uuid4()):
+        response = await world.send("duty", "GET", f"/api/sites/{site}/twin/movements")
+        assert response.status_code == 404
