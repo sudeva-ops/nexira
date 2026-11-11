@@ -111,7 +111,7 @@ Annotations added here appear in the After-Action Review spec's timeline. That s
 | # | Gap | Proposed answer |
 |---|---|---|
 | G-1 | A partner has no location, only the countries it covers (`partner.coverage`) | Nearby lists the partners covering the country of the mission nearest the point (within the radius, else the nearest), marked "covers KE", with no distance |
-| G-2 | **Needs a decision.** Which mission an annotation belongs to, for the Head of Mission's scope | **A (proposed):** the linked incident's mission; else the mission nearest the shape, if within 300 km; else none (tenant-wide). A Head of Mission may only add or change annotations whose mission is theirs. **B:** the author picks a mission from a list every time |
+| G-2 | **Decided: A** (PR #168). Which mission an annotation belongs to, for the Head of Mission's scope | **A (chosen):** the linked incident's mission; else the mission nearest the shape, if within 300 km; else none (tenant-wide). A Head of Mission may only add or change annotations whose mission is theirs. **B:** the author picks a mission from a list every time |
 | G-3 | Editing a shape vertex by vertex needs a drawing library; the stack has none, and AGENTS.md fixes the stack | Our own small drawing (click, double-click, Escape). Edit changes the label, note and end time; a shape is changed by redrawing it |
 | G-4 | Annotation labels are free text, which may contain a name; AAR-02 leaves out free text (NOTE, AAR G-1) | The Incidents timeline shows the label (as it shows notes); AAR-02 and the replay's timeline show only the kind and symbol ("Checkpoint added", "Area added") |
 | G-5 | Who counts as "staff" in Nearby; the exposure groups only staff (`STAFF_TYPES`: DIPLOMAT, LOCAL_STAFF), delegates and citizens | The same three groups, so Nearby agrees with the exposure, plus an "others" count for DEPENDANT and CONTRACTOR, so no one near the point is left out silently |
@@ -125,3 +125,8 @@ Annotations added here appear in the After-Action Review spec's timeline. That s
 ## 7. Prompts
 
 As `docs/prompts-pilot.md` Prompts 127–133. Prompt 127 is 🔒.
+
+## 8. Decisions by the product owner (2026-11-11, PR #168: "A and Approved")
+
+- G-2: option A. An annotation belongs to its incident's mission, else the mission nearest the shape within 300 km, else none (tenant-wide); a Head of Mission adds or changes only those of their mission.
+- G-1, G-3..G-11: as proposed.
