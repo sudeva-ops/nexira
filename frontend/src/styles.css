@@ -4366,3 +4366,62 @@ tr.nx-flash-b > td {
   font-size: 12px;
   color: var(--nx-tx2);
 }
+
+/* Site Twin live activity (TWN-12, TWN-14, TWN-16; D-53). A person walks to a new zone over 2 s
+   and drifts gently in place; Calm mode and reduced motion still both (the rules above). */
+.nx-twn-person {
+  transition: transform 2s ease-in-out;
+}
+
+.nx-twn-person circle {
+  animation-name: nx-twn-drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+@keyframes nx-twn-drift {
+  0% {
+    transform: translate(0, 0);
+  }
+  33% {
+    transform: translate(2.5px, -1.5px);
+  }
+  66% {
+    transform: translate(-1.5px, 2px);
+  }
+  100% {
+    transform: translate(1.5px, 1px);
+  }
+}
+
+.nx-twn-furniture {
+  pointer-events: none;
+}
+
+.nx-twn-furniture rect,
+.nx-twn-furniture circle,
+.nx-twn-furniture line {
+  fill: none;
+  stroke: rgba(171, 179, 191, 0.16);
+  stroke-width: 1;
+}
+
+.nx-twn-moves {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--nx-line);
+  font-size: 12px;
+}
+
+.nx-twn-moves ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

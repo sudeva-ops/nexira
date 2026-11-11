@@ -108,8 +108,8 @@ describe("Site Twin", () => {
     expect(screen.getByText("Last drill 3 weeks ago")).toBeInTheDocument();
     const plan = screen.getByRole("img", { name: "Embassy Nairobi floor plan" });
     expect(within(plan).getByText("Chancery offices")).toBeInTheDocument();
-    expect(plan.querySelectorAll("circle")).toHaveLength(4);
-    expect(plan.querySelectorAll('circle[data-kind="STAFF"]')).toHaveLength(2);
+    expect(plan.querySelectorAll("g.nx-twn-person")).toHaveLength(4);
+    expect(plan.querySelectorAll('g.nx-twn-person[data-kind="STAFF"]')).toHaveLength(2);
     // Names only as the API gives them (within scope); labels for guards and visitors.
     const titles = [...plan.querySelectorAll("circle title")].map((t) => t.textContent);
     expect(titles).toContain("Fictional Officer A · Staff · Chancery offices");
@@ -319,5 +319,44 @@ describe("Site Twin helpers", () => {
     expect(drillAgo("2026-10-12", today)).toBe("3 weeks ago");
     expect(drillAgo("2026-11-01", today)).toBe("1 day ago");
     expect(drillAgo(null, today)).toBeNull();
+  });
+});
+
+describe("Live activity (TWN-12, TWN-14, TWN-16)", () => {
+  const MOVES = {
+    movements: [
+      { at: "2026-11-11T07:44:00Z", kind: "VISITOR", from_zone: "Consular hall", to_zone: null },
+      { at: "2026-11-11T07:43:00Z", kind: "VISITOR", from_zone: "Gate 1", to_zone: "Lobby & reception" },
+      { at: "2026-11-11T07:42:00Z", kind: "VISITOR", from_zone: null, to_zone: "Gate 1" },
+      { at: "2026-11-11T07:41:00Z", kind: "STAFF", from_zone: "Chancery offices", to_zone: "Conference room" },
+    ],
+    arrivals_today: 5,
+    departures_today: 6,
+    visitors_waiting: 10,
+  };
+
+  it("shows the recent movements by kind and zone, and today's figures", async () => {
+    setup(DUTY_OFFICER, twin(), false, { "GET /api/sites/s-nbo/twin/movements": { body: MOVES } });
+    renderApp("/twin");
+    const strip = await screen.findByLabelText("Recent movements");
+    expect(strip).toHaveTextContent("Today 5 in · 6 out · 10 visitors waiting");
+    const lines = within(strip).getAllByRole("listitem").map((li) => li.textContent);
+    expect(lines).toEqual([
+      "11:44 Left · Consular hall · Visitor",
+      "11:43 Gate 1 → Lobby & reception · Visitor",
+      "11:42 Arrived · Gate 1 · Visitor",
+      "11:41 Chancery offices → Conference room · Staff",
+    ]);
+  });
+
+  it("places each person in its zone, with the room's furniture under them", async () => {
+    setup(DUTY_OFFICER, twin());
+    renderApp("/twin");
+    const plan = await screen.findByRole("img", { name: "Embassy Nairobi floor plan" });
+    const people = [...plan.querySelectorAll<SVGGElement>("g.nx-twn-person")];
+    expect(people.length).toBeGreaterThan(0);
+    for (const p of people) expect(p.style.transform).toMatch(/^translate\(\d+(\.\d+)?px, \d+(\.\d+)?px\)$/);
+    expect(people.map((p) => p.dataset.zone)).toContain("ch");
+    expect(plan.querySelectorAll(".nx-twn-furniture rect").length).toBeGreaterThan(5);
   });
 });
