@@ -3,6 +3,7 @@
 from app.core.model_base import Base
 from app.modules.aar.models import AarItem, AfterActionReview
 from app.modules.agents.models import ActionPolicy, Agent, AgentProposal, ProposalApproval
+from app.modules.annotations.models import MapAnnotation
 from app.modules.audit.models import AuditLog
 from app.modules.checkin.models import CheckinResponse
 from app.modules.documents.models import TravelDocument
@@ -75,6 +76,7 @@ __all__ = [
     "IntelSource",
     "LocationObservation",
     "LogisticsRoute",
+    "MapAnnotation",
     "MedicalFacility",
     "Mission",
     "MissionClimateRisk",
