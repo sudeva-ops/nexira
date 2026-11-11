@@ -398,3 +398,8 @@ The schema has been applied to PostgreSQL 16 + PostGIS 3 (arm64) as `nexira_owne
 5. Arabic UI in Phase 1 or Phase 2. Current assumption: Phase 2, with the layout kept RTL-ready.
 6. Native-speaker review of AR, FR and SW templates (D-15).
 7. Packaging: Phase 1 does not deliver a complete "Essentials" tier, because Mass Notification is Phase 2. Either accept Phase 1 as a pilot only, or move a basic notification composer into Phase 1.
+
+**D-54 · UI polish pass.** Approved by the product owner on 2026-11-11 (PR #183). Requirements UIP-01 to UIP-08 (§121–125) in `docs/requirements-pilot.md`, with the defaults in §125.
+- **Display only.** Layout and wording fixes from a screenshot sweep of every screen; no data, API, role or permission change, so nothing is 🔒.
+- **The sidebar follows the role, the API decides.** Audit is left out of the sidebar for non-administrators as VIP Protection already is; the API's checks are unchanged (D-04).
+- **Next, graphics; the globe starts with NASA.** The graphics module that follows starts the globe's look with self-hosted NASA Blue Marble and Black Marble imagery (public domain, D-24); paid map products are considered only if that falls short.
