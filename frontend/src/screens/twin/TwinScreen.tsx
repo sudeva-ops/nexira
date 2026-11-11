@@ -3,15 +3,17 @@ import { type KeyboardEvent, type MouseEvent, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { ApiError } from "../../api/client";
+import { formatTime, HOME_TZ } from "../../app/time";
 import {
-  dotsIn,
   drillAgo,
   OCCUPANT_COLOUR,
   OCCUPANT_LABEL,
   type OccupantKind,
   SENSOR_SEV,
   type Sensor,
+  type Movement,
   type Twin,
+  useMovements,
   useTickReadiness,
   useTwin,
   useTwinPermissions,
@@ -20,6 +22,8 @@ import {
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { CctvWall } from "./CctvWall";
+import { furniture } from "./furniture";
+import { drift, shareFill, spots } from "./motion";
 import { cone, type Coverage, coverage, placed, target } from "./coverage";
 
 const KINDS: OccupantKind[] = ["STAFF", "GUARD", "VISITOR"];
@@ -192,7 +196,7 @@ function Plan({
       {twin.zones.map((z) => {
         const safe = z.kind === "SAFE_ROOM";
         const fault = down.has(z.code);
-        const fill = safe && sheltering ? "rgba(50,164,103,.12)" : z.kind === "MUSTER" ? "rgba(76,144,240,.06)" : "#1C2127";
+        const fill = safe && sheltering ? "rgba(50,164,103,.12)" : shareFill(z.count, twin.counts.on_site);
         const pick = cover
           ? {
               role: "button",
@@ -224,6 +228,18 @@ function Plan({
               stroke={safe ? "#32A467" : fault ? "#CD4246" : "#404854"}
               strokeWidth={safe || fault ? 1.8 : 1}
             />
+            {/* TWN-16: faint furniture, under the people and the cones. */}
+            <g className="nx-twn-furniture" aria-hidden="true">
+              {furniture(z).map((f, i) =>
+                f.shape === "rect" ? (
+                  <rect key={i} x={f.x} y={f.y} width={f.w} height={f.h} rx={f.r} />
+                ) : f.shape === "circle" ? (
+                  <circle key={i} cx={f.cx} cy={f.cy} r={f.r} />
+                ) : (
+                  <line key={i} x1={f.x1} y1={f.y1} x2={f.x2} y2={f.y2} />
+                ),
+              )}
+            </g>
             <text x={z.x + 8} y={z.y + 16} fill="#ABB3BF" fontSize="10.5" fontWeight="600">
               {z.name}
             </text>
@@ -254,18 +270,60 @@ function Plan({
           </text>
         </g>
       )}
-      {twin.zones.flatMap((z) =>
-        dotsIn(z, byZone.get(z.code)?.length ?? 0).map((p, k) => {
-          const o = (byZone.get(z.code) ?? [])[k];
-          if (!o) return null;
+      {/* TWN-12: each person at a stable spot in the zone, drifting; a move walks there (CSS). */}
+      {twin.zones.flatMap((z) => {
+        const here = byZone.get(z.code) ?? [];
+        const at = spots(z, here.map((o) => o.id));
+        return here.map((o) => {
+          const p = at.get(o.id);
+          if (!p) return null;
+          const d = drift(o.id);
           return (
-            <circle key={o.id} cx={p.x} cy={p.y} r="5" fill={OCCUPANT_COLOUR[o.kind]} stroke="#111418" data-kind={o.kind}>
-              <title>{`${o.name ?? o.label ?? OCCUPANT_LABEL[o.kind]} · ${OCCUPANT_LABEL[o.kind]} · ${z.name}`}</title>
-            </circle>
+            <g
+              key={o.id}
+              className="nx-twn-person"
+              style={{ transform: `translate(${p.x}px, ${p.y}px)` }}
+              data-kind={o.kind}
+              data-zone={z.code}
+            >
+              <circle
+                r="5"
+                fill={OCCUPANT_COLOUR[o.kind]}
+                stroke="#111418"
+                style={{ animationDelay: d.delay, animationDuration: d.period }}
+              >
+                <title>{`${o.name ?? o.label ?? OCCUPANT_LABEL[o.kind]} · ${OCCUPANT_LABEL[o.kind]} · ${z.name}`}</title>
+              </circle>
+            </g>
           );
-        }),
-      )}
+        });
+      })}
     </svg>
+  );
+}
+
+/** TWN-14: the last movements under the plan, newest first, and today's figures; never who. */
+function MovementStrip({ siteId }: { siteId: string }) {
+  const data = useMovements(siteId).data;
+  if (!data) return null;
+  const where = (m: Movement) =>
+    m.from_zone === null ? `Arrived · ${m.to_zone ?? "?"}` : m.to_zone === null ? `Left · ${m.from_zone}` : `${m.from_zone} → ${m.to_zone}`;
+  return (
+    <div className="nx-twn-moves" aria-label="Recent movements">
+      <span className="nx-twn-moves-today">
+        Today <b>{data.arrivals_today}</b> in · <b>{data.departures_today}</b> out ·{" "}
+        <b>{data.visitors_waiting}</b> visitor{data.visitors_waiting === 1 ? "" : "s"} waiting
+      </span>
+      <ol>
+        {data.movements.slice(0, 6).map((m) => (
+          <li key={`${m.at}-${m.kind}`}>
+            <span className="nx-mono nx-dim">{formatTime(new Date(m.at), HOME_TZ).slice(0, 5)}</span> {where(m)} ·{" "}
+            <span className="nx-dim">{OCCUPANT_LABEL[m.kind]}</span>
+          </li>
+        ))}
+        {data.movements.length === 0 && <li className="nx-dim">No movement recorded yet</li>}
+      </ol>
+    </div>
   );
 }
 
@@ -503,6 +561,7 @@ export function TwinScreen() {
               >
                 <div className="nx-bd nx-twn-canvas">
                   <Plan twin={shown} cover={covering ? cover : null} onZone={(zone) => look({ zone })} />
+                  <MovementStrip siteId={shown.site.id} />
                   {covering && cover && (
                     <div className="nx-twn-cover" aria-label="What the cameras see">
                       {cover.notCovered.length ? (

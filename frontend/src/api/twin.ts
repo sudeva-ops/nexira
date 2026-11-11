@@ -118,6 +118,7 @@ export const twinKeys = {
   sites: ["twin", "sites"] as const,
   twin: (siteId: string) => ["twin", "site", siteId] as const,
   permissions: (siteId: string) => ["twin", "permissions", siteId] as const,
+  movements: (siteId: string) => ["twin", "movements", siteId] as const, // under "twin": live
 };
 
 export const OCCUPANT_COLOUR: Record<OccupantKind, string> = {
@@ -175,5 +176,28 @@ export function useTickReadiness() {
       client.setQueryData(twinKeys.twin(twin.site.id), twin);
       void client.invalidateQueries({ queryKey: twinKeys.all });
     },
+  });
+}
+
+/** TWN-14 (D-53): one presence move, by kind and zone names only; never who. */
+export interface Movement {
+  at: string;
+  kind: OccupantKind;
+  from_zone: string | null; // null for an arrival
+  to_zone: string | null; // null for a departure
+}
+
+export interface Movements {
+  movements: Movement[];
+  arrivals_today: number;
+  departures_today: number;
+  visitors_waiting: number;
+}
+
+export function useMovements(siteId: string | undefined) {
+  return useQuery({
+    queryKey: twinKeys.movements(siteId ?? ""),
+    queryFn: () => apiGet<Movements>(`/api/sites/${siteId}/twin/movements`),
+    enabled: !!siteId,
   });
 }

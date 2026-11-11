@@ -71,6 +71,12 @@ The strip refreshes on `SITE_UPDATED`.
 - GATE: a barrier;
 - MUSTER: none.
 
+**As built in Prompt 136** (each a deviation for approval in its PR):
+- A person's dot keeps its element across reads (the presence row's id), so a move to another zone walks there by a CSS transition on its transform; an arrival or a departure appears or goes without a walk. The drift is a CSS keyframe with a delay and period from the person's key. The app's Calm and reduced-motion rules still both.
+- The zone tint replaces the muster point's fixed tint; the safe room keeps its green while sheltering.
+- The strip shows the last six moves in one or two lines under the plan, times in HOME_TZ; the API keeps 20.
+- The specs count people as `g.nx-twn-person` rather than every `circle`, since the conference room's chairs are circles too (`TwinScreen.test.tsx`, `twn-acceptance.spec.ts`).
+
 ## 5. The camera wall (TWN-15)
 
 Each tile gets a corner label, "7 in zone · access control (simulated)", from presence. The generated views already draw walkers matching the zone's occupants (`cctv.ts` `walkers`, `people`). Over a clip, the same walkers are drawn on a transparent layer as stylised silhouettes (§120 Q3), never photographic. An offline camera still shows NO SIGNAL, with no figures.

@@ -119,7 +119,7 @@ test("Site Twin acceptance: the embassy, NBO-SITE faults, shelter and recovery, 
   await expect(page.getByText("11 staff · 3 guards · 11 visitors")).toBeVisible();
   await expect(page.getByText("43 / 43", { exact: true })).toBeVisible();
   await expect(page.getByTestId("twin-shelter")).toContainText(`Shelter-in-place active (${INCIDENT})`);
-  await expect(page.getByRole("img", { name: "Embassy Nairobi floor plan" }).locator("circle")).toHaveCount(25);
+  await expect(page.getByRole("img", { name: "Embassy Nairobi floor plan" }).locator("g.nx-twn-person")).toHaveCount(25);
   // Camera coverage before the unrest: 16 blue cones, below 100%, the seeded corner named
   // (TWN-08, plan-pilot-rpl §4: 97% after migration 0019).
   const cover = coverageOf(page);
