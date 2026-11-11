@@ -250,6 +250,8 @@ ROWS: dict[str, str] = {
             "PLAN_ADHERENCE",
         )
     ),
+    "map_annotation": "INSERT INTO map_annotation (tenant_id, kind, symbol, shape, label, "
+    "created_by) VALUES ('{t}', 'MARK', 'CHECKPOINT', " + PT + ", 'Checkpoint', '{user}')",
 }
 
 # nexira_app has no UPDATE/DELETE on audit_log at all (D-20), so those fail with
@@ -290,6 +292,7 @@ NO_UPDATE_DELETE = {  # append-only / seeded
     "aar_item",  # UPDATE of the decision columns only; no DELETE (PC-50)
     "exercise",  # UPDATE of the ending columns only, once; no DELETE (PC-51)
     "exercise_score",  # frozen once written (PC-52)
+    "map_annotation",  # UPDATE of the edit and withdraw columns only; no DELETE (PC-54)
 }
 NO_UPDATE = {  # an UPDATE of other columns is refused; a DELETE is a departure
     "site_presence",  # UPDATE of zone_id only (PC-41)
@@ -450,7 +453,7 @@ async def test_tenant_b_cannot_insert_rows_for_tenant_a(
             r"|supply mitigation: no such supplier"
             r"|risk index: no such mission|mission event: no such mission"
             r"|after-action review: no such incident|aar item: no such review"
-            r"|exercise: no such mission"
+            r"|exercise: no such mission|map annotation: no such user"
         ),
     ):
         await api.execute(sql_for(table, world.a))

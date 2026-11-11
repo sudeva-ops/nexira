@@ -62,10 +62,10 @@ def test_upgrade_downgrade_upgrade(fresh: DbUrls) -> None:
     # health tables (0009), the three evacuation tables (0010), the two fleet tables (0011),
     # the four VIP tables (0012), the five Site Twin tables (0013), the three supply tables
     # (0014), the two predictive tables (0015), the two review tables (0016), the two exercise
-    # tables (0017), and alembic_version.
+    # tables (0017), map_annotation (0020), and alembic_version.
     assert (
         len(upgraded["tables"] - before["tables"])
-        == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 2 + 4 + 5 + 3 + 2 + 2 + 2 + 1
+        == 33 + 1 + 2 + 3 + 1 + 2 + 1 + 1 + 4 + 3 + 2 + 4 + 5 + 3 + 2 + 2 + 2 + 1 + 1
     )
     assert upgraded["views"] == {"v_incident_people_in_zone", "v_checkin_latest"}
     assert {"audit_log_chain", "audit_verify_chain", "next_reference"} <= upgraded["functions"]
@@ -1306,3 +1306,46 @@ async def _guard_on(admin_url: str) -> tuple[object, ...]:
     finally:
         await conn.close()
     return tuple(row or ())
+
+
+ANNOTATION_TABLES = ("map_annotation",)
+
+
+def test_downgrading_0020_restores_0019_exactly(fresh: DbUrls) -> None:
+    """PC-54 (D-52): FORCE RLS; read and added by the app, changed only through its column
+    grants; the backup role reads it; the guards pinned to a search_path; the downgrade leaves
+    0019 exactly."""
+    cfg = alembic_config(fresh.owner)
+    admin = DbUrls.plain(fresh.admin)
+    command.downgrade(cfg, "base")
+    command.upgrade(cfg, "0019")
+    at_0019 = asyncio.run(_shape(admin, ANNOTATION_TABLES, "map_annotation%"))
+    command.upgrade(cfg, "0020")
+    at_0020 = asyncio.run(_shape(admin, ANNOTATION_TABLES, "map_annotation%"))
+    command.downgrade(cfg, "0019")
+    assert asyncio.run(_shape(admin, ANNOTATION_TABLES, "map_annotation%")) == at_0019
+    assert at_0019["tables"] == []
+    seeded = (
+        "{nexira_owner=arwdDxt/nexira_owner,nexira_backup=r/nexira_owner,"
+        "nexira_app=ar/nexira_owner}"
+    )
+    assert at_0020["tables"] == [("map_annotation", True, seeded)]
+    assert at_0020["columns"] == [
+        ("map_annotation", column)
+        for column in (
+            "ends_at",
+            "label",
+            "note",
+            "reason",
+            "shape",
+            "status",
+            "updated_by",
+            "withdrawn_by",
+        )
+    ]
+    assert at_0020["policies"] == 1
+    assert at_0020["search_paths"] == [
+        (name, '{"search_path=pg_catalog, public, pg_temp"}')
+        for name in ("map_annotation_guard", "map_annotation_no_truncate_guard")
+    ]
+    command.upgrade(cfg, "head")
