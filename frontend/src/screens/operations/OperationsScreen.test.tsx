@@ -30,6 +30,8 @@ vi.mock("../../map/OperationsMap", () => ({
     onZoom,
     near,
     onNearby,
+    fly,
+    mark,
   }: {
     incidents: Incident[];
     onSelect: (i: Incident) => void;
@@ -41,6 +43,8 @@ vi.mock("../../map/OperationsMap", () => ({
     onZoom?: (z: number) => void;
     near?: { lon: number; lat: number; km: number } | null;
     onNearby?: (p: [number, number]) => void;
+    fly?: { lon: number; lat: number; zoom?: number } | null;
+    mark?: { lon: number; lat: number } | null;
   }) => (
     <div data-testid="operations-map">
       {incidents.map((i) => (
@@ -70,6 +74,8 @@ vi.mock("../../map/OperationsMap", () => ({
         map right-click
       </button>
       <span>nearby circle: {near ? `${near.km} km` : "none"}</span>
+      <span>flown to: {fly ? `${fly.lat},${fly.lon} at ${fly.zoom ?? "-"}` : "none"}</span>
+      <span>marked: {mark ? `${mark.lat},${mark.lon}` : "none"}</span>
     </div>
   ),
 }));
@@ -412,5 +418,67 @@ describe("Nearby (NBY-01..06)", () => {
     const panel = await screen.findByLabelText("What's nearby");
     expect(panel).toHaveTextContent("230 more not named for your role");
     expect(panel).not.toHaveTextContent("Peter Mwangi");
+  });
+});
+
+describe("Map search (SRC-01..04)", () => {
+  function searchServer() {
+    return mockServer({
+      "GET /api/me": { body: DUTY_OFFICER },
+      "GET /api/operations/summary": { body: SUMMARY },
+      "GET /api/missions": { body: MISSIONS },
+      "GET /api/incidents": { body: [INCIDENT] },
+      "GET /api/signals": { body: SIGNALS },
+      "GET /api/weather": { body: WEATHER },
+      [`GET /api/incidents/${INCIDENT.id}`]: { body: DETAIL },
+      "GET /api/nearby": { body: NEARBY },
+    });
+  }
+
+  it("focuses with /, finds a mission first and flies there, marking the point", async () => {
+    searchServer();
+    renderApp("/operations");
+    await screen.findByText("1,338");
+    await userEvent.keyboard("/");
+    const box = screen.getByRole("combobox", { name: "Search the map" });
+    expect(box).toHaveFocus();
+    const mission = MISSIONS[0];
+    await userEvent.type(box, mission?.code ?? "");
+    const results = await screen.findByRole("listbox", { name: "Search results" });
+    expect(within(results).getAllByRole("option")[0]).toHaveTextContent(mission?.city ?? "");
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByText(`flown to: ${mission?.lat},${mission?.lon} at 8`)).toBeInTheDocument();
+    expect(screen.getByText(`marked: ${mission?.lat},${mission?.lon}`)).toBeInTheDocument();
+  });
+
+  it("finds a place in the bundled gazetteer and coordinates, sending nothing", async () => {
+    const fetchMock = searchServer();
+    renderApp("/operations");
+    const box = await screen.findByRole("combobox", { name: "Search the map" });
+    await userEvent.click(box);
+    await userEvent.type(box, "Kampala");
+    const results = await screen.findByRole("listbox", { name: "Search results" });
+    expect(await within(results).findByRole("option", { name: /Kampala.*UG/ })).toBeInTheDocument();
+    await userEvent.clear(box);
+    await userEvent.type(box, "geo:-4.04,39.67");
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByText("flown to: -4.04,39.67 at 8")).toBeInTheDocument();
+    const urls = fetchMock.mock.calls.map(([url]) => String(url));
+    expect(urls.filter((u) => /kampala|geo:|39\.67/i.test(u))).toEqual([]);
+  });
+
+  it("opens an incident it finds, and Shift+Enter asks what is nearby", async () => {
+    searchServer();
+    renderApp("/operations");
+    const box = await screen.findByRole("combobox", { name: "Search the map" });
+    await userEvent.click(box);
+    await userEvent.type(box, INCIDENT.reference);
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByLabelText("Exposure summary")).toBeInTheDocument();
+    await userEvent.click(box);
+    await userEvent.clear(box);
+    await userEvent.type(box, "-1.2921, 36.8219");
+    await userEvent.keyboard("{Shift>}{Enter}{/Shift}");
+    expect(await screen.findByLabelText("What's nearby")).toBeInTheDocument();
   });
 });

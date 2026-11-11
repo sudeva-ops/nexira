@@ -4185,7 +4185,7 @@ tr.nx-flash-b > td {
    the card of a picked annotation. */
 .nx-ann-tools {
   position: absolute;
-  top: 42px;
+  top: 78px;
   left: 10px;
   z-index: 2;
   display: flex;
@@ -4203,7 +4203,7 @@ tr.nx-flash-b > td {
 
 .nx-ann-card {
   position: absolute;
-  top: 82px;
+  top: 118px;
   left: 10px;
   z-index: 2;
   width: 280px;
@@ -4299,4 +4299,63 @@ tr.nx-flash-b > td {
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+/* Map search (SRC-01..04, D-52): under the legend; results in a list below it. */
+.nx-search {
+  position: absolute;
+  top: 42px;
+  left: 10px;
+  z-index: 3;
+  width: min(380px, calc(100% - 80px));
+}
+
+.nx-search .bp6-input {
+  background: rgba(17, 20, 24, 0.9);
+}
+
+.nx-search-results {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 4px 0;
+  border: 1px solid #383e47;
+  border-radius: 4px;
+  background: rgba(17, 20, 24, 0.97);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.nx-search-results li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.nx-search-results li.active {
+  background: rgba(76, 144, 240, 0.18);
+}
+
+.nx-search-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nx-search-kind {
+  font-size: 11px;
+  color: #738091;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.nx-air-mapwrap {
+  position: relative;
+}
+
+.nx-air-mapwrap .nx-search {
+  top: 10px;
 }

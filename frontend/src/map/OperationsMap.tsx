@@ -79,7 +79,8 @@ interface Props {
   // asks for it, and where the map flies to (a new object each time).
   near?: { lon: number; lat: number; km: number } | null;
   onNearby?: (p: LonLat) => void;
-  fly?: { lon: number; lat: number } | null;
+  fly?: { lon: number; lat: number; zoom?: number } | null;
+  mark?: { lon: number; lat: number } | null; // a search result's point (SRC-04)
 }
 
 const LONG_PRESS_MS = 600;
@@ -106,6 +107,7 @@ export function OperationsMap({
   near = null,
   onNearby = noop,
   fly = null,
+  mark = null,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
@@ -230,6 +232,18 @@ export function OperationsMap({
             "circle-radius": 5,
             "circle-stroke-color": "#111418",
             "circle-stroke-width": 2,
+          },
+        });
+        m.addSource("searched", { type: "geojson", data: EMPTY });
+        m.addLayer({
+          id: "searched",
+          type: "circle",
+          source: "searched",
+          paint: {
+            "circle-color": "transparent",
+            "circle-radius": 11,
+            "circle-stroke-color": "#FBD065",
+            "circle-stroke-width": 3,
           },
         });
         let pressedAt: { x: number; y: number } | null = null;
@@ -466,8 +480,14 @@ export function OperationsMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, nearKey]);
   useEffect(() => {
-    if (map && fly) map.flyTo({ center: [fly.lon, fly.lat], zoom: Math.max(map.getZoom(), 13) });
+    if (map && fly) map.flyTo({ center: [fly.lon, fly.lat], zoom: fly.zoom ?? Math.max(map.getZoom(), 13) });
   }, [map, fly]);
+  useEffect(() => {
+    (map?.getSource("searched") as GeoJSONSource | undefined)?.setData({
+      type: "FeatureCollection",
+      features: mark ? [{ type: "Feature", geometry: { type: "Point", coordinates: [mark.lon, mark.lat] }, properties: {} }] : [],
+    });
+  }, [map, mark]);
   useEffect(() => {
     (map?.getSource("draft") as GeoJSONSource | undefined)?.setData(draftFeatures(draft));
     if (map) map.getCanvas().style.cursor = draft ? "crosshair" : "";

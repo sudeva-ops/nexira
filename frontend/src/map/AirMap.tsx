@@ -23,10 +23,11 @@ interface Props {
   flights: Flight[];
   selectedId: string | null;
   onSelect: (id: string) => void;
+  fly?: { lon: number; lat: number; zoom: number } | null; // a search result (SRC-04)
 }
 
 /** AT-02: our travellers' flights only, with their routes; positions are simulated. */
-export function AirMap({ flights, selectedId, onSelect }: Props) {
+export function AirMap({ flights, selectedId, onSelect, fly = null }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
   const [baseMissing, setBaseMissing] = useState(false);
@@ -229,6 +230,10 @@ export function AirMap({ flights, selectedId, onSelect }: Props) {
     // Only when the selection changes, not on every position update.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, selectedId]);
+
+  useEffect(() => {
+    if (map && fly) map.flyTo({ center: [fly.lon, fly.lat], zoom: fly.zoom });
+  }, [map, fly]);
 
   return (
     <div className="nx-map nx-air-map" ref={container} data-testid="air-map">

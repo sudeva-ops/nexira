@@ -1,13 +1,15 @@
 import { Spinner } from "@blueprintjs/core";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { useAnnotations } from "../../api/annotations";
 import { DEFAULT_RADIUS_KM, type Near, nearParams, parseNear } from "../../api/nearby";
 import { type Incident, useIncident, useIncidents, useOperationsSummary, useSignals } from "../../api/intel";
-import { useMissions } from "../../api/people";
+import { useMissions, useSites } from "../../api/people";
 import { useWeather } from "../../api/weather";
 import { addPoint, canFinish, type Draft } from "../../map/annotations";
+import { MapSearch } from "../../map/MapSearch";
+import { RECORD_ZOOM, type Result } from "../../map/search";
 import { Card, Kpi } from "../../ui/primitives";
 import { AnnotationCard, AnnotationForm, AnnotationTools } from "./Annotations";
 import { ImpactPanel } from "./ImpactPanel";
@@ -18,6 +20,9 @@ import { WeatherPanel } from "./WeatherPanel";
 const NO_EXPOSURE: never[] = [];
 const NO_WEATHER: never[] = [];
 const NO_ANNOTATIONS: never[] = [];
+const NO_MISSIONS: never[] = [];
+const NO_INCIDENTS: never[] = [];
+const MARK_MS = 10_000; // a search result's point stays marked this long (SRC-04)
 
 // MapLibre is most of the bundle; load it only with this screen.
 const OperationsMap = lazy(() =>
@@ -30,12 +35,18 @@ export function OperationsScreen() {
   const selectedId = params.get("incident");
   // NBY-06: the point and radius live in the address (replaced, not pushed, as they change).
   const near = parseNear(params.get("near"), params.get("r"));
-  const [fly, setFly] = useState<{ lon: number; lat: number } | null>(null);
+  const [fly, setFly] = useState<{ lon: number; lat: number; zoom?: number } | null>(null);
+  const [mark, setMark] = useState<{ lon: number; lat: number } | null>(null);
+  useEffect(() => {
+    if (!mark) return;
+    const timer = window.setTimeout(() => setMark(null), MARK_MS);
+    return () => window.clearTimeout(timer);
+  }, [mark]);
   const showNear = (n: Near) => setParams(nearParams(n), { replace: true });
   const summary = useOperationsSummary().data;
-  const missions = useMissions().data ?? [];
+  const missions = useMissions().data ?? NO_MISSIONS;
   const incidentsQuery = useIncidents("ACTIVE");
-  const incidents = incidentsQuery.data ?? [];
+  const incidents = incidentsQuery.data ?? NO_INCIDENTS;
   const signals = useSignals(50).data ?? [];
   const selected = useIncident(selectedId ?? undefined).data;
   const weatherQuery = useWeather();
@@ -71,6 +82,48 @@ export function OperationsScreen() {
   }, [draft]);
 
   const select = (incident: Incident) => setParams({ incident: incident.id });
+  // SRC-02: the platform's own records, matched in the browser from what is already loaded.
+  const sites = useSites("").data?.items;
+  const records = useMemo<Result[]>(
+    () => [
+      ...missions.map((m) => ({
+        kind: "MISSION" as const,
+        id: m.id,
+        label: m.city,
+        detail: `${m.code} · ${m.country_code}`,
+        lon: m.lon,
+        lat: m.lat,
+        zoom: RECORD_ZOOM,
+      })),
+      ...(sites ?? []).map((s) => ({
+        kind: "SITE" as const,
+        id: s.id,
+        label: s.name,
+        detail: `${s.mission_code} · ${s.city}`,
+        lon: s.lon,
+        lat: s.lat,
+        zoom: RECORD_ZOOM,
+      })),
+      ...incidents.map((i) => ({
+        kind: "INCIDENT" as const,
+        id: i.id,
+        label: i.reference,
+        detail: i.title,
+        lon: i.lon,
+        lat: i.lat,
+        zoom: RECORD_ZOOM,
+      })),
+    ],
+    [missions, sites, incidents],
+  );
+  const found = (r: Result) => {
+    if (r.kind === "INCIDENT") {
+      setParams({ incident: r.id });
+      return;
+    }
+    setFly({ lon: r.lon, lat: r.lat, zoom: r.zoom });
+    setMark({ lon: r.lon, lat: r.lat });
+  };
   const worst = incidents.find((i) => i.severity === summary?.highest_active_severity);
   const posture = summary?.highest_active_severity ?? null;
 
@@ -158,6 +211,7 @@ export function OperationsScreen() {
             near={near}
             onNearby={([lon, lat]) => showNear({ lon, lat, km: near?.km ?? DEFAULT_RADIUS_KM })}
             fly={fly}
+            mark={mark}
           />
         </Suspense>
         <div className="nx-legend">
@@ -186,6 +240,11 @@ export function OperationsScreen() {
             Annotations
           </button>
         </div>
+        <MapSearch
+          records={records}
+          onPick={found}
+          onNearby={(r) => showNear({ lon: r.lon, lat: r.lat, km: near?.km ?? DEFAULT_RADIUS_KM })}
+        />
         {annotationsQuery.data?.can_add && (
           <AnnotationTools
             zoom={zoom}
