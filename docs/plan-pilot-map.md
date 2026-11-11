@@ -51,6 +51,13 @@ The author's role is the highest of the roles that allowed the action, in the or
 
 **Incident Replay:** the replay payload gains `annotations` (kind, symbol, shape, `created_at`, `withdrawn_at`). The map shows each one while `created_at ≤ t < withdrawn_at`.
 
+**As built in Prompt 128** (each a deviation for approval in its PR):
+- The event is `ANNOTATION_UPDATED`, as every other module's (`AAR_UPDATED`, `SITE_UPDATED`), not `annotation.changed`; `core/realtime.py` forwards it.
+- The author's role is worked out on read from their grants (the table stores the person, not the role): the highest annotating role covering the annotation's mission, or "A user" if it was taken away since.
+- Who may edit or withdraw is any annotating role in the annotation's mission (ANN-03); the author alone, without such a role, may not.
+- AAR-02 and the replay's timeline read "Map annotation added: Checkpoint." (G-4); the incident's own timeline has "Annotation added: Checkpoint · <label>."; the replay's `annotations` carry the kind, symbol, shape and times, and no label or note.
+- An end time must be in the future; ending one now is a withdrawal.
+
 ## 3. Nearby (NBY-01..06)
 
 `GET /api/nearby?lon=&lat=&radius_m=` (1,000 to 50,000) runs as the person asking, under RLS and mission scope. It returns one list per kind, nearest first:

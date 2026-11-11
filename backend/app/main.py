@@ -10,6 +10,7 @@ from app.core.realtime import hub
 from app.core.realtime import router as realtime_router
 from app.modules.aar.router import router as aar_router
 from app.modules.agents.router import router as agents_router
+from app.modules.annotations.router import router as annotations_router
 from app.modules.audit.router import router as audit_router
 from app.modules.checkin.router import router as checkin_router
 from app.modules.copilot.router import router as copilot_router
@@ -85,6 +86,7 @@ def create_app(app_env: str) -> FastAPI:
         exercises_router,
         copilot_router,
         replay_router,
+        annotations_router,
         checkin_router,
         agents_router,
         travel_router,

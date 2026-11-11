@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.aar.schemas import MetricOut, TimelineEntryOut
+from app.modules.annotations import service as annotations
 from app.modules.checkin import service as checkin
 from app.modules.tenancy.service import ROLES
 
@@ -177,6 +178,11 @@ def _event_line(row: Any) -> TimelineEntryOut | None:
         return TimelineEntryOut(
             at=at, source="DECISION", text=f"{step}: {verb} by the {role_label(row.step_role)}."
         )
+    if row.event_type == "ANNOTATION":
+        # The kind only: a label is free text and may name someone (plan-pilot-map G-4).
+        verb = annotations.VERB.get(str(data.get("action")), "changed")
+        kind = annotations.what(str(data.get("kind")), data.get("symbol"))
+        return TimelineEntryOut(at=at, source="ANNOTATION", text=f"Map annotation {verb}: {kind}.")
     return None  # NOTE (free text) and anything unknown are left out (G-1)
 
 
