@@ -137,6 +137,12 @@ It then matches places, by prefix and rank, accent-insensitively.
 
 Annotations added here appear in the After-Action Review spec's timeline. That spec's checks are by pattern, so they still hold. A check that the replay draws an annotation goes into `rpl-acceptance.spec.ts`.
 
+**As built in Prompt 133** (each a deviation for approval in its PR):
+- The map is a canvas, so the map element carries `data-annotations` (how many it draws) and `data-marked` (the searched point) for the spec to read.
+- The Viewer's view of an annotation (role, no edit, no name) is checked through the API as the Viewer; the card is checked on the Duty Officer's map, whose framing the spec knows. The Viewer's map is framed a little differently, so a click at the same spot missed in the first run.
+- "A restricted trip's travellers do not appear" (§114) is not checked here: the seed's only restricted trips are Amman diplomats, nowhere near Nairobi. `test_nearby_api.py` checks it on real Postgres.
+- At the incident's centre and radius, Nearby's groups equal the incident's exposure counts (staff, delegates, citizens), which is how the spec ties Nearby to the record.
+
 ## 6. Gaps and conflicts, with proposed answers
 
 | # | Gap | Proposed answer |
