@@ -322,6 +322,11 @@ Rules:
 - **Nearby is a read.** Worked out from current places under RLS and mission scope; names only within the people scope; restricted trips never (D-33); not audited.
 - **Search stays in the browser.** Coordinates, `geo:` URIs, platform records and a bundled public-domain gazetteer; no geocoder and no request leaves the stack (D-24).
 
+**D-53 · Site Twin live activity.** Approved by the product owner on 2026-11-11 (PR #173). Requirements TWN-12 to TWN-16 (§116–120) in `docs/requirements-pilot.md`, with the defaults in §120.
+- **Busy from the same feeds.** People move on the plan from simulated access control and Wi-Fi presence; a normal day of simulated presence runs outside the scenarios, and every stored move is audited like any other.
+- **Nothing from the pictures.** Counts on the camera wall come from presence; stylised figures are drawn over the clips; nothing is detected or counted from video (§108 Q5).
+- **No schema change.** No capacity for every room; zones are tinted by their share of the people.
+
 ---
 
 ## 7. Phase 1 acceptance scenario: NBO-CIVIL-UNREST

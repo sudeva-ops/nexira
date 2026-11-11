@@ -1372,7 +1372,7 @@ Playwright on the real stack, during NBO-CIVIL-UNREST after the Phase 1 run:
 
 ## 116. Purpose and starting point (Site Twin: live activity)
 
-Proposed for the product owner's approval. The Site Twin's floor plan works, but at rest it reads as empty: people are dots in neat rows that never move, the rooms are bare rectangles, and the camera wall's clips show empty places. This module makes the embassy look as busy as it is, from the same simulated access control and Wi-Fi presence. It adds no new source of truth and no video analytics.
+Approved by the product owner on 2026-11-11 (PR #173; D-53), with the defaults in §120. The Site Twin's floor plan works, but at rest it reads as empty: people are dots in neat rows that never move, the rooms are bare rectangles, and the camera wall's clips show empty places. This module makes the embassy look as busy as it is, from the same simulated access control and Wi-Fi presence. It adds no new source of truth and no video analytics.
 
 | Exists today | Where |
 |---|---|
@@ -1411,7 +1411,7 @@ Playwright on the real stack:
 - **The camera wall:** each key camera's tile shows its zone's count, equal to the plan's.
 - **Unchanged:** Phase 1 figures and every existing acceptance spec, including the Site Twin spec's exact counts, still pass. The normal day is paused for them, or they read counts at their own scene points.
 
-## 120. Questions for the product owner (proposed defaults)
+## 120. Questions answered by the product owner (2026-11-11: "approved")
 
 1. **The normal day's pace:** about one move a minute, visitors cycling through Gate 1 → Lobby → Consular hall → out, between 08:00 and 18:00 Nairobi time and quieter at night. *Default: yes.*
 2. **Capacity for every room:** no. Tint each zone by its share of the site's people, and show "x / capacity" only where a capacity exists (safe room, muster point). *Default: no schema change.* (Alternative: PC-55 adds capacity to every zone, 🔒.)

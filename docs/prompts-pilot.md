@@ -1200,3 +1200,43 @@ Playwright, real stack (§114; plan §5): map-acceptance.spec.ts before the Copi
 replay's annotation check in rpl-acceptance.spec.ts. Report the real output; make acceptance (all
 specs) still passes.
 ```
+
+## Pilot module 25 · Site Twin live activity (D-53)
+
+Requirements TWN-12..TWN-16 (`docs/requirements-pilot.md` §116–120); plan `docs/plan-pilot-twa.md`. None of these prompts is 🔒.
+
+### Prompt 134 · The normal day
+```
+TWN-13 (plan §2, G-1..G-4). app/modules/twin/ambient.py in the worker: a deterministic day
+script over the seeded occupants through twin.service.presence() every 60 s (±15 s); paused by
+shelter, an ACTIVE evacuation or an NBO-SITE run; the switch per G-2 (TWIN_NORMAL_DAY, off for
+reset-demo and acceptance; presenter bar "Normal day", audited). Tests on real Postgres: a tick
+moves one occupant and audits it, each pause, the band, the switch.
+```
+
+### Prompt 135 · Recent movements
+```
+TWN-14 (plan §3, G-5). GET /api/sites/{id}/twin/movements: the last 20 SITE.PRESENCE entries as
+kind and zones, and today's arrivals, departures and visitors waiting; no person id, label or
+name. Tests on real Postgres: the order, the figures, nothing identifying in the response.
+```
+
+### Prompt 136 · People who move, and rooms
+```
+TWN-12, TWN-16 (plan §4, G-6, G-7, G-9). screens/twin/motion.ts and furniture.ts (pure, tested);
+the plan draws dots at stable places with drift, walks on a zone change, the share tint, the
+furniture; reduced motion and Calm still; the movements strip under the plan. Tests: Vitest.
+```
+
+### Prompt 137 · Activity on the camera wall
+```
+TWN-15 (plan §5, G-8). The count from presence on each tile; the stylised walkers over the clips
+as in the generated views; NO SIGNAL unchanged. Tests: Vitest.
+```
+
+### Prompt 138 · Acceptance
+```
+Playwright, real stack (§119; plan §6): twa-acceptance.spec.ts last in make acceptance, with the
+normal day on; every other spec with it off. Report the real output; make acceptance (all
+specs) still passes.
+```
