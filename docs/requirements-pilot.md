@@ -1280,3 +1280,92 @@ Playwright on the real stack, on a freshly reset demo and during NBO-SITE:
 5. **No video analytics:** nothing is detected or counted from the views; occupancy stays from access control and Wi-Fi presence (TWN-02). *Default: yes.*
 6. **Who sees it:** every role that sees the Site Twin. *Default: yes.*
 7. **🔒:** none; PC-53 still needs your approval as a schema change. *Default: yes.*
+
+## 109. Purpose and starting point (map tools: annotations, Nearby, search)
+
+Proposed for the product owner's approval. The ideas come from the same open-source globe viewer (God's Eye View): drawing on the world, a roster of what is near a target, and search without a geocoder. Only the ideas are reused, not its code, stack or data feeds; voice control is left out (no local speech model yet).
+
+Three tools on the world maps, for the people running a crisis:
+- **Annotations:** the Duty Officer marks a checkpoint, a closed road, a rally point or an area to avoid, and everyone with the map sees it at once.
+- **Nearby:** pick a point, a mission, a site or an incident and see who and what is within a few kilometres.
+- **Search:** type a place, a mission, an incident reference or coordinates and the map goes there, with no request leaving the stack.
+
+| Exists today | Where |
+|---|---|
+| Global Operations, Air Travel Tracking and Incident Replay maps (MapLibre, self-hosted tiles, D-24) | `map/OperationsMap.tsx`, `AirMap.tsx`, `ReplayMap.tsx` |
+| Every located record as `geography(Point,4326)`: missions, sites, people's current places, vehicles, partners, travellers' places, hazards, incidents | schema v0.2 and pilot migrations |
+| Distance queries with PostGIS (exposure: `incident_exposure`, `intel/exposure.py`) | intel |
+| Names only within the people scope | `evacuations.name_scope()` |
+| Restricted trips never shown (D-33) | travel |
+| Realtime events to the browser (Redis Streams → WebSocket) | `app/core/events.py`, `realtime.py` |
+| Audit through `audit.py`; the hash chain in the database (D-20) | core |
+| Nothing drawn on the map by people; no "what's near here"; no search on the maps | — |
+
+## 110. Requirements: map annotations (ANN)
+
+| ID | Requirement | Pri. |
+|---|---|---|
+| ANN-01 | **Draw on the map.** On Global Operations, a person who may annotate (§113 Q2) adds a **mark** (checkpoint, closed road, rally point, hazard or note, each with its own symbol), a **line** (a route or a closed stretch of road) or an **area** (a polygon: an area to avoid, a cordon). Each has a label (up to 80 characters), an optional note (up to 280) and, optionally, the incident it belongs to. | M |
+| ANN-02 | **Everyone sees it at once.** A new, changed or withdrawn annotation reaches every open map of the tenant within 2 seconds (realtime), for every role, including the Viewer. A layer switch hides annotations. | M |
+| ANN-03 | **Change and withdraw, never delete.** Its author, or anyone with a role that may annotate in that mission, edits the label, the note or the shape, or withdraws it with a reason. A withdrawn annotation leaves the map but stays on record. An annotation can carry an end time, after which it leaves the map by itself. | M |
+| ANN-04 | **Roles, not names.** The map shows the author's role and the time ("Duty Officer · 14:02"); who it was is in the audit log (as AAR, D-47). | M |
+| ANN-05 | **Audited.** Creating, editing and withdrawing are written through `audit.py` with the annotation's kind, label and shape; the chain verifies (D-20). | M |
+| ANN-06 | **With its incident.** An annotation linked to an incident appears in the incident's timeline ("Annotation added: Checkpoint · Uhuru Highway") and, at its time, in Incident Replay (RPL-02). An exercise incident's annotations are labelled EXERCISE (EXR-03). | S |
+
+## 111. Requirements: Nearby (NBY)
+
+| ID | Requirement | Pri. |
+|---|---|---|
+| NBY-01 | **Pick a point.** "What's nearby" opens from a right-click (or a long press) on the Global Operations map, or from a mission, a site or an incident. The point is marked and the radius drawn as a circle. | M |
+| NBY-02 | **Radius.** 1, 5, 10, 25 or 50 km; 10 km by default. | M |
+| NBY-03 | **What is listed,** each with its distance, nearest first: people by group (staff, delegates, citizens) with counts and location confidence; sites; vehicles (Fleet); travellers in transit and their trips; assistance partners; active incidents and hazards; annotations. A restricted trip and its travellers never appear (D-33). Names only within the person's people scope (`name_scope()`); otherwise counts. | M |
+| NBY-04 | **From the record, as the person asking.** `GET /api/nearby?lon=…&lat=…&radius_m=…` runs under RLS and mission scope with the existing tables (PostGIS `ST_DWithin`). Worked out on read; nothing is stored. | M |
+| NBY-05 | **From a result to its screen.** Each row opens its record (a person in People & Sites, a vehicle in Fleet, a trip in Journey Management, an incident in Incidents) or flies the map to it. | S |
+| NBY-06 | **Link to it.** The address holds the point and radius (`?near=lat,lon&r=10`), so a link opens the same list for anyone who may read it. | S |
+
+## 112. Requirements: map search (SRC)
+
+| ID | Requirement | Pri. |
+|---|---|---|
+| SRC-01 | **One box on the maps.** A search box on Global Operations and Air Travel Tracking (`/` focuses it). Results as you type, grouped: platform records first, then places. Enter goes to the first. | M |
+| SRC-02 | **What it finds.** Missions (code or city), sites, incident references, flights by number (Air), places from a bundled gazetteer, decimal coordinates (`-1.29, 36.82`), degrees-minutes-seconds and a `geo:` URI (RFC 5870, for example `geo:-1.29,36.82`). | M |
+| SRC-03 | **No request leaves the stack.** Places come from a gazetteer bundled with the frontend: Natural Earth populated places (public domain), built once by a script, as the star field. Platform records are matched in the browser from what the map has already loaded, so a search sends nothing to anyone (D-24). | M |
+| SRC-04 | **What happens on a result.** The map flies there and marks the point; a record opens as it would from the map; any result offers "What's nearby" (NBY-01). | S |
+
+### Not in these modules
+- Voice control or speech, and free-hand drawing on the globe at world zoom;
+- annotations shared outside the tenant, imported or exported as files (KML, GeoJSON);
+- history of where people were (Nearby uses current places only, as Incident Replay);
+- a geocoder, street-level addresses or routing;
+- annotations on the Site Twin floor plan.
+
+## 113. Data changes (proposed in `docs/schema/proposed-changes.md`)
+
+- **PC-54 · `map_annotation`**: one table for marks, lines and areas: the kind, the symbol, `geography` shape, label, note, the optional incident and mission, the end time, the status (ACTIVE, WITHDRAWN) with the reason, the author and the times, written by the database. FORCE RLS with `tenant_isolation`; SELECT, INSERT and a column-limited UPDATE for `nexira_app`; no DELETE.
+
+Nearby and search add no table. **🔒 under D-29:** the PC-54 migration adds a table with RLS and grants, so its prompt needs your named sign-off. Nearby and search are not 🔒.
+
+## 114. Acceptance for the modules
+
+Playwright on the real stack, during NBO-CIVIL-UNREST after the Phase 1 run:
+- **Annotations:** the Duty Officer marks a checkpoint and draws an area to avoid near INC-<year>-1042. A second browser, signed in as the Viewer, sees both within 2 seconds, with "Duty Officer" and no name. The Viewer cannot add one (the button is absent, and the API answers 403). The Duty Officer withdraws the checkpoint with a reason; it leaves both maps. The incident's timeline has both entries. The audit has the three actions, and the chain verifies.
+- **Nearby:** from the Nairobi embassy at 10 km: the embassy, the exposed people by group (matching the incident's exposure inside that radius), the fleet vehicles there, the active incident and the annotation. A restricted trip's travellers do not appear. The Viewer sees counts and no names.
+- **Search:**
+  - "NBO" goes to the Nairobi mission;
+  - "INC-<year>-1042" opens the incident;
+  - "geo:-4.04,39.67" goes to Mombasa;
+  - "Kampala" is found in the gazetteer;
+  - no request leaves the stack while searching.
+- `make acceptance` (all existing specs) still passes.
+
+## 115. Questions for the product owner (proposed defaults)
+
+1. **Scope:** the three tools on Global Operations; search also on Air Travel Tracking; annotations shown read-only on Incident Replay. *Default: yes.*
+2. **Who may annotate:** Duty Officer, Security Officer, HQ Crisis Director everywhere; Head of Mission within their mission; Consular Officer and Travel Desk not; the Viewer never. *Default: yes.*
+3. **End time:** none by default; the author may set one. A withdrawn or ended annotation stays on record. *Default: yes.*
+4. **Names:** roles on the map, the person in the audit log only (ANN-04). *Default: yes.*
+5. **Nearby and the audit:** opening Nearby is a read, like the exposure on Incidents, and is not audited. *Default: yes.* (Alternative: audit each lookup that lists named people.)
+6. **Nearby radius:** 1–50 km, 10 km default (NBY-02). *Default: yes.*
+7. **Gazetteer:** Natural Earth populated places, public domain, about 7,000 places, bundled. *Default: yes.*
+8. **Agents:** no agent draws or reads annotations in this pilot. *Default: yes.*
+9. **🔒:** the PC-54 migration only (§113). *Default: yes.*
