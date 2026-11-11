@@ -6,6 +6,7 @@ import type { Mission } from "../api/people";
 import { arcPairs } from "../app/introRules";
 import { registerPmtiles, tilesAvailable } from "./base";
 import { addDaylight } from "./daylight";
+import { addStars } from "./stars";
 import { greatCircle, missionFeatures } from "./geo";
 import { baseStyle } from "./style";
 import { applyProjection } from "./three";
@@ -20,6 +21,21 @@ const ARC_DRAW_MS = 1_100;
 const PULSE_MS = 1_800;
 const COMET_MS = 2_400; // a light runs the length of each arc this often
 const START: [number, number] = [20, 15]; // where Global Operations opens
+
+/** The globe's centre and radius on screen, in CSS pixels. */
+export interface GlobeFrame {
+  x: number;
+  y: number;
+  r: number;
+}
+
+/** Measured, not computed from the zoom: the centre and a point 60° up its meridian. */
+function globeFrame(m: MapLibreMap): GlobeFrame {
+  const c = m.getCenter();
+  const centre = m.project(c);
+  const up = m.project([c.lng, c.lat + 60]);
+  return { x: centre.x, y: centre.y, r: Math.hypot(up.x - centre.x, up.y - centre.y) / Math.sin(Math.PI / 3) };
+}
 
 function arcs(missions: Mission[], elapsed: number): FeatureCollection<LineString> {
   return {
@@ -51,14 +67,18 @@ export function IntroGlobe({
   missions,
   descend,
   onTurn,
+  onFrame,
 }: {
   missions: Mission[];
   descend: boolean;
   onTurn?: (lon: number, lat: number) => void; // the HUD's readout
+  onFrame?: (frame: GlobeFrame) => void; // where the globe is on screen, for the compass ring
 }) {
   const turned = useRef(onTurn);
+  const framed = useRef(onFrame);
   useEffect(() => {
     turned.current = onTurn;
+    framed.current = onFrame;
   });
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
@@ -72,6 +92,7 @@ export function IntroGlobe({
     let disposed = false;
     let frame = 0;
     let stopDaylight = () => {};
+    let stopStars = () => {};
     registerPmtiles();
     void tilesAvailable().then((available) => {
       if (disposed || !container.current) return;
@@ -90,6 +111,8 @@ export function IntroGlobe({
         if (disposed) return;
         applyProjection(m, true);
         stopDaylight = addDaylight(m);
+        stopStars = addStars(m, () => true);
+        framed.current?.(globeFrame(m));
         m.addSource("arcs", { type: "geojson", data: arcs([], 0), lineMetrics: true });
         m.addSource("missions", { type: "geojson", data: missionFeatures(data.current) });
         m.addSource("comets", { type: "geojson", data: comets([], 0) });
@@ -117,6 +140,12 @@ export function IntroGlobe({
             "circle-stroke-width": 3,
             "circle-stroke-opacity": 0.35,
           },
+        });
+        m.addLayer({
+          id: "glow",
+          type: "circle",
+          source: "missions",
+          paint: { "circle-color": ["get", "colour"], "circle-radius": 10, "circle-blur": 1, "circle-opacity": 0.45 },
         });
         m.addLayer({
           id: "pulse",
@@ -166,6 +195,7 @@ export function IntroGlobe({
       disposed = true;
       cancelAnimationFrame(frame);
       stopDaylight();
+      stopStars();
       map.current?.remove();
       map.current = null;
     };

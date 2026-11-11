@@ -764,6 +764,7 @@ tr.click:focus-visible,
   height: 16px;
   border: 2px solid #fff;
   background: var(--c, #cd4246);
+  box-shadow: 0 0 12px 3px color-mix(in srgb, var(--c, #cd4246) 70%, transparent); /* its glow */
   transform: rotate(45deg);
   animation: nx-pulse 1.6s ease-out infinite;
 }
@@ -779,10 +780,14 @@ tr.click:focus-visible,
 
 @keyframes nx-pulse {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--c, #cd4246) 70%, transparent);
+    box-shadow:
+      0 0 12px 3px color-mix(in srgb, var(--c, #cd4246) 70%, transparent),
+      0 0 0 0 color-mix(in srgb, var(--c, #cd4246) 70%, transparent);
   }
   100% {
-    box-shadow: 0 0 0 14px transparent;
+    box-shadow:
+      0 0 12px 3px color-mix(in srgb, var(--c, #cd4246) 70%, transparent),
+      0 0 0 14px transparent;
   }
 }
 
@@ -3345,42 +3350,6 @@ tr.nx-flash-b > td {
 }
 
 /* Stars: three tiled layers of points drifting slowly behind the globe. */
-.nx-intro-stars {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.7;
-  background-image:
-    radial-gradient(1px 1px at 23px 37px, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 141px 91px, #cfe2ff 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 77px 163px, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 199px 13px, #9fc3ff 50%, transparent 51%),
-    radial-gradient(1px 1px at 251px 211px, #fff 50%, transparent 51%),
-    radial-gradient(1.5px 1.5px at 311px 127px, #e6efff 50%, transparent 51%),
-    radial-gradient(1px 1px at 41px 113px, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 97px 29px, #cfe2ff 50%, transparent 51%),
-    radial-gradient(1px 1px at 157px 151px, #fff 50%, transparent 51%),
-    radial-gradient(1px 1px at 183px 67px, #9fc3ff 50%, transparent 51%);
-  background-size:
-    337px 241px,
-    337px 241px,
-    337px 241px,
-    337px 241px,
-    337px 241px,
-    337px 241px,
-    211px 173px,
-    211px 173px,
-    211px 173px,
-    211px 173px;
-  animation: nx-intro-drift 60s linear infinite;
-}
-
-@keyframes nx-intro-drift {
-  to {
-    background-position: -337px 120px;
-  }
-}
-
 /* A glow behind the globe; it follows the globe to the centre as it settles. */
 .nx-intro-halo {
   position: absolute;
@@ -3403,6 +3372,42 @@ tr.nx-flash-b > td {
   50% {
     opacity: 0.7;
   }
+}
+
+/* The compass ring round the globe (Intro.tsx): longitude ticks that turn with it. */
+.nx-intro-ring {
+  position: absolute;
+  pointer-events: none;
+  overflow: visible;
+  transition: opacity 0.6s ease;
+  animation: nx-intro-in 1.2s 0.4s ease both;
+}
+
+.nx-intro-ring.away {
+  opacity: 0;
+}
+
+.nx-intro-ring circle {
+  fill: none;
+  stroke: rgba(138, 187, 255, 0.28);
+  stroke-width: 0.25;
+}
+
+.nx-intro-ring line {
+  stroke: rgba(138, 187, 255, 0.5);
+  stroke-width: 0.3;
+}
+
+.nx-intro-ring text {
+  fill: #738091;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 2.6px;
+  letter-spacing: 0.08em;
+  text-anchor: middle;
+}
+
+.nx-intro-ring .mark {
+  fill: #8abbff;
 }
 
 /* The HUD: corner brackets, the session line and the globe's bearing. */
@@ -4164,5 +4169,14 @@ tr.nx-flash-b > td {
   top: 0;
   height: 7px;
   background: repeating-linear-gradient(135deg, rgba(171, 179, 191, 0.35) 0 3px, transparent 3px 6px);
+  pointer-events: none;
+}
+
+/* The star field behind the world globe (map/stars.ts): under MapLibre's canvas. */
+.nx-stars {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
 }
