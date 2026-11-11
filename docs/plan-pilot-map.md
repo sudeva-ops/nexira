@@ -77,6 +77,12 @@ Each row carries its distance (`ST_Distance`) and the link to its screen. The en
 - Each row opens its screen or flies the map to it.
 - `?near=lat,lon&r=10` goes in the address (replace, as the replay's `t`).
 
+**As built in Prompt 130** (each a deviation for approval in its PR):
+- A restricted trip's traveller is counted in the people figures, as the incident exposure counts them, but is never named and never counted as a traveller (D-33).
+- Each list holds at most the 50 nearest; the people counts cover everyone in range, and `unnamed` says how many in range the caller may not see by name.
+- Partners are those covering the country of the mission nearest the point, wherever it is (G-1); the response names that mission and country.
+- On the live stack, from the Nairobi embassy at 10 km: 14 staff, 3 delegates, 212 citizens (as INC-<year>-1042's exposure) and 1 other.
+
 ## 4. Search (SRC-01..04)
 
 **Gazetteer:** `infra/scripts/build-places.py`, built as the star field is:

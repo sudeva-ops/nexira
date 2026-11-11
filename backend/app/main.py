@@ -22,6 +22,7 @@ from app.modules.fleet.router import router as fleet_router
 from app.modules.hazards.router import router as hazards_router
 from app.modules.health_intel.router import router as health_router
 from app.modules.intel.router import router as intel_router
+from app.modules.nearby.router import router as nearby_router
 from app.modules.notifications.router import router as notifications_router
 from app.modules.partners.router import router as partners_router
 from app.modules.people.router import router as people_router
@@ -87,6 +88,7 @@ def create_app(app_env: str) -> FastAPI:
         copilot_router,
         replay_router,
         annotations_router,
+        nearby_router,
         checkin_router,
         agents_router,
         travel_router,
