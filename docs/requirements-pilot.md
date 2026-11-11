@@ -1283,7 +1283,7 @@ Playwright on the real stack, on a freshly reset demo and during NBO-SITE:
 
 ## 109. Purpose and starting point (map tools: annotations, Nearby, search)
 
-Proposed for the product owner's approval. The ideas come from the same open-source globe viewer (God's Eye View): drawing on the world, a roster of what is near a target, and search without a geocoder. Only the ideas are reused, not its code, stack or data feeds; voice control is left out (no local speech model yet).
+Approved by the product owner on 2026-11-11 (PR #167; D-52), with the defaults in §115. The ideas come from the same open-source globe viewer (God's Eye View): drawing on the world, a roster of what is near a target, and search without a geocoder. Only the ideas are reused, not its code, stack or data feeds; voice control is left out (no local speech model yet).
 
 Three tools on the world maps, for the people running a crisis:
 - **Annotations:** the Duty Officer marks a checkpoint, a closed road, a rally point or an area to avoid, and everyone with the map sees it at once.
@@ -1358,7 +1358,7 @@ Playwright on the real stack, during NBO-CIVIL-UNREST after the Phase 1 run:
   - no request leaves the stack while searching.
 - `make acceptance` (all existing specs) still passes.
 
-## 115. Questions for the product owner (proposed defaults)
+## 115. Questions answered by the product owner (2026-11-11: "Approved")
 
 1. **Scope:** the three tools on Global Operations; search also on Air Travel Tracking; annotations shown read-only on Incident Replay. *Default: yes.*
 2. **Who may annotate:** Duty Officer, Security Officer, HQ Crisis Director everywhere; Head of Mission within their mission; Consular Officer and Travel Desk not; the Viewer never. *Default: yes.*

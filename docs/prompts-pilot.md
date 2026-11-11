@@ -1140,3 +1140,63 @@ Playwright, real stack (§102, §107; plan §6): rpl-acceptance.spec.ts after th
 spec; the coverage checks in twn-acceptance.spec.ts. Report the real output; make acceptance (all
 specs) still passes.
 ```
+
+## Pilot modules 22–24 · Map annotations, Nearby and map search (D-52)
+
+Requirements ANN-01..06, NBY-01..06 and SRC-01..04 (`docs/requirements-pilot.md` §109–115); plan `docs/plan-pilot-map.md`. Prompt 127 is 🔒 (D-29).
+
+### Prompt 127 · Annotations table (migration) 🔒
+```
+ANN-01, ANN-03, PC-54. Migration 0020: map_annotation as PC-54 (plan §2): the geometry type
+checked against the kind, the guard (kind, author, incident and mission fixed; ACTIVE → WITHDRAWN
+once with a reason; times by the database), FORCE RLS, the column grants, no DELETE. Tests on real
+Postgres as nexira_api: RLS across tenants, the guard each way, no DELETE, the downgrade. Needs a
+named human reviewer's sign-off in the PR (D-29).
+```
+
+### Prompt 128 · Annotations API
+```
+ANN-01..06. app/modules/annotations (plan §2): list, add, edit, withdraw; roles and mission scope
+through approvals.py (G-2); the author's role, never the person; audit.write for each change; an
+ANNOTATION incident_event for a linked incident; annotation.changed published; AAR-02's timeline
+and the replay payload carry annotations (G-4). Tests on real Postgres: each role, the Head of
+Mission's scope, the Viewer refused, the audit rows, no name in any response.
+```
+
+### Prompt 129 · Annotations on the map
+```
+ANN-01..04, ANN-06. map/annotations.ts (pure) and the layers on Global Operations: marks, lines,
+areas; the toolbar from zoom 5 (G-6); the form; the popup with Edit and Withdraw where allowed;
+the layer switch; realtime refresh; annotations on the replay map at t. Tests: Vitest for the
+drawing state and the GeoJSON.
+```
+
+### Prompt 130 · Nearby API
+```
+NBY-01..04. GET /api/nearby (plan §3): each kind with distance, nearest first; people by the
+exposure groups (G-5) with names only within name_scope(); restricted trips never (D-33);
+partners by the nearest mission's country (G-1); not audited. Tests on real Postgres: the radius
+bounds, the Viewer gets counts, a restricted traveller left out, RLS across tenants.
+```
+
+### Prompt 131 · Nearby panel
+```
+NBY-01, NBY-02, NBY-05, NBY-06. The panel on Global Operations: right-click without a drag
+(G-10), long press, and from a mission, site or incident popup; radius chips; the circle; rows
+that open their screen or fly the map; ?near=…&r=… in the address. Tests: Vitest.
+```
+
+### Prompt 132 · Map search
+```
+SRC-01..04. infra/scripts/build-places.py and frontend/src/map/places.json (Natural Earth,
+public domain, checked by SHA-256); map/search.ts (coordinates, DMS, geo: URIs, records, places);
+the box on Global Operations and Air (/ to focus, keys, fly and mark, "What's nearby"); the
+gazetteer loaded on first focus (G-11). Tests: Vitest for the parser and the ranking.
+```
+
+### Prompt 133 · Acceptance
+```
+Playwright, real stack (§114; plan §5): map-acceptance.spec.ts before the Copilot spec, and the
+replay's annotation check in rpl-acceptance.spec.ts. Report the real output; make acceptance (all
+specs) still passes.
+```
