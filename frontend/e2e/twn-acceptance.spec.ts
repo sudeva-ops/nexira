@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
 import { as, cspViolations, PASSWORD, signedIn, until } from "./support";
 
@@ -8,7 +8,8 @@ import { as, cspViolations, PASSWORD, signedIn, until } from "./support";
 // PB-07's shelter alert (step 4), so Nairobi shelters; EVN-1001 is complete, so no route shows
 // (the Phase 1 spec checks Route B while it was ACTIVE, plan G-3). This spec plays NBO-SITE from
 // the presenter bar: the faults, the shelter and the recovery; then the readiness tick, names by
-// scope and the audit.
+// scope and the audit. Prompt 126 (§107, D-51): the camera coverage through the same scenes, and
+// the handoff from the plan and from INC-<year>-1042's SITE entries.
 
 interface Twin {
   site: { id: string; name: string };
@@ -42,6 +43,23 @@ const SCENARIO = "NBO-SITE";
 const year = new Date().getUTCFullYear();
 const INCIDENT = `INC-${year}-1042`;
 const STAFF = ["Omar Siddiqui", "Martin Keller", "James Otieno"];
+
+/** Camera coverage on a Site Twin page (TWN-09, TWN-11): the cones, the KPI and the list. */
+function coverageOf(page: Page) {
+  const cones = page.getByTestId("twin-coverage");
+  return {
+    // Blueprint's switch indicator covers its input, so the label takes the click.
+    on: async () => {
+      await page.locator("label.nx-twn-switch").click();
+      await expect(page.getByRole("checkbox", { name: "Camera coverage" })).toBeChecked();
+    },
+    cones: cones.locator("g[data-camera]"),
+    online: cones.locator('g[data-state="online"]'),
+    camera: (code: string) => cones.locator(`g[data-camera="${code}"]`),
+    kpi: page.locator(".nx-kpi", { hasText: "Camera coverage" }).locator(".v"),
+    seen: page.getByLabel("What the cameras see"),
+  };
+}
 
 test("Site Twin acceptance: the embassy, NBO-SITE faults, shelter and recovery, readiness, names", async ({
   browser,
@@ -102,6 +120,24 @@ test("Site Twin acceptance: the embassy, NBO-SITE faults, shelter and recovery, 
   await expect(page.getByText("43 / 43", { exact: true })).toBeVisible();
   await expect(page.getByTestId("twin-shelter")).toContainText(`Shelter-in-place active (${INCIDENT})`);
   await expect(page.getByRole("img", { name: "Embassy Nairobi floor plan" }).locator("circle")).toHaveCount(25);
+  // Camera coverage before the unrest: 16 blue cones, below 100%, the seeded corner named
+  // (TWN-08, plan-pilot-rpl §4: 97% after migration 0019).
+  const cover = coverageOf(page);
+  await cover.on();
+  await expect(cover.cones).toHaveCount(16);
+  await expect(cover.online).toHaveCount(16);
+  await expect(cover.kpi).toHaveText("97%");
+  await expect(cover.seen).toContainText("Every zone has a working camera");
+  await expect(cover.seen).toContainText("Blind spots: Chancery offices (7%)");
+  // Handoff from the plan (TWN-10): Gate 2 opens the Gate 2 camera that sees most of it.
+  await page.getByRole("button", { name: "Open the camera on Gate 2" }).click();
+  await expect(page.getByRole("dialog")).toContainText("CAM-03 · Gate 2");
+  // Blueprint moves focus into the dialog on the next frame; Escape needs it there.
+  await expect
+    .poll(() => page.evaluate(() => Boolean(document.activeElement?.closest(".bp6-overlay"))))
+    .toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   const before = (await siteEntries()).length;
 
   // --- 1. NBO-SITE scene 1: Gate 2 reader FAULT, camera 7 OFFLINE (TWN-03) --------------------
@@ -121,6 +157,15 @@ test("Site Twin acceptance: the embassy, NBO-SITE faults, shelter and recovery, 
   });
   expect(faulty.readiness.items.find((i) => i.label === "All access points monitored")?.done).toBe(false);
   await expect(page.getByText("41 / 43", { exact: true })).toBeVisible({ timeout: 20_000 }); // live
+  // Camera 7's cone turns red and dashed and the KPI falls; CAM-08 still covers the consular
+  // hall, so no zone is listed as not covered, only the part it no longer sees.
+  await expect(cover.camera("CAM-07")).toHaveAttribute("data-state", "down");
+  await expect(cover.camera("CAM-07").locator("path")).toHaveAttribute("stroke-dasharray", "5 4");
+  await expect(cover.online).toHaveCount(15);
+  await expect(cover.kpi).toHaveText("96%");
+  await expect(cover.seen).toContainText("Every zone has a working camera");
+  await expect(cover.seen).not.toContainText("Not covered now");
+  await expect(cover.seen).toContainText("Blind spots: Chancery offices (7%), Consular hall (");
   const entries = (await siteEntries()).slice(before);
   expect(entries.map((e) => e.summary)).toEqual([
     "Embassy Nairobi · Gate 2 · badge reader: FAULT (Fault · manual guard).",
@@ -150,6 +195,24 @@ test("Site Twin acceptance: the embassy, NBO-SITE faults, shelter and recovery, 
   await until(async () => ((await twin()).counts.faults === 0 ? true : undefined), "the systems recovered");
   await expect(page.getByText("43 / 43", { exact: true })).toBeVisible({ timeout: 20_000 });
   expect((await siteEntries()).length - before).toBe(4); // two faults, two recoveries
+  await expect(cover.camera("CAM-07")).toHaveAttribute("data-state", "online");
+  await expect(cover.online).toHaveCount(16);
+  await expect(cover.kpi).toHaveText("97%");
+  await expect(cover.seen).toContainText("Blind spots: Chancery offices (7%)");
+  await expect(cover.seen).not.toContainText("Consular hall");
+
+  // Handoff from INC-<year>-1042's SITE entries (TWN-10): the camera's own entry opens it; the
+  // Gate 2 reader's opens the camera watching Gate 2.
+  const timeline = page.locator('.nx-tl[aria-label="Timeline"]');
+  const entry = (text: string) => timeline.locator(":scope > div", { hasText: text }).first();
+  await page.goto(`/incidents?id=${incident?.id}`);
+  await entry("Camera 7: OFFLINE").getByRole("link", { name: "View camera" }).click();
+  await expect(page).toHaveURL(new RegExp(`/twin\\?site=${embassy.id}&camera=CAM-07$`));
+  await expect(page.getByRole("dialog")).toContainText("CAM-07 · Consular hall");
+  await page.goto(`/incidents?id=${incident?.id}`);
+  await entry("Gate 2 · badge reader: FAULT").getByRole("link", { name: "View camera" }).click();
+  await expect(page).toHaveURL(/camera=G2-READER$/);
+  await expect(page.getByRole("dialog")).toContainText("CAM-03 · Gate 2");
 
   // --- 4. Readiness: a Security Officer ticks; the Viewer cannot (TWN-05) ----------------------
   const open = seeded.readiness.items.find((i) => i.label === "Generator load test witnessed");
@@ -181,6 +244,11 @@ test("Site Twin acceptance: the embassy, NBO-SITE faults, shelter and recovery, 
   const viewerPage = await signedIn(browser, "viewer", "/twin");
   await expect(viewerPage.getByText("11 staff · 3 guards · 11 visitors")).toBeVisible();
   await expect(viewerPage.getByRole("button", { name: /Mark done/ })).toHaveCount(0);
+  const viewerCover = coverageOf(viewerPage); // the same coverage: no names are involved (§107)
+  await viewerCover.on();
+  await expect(viewerCover.online).toHaveCount(16);
+  await expect(viewerCover.kpi).toHaveText("97%");
+  await expect(viewerCover.seen).toContainText("Blind spots: Chancery offices (7%)");
   expect(await viewerPage.content()).not.toContain("Omar Siddiqui");
   await viewerPage.context().close();
 
