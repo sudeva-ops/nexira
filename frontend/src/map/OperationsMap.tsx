@@ -21,6 +21,7 @@ import {
 } from "./geo";
 import { MapToggle } from "./MapToggle";
 import { registerPmtiles, tilesAvailable } from "./base";
+import { addDaylight } from "./daylight";
 import { GROW_MS, growScale } from "./motion";
 import { breath, phase, sonar } from "./plane";
 import {
@@ -93,6 +94,7 @@ export function OperationsMap({
   useEffect(() => {
     let disposed = false;
     let created: MapLibreMap | null = null;
+    let stopDaylight = () => {};
     registerPmtiles();
     void tilesAvailable().then((available) => {
       if (disposed || !container.current) return;
@@ -109,6 +111,7 @@ export function OperationsMap({
       m.on("load", () => {
         if (disposed) return;
         applyProjection(m, globeRef.current);
+        stopDaylight = addDaylight(m);
         m.addSource("zones", { type: "geojson", data: EMPTY });
         m.addSource("missions", { type: "geojson", data: EMPTY });
         m.addSource("exposure", { type: "geojson", data: EMPTY });
@@ -217,6 +220,7 @@ export function OperationsMap({
       for (const marker of [...placed.values(), ...wxPlaced.values()]) marker.remove();
       placed.clear();
       wxPlaced.clear();
+      stopDaylight();
       created?.remove();
     };
   }, []);
