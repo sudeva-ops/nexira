@@ -7,13 +7,15 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.core import audit
 from app.core.approvals import require_roles
+from app.core.config import get_settings
 from app.core.db import engine_dependency
-from app.core.events import Publisher, get_publisher
+from app.core.events import Publisher, get_publisher, get_redis
 from app.core.security import CurrentUser, get_db
 from app.modules.scenarios import service
 from app.modules.scenarios.models import Scenario, ScenarioRun
 from app.modules.scenarios.player import Player, Status
-from app.modules.scenarios.schemas import ScenarioStateOut, SceneOut
+from app.modules.scenarios.schemas import NormalDayIn, NormalDayOut, ScenarioStateOut, SceneOut
+from app.modules.twin import ambient
 
 router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
 
@@ -22,6 +24,14 @@ Session = Annotated[AsyncSession, Depends(get_db)]
 Players = Annotated[service.PlayerRegistry, Depends(service.get_registry)]
 Pub = Annotated[Publisher, Depends(get_publisher)]
 Engine = Annotated[AsyncEngine, Depends(engine_dependency)]
+
+
+def get_flags() -> ambient.Flags:
+    """The normal day's switch (plan-pilot-twa G-2); tests override it."""
+    return ambient.RedisFlags(get_redis())
+
+
+Flags = Annotated[ambient.Flags, Depends(get_flags)]
 
 
 def _state(scenario: Scenario, run: ScenarioRun, player: Player) -> ScenarioStateOut:
@@ -66,6 +76,31 @@ async def _context(
         session, scenario, run, players=players, publisher=publisher, engine=engine
     )
     return scenario, run, player
+
+
+# TWN-13 (D-53): the presenter bar's "Normal day" switch, before /{code} so it is not a scenario.
+@router.get("/normal-day")
+async def normal_day(user: Operator, flags: Flags) -> NormalDayOut:
+    on = await ambient.is_on(flags, user.tenant_id, get_settings().twin_normal_day)
+    return NormalDayOut(on=on)
+
+
+@router.post("/normal-day")
+async def switch_normal_day(
+    body: NormalDayIn, user: Operator, session: Session, flags: Flags
+) -> NormalDayOut:
+    await audit.write(
+        session,
+        actor_type="USER",
+        actor_id=str(user.id),
+        action="SITE.NORMAL_DAY",
+        entity_type="tenant",
+        entity_id=str(user.tenant_id),
+        details={"on": body.on},
+    )
+    await session.commit()  # audited first: a switch that is not recorded does not happen
+    await ambient.switch(flags, user.tenant_id, body.on)
+    return NormalDayOut(on=body.on)
 
 
 @router.get("/{code}")

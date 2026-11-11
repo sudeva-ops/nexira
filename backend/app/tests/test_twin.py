@@ -138,6 +138,11 @@ async def _mission(idp: Idp, code: str, city: str, country: str, at: Any) -> uui
 
 @pytest.fixture
 async def world(client: AsyncClient, idp: Idp) -> World:
+    return await make_world(client, idp)
+
+
+async def make_world(client: AsyncClient, idp: Idp) -> World:
+    """The embassy with a plan, staff, a guard and visitors; also the normal day's tests."""
     nbo = await _mission(idp, "NBO", "Nairobi", "KE", EMBASSY)
     cai = await _mission(idp, "CAI", "Cairo", "EG", CAIRO)
     grants: dict[str, list[tuple[str, uuid.UUID | None]]] = {

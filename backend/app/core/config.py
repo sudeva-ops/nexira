@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     worker_tenant_ids: list[str] = Field(default_factory=list)  # plan G-01
     undo_window_s: int = 300  # plan G-17
     playbook_step_delay_s: float = 0.0  # demo pacing between playbook steps
+    # TWN-13 (D-53, plan-pilot-twa G-2): the Site Twin's normal day, unless the presenter's switch
+    # or `make reset-demo` says otherwise.
+    twin_normal_day: bool = True
     # CHK-04: channel adapters are pluggable, but Phase 1 has only the simulated one
     # (no real SMS, email or WhatsApp). Any other value fails at startup.
     channel_adapter: Literal["simulated"] = "simulated"

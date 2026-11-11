@@ -60,3 +60,20 @@ export function useScenarioCommand(code: string) {
     onSuccess: (state) => client.setQueryData(["scenario", code], state),
   });
 }
+
+/** TWN-13 (D-53): the Site Twin's normal day of simulated presence, switched on the bar. */
+export function useNormalDay(enabled: boolean) {
+  return useQuery({
+    queryKey: ["scenario", "normal-day"],
+    queryFn: () => apiGet<{ on: boolean }>("/api/scenarios/normal-day"),
+    enabled,
+  });
+}
+
+export function useSwitchNormalDay() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (on: boolean) => apiSend<{ on: boolean }>("POST", "/api/scenarios/normal-day", { on }),
+    onSuccess: (state) => client.setQueryData(["scenario", "normal-day"], state),
+  });
+}

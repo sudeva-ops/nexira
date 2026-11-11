@@ -1,4 +1,4 @@
-import { HTMLSelect, Icon } from "@blueprintjs/core";
+import { HTMLSelect, Icon, Switch } from "@blueprintjs/core";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -7,8 +7,10 @@ import {
   DEMO_SCENARIO,
   DEMO_SCENARIOS,
   type DemoScenario,
+  useNormalDay,
   useScenario,
   useScenarioCommand,
+  useSwitchNormalDay,
 } from "../api/scenario";
 import { demoMode } from "../app/demo";
 import { SCENE_SCREEN } from "./scenes";
@@ -24,6 +26,8 @@ export function PresenterBar() {
   const [code, setCode] = useState<DemoScenario>(DEMO_SCENARIO);
   const { data: state } = useScenario(code, enabled);
   const command = useScenarioCommand(code);
+  const normalDay = useNormalDay(enabled).data;
+  const switchDay = useSwitchNormalDay();
   const navigate = useNavigate();
   if (!enabled || !state) return null;
 
@@ -87,6 +91,16 @@ export function PresenterBar() {
       >
         <Icon icon="arrow-right" size={12} />
       </button>
+      {normalDay && (
+        // TWN-13 (D-53): simulated comings and goings at the embassy outside the scenarios.
+        <Switch
+          className="nx-presenter-day"
+          label="Normal day"
+          checked={normalDay.on}
+          disabled={switchDay.isPending}
+          onChange={(e) => switchDay.mutate(e.currentTarget.checked)}
+        />
+      )}
       {scene?.expect && <div className="nx-presenter-expect">{scene.expect}</div>}
     </div>
   );

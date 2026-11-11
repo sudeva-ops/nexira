@@ -15,5 +15,6 @@ data:
   WORKER_TENANT_IDS: {{ .Values.app.workerTenantIds | toJson | quote }}
   UNDO_WINDOW_S: {{ .Values.app.undoWindowS | quote }}
   PLAYBOOK_STEP_DELAY_S: "0"
+  TWIN_NORMAL_DAY: "false"  # TWN-13: no invented presence unless the presenter switches it on
   CHANNEL_ADAPTER: simulated  # CHK-04: the only adapter in Phase 1
   PYTHONDONTWRITEBYTECODE: "1"

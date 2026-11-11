@@ -116,6 +116,11 @@ reset-demo: env
 	$(COMPOSE) up -d --wait postgres
 	$(MAKE) migrate
 	$(MAKE) seed
+	# TWN-13 (D-53, plan-pilot-twa G-2): the normal day starts off after a reset, so the
+	# acceptance specs see the seeded counts; the presenter bar switches it on.
+	$(COMPOSE) up -d --wait redis
+	$(COMPOSE) exec -T redis sh -c 'redis-cli --scan --pattern "nexira:twin:normal-day:*" \
+	  | xargs -r redis-cli DEL >/dev/null; redis-cli SET nexira:twin:normal-day:default off >/dev/null'
 
 # D-24: world (z0-6) and Nairobi (z0-15) PMTiles, fonts and sprites into infra/tiles/
 # (not committed). Downloads at build time only; the app works offline afterwards.

@@ -22,6 +22,7 @@ from app.modules.playbooks.consumer import resume_runs, run_handler
 from app.modules.predictive import consumer as predictive
 from app.modules.supply import consumer as supply
 from app.modules.travel import tracker
+from app.modules.twin import ambient
 from app.modules.twin import consumer as twin
 from app.modules.vip import consumer as vip
 from app.modules.weather import feed as weather
@@ -111,6 +112,22 @@ async def partners_loop(
             except Exception:
                 log.exception("partner tick failed for %s", tenant_id)
         await asyncio.sleep(PARTNERS_EVERY_S)
+
+
+async def normal_day_loop(
+    engine: AsyncEngine, publisher: Publisher, tenant_ids: list[uuid.UUID], default_on: bool
+) -> None:
+    """The Site Twin's normal day (TWN-13, D-53): one move about a minute, when switched on."""
+    step = 0
+    while True:
+        await asyncio.sleep(ambient.wait_s(step))
+        for tenant_id in tenant_ids:
+            try:
+                flags = ambient.RedisFlags(get_redis())
+                await ambient.tick(engine, tenant_id, publisher, flags, step, default_on)
+            except Exception:
+                log.exception("normal day tick failed for %s", tenant_id)
+        step += 1
 
 
 async def armed_loop(
@@ -274,6 +291,9 @@ async def main() -> None:
             tasks.create_task(predictive_loop(engine, publisher, tenant_ids))
             tasks.create_task(partners_loop(engine, publisher, tenant_ids, partner_adapter))
             tasks.create_task(armed_loop(engine, publisher, tenant_ids))
+            tasks.create_task(
+                normal_day_loop(engine, publisher, tenant_ids, settings.twin_normal_day)
+            )
     finally:
         await client.aclose()
         await engine.dispose()

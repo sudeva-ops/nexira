@@ -19,3 +19,13 @@ class ScenarioStateOut(BaseModel):
     position: int  # events of the current scene already played
     scene_complete: bool
     scenes: list[SceneOut]
+
+
+class NormalDayIn(BaseModel):
+    on: bool
+
+
+class NormalDayOut(BaseModel):
+    """TWN-13 (D-53): whether the Site Twin's normal day runs for this tenant."""
+
+    on: bool

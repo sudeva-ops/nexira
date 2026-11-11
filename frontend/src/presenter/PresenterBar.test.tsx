@@ -6,7 +6,7 @@ import type { Me } from "../api/me";
 import type { ScenarioState } from "../api/scenario";
 import { SCENE_SCREEN } from "./scenes";
 import { SUMMARY, VIEWER } from "../test/fixtures";
-import { DUTY_OFFICER, mockApi, renderApp } from "../test/render";
+import { DUTY_OFFICER, mockApi, mockServer, renderApp } from "../test/render";
 
 // "Next scene" navigates to the map screens; jsdom has no WebGL, so the maps are stubbed
 // (as in the screens' own tests).
@@ -46,6 +46,7 @@ function setup(me: Me) {
     "/api/scenarios/NBO-CIVIL-UNREST": { body: STATE },
     "/api/scenarios/NBO-CIVIL-UNREST/next": { body: { ...STATE, status: "PLAYING", current_scene: 1 } },
     "/api/scenarios/FRA-NATIONAL-PROTESTS": { body: FRANCE },
+    "/api/scenarios/normal-day": { body: { on: false } },
     "/api/incidents": { body: [] },
     "/api/signals": { body: [] },
     "/api/missions": { body: [] },
@@ -149,5 +150,30 @@ describe("Presenter bar", () => {
     expect(Object.values(SCENE_SCREEN["NBO-SITE"])).toEqual(Array(4).fill("/twin"));
     expect(Object.values(SCENE_SCREEN["NBO-SUPPLY"])).toEqual(Array(4).fill("/supply"));
     expect(Object.values(SCENE_SCREEN["ADD-FORECAST"])).toEqual(Array(2).fill("/predictive"));
+  });
+
+  it("switches the Site Twin's normal day (TWN-13)", async () => {
+    vi.stubEnv("VITE_DEMO_MODE", "true");
+    const fetchMock = mockServer({
+      "GET /api/me": { body: DUTY_OFFICER },
+      "GET /api/proposals": { body: [] },
+      "GET /api/agents": { body: { paused: false, agents: [] } },
+      "GET /api/agents/activity": { body: [] },
+      "GET /api/scenarios/NBO-CIVIL-UNREST": { body: STATE },
+      "GET /api/scenarios/normal-day": { body: { on: false } },
+      "POST /api/scenarios/normal-day": { body: { on: true } },
+      "GET /api/incidents": { body: [] },
+      "GET /api/signals": { body: [] },
+      "GET /api/missions": { body: [] },
+      "GET /api/operations/summary": { body: SUMMARY },
+    });
+    renderApp("/");
+    const bar = await screen.findByRole("toolbar", { name: "Presenter" });
+    const day = await within(bar).findByRole("checkbox", { name: "Normal day" });
+    expect(day).not.toBeChecked();
+    await userEvent.click(within(bar).getByText("Normal day"));
+    await vi.waitFor(() => expect(day).toBeChecked());
+    const sent = fetchMock.mock.calls.find(([url, init]) => String(url) === "/api/scenarios/normal-day" && init?.method === "POST");
+    expect(JSON.parse(String(sent?.[1]?.body))).toEqual({ on: true });
   });
 });
