@@ -1369,3 +1369,54 @@ Playwright on the real stack, during NBO-CIVIL-UNREST after the Phase 1 run:
 7. **Gazetteer:** Natural Earth populated places, public domain, about 7,000 places, bundled. *Default: yes.*
 8. **Agents:** no agent draws or reads annotations in this pilot. *Default: yes.*
 9. **🔒:** the PC-54 migration only (§113). *Default: yes.*
+
+## 116. Purpose and starting point (Site Twin: live activity)
+
+Proposed for the product owner's approval. The Site Twin's floor plan works, but at rest it reads as empty: people are dots in neat rows that never move, the rooms are bare rectangles, and the camera wall's clips show empty places. This module makes the embassy look as busy as it is, from the same simulated access control and Wi-Fi presence. It adds no new source of truth and no video analytics.
+
+| Exists today | Where |
+|---|---|
+| Who is in which zone now: staff, guards, visitors (TWN-02), moved by `SITE_PRESENCE` events through the worker, each move audited (`SITE.PRESENCE`) | `site_presence`, `twin/consumer.py` |
+| The plan (SVG, 790 × 455) with people as dots in rows, a count per zone, capacity only for the safe room and muster point (PC-39) | `screens/twin/TwinScreen.tsx` |
+| The CCTV wall: self-hosted clips of empty places (no person in any clip), or generated views peopled from occupancy when no clip is installed | `screens/twin/CctvWall.tsx`, `cctv.ts` |
+| Presence changes only in `NBO-SITE` scenes; between them, nothing moves | simulator |
+| Nothing is detected or counted from the cameras (§108 Q5) | — |
+
+## 117. Requirements: live activity (TWN-12..TWN-16)
+
+| ID | Requirement | Pri. |
+|---|---|---|
+| TWN-12 | **People who move.** On the plan, each occupant's dot sits at its own place in its zone (scattered, not in rows) and drifts slowly within it. When presence moves someone to another zone, their dot walks there through the zones' shared edge over about two seconds. Kinds keep their colours (TWN-02). Display only: the in-zone drift is not stored. Under reduced motion or Calm mode, dots jump without animation. | M |
+| TWN-13 | **A normal day.** Outside a scenario, the simulator plays a gentle loop of the embassy's working day: visitors arrive at Gate 1, wait in the lobby, are seen in the consular hall and leave; staff move between the chancery, the conference room and the IT room; guards walk a round. About one move a minute, through the same `SITE_PRESENCE` events, so every move is stored and audited like any other (AGENTS.md). It pauses while `NBO-SITE` or shelter-in-place is active and starts again after recovery. | M |
+| TWN-14 | **Recent movements.** Under the plan, a strip of the last movements, newest first: "09:42 · Gate 1 → Lobby · Visitor", "09:44 · Chancery → Conference room · Staff". Kind and zones only, never a name (TWN-02), from the record of presence moves. Beside it, today's figures: arrivals, departures and visitors waiting at the consular hall. | M |
+| TWN-15 | **Activity on the camera wall.** Every tile shows its zone's occupancy, "7 in zone · access control (simulated)". The count comes from presence, never from the picture (§108 Q5). The stylised figures already drawn in generated views are also drawn over the clips, matching the zone's count (§120 Q3). | S |
+| TWN-16 | **Rooms that look like rooms.** Each zone kind gets faint outlines of its furniture on the plan: desks in the chancery, a table in the conference room, counters and seating in the consular hall, racks in the IT room, bunks and stores in the safe room. It is decoration only, under the dots and coverage cones, and does not change any count. | S |
+
+### Not in this module
+- Video of real people, or any detection, counting or tracking from the camera pictures (§108 Q5);
+- capacity for every room (only the safe room and muster point have one; §120 Q2);
+- presence feeding location confidence or the check-in (as TWN-02);
+- floors other than the Nairobi embassy's ground floor, or a floor plan editor.
+
+## 118. Data changes
+
+None by default. TWN-12, TWN-15 and TWN-16 are display only. TWN-13 uses the existing `SITE_PRESENCE` events and `site_presence` rows. TWN-14 is worked out on read from the `SITE.PRESENCE` audit entries for the site, which hold kinds and zones and no names. If you choose capacity for every room (§120 Q2), that is a schema change (PC-55) and 🔒 under D-29.
+
+## 119. Acceptance for the module
+
+Playwright on the real stack:
+- **At rest:** with the normal day running, within two minutes a dot moves on the Nairobi plan and a new line appears in "Recent movements", for the Duty Officer and the Viewer; neither line nor tile carries a name.
+- **The record:** each such move is in the audit log as `SITE.PRESENCE`, and the chain verifies.
+- **During `NBO-SITE`:** the normal day pauses (no ambient move while the scene plays or while sheltering), and its counts match TWN-07's (9 / 20 in the safe room); after scene 3 it resumes.
+- **The camera wall:** each key camera's tile shows its zone's count, equal to the plan's.
+- **Unchanged:** Phase 1 figures and every existing acceptance spec, including the Site Twin spec's exact counts, still pass. The normal day is paused for them, or they read counts at their own scene points.
+
+## 120. Questions for the product owner (proposed defaults)
+
+1. **The normal day's pace:** about one move a minute, visitors cycling through Gate 1 → Lobby → Consular hall → out, between 08:00 and 18:00 Nairobi time and quieter at night. *Default: yes.*
+2. **Capacity for every room:** no. Tint each zone by its share of the site's people, and show "x / capacity" only where a capacity exists (safe room, muster point). *Default: no schema change.* (Alternative: PC-55 adds capacity to every zone, 🔒.)
+3. **Figures over the clips:** yes, stylised silhouettes, clearly drawn, never photographic, with the "simulated" label on the tile. *Default: yes.* (Alternative: the count only, and the clips stay empty.)
+4. **Audit of the normal day:** every ambient move is audited like every presence move (AGENTS.md: every state change). At about one a minute that is about 1,400 audit rows a day for the site. *Default: yes.* (Alternative: a slower pace.)
+5. **Acceptance runs:** `make acceptance` and the demo reset start with the normal day paused, so the existing specs' exact counts hold; the presenter bar gets a "Normal day" switch, on by default outside acceptance. *Default: yes.*
+6. **Who sees it:** every role that sees the Site Twin; kinds and zones only, as TWN-02. *Default: yes.*
+7. **🔒:** none, unless Q2 takes PC-55. *Default: none.*
