@@ -29,6 +29,12 @@ Display only: no schema, API, role or permission change, so nothing here is 🔒
 | G-5 | Hiding Audit must not look like a permission change | It is display only, as VIP-06 is: the API still refuses non-admins (D-04), and `/audit` opened directly still says "Administrators only". No change to `security.py` or `approvals.py` |
 | G-6 | Unit tests and e2e may name the old button text | None found for "Open AAR-…" or the ticker. Tests that name "Request partner" keep their accessible name |
 
+**As built in Prompts 140 and 141** (each a deviation for approval in its PR):
+- The main cause of the wrapped and heavy buttons was Blueprint's small buttons keeping 14px text next to the app's 11–12px. One rule (`.bp6-button.bp6-small { font-size: 12px }`) applies across every screen, not only the ones in the sweep.
+- Card headers: the title keeps its room (up to 70%) and the subtitle gives way first; actions sit in `.nx-card-actions`, which never shrinks or wraps.
+- The layout spec found two cut labels the sweep missed (the CCTV tiles' camera and zone); they now carry their full text as a title.
+- The Air Travel globe is checked from pixels, because the map does not expose its zoom: a strip across the middle of the map's top and bottom edges must be mostly empty space. Against the old 360px box the top strip reads 95% globe; against the new one, 0%.
+
 ## 3. Prompts
 
 As `docs/prompts-pilot.md` Prompts 139–141. None is 🔒.
