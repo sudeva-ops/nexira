@@ -81,7 +81,7 @@ Every other spec runs with the day off (G-2).
 | # | Gap | Proposed answer |
 |---|---|---|
 | G-1 | The presence consumer takes `SITE_PRESENCE` only from the scenario player (L5), so a separate simulator could not move people | The normal day is a worker task in the backend calling `twin.service.presence()` directly. The consumer's filter is unchanged, and no new event source is trusted |
-| G-2 | **Needs a decision.** Where the "Normal day" switch lives, with no schema change | **A (proposed):** a Redis flag per tenant, `nexira:twin:normal-day:<tenant>`. Its initial value comes from the setting `TWIN_NORMAL_DAY` (`on` in `.env.example`); `make reset-demo` and `make acceptance` set it `off`. The presenter bar (demo mode) gets a "Normal day" switch, and changing it is audited (`SITE.NORMAL_DAY`). **B:** on whenever the demo is not running a scenario, with no switch, and the acceptance specs adapt to moving counts |
+| G-2 | **Decided: A** (PR #176). Where the "Normal day" switch lives, with no schema change | **A (chosen):** a Redis flag per tenant, `nexira:twin:normal-day:<tenant>`. Its initial value comes from the setting `TWIN_NORMAL_DAY` (`on` in `.env.example`); `make reset-demo` and `make acceptance` set it `off`. The presenter bar (demo mode) gets a "Normal day" switch, and changing it is audited (`SITE.NORMAL_DAY`). **B:** on whenever the demo is not running a scenario, with no switch, and the acceptance specs adapt to moving counts |
 | G-3 | What pauses the day | Shelter-in-place at the site, an ACTIVE evacuation there, or an `NBO-SITE` run not yet complete, all worked out on each tick |
 | G-4 | The day must not drift the site away from its seeded shape | A fixed script over the seeded occupants only, so totals stay in a band. `NBO-SITE` scene 1 resets to the seed |
 | G-5 | Movements come from the audit log, which `audit.py` never reads | The twin service reads `audit_log` with SELECT (the app's grant), filtered to `SITE.PRESENCE` for the site. `audit.py` stays insert-only. The response holds kind and zones only |
@@ -94,3 +94,8 @@ Every other spec runs with the day off (G-2).
 ## 8. Prompts
 
 As `docs/prompts-pilot.md` Prompts 134–138. None is 🔒.
+
+## 9. Decisions by the product owner (2026-11-11, PR #176: "Approved")
+
+- G-2: option A, as proposed. A Redis flag per tenant, started from `TWIN_NORMAL_DAY` (on), set off by `make reset-demo` and `make acceptance`, and a "Normal day" switch on the presenter bar, audited.
+- G-1, G-3..G-10: as proposed.
