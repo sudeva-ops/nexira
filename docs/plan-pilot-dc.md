@@ -32,6 +32,12 @@ No schema or API change, and nothing here is 🔒 under D-29. Display code only.
 | G-8 | **The context line on each screen.** | `ContextLine` holds a sentence on the left and the screen's actions on the right. **Executive:** today's line and Export briefing. **Site Twin:** the site picker and "Illustrative floor plan (simulated)". **Decision Queue:** "N agents are watching…" and Agent console (the red kill-switch banner stays). **AI Agents:** the active sentence (the red paused banner stays). **Health:** its note. Predictive Risk's "Model output is advisory" stays a banner, as DC-06 names it. Other screens get no line: there is nothing to say there that the top bar's SIMULATED DATA does not. |
 | G-9 | **Which tiles get sparklines (DC-02).** | A tile whose figure counts events over a period, where the screen already loads their times: **Mass Notification**'s three "· 24h" tiles (per hour, from campaigns' `sent_at`; failures from deliveries); **AI Agents**' Proposals (per hour over 24 hours); **Exercise & Training**'s "Exercises · year" (per month); and the new **Incidents** "Opened · 30 days", **Playbooks** "Runs · 30 days" and **Audit** "Entries · 24 h". Tiles that hold a state (counts now, percentages, scores) get none. The campaign list has delivery counts per campaign but no time for each delivery, so the delivered and failed sparklines put each campaign's counts in the hour it was sent; their labels say "by the hour sent". |
 
+**As built** (each a deviation for approval in its PR):
+- **Prompt 147:** the map's code-loading spinner on Operations and Replay stays, as do VIP's "No visits", "No playbooks" and Site Twin's camera dialog message (#197).
+- **Prompt 148:** "Missions rising" counts missions whose forecast goes up (`change > 0`); the overview lists every mission (#198).
+- **Prompt 149:** Mass Notification's delivered and failed sparklines put each campaign's counts in the hour it was sent, as the deliveries carry no times (#200).
+- **Prompt 150:** the sweep found the CCTV overlay's "N in zone · access control (simulated)" in monospace; it is now in the body font, while the camera code and clock stay monospace. AI Risk Copilot's opening message is a Blueprint empty state inside its conversation panel; it is kept, as a conversation's start rather than a list with nothing in it.
+
 ## 3. Prompts
 
 As `docs/prompts-pilot.md` Prompts 147–150. None is 🔒.

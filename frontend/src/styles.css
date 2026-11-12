@@ -4112,6 +4112,8 @@ tr.nx-flash-b > td {
 }
 
 .nx-cctv-hud .br {
+  font-family: var(--bp-typography-family-default); /* DC-07: a phrase, not the camera's code or clock */
+  letter-spacing: 0;
   bottom: 0;
   right: 0;
 }

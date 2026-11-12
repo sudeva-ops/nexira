@@ -92,6 +92,9 @@ acceptance: env reset-demo up
 	$(MAKE) reset-demo
 	$(COMPOSE) restart backend worker
 	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/gfx-acceptance.spec.ts
+	# Design consistency (§134, D-56): every screen as the Administrator; scene 1 only, so Safety
+	# Check-in and After-Action Review are still at rest. Reads only.
+	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/dc-acceptance.spec.ts
 	# Site Twin live activity (§119, D-53): last; it switches the normal day on, then off again.
 	set -a && . ./$(ENV_FILE) && set +a && cd frontend && npx playwright test e2e/twa-acceptance.spec.ts
 
