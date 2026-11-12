@@ -1,5 +1,5 @@
 import { EXPOSURE_PULSE_MS, exposureFeatures, exposureTier, ZONE_HEIGHT_M, zoneFeatures } from "./geo";
-import { globePreferred, IDLE_MS, setGlobePreferred, shouldSpin } from "./three";
+import { eastOf, globePreferred, IDLE_MS, setGlobePreferred, shouldSpin, sweepClip } from "./three";
 import { DETAIL, INCIDENT } from "../test/fixtures";
 
 describe("the 3D map", () => {
@@ -41,5 +41,20 @@ describe("the 3D map", () => {
     expect(globePreferred()).toBe(false);
     setGlobePreferred(true);
     expect(globePreferred()).toBe(true);
+  });
+
+  it("keeps the sweep on the globe, offset to the map's frame, and lets it fill a flat map (GFX-04)", () => {
+    expect(sweepClip({ x: 400, y: 300, r: 250.04 }, { x: 0, y: 40 })).toBe("circle(250px at 400px 340px)");
+    expect(sweepClip(null, { x: 0, y: 0 })).toBe("none");
+    expect(sweepClip({ x: 400, y: 300, r: Number.NaN }, { x: 0, y: 0 })).toBe("none");
+    expect(sweepClip({ x: 400, y: 300, r: 0 }, { x: 0, y: 0 })).toBe("none");
+  });
+
+  it("walks due east along a great circle", () => {
+    const near = (p: [number, number], q: [number, number]) => p.map((v, i) => Math.abs(v - (q[i] ?? 0)) < 1e-9);
+    expect(near(eastOf([20, 0], 30), [50, 0])).toEqual([true, true]);
+    // From 15° N, a quarter of the way round lands on the equator.
+    expect(eastOf([20, 15], 90)[1]).toBeCloseTo(0, 9);
+    expect(eastOf([20, 15], 90)[0]).toBeCloseTo(110, 9);
   });
 });

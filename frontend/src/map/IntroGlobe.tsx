@@ -9,7 +9,7 @@ import { addDaylight } from "./daylight";
 import { addStars } from "./stars";
 import { greatCircle, missionFeatures } from "./geo";
 import { baseStyle } from "./style";
-import { applyProjection } from "./three";
+import { applyProjection, globeFrame, type GlobeFrame } from "./three";
 
 // The sign-in intro's globe: the same self-hosted map as Global Operations (D-24), turning faster,
 // each mission a pulsing dot in its risk colour, arcs drawing between neighbours; then it settles on
@@ -21,21 +21,6 @@ const ARC_DRAW_MS = 1_100;
 const PULSE_MS = 1_800;
 const COMET_MS = 2_400; // a light runs the length of each arc this often
 const START: [number, number] = [20, 15]; // where Global Operations opens
-
-/** The globe's centre and radius on screen, in CSS pixels. */
-export interface GlobeFrame {
-  x: number;
-  y: number;
-  r: number;
-}
-
-/** Measured, not computed from the zoom: the centre and a point 60° up its meridian. */
-function globeFrame(m: MapLibreMap): GlobeFrame {
-  const c = m.getCenter();
-  const centre = m.project(c);
-  const up = m.project([c.lng, c.lat + 60]);
-  return { x: centre.x, y: centre.y, r: Math.hypot(up.x - centre.x, up.y - centre.y) / Math.sin(Math.PI / 3) };
-}
 
 function arcs(missions: Mission[], elapsed: number): FeatureCollection<LineString> {
   return {
@@ -94,11 +79,11 @@ export function IntroGlobe({
     let stopDaylight = () => {};
     let stopStars = () => {};
     registerPmtiles();
-    void tilesAvailable().then((available) => {
+    void tilesAvailable().then((tiles) => {
       if (disposed || !container.current) return;
       const m = new MapLibreMap({
         container: container.current,
-        style: baseStyle(window.location.origin, available),
+        style: baseStyle(window.location.origin, tiles),
         center: START,
         zoom: 2.1,
         interactive: false,

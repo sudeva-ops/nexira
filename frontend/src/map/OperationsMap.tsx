@@ -36,6 +36,7 @@ import { GROW_MS, growScale } from "./motion";
 import { breath, phase, sonar } from "./plane";
 import {
   applyProjection,
+  clipSweep,
   globePreferred,
   SELECT_BEARING,
   SELECT_PITCH,
@@ -138,13 +139,14 @@ export function OperationsMap({
     let created: MapLibreMap | null = null;
     let stopDaylight = () => {};
     let stopStars = () => {};
+    let stopSweep = () => {};
     registerPmtiles();
-    void tilesAvailable().then((available) => {
+    void tilesAvailable().then((tiles) => {
       if (disposed || !container.current) return;
-      setBaseMissing(!available);
+      setBaseMissing(!tiles.base);
       const m = new MapLibreMap({
         container: container.current,
-        style: baseStyle(window.location.origin, available),
+        style: baseStyle(window.location.origin, tiles),
         center: [20, 15],
         zoom: globeRef.current ? 2 : 1.4, // a globe at 1.4 is small
         attributionControl: { compact: false, customAttribution: ATTRIBUTION },
@@ -156,6 +158,7 @@ export function OperationsMap({
         applyProjection(m, globeRef.current);
         stopDaylight = addDaylight(m);
         stopStars = addStars(m, () => globeRef.current);
+        stopSweep = clipSweep(m, () => globeRef.current);
         m.addSource("zones", { type: "geojson", data: EMPTY });
         m.addSource("missions", { type: "geojson", data: EMPTY });
         m.addSource("exposure", { type: "geojson", data: EMPTY });
@@ -365,6 +368,7 @@ export function OperationsMap({
       wxPlaced.clear();
       stopDaylight();
       stopStars();
+      stopSweep();
       created?.remove();
     };
   }, []);

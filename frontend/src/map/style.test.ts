@@ -1,6 +1,10 @@
-import { baseStyle, CITY_MINZOOM } from "./style";
+import type { LayerSpecification } from "maplibre-gl";
+
+import { baseStyle, CITY_MINZOOM, HANDOVER_ZOOM, IMAGERY_ATTRIBUTION } from "./style";
 
 const ORIGIN = "http://nexira.local";
+const VECTOR = { base: true, imagery: false };
+const IMAGERY = { base: true, imagery: true };
 
 function urls(value: unknown): string[] {
   if (typeof value === "string") return /^[a-z]+:\/\//.test(value) ? [value] : [];
@@ -11,7 +15,7 @@ function urls(value: unknown): string[] {
 
 describe("base map style (D-24)", () => {
   it("uses only the self-hosted tiles, fonts and sprites", () => {
-    const style = baseStyle(ORIGIN, true);
+    const style = baseStyle(ORIGIN, VECTOR);
     const found = urls(style);
     expect(found.length).toBeGreaterThan(0);
     for (const url of found) {
@@ -24,12 +28,12 @@ describe("base map style (D-24)", () => {
   });
 
   it("credits OpenStreetMap", () => {
-    const world = baseStyle(ORIGIN, true).sources.world as { attribution?: string };
+    const world = baseStyle(ORIGIN, VECTOR).sources.world as { attribution?: string };
     expect(world.attribution).toContain("© OpenStreetMap contributors");
   });
 
   it("hands over from the world extract to the Nairobi extract at city zoom", () => {
-    const { layers } = baseStyle(ORIGIN, true);
+    const { layers } = baseStyle(ORIGIN, VECTOR);
     const nairobi = layers.filter((l) => l.id.startsWith("nairobi-"));
     expect(nairobi.length).toBeGreaterThan(10);
     expect(nairobi.every((l) => (l.minzoom ?? 0) >= CITY_MINZOOM)).toBe(true);
@@ -38,8 +42,35 @@ describe("base map style (D-24)", () => {
   });
 
   it("falls back to a plain background when the tiles are not built", () => {
-    const style = baseStyle(ORIGIN, false);
+    const style = baseStyle(ORIGIN, { base: false, imagery: false });
     expect(urls(style)).toEqual([]);
     expect(style.layers.map((l) => l.type)).toEqual(["background"]);
+  });
+
+  it("adds the NASA imagery only when it is built, self-hosted and credited (GFX-01, GFX-02)", () => {
+    expect(Object.keys(baseStyle(ORIGIN, VECTOR).sources)).not.toContain("earth-day");
+    const style = baseStyle(ORIGIN, IMAGERY);
+    const source = style.sources["earth-day"] as { type: string; url: string; attribution: string };
+    expect(source).toMatchObject({ type: "raster", url: `pmtiles://${ORIGIN}/tiles/earth-day.pmtiles` });
+    expect(source.attribution).toBe(IMAGERY_ATTRIBUTION);
+    for (const url of urls(style)) expect(url).toMatch(new RegExp(`^(pmtiles://)?${ORIGIN}/tiles/`));
+  });
+
+  it("draws the imagery under every vector layer and hands over by zoom 6 (GFX-01)", () => {
+    const { layers } = baseStyle(ORIGIN, IMAGERY);
+    expect(layers.map((l) => l.id).slice(0, 2)).toEqual(["background", "earth-day"]);
+    expect(layers[1]?.maxzoom).toBe(HANDOVER_ZOOM);
+  });
+
+  it("clears the world's land and water fills at world zoom, only with the imagery", () => {
+    const opacity = (layers: LayerSpecification[], id: string) =>
+      (layers.find((l) => l.id === id) as { paint?: Record<string, unknown> }).paint?.["fill-opacity"];
+    const withImagery = baseStyle(ORIGIN, IMAGERY).layers;
+    expect(opacity(withImagery, "world-earth")).toEqual(["interpolate", ["linear"], ["zoom"], 5, 0, 6, 1]);
+    expect(opacity(withImagery, "world-water")).toEqual(["interpolate", ["linear"], ["zoom"], 5, 0, 6, 1]);
+    expect(opacity(withImagery, "world-landcover")).toBe(0);
+    expect(opacity(baseStyle(ORIGIN, VECTOR).layers, "world-earth")).toBeUndefined();
+    // The city extract is untouched.
+    expect(opacity(withImagery, "nairobi-earth")).toBeUndefined();
   });
 });

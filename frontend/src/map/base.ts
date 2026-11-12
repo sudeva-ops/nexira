@@ -3,7 +3,7 @@ import { addProtocol, setWorkerUrl } from "maplibre-gl";
 import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import { Protocol } from "pmtiles";
 
-import { TILES_PATH } from "./style";
+import { type Tiles, TILES_PATH } from "./style";
 
 // Shared by the operations and air maps (D-24: self-hosted PMTiles, no external URLs).
 
@@ -15,11 +15,17 @@ export function registerPmtiles() {
   protocolRegistered = true;
 }
 
-export async function tilesAvailable(): Promise<boolean> {
+async function built(name: string): Promise<boolean> {
   try {
-    const response = await fetch(`${TILES_PATH}/world.pmtiles`, { method: "HEAD" });
+    const response = await fetch(`${TILES_PATH}/${name}`, { method: "HEAD" });
     return response.ok;
   } catch {
     return false;
   }
+}
+
+/** Which of the files `make tiles` builds are served (the NASA imagery is optional, GFX-02). */
+export async function tilesAvailable(): Promise<Tiles> {
+  const [base, imagery] = await Promise.all([built("world.pmtiles"), built("earth-day.pmtiles")]);
+  return { base, imagery: base && imagery };
 }

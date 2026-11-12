@@ -40,11 +40,14 @@ async function problems(page: Page): Promise<Problems> {
   });
 }
 
-/** The share of a row across the map's middle that differs from the space at its left end. */
+/** The share of a row near the map's middle that differs from the space at its left end; the strip
+ *  ends before the attribution, which grew with the NASA credit (GFX-02). */
 async function covered(page: Page, box: { x: number; y: number; width: number; height: number }, y: number) {
+  const credit = await page.locator(".maplibregl-ctrl-attrib").first().boundingBox();
+  const end = Math.min(0.65, credit ? (credit.x - box.x - 8) / box.width : 0.65);
   const shot = (await page.screenshot({ clip: box })).toString("base64");
   return page.evaluate(
-    async ({ shot, y }) => {
+    async ({ shot, y, end }) => {
       const img = new Image();
       img.src = `data:image/png;base64,${shot}`;
       await img.decode();
@@ -58,8 +61,8 @@ async function covered(page: Page, box: { x: number; y: number; width: number; h
       const px = (x: number) => Array.from(ctx.getImageData(x, row, 1, 1).data.slice(0, 3));
       const space = px(Math.round(img.width * 0.02));
       // Clear of the search box (top left) and the globe/flat switch and attribution (right).
-      const from = Math.round(img.width * 0.5);
-      const to = Math.round(img.width * 0.65);
+      const from = Math.round(img.width * (end - 0.15));
+      const to = Math.round(img.width * end);
       let differ = 0;
       for (let x = from; x < to; x += 1) {
         const p = px(x);
@@ -67,7 +70,7 @@ async function covered(page: Page, box: { x: number; y: number; width: number; h
       }
       return differ / (to - from);
     },
-    { shot, y },
+    { shot, y, end },
   );
 }
 

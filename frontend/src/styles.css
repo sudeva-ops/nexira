@@ -2908,15 +2908,34 @@ tr.nx-flash-b > td {
   }
 }
 
-/* A faint radar sweep over the operations map. */
+/* A faint radar sweep over the operations map. The gradient turns, not the element, so the clip
+   that keeps it on the globe (GFX-04, map/three.ts clipSweep) stays put. */
+@property --nx-sweep-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes nx-sweep {
+  to {
+    --nx-sweep-angle: 360deg;
+  }
+}
+
 .nx-mapwrap::after {
   content: "";
   position: absolute;
-  inset: -50%;
+  inset: 0;
   z-index: 1;
-  background: conic-gradient(from 0deg, rgba(76, 144, 240, 0.2), rgba(76, 144, 240, 0.05) 12%, transparent 22%);
+  background: conic-gradient(
+    from var(--nx-sweep-angle),
+    rgba(76, 144, 240, 0.2),
+    rgba(76, 144, 240, 0.05) 12%,
+    transparent 22%
+  );
+  clip-path: var(--nx-sweep-clip, none);
   pointer-events: none;
-  animation: nx-turn 9s linear infinite;
+  animation: nx-sweep 9s linear infinite;
 }
 
 /* Calm mode (user menu): no motion at all, as with reduced motion. */
