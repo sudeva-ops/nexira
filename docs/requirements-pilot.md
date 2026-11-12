@@ -1476,3 +1476,70 @@ None. Every requirement is display only. UIP-07 hides a sidebar entry using the 
 3. **Audit in the sidebar:** hidden for roles that cannot open it. *Default: yes.* (Alternative: shown greyed with a lock, so people know it exists.)
 4. **Icons:** I pick replacements from Blueprint's set (for example `symbol-cross` for Health Intelligence, `helper-management` for Assistance Partners and `clipboard-file` for After-Action Review) and show them in the PR's screenshots. *Default: yes.*
 5. **🔒:** none. *Default: none.*
+
+## 126. Purpose and starting point (graphics: the globe, resting states, charts)
+
+Approved by the product owner on 2026-11-12 (PR #189; D-55), with the defaults in §130. It follows the UI polish pass (D-54), whose §122 left these items to this module. For the globe, the product owner chose on 2026-11-11 to start with NASA Blue Marble (day) and Black Marble (night lights) imagery, which is public domain, self-hosted under D-24. Paid imagery (MapTiler on-prem, EOX Sentinel-2 cloudless, Cesium self-hosted) is looked at only if NASA's does not work. Seen in a screenshot sweep at 1440 × 900 as the Duty Officer, straight after `make reset-demo` (scene 0, "Calm"):
+
+| Seen in the sweep | Where |
+|---|---|
+| The globe is a dark vector map: land and sea are flat greys, so at world zoom it reads as a diagram, not the Earth | `map/style.ts`, used by Global Operations, Air Travel, Replay and the sign-in globe |
+| Global Operations: the night shading spills past the globe's rim into space as a flat band on the left | `map/daylight.ts`, `map/OperationsMap.tsx` |
+| Executive Overview: "Alerts · last 30 days" is an empty frame with a flat line ("0 incidents · 0 signals"); Recent activity is one sentence; a third of the page is blank | `screens/executive` |
+| Decision Queue: "No decisions waiting", then two-thirds of the screen is empty; Agent activity says only "Agents are watching…" | `screens/queue` |
+| The stat tiles are numbers only. Only AI Agents has sparklines (its activity per agent, last hour) | `ui/primitives.tsx` (`Kpi`), `ui/Sparkline.tsx` |
+| Incident detail has no map: the place is a text label, and "Open in map" leaves the screen | `screens/incidents/IncidentDetail.tsx` |
+
+## 127. Requirements: graphics (GFX-01..GFX-08)
+
+| ID | Requirement | Pri. |
+|---|---|---|
+| GFX-01 | **The Earth from imagery.** At world zoom the globe shows NASA Blue Marble imagery for land and sea, toned down to sit under the Blueprint dark styling so that markers, arcs and labels stay the brightest things on the map. Borders and place names stay on top. The imagery gives way to today's dark vector map as you zoom in (by zoom 6, where the world extract ends), so city detail is unchanged. It applies wherever the shared base map is used (Global Operations, Air Travel, Replay, the sign-in globe), in both globe and flat views. | M |
+| GFX-02 | **Self-hosted, built once.** `make tiles` fetches the NASA imagery once on the build machine, checks it against a SHA-256, and builds it into a raster PMTiles file under `infra/tiles/`, next to `world.pmtiles`. Nothing is fetched at runtime (D-24); an air-gapped site copies the built file in, as it does today. The attribution line adds "Imagery: NASA". Without the file, the map falls back to today's dark vector map, the way it already falls back to a plain background without tiles. | M |
+| GFX-03 | **Night on the globe.** The night side shows Black Marble city lights, blended into the day side along a soft terminator that follows the clock (the existing `daylight.ts` sun position). If MapLibre cannot blend the two within the current stack (see §130 Q2), the night side keeps today's translucent shade over Blue Marble, and the city lights are left out. | S |
+| GFX-04 | **The globe's edge.** No shading, glow or overlay is drawn outside the globe's disc. The rim has the existing atmosphere and nothing else. | M |
+| GFX-05 | **A 30-day trend that is never empty.** Executive Overview's "Alerts · last 30 days" shows a believable 30-day history in a fresh demo. Days before the demo's live data are illustrative, worked out the same way every time, and are drawn and labelled as such (lighter, "illustrative" in the legend and tooltip), as Predictive Risk does with its history (PRD-01). Live days are drawn from the record, as today. | M |
+| GFX-06 | **Resting states.** When nothing is happening, the Decision Queue and Executive Overview still show something worth reading, and nothing on them is invented:<br>• **Decision Queue:** what the agents are watching, as counts from existing APIs (missions, people, travellers in transit, feeds), and each agent's latest check.<br>• **Executive Overview:** when nothing opened or closed in the last 7 days, Recent activity says how long it has been quiet and names the last incident on record.<br>• **Both screens:** at 1440 × 900 neither leaves a column blank for more than a third of the screen's height. | M |
+| GFX-07 | **Sparklines in the stat tiles, from real data.** Stat tiles that count something over time show a small sparkline of that count, from the screen's own data. They cover at least: Global Operations' Signals · 24h (per hour), Executive Overview's Active incidents (per day over the 30 days, illustrative days lighter), and the Decision Queue's Awaiting decision (per hour over 24 hours). A tile with no history shows no sparkline, never a made-up line. | S |
+| GFX-08 | **An incident mini-map.** Incident detail shows a small map of the incident's place, with its marker, the mission, and the people exposed (the same layers and colours as Global Operations, from the same self-hosted tiles). It is a still view, not interactive; clicking it opens Global Operations on the incident, as "Open in map" does. It uses city zoom where city tiles exist (Nairobi) and regional zoom elsewhere. | M |
+
+### Not in this module
+- Paid or commercial imagery: only if NASA imagery does not work, after the product owner decides (§126);
+- terrain, 3D buildings or a 3D Site Twin;
+- shared panel and stat-tile components across every screen (the design consistency module);
+- new charts beyond the trend and the sparklines named here;
+- any change to roles, permissions, approvals or the audit trail.
+
+## 128. Data changes
+
+No database schema change.
+- **GFX-05:** the illustrative days are worked out when the API is read and are never stored. The Executive Overview API adds a `source` to each trend day (`LIVE` or `ILLUSTRATIVE`), as the Predictive Risk API already does. This changes the API only, not the database.
+- **GFX-06 and GFX-07:** these read existing APIs.
+- **GFX-01 to GFX-03:** these add build-time tiles only.
+
+No 🔒 area (D-29) is touched.
+
+## 129. Acceptance for the module
+
+- **Vitest:**
+  - the illustrative trend is the same on every read and is marked `ILLUSTRATIVE`;
+  - sparklines are drawn from real buckets, and none is drawn without history;
+  - the resting-state texts;
+  - the base style adds the imagery source only when its file exists.
+- **pytest:** the Executive Overview trend has 30 days, and each day carries `source`; live days match the record.
+- **Playwright on the real stack:**
+  - after `make reset-demo`, the 30-day trend is not flat, and its illustrative days are labelled;
+  - Decision Queue and Executive Overview pass the "no column blank for more than a third of the height" check at 1440 × 900;
+  - the imagery tiles load from `/tiles/` with no request leaving the stack (as `map-acceptance` checks today);
+  - no pixels outside the globe's disc differ from space (extending the globe check in `uip-acceptance`);
+  - after scene 1, incident detail shows the mini-map with the incident marker, and clicking it opens Global Operations on the incident.
+- **Screenshots** of every changed screen go in each PR, for the product owner's visual review.
+- **Unchanged:** every existing unit test and acceptance spec passes.
+
+## 130. Questions answered by the product owner (2026-11-12: "approved", all defaults)
+
+1. **Imagery size and detail:** NASA imagery to zoom 5 (about 5 km a pixel, roughly 100–200 MB for day and night together), with the vector map taking over from zoom 6. *Default: yes.* (Alternative: to zoom 6, about four times the size.)
+2. **Night lights:** try the Black Marble blend (GFX-03); if MapLibre cannot blend it cleanly in the current stack, ship Blue Marble with today's night shade and record it in the PR, without adding a 3D library. *Default: yes.* (Alternative: add a custom WebGL layer, more code to review.)
+3. **The 30-day history:** worked out on read and labelled illustrative, not stored (§128). *Default: yes.* (Alternative: seed closed incidents and signals into the record, which would also show in the Incidents list and in AARs.)
+4. **Sparklines:** the three tiles named in GFX-07 now; others in the design consistency module. *Default: yes.*
+5. **🔒:** none. *Default: none.*

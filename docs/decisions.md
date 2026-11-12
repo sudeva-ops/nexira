@@ -332,6 +332,12 @@ Rules:
 - **The sidebar follows the role, the API decides.** Audit is left out of the sidebar for non-administrators as VIP Protection already is; the API's checks are unchanged (D-04).
 - **Next, graphics; the globe starts with NASA.** The graphics module that follows starts the globe's look with self-hosted NASA Blue Marble and Black Marble imagery (public domain, D-24); paid map products are considered only if that falls short.
 
+**D-55 · Graphics: the NASA globe, resting states and charts.** Approved by the product owner on 2026-11-12 (PR #189). Requirements GFX-01 to GFX-08 (§126–130) in `docs/requirements-pilot.md`, with the defaults in §130.
+- **NASA imagery, self-hosted.** Blue Marble (day) and Black Marble (night lights) to zoom 5, built once by `make tiles` and checked against SHA-256; never fetched at runtime (D-24). The dark vector map takes over from zoom 6 and is the fallback without the file.
+- **No 3D library for the night side.** If MapLibre cannot blend the city lights cleanly, the night side keeps today's shade over Blue Marble, recorded in the PR.
+- **Illustrative, labelled, not stored.** The 30-day trend's days before live data are worked out on read and marked `ILLUSTRATIVE`, as Predictive Risk's history is (PRD-01); no incidents or signals are seeded into the record.
+- **Nothing invented.** Resting states and sparklines read existing data; a tile with no history shows no line. No schema change; nothing is 🔒.
+
 ---
 
 ## 7. Phase 1 acceptance scenario: NBO-CIVIL-UNREST
