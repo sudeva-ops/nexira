@@ -1550,8 +1550,8 @@ Draft for the product owner. It follows the graphics module (D-55), whose §127 
 
 | Seen in the sweep | Where |
 |---|---|
-| 18 screens open with a row of stat tiles. Incidents, Response Playbooks, Predictive Risk, Safety Check-in, After-Action Review and Audit have none | `screens/*` |
-| Only 3 of about 80 tiles have a sparkline (GFX-07) | `ui/primitives.tsx` `Kpi` |
+| 17 screens open with a row of stat tiles. Incidents, Response Playbooks, Predictive Risk and Audit have none; Safety Check-in and After-Action Review show theirs only once a check-in or review is open | `screens/*` |
+| Only 3 of the 87 tiles in the code have a sparkline (GFX-07) | `ui/primitives.tsx` `Kpi` |
 | Empty states take three forms: a Blueprint `NonIdealState` filling the whole page (Safety Check-in, After-Action Review), a `NonIdealState` inside a card (Decision Queue), and a dim sentence in a card (29 places), some in a monospace font ("No events yet.", "Agents are watching…") | `screens/*` |
 | Loading takes two forms: skeleton rows (53 places) and a spinner (15 places on 12 screens) | `ui/Skeleton.tsx`, Blueprint `Spinner` |
 | Audit is the only screen without panels: a full-width green callout and a bare table | `screens/audit/AuditScreen.tsx` |
@@ -1562,7 +1562,7 @@ Draft for the product owner. It follows the graphics module (D-55), whose §127 
 
 | ID | Requirement | Pri. |
 |---|---|---|
-| DC-01 | **A tile row on every working screen.** Incidents, Response Playbooks, Predictive Risk, Safety Check-in, After-Action Review and Audit open with a row of 4 or 5 stat tiles, like the other screens. Each figure comes from an API the screen already calls (or one it is allowed to call); a figure not yet loaded shows "—". AI Risk Copilot, a conversation, keeps its Grounding context panel instead. | M |
+| DC-01 | **A tile row on every working screen.** Incidents, Response Playbooks, Predictive Risk and Audit open with a row of 4 or 5 stat tiles, like the other screens; Safety Check-in and After-Action Review show theirs at rest too, before a check-in or review is open. Each figure comes from an API the screen already calls (or one it is allowed to call); a figure not yet loaded shows "—". AI Risk Copilot, a conversation, keeps its Grounding context panel instead. | M |
 | DC-02 | **Sparklines in the remaining tiles, from real data.** Every tile whose figure counts events over a period shows a sparkline of that count, from timestamps the screen already loads, as GFX-07 does. A tile with no history, or whose figure is not a count over time, shows none. Illustrative history is drawn lighter, as on Executive Overview. | S |
 | DC-03 | **One empty state.** Inside a panel, "nothing here yet" is one dim sentence in the body font that says what will appear and when, from a shared component. A whole-page empty state is kept only where the screen cannot work at all (an error, no access). Safety Check-in and After-Action Review at rest show their normal layout (tiles and panels) with empty panels, not a blank page. | M |
 | DC-04 | **One loading state.** While a panel's data loads, it shows skeleton rows of about its final height. A spinner is used only inside a button or dialog while an action runs. | S |
@@ -1599,7 +1599,7 @@ No 🔒 area (D-29) is touched.
 
 ## 135. Questions for the product owner
 
-1. **Which screens get a tile row:** the six in DC-01; AI Risk Copilot keeps its Grounding context panel. *Default: yes.* (Alternative: Copilot too, with the same four counts as tiles.)
+1. **Which screens get a tile row:** the four new ones and the two at rest in DC-01; AI Risk Copilot keeps its Grounding context panel. *Default: yes.* (Alternative: Copilot too, with the same four counts as tiles.)
 2. **Sparklines:** every tile that counts events over time, where the screen already loads the timestamps. *Default: yes.* (Alternative: only tiles on the Command and Monitor screens.)
 3. **Safety Check-in and After-Action Review at rest:** the normal layout with empty panels (DC-03). *Default: yes.* (Alternative: keep the whole-page empty state and only restyle it.)
 4. **The context line (DC-06):** one shared line, banners kept only for warnings that need action. *Default: yes.* (Alternative: leave each screen's line or banner as it is.)
