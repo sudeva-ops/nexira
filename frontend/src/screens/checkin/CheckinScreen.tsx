@@ -22,16 +22,45 @@ import { escalationText } from "./escalation";
 import { type RequestFor, RequestDialog } from "../partners/RequestDialog";
 import { PhonePreview } from "./PhonePreview";
 import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
 import { SkeletonRows } from "../../ui/Skeleton";
 
 const SAFE = "#32A467";
 const HELP = "#E76A6E";
 const PENDING = "#404854";
 
+/** DC-01, DC-03 (D-56; plan G-4): with no check-in, the screen's normal layout with nothing in it
+ *  yet, not a blank page. Nothing is counted, so every figure is "—". */
+function AtRest() {
+  const none = "No check-in running";
+  return (
+    <div className="nx-pad">
+      <TileRow label="Personnel figures">
+        <Kpi icon="people" label="Personnel accounted" value="—" detail={none} />
+        <Kpi icon="tick" label="Safe" value="—" detail={none} />
+        <Kpi icon="warning-sign" label="Need help" value="—" detail={none} />
+        <Kpi icon="time" label="No response" value="—" detail={none} />
+      </TileRow>
+      <div className="nx-cigrid">
+        <Card icon="people" title="Mission personnel" className="nx-span2">
+          <Empty>
+            No safety check-in yet. Playbooks send one (PB-07 step 5); personnel and citizens are
+            counted here as they answer.
+          </Empty>
+        </Card>
+        <Card icon="feed" title="Live responses" className="nx-side nx-responses">
+          <Empty>Answers appear here as they arrive, newest first.</Empty>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 /** Safety Check-in (CHK-01..03, D-28). */
 export function CheckinScreen() {
   const [params, setParams] = useSearchParams();
-  const checkins = (useCampaigns().data ?? []).filter((c) => c.campaign_type === "CHECKIN");
+  const campaigns = useCampaigns();
+  const checkins = (campaigns.data ?? []).filter((c) => c.campaign_type === "CHECKIN");
   const campaign = checkins.find((c) => c.id === params.get("campaign")) ?? checkins[0];
   const summary = useCheckinSummary(campaign?.id).data;
   const responses = useCheckinResponses(campaign?.id).data ?? [];
@@ -44,15 +73,9 @@ export function CheckinScreen() {
   const canRequest = !!incident && canRequestPartner(me, incident.mission_id);
   const [helpFor, setHelpFor] = useState<RequestFor | null>(null);
 
-  if (!campaign) {
-    return (
-      <NonIdealState
-        icon="tick-circle"
-        title="No active safety check-in"
-        description="Check-ins are launched by playbooks (PB-07 step 5)."
-      />
-    );
-  }
+  if (campaigns.isPending) return <SkeletonRows rows={6} />;
+  if (campaigns.isError) return <NonIdealState icon="error" title="The check-ins could not be loaded" />;
+  if (!campaign) return <AtRest />; // loaded, and no check-in yet
   if (!summary) return <SkeletonRows rows={6} />;
   const p = summary.personnel;
   const c = summary.citizens;

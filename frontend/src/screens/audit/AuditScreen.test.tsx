@@ -31,6 +31,10 @@ describe("audit screen", () => {
     renderApp("/audit");
     expect(await screen.findByText("ROLE.GRANT")).toBeInTheDocument();
     expect(await screen.findByText("Hash chain intact")).toBeInTheDocument();
+    // DC-01: the figures in a tile row
+    const tiles = screen.getByRole("group", { name: "Audit figures" });
+    expect(tiles).toHaveTextContent("Entries7");
+    expect(tiles).toHaveTextContent("ChainIntact7 entries verified by the database");
   });
 
   it("reports a broken chain", async () => {
@@ -41,7 +45,7 @@ describe("audit screen", () => {
     });
     renderApp("/audit");
     expect(await screen.findByText("Hash chain broken")).toBeInTheDocument();
-    expect(screen.getByText("First broken entry: #3.")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Hash chain broken. First broken entry: #3.");
   });
 
   it("does not show the log to other roles", async () => {

@@ -19,7 +19,10 @@ import {
   useStartRun,
 } from "../../api/playbooks";
 import { formatStamp } from "../../app/time";
-import { Card } from "../../ui/primitives";
+import { Card, Kpi } from "../../ui/primitives";
+import { playbookFigures } from "../../ui/figures";
+import { TileRow } from "../../ui/TileRow";
+import { useNow } from "../../ui/useNow";
 import { plural, roleLabel } from "../../ui/format";
 import { ACTION_ICON, STEP_CLASS, stepDetail } from "./steps";
 import { Empty } from "../../ui/Empty";
@@ -207,11 +210,36 @@ export function PlaybooksScreen() {
   const runId = params.get("run") ?? forPlaybook[0]?.id;
   const runQuery = useRun(runId);
   const run = runQuery.data;
+  const now = useNow(true, 60_000);
+  const f = playbookFigures(runs, now);
 
   if (playbooks.isPending) return <SkeletonRows rows={6} />;
   if (!playbook) return <NonIdealState icon="flash" title="No playbooks" />;
   return (
-    <div className="nx-pbgrid">
+    <div className="nx-pad">
+      {/* DC-01 (plan G-2): from the library and the runs the screen loads */}
+      <TileRow label="Playbook figures">
+        <Kpi icon="flash" label="Playbooks" value={playbooks.data?.length ?? 0} detail="In the library" />
+        <Kpi
+          icon="play"
+          label="Runs active"
+          value={f.active}
+          detail={f.armed ? `${f.armed} armed to start by itself` : "Running or waiting"}
+        />
+        <Kpi
+          icon="hand"
+          label="Waiting at a gate"
+          value={<span className={f.atGate ? "nx-pending" : undefined}>{f.atGate}</span>}
+          detail="A step needs a named approver"
+        />
+        <Kpi
+          icon="history"
+          label="Runs · 30 days"
+          value={f.runs30}
+          detail={`${f.byAgent} started from an agent's proposal`}
+        />
+      </TileRow>
+      <div className="nx-pbgrid">
       <Card
         icon="flash"
         title="Playbook library"
@@ -263,6 +291,7 @@ export function PlaybooksScreen() {
         <RunView playbook={playbook} run={run} />
       )}
       <AuditTrail runId={run?.id} />
+    </div>
     </div>
   );
 }

@@ -33,6 +33,7 @@ import { SkeletonRows } from "../../ui/Skeleton";
 import { REJECT_REASONS } from "../queue/format";
 import { inDays, metricTarget, metricValue } from "./format";
 import { TileRow } from "../../ui/TileRow";
+import { reviewFigures } from "../../ui/figures";
 import { Empty } from "../../ui/Empty";
 
 const PRIORITY_SEV: Record<Priority, string> = {
@@ -490,8 +491,22 @@ export function AarScreen() {
       <NonIdealState icon="error" title="The reviews could not be loaded" />
     );
   const data = list.data;
+  const f = data && reviewFigures(data);
   return (
-    <div className="nx-pad nx-aar">
+    <div className="nx-pad">
+      {/* DC-01 (plan G-4): the reviews and the incidents ready for one, at rest and with a review open */}
+      <TileRow label="Review figures">
+        <Kpi
+          icon="endorsed"
+          label="Reviews"
+          value={f ? f.reviews : "—"}
+          detail={f ? `${f.drafts} draft · ${f.final} final` : ""}
+        />
+        <Kpi icon="inbox" label="Ready for review" value={f ? f.ready : "—"} detail="Monitoring or closed" />
+        <Kpi icon="search-text" label="Findings" value={f ? f.findings : "—"} detail="Drafted from the record or added" />
+        <Kpi icon="tick" label="Actions accepted" value={f ? f.accepted : "—"} detail="With an owner and a due date" />
+      </TileRow>
+      <div className="nx-aar">
       <div className="nx-col nx-aar-side">
         <Card icon="endorsed" title="Reviews">
           {!data ? (
@@ -570,11 +585,12 @@ export function AarScreen() {
         {!data ? (
           <SkeletonRows rows={10} />
         ) : !selected ? (
-          <NonIdealState
-            icon="endorsed"
-            title="No incident to review yet"
-            description="A review is built from the platform record once an incident is at Monitoring or Closed."
-          />
+          <Card icon="endorsed" title="Review">
+            <Empty>
+              No incident to review yet. A review is built from the platform record once an incident is
+              at Monitoring or Closed.
+            </Empty>
+          </Card>
         ) : review.isError ? (
           <NonIdealState icon="error" title="The review could not be loaded" />
         ) : review.data ? (
@@ -583,6 +599,7 @@ export function AarScreen() {
           <SkeletonRows rows={10} />
         )}
       </div>
+    </div>
     </div>
   );
 }

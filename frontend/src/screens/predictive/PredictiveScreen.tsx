@@ -6,12 +6,15 @@ import {
   defaultMission,
   type Driver,
   type MissionRisk,
+  type PredictiveOverview,
   type Rising,
   shortDay,
   useMissionRisk,
   usePredictiveOverview,
 } from "../../api/predictive";
-import { Card } from "../../ui/primitives";
+import { Card, Kpi } from "../../ui/primitives";
+import { predictiveFigures } from "../../ui/figures";
+import { TileRow } from "../../ui/TileRow";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { Empty } from "../../ui/Empty";
 
@@ -193,6 +196,29 @@ function Calendar({ events }: { events: CalendarEvent[] }) {
 }
 
 /** Predictive Risk (PRD-07; D-46): advisory, an illustrative model on simulated data. */
+function PredictiveTiles({ o }: { o: PredictiveOverview | undefined }) {
+  const f = o && predictiveFigures(o);
+  return (
+    <TileRow label="Forecast figures">
+      <Kpi icon="trending-up" label="Missions rising" value={f ? f.rising : "—"} detail="Forecast up over the next 14 days" />
+      <Kpi
+        icon="warning-sign"
+        label="Crossing the threshold"
+        value={f ? <span className={f.crossing ? "nx-pending" : undefined}>{f.crossing}</span> : "—"}
+        detail={o ? `Elevated at ${o.threshold}` : ""}
+        alert={!!f?.crossing}
+      />
+      <Kpi
+        icon="chart"
+        label="Highest peak"
+        value={f?.top ? f.top.peak : "—"}
+        detail={f?.top ? `${f.top.city} ${f.top.mission_code} · ${shortDay(f.top.peak_day)}` : "No mission rising"}
+      />
+      <Kpi icon="lab-test" label="Model" value="Illustrative" detail="A projection, not a prediction" />
+    </TileRow>
+  );
+}
+
 export function PredictiveScreen() {
   const overview = usePredictiveOverview();
   const [params, setParams] = useSearchParams();
@@ -213,6 +239,8 @@ export function PredictiveScreen() {
           because of a forecast. Simulated data for demonstration.
         </div>
       </div>
+      {/* DC-01 (plan G-3): from the forecast overview; no figure here counts over time */}
+      <PredictiveTiles o={o} />
       {!o ? (
         <SkeletonRows rows={8} />
       ) : (

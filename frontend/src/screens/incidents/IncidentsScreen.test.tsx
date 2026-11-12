@@ -42,6 +42,10 @@ describe("Incidents", () => {
     expect(screen.getByText(/Severity raised from HIGH to CRITICAL/)).toBeInTheDocument();
     expect(screen.getByText("Confidence 92%")).toBeInTheDocument();
     expect(screen.getByLabelText("Timeline")).toHaveTextContent("ESCALATED");
+    // DC-01 (plan G-1): the register's figures
+    const figures = screen.getByRole("group", { name: "Incident figures" });
+    expect(figures).toHaveTextContent("Active1Highest: critical");
+    expect(figures).toHaveTextContent(`Signals fused${INCIDENT.signal_count}`);
   });
 
   it("lets a Duty Officer change status and add a note (INC-07)", async () => {

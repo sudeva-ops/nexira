@@ -4665,3 +4665,18 @@ tr.nx-flash-b > td {
   padding: 4px 0;
   border-bottom: 0;
 }
+
+/* DC-01: a split view under a tile row takes the page's padding */
+.nx-pad > .nx-split,
+.nx-pad > .nx-pbgrid {
+  padding: 0;
+}
+
+.nx-pad > .nx-pbgrid {
+  height: auto;
+  min-height: 560px;
+}
+
+.nx-span2 {
+  grid-column: span 2;
+}
