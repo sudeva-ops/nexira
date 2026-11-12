@@ -9,6 +9,9 @@ import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { TileRow } from "../../ui/TileRow";
 import { useNow } from "../../ui/useNow";
+import { buckets } from "../../ui/spark";
+
+const DAY_MS = 86_400_000;
 
 // Audit view (admin, D-25). The backend enforces ADMIN; this only avoids
 // showing an empty screen to other roles. DC-01, DC-05 (D-56): figures in a tile row and the
@@ -50,6 +53,10 @@ export function AuditScreen() {
           icon="time"
           label="Entries · 24 h"
           value={f ? f.day : "—"}
+          trend={{
+            values: buckets((log.data ?? []).map((e) => e.occurred_at), now, DAY_MS, 24),
+            label: "Audit entries per hour, last 24 hours (of the latest 200)",
+          }}
           detail={f ? (f.full ? `The latest ${AUDIT_PAGE} are all from today` : `${f.agents} by agents`) : ""}
         />
         <Kpi icon="person" label="People acting · 24 h" value={f ? f.people : "—"} detail="Named users, by id" />

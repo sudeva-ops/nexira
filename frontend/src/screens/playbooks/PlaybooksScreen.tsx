@@ -27,8 +27,10 @@ import { plural, roleLabel } from "../../ui/format";
 import { ACTION_ICON, STEP_CLASS, stepDetail } from "./steps";
 import { Empty } from "../../ui/Empty";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { buckets } from "../../ui/spark";
 
 const LIVE = ["RUNNING", "AWAITING_APPROVAL"];
+const DAY_MS = 86_400_000;
 
 function errorText(error: unknown): string {
   return error instanceof ApiError ? error.message : "Something went wrong";
@@ -236,6 +238,10 @@ export function PlaybooksScreen() {
           icon="history"
           label="Runs · 30 days"
           value={f.runs30}
+          trend={{
+            values: buckets(runs.map((r) => r.started_at), now, 30 * DAY_MS, 30),
+            label: "Playbook runs started per day, last 30 days",
+          }}
           detail={`${f.byAgent} started from an agent's proposal`}
         />
       </TileRow>

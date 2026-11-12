@@ -17,6 +17,7 @@ import { CampaignDetail } from "./CampaignDetail";
 import { Composer } from "./Composer";
 import { TileRow } from "../../ui/TileRow";
 import { Empty } from "../../ui/Empty";
+import { sums } from "../../ui/spark";
 
 const DAY_MS = 86_400_000;
 const STATUS: Record<string, [string, string]> = {
@@ -61,6 +62,11 @@ export function NotifyScreen() {
   );
   const delivered = (totals.DELIVERED ?? 0) + (totals.READ ?? 0);
   const all = Object.values(totals).reduce((a, b) => a + b, 0);
+  // DC-02 (plan G-9): per hour over 24 h. Deliveries carry no times of their own, so each
+  // campaign's counts sit in the hour it was sent.
+  const sent = recent.map((c) => ({ at: c.sent_at ?? "", deliveries: c.deliveries }));
+  const hourly = (n: (d: Record<string, number>) => number) =>
+    sums(sent.map((c) => ({ at: c.at, n: n(c.deliveries) })), now, DAY_MS, 24);
 
   return (
     <div className="nx-pad">
@@ -72,18 +78,29 @@ export function NotifyScreen() {
           detail="Citizen messages need a second person (D-31)"
           alert={list.some((c) => c.status === "PENDING_APPROVAL")}
         />
-        <Kpi icon="send-message" label="Campaigns sent · 24h" value={recent.length} detail={`${all} deliveries`} />
+        <Kpi
+          icon="send-message"
+          label="Campaigns sent · 24h"
+          value={recent.length}
+          detail={`${all} deliveries`}
+          trend={{ values: hourly(() => 1), label: "Campaigns sent per hour, last 24 hours" }}
+        />
         <Kpi
           icon="tick"
           label="Delivered or read · 24h"
           value={all ? `${Math.round((delivered / all) * 100)}%` : "—"}
           detail="Simulated channels (D-19)"
+          trend={{
+            values: hourly((d) => (d.DELIVERED ?? 0) + (d.READ ?? 0)),
+            label: "Messages delivered or read per hour, by the hour sent, last 24 hours",
+          }}
         />
         <Kpi
           icon="warning-sign"
           label="Failed · 24h"
           value={totals.FAILED ?? 0}
           detail="No fallback in the pilot (MN-11 deferred)"
+          trend={{ values: hourly((d) => d.FAILED ?? 0), label: "Failed messages per hour, by the hour sent, last 24 hours" }}
         />
       </TileRow>
 

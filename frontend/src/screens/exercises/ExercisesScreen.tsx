@@ -27,6 +27,8 @@ import { SkeletonRows } from "../../ui/Skeleton";
 import { measuredText } from "./format";
 import { TileRow } from "../../ui/TileRow";
 import { Empty } from "../../ui/Empty";
+import { exerciseMonths } from "../../ui/figures";
+import { useNow } from "../../ui/useNow";
 
 // EXR-08 (plan-pilot-exr §8): the KPIs, the recent exercises, Run an exercise and the scoring
 // breakdown, as the design. Launch, Next inject, End and Abandon show only to those the API
@@ -50,7 +52,18 @@ function ScoreBar({ score, width }: { score: number | null; width?: number }) {
   );
 }
 
-function Figures({ k, templates }: { k: Kpis; templates: Template[] }) {
+function Figures({
+  k,
+  templates,
+  rows,
+  now,
+}: {
+  k: Kpis;
+  templates: Template[];
+  rows: ExerciseSummary[];
+  now: number;
+}) {
+  const series = exerciseMonths(rows, now);
   const year = new Date().getFullYear();
   const share = k.personnel ? Math.round((100 * k.took_part) / k.personnel) : null;
   const delta =
@@ -58,7 +71,13 @@ function Figures({ k, templates }: { k: Kpis; templates: Template[] }) {
   const themes = [...new Set(templates.map((t) => t.theme).filter(Boolean))];
   return (
     <TileRow label="Exercise figures">
-      <Kpi icon="locate" label={`Exercises · ${year}`} value={k.this_year} detail="Completed this year" />
+      <Kpi
+        icon="locate"
+        label={`Exercises · ${year}`}
+        value={k.this_year}
+        detail="Completed this year"
+        trend={{ ...series, label: `Exercises completed per month, ${year}; seeded history lighter` }}
+      />
       <Kpi
         icon="chart"
         label="Average score"
@@ -299,6 +318,7 @@ function Breakdown({ x }: { x: Exercise }) {
 
 export function ExercisesScreen() {
   const list = useExercises();
+  const now = useNow(true, 60_000);
   const templates = useTemplates();
   const [params, setParams] = useSearchParams();
   const rows = list.data?.exercises ?? [];
@@ -311,7 +331,7 @@ export function ExercisesScreen() {
   return (
     <div className="nx-pad">
       {list.data ? (
-        <Figures k={list.data.kpis} templates={templates.data ?? []} />
+        <Figures k={list.data.kpis} templates={templates.data ?? []} rows={rows} now={now} />
       ) : (
         <SkeletonRows rows={2} />
       )}

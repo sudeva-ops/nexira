@@ -1,8 +1,10 @@
 import type { AuditEntry } from "../api/audit";
 import type { Reviews } from "../api/aar";
+import type { ExerciseSummary } from "../api/exercises";
 import type { Incident, Severity } from "../api/intel";
 import type { PlaybookRun } from "../api/playbooks";
 import type { PredictiveOverview } from "../api/predictive";
+import { months } from "./spark";
 
 // DC-01 (D-56; plan G-1..G-4): the figures behind the new tile rows, from data each screen
 // already loads. A list the API pages (runs: 50, audit: 200) gives "50+"/"200+" when every
@@ -86,3 +88,16 @@ export function reviewFigures(r: Reviews) {
     accepted: r.reviews.reduce((sum, x) => sum + x.accepted, 0),
   };
 }
+
+/** DC-02: completed exercises per month this year; the months before the first real (EXERCISE)
+ *  one are the seeded, illustrative history, drawn lighter (EXR-07). */
+export function exerciseMonths(rows: ExerciseSummary[], now: number): { values: number[]; faint: number } {
+  const done = rows.filter((r) => r.status === "COMPLETED" && r.ended_at);
+  const values = months(done.map((r) => r.ended_at ?? ""), now);
+  const firstReal = done
+    .filter((r) => r.source === "EXERCISE")
+    .map((r) => new Date(r.ended_at ?? "").getUTCMonth())
+    .reduce((a, b) => Math.min(a, b), values.length);
+  return { values, faint: done.some((r) => r.source === "ILLUSTRATIVE") ? firstReal : 0 };
+}
+

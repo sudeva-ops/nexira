@@ -76,6 +76,8 @@ function KillSwitch({ paused }: { paused: boolean }) {
 }
 
 /** AI Agents (AGT-07, AGT-08): roster, autonomy (ADMIN), kill switch (ADMIN). */
+const DAY_MS = 86_400_000;
+
 export function AgentsScreen() {
   const { data } = useAgents();
   const proposals = useProposals().data ?? [];
@@ -121,7 +123,16 @@ export function AgentsScreen() {
           value={data.agents.length}
           detail={data.paused ? "Paused" : `${data.agents.filter((a) => a.is_enabled).length} enabled`}
         />
-        <Kpi icon="inbox" label="Proposals" value={proposals.length} detail={`${proposals.filter((p) => p.status === "PENDING").length} pending`} />
+        <Kpi
+          icon="inbox"
+          label="Proposals"
+          value={proposals.length}
+          detail={`${proposals.filter((p) => p.status === "PENDING").length} pending`}
+          trend={{
+            values: buckets(proposals.map((p) => p.created_at), now, DAY_MS, 24),
+            label: "Proposals raised per hour, last 24 hours",
+          }}
+        />
         <Kpi
           icon="people"
           label="Human override rate"
