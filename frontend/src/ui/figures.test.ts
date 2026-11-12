@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import type { AuditEntry } from "../api/audit";
 import type { Reviews, ReviewSummary } from "../api/aar";
+import type { ExerciseSummary } from "../api/exercises";
 import type { Incident } from "../api/intel";
 import type { PlaybookRun } from "../api/playbooks";
 import type { PredictiveOverview } from "../api/predictive";
 import {
   auditFigures,
   countOf,
+  exerciseMonths,
   incidentFigures,
   playbookFigures,
   predictiveFigures,
@@ -97,5 +99,28 @@ describe("reviewFigures (G-4)", () => {
       ({ status, items, accepted }) as ReviewSummary;
     const r = { reviews: [review("DRAFT", 4, 1), review("FINAL", 6, 3)], ready: [{}, {}] } as Reviews;
     expect(reviewFigures(r)).toEqual({ reviews: 2, drafts: 1, final: 1, ready: 2, findings: 10, accepted: 4 });
+  });
+});
+
+describe("exerciseMonths (DC-02)", () => {
+  const ex = (ended: string, source: ExerciseSummary["source"], status: ExerciseSummary["status"] = "COMPLETED") =>
+    ({ ended_at: ended, source, status }) as ExerciseSummary;
+  it("counts completed exercises per month, the seeded history before the first real one lighter", () => {
+    const now = Date.parse("2026-05-20T00:00:00Z");
+    const f = exerciseMonths(
+      [
+        ex("2026-01-10T00:00:00Z", "ILLUSTRATIVE"),
+        ex("2026-02-10T00:00:00Z", "ILLUSTRATIVE"),
+        ex("2026-04-02T00:00:00Z", "EXERCISE"),
+        ex("2026-04-03T00:00:00Z", "EXERCISE", "ABANDONED"),
+      ],
+      now,
+    );
+    expect(f).toEqual({ values: [1, 1, 0, 1, 0], faint: 3 });
+  });
+  it("draws nothing lighter without seeded history, and all of it with no real exercise", () => {
+    const now = Date.parse("2026-03-01T00:00:00Z");
+    expect(exerciseMonths([ex("2026-02-01T00:00:00Z", "EXERCISE")], now).faint).toBe(0);
+    expect(exerciseMonths([ex("2026-02-01T00:00:00Z", "ILLUSTRATIVE")], now).faint).toBe(3);
   });
 });

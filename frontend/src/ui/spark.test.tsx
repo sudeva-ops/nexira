@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { Ring } from "./Ring";
 import { SkeletonRows } from "./Skeleton";
 import { Kpi } from "./primitives";
-import { buckets, hasHistory, remaining, ringTone } from "./spark";
+import { buckets, hasHistory, months, remaining, ringTone, sums } from "./spark";
 import { Sparkline } from "./Sparkline";
 
 const NOW = Date.parse("2026-10-30T12:00:00Z");
@@ -13,6 +13,25 @@ describe("buckets", () => {
   it("counts events per bucket, oldest first, ignoring those outside the window", () => {
     const times = [ago(1), ago(2), ago(14), ago(59), ago(61), new Date(NOW + 60_000).toISOString()];
     expect(buckets(times, NOW, 3_600_000, 4)).toEqual([1, 0, 0, 3]);
+  });
+});
+
+describe("sums (DC-02)", () => {
+  it("adds each item's own count in the bucket of its time", () => {
+    const now = Date.parse("2026-11-12T12:00:00Z");
+    const at = (h: number) => new Date(now - h * 3_600_000).toISOString();
+    expect(sums([{ at: at(0.5), n: 40 }, { at: at(0.7), n: 2 }, { at: at(2.5), n: 5 }, { at: at(30), n: 9 }], now, 4 * 3_600_000, 4)).toEqual([
+      0, 5, 0, 42,
+    ]);
+  });
+});
+
+describe("months (DC-02)", () => {
+  it("counts this year's times per month, January to now", () => {
+    const now = Date.parse("2026-04-20T00:00:00Z");
+    expect(
+      months(["2026-01-03T00:00:00Z", "2026-03-31T23:00:00Z", "2026-03-01T00:00:00Z", "2025-12-30T00:00:00Z", "2026-05-01T00:00:00Z"], now),
+    ).toEqual([1, 0, 2, 0]);
   });
 });
 

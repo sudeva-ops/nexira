@@ -12,6 +12,7 @@ import { plural } from "../../ui/format";
 import { incidentFigures } from "../../ui/figures";
 import { TileRow } from "../../ui/TileRow";
 import { useNow } from "../../ui/useNow";
+import { buckets } from "../../ui/spark";
 
 const TABS: { label: string; status?: IncidentStatus }[] = [
   { label: "All" },
@@ -25,6 +26,8 @@ const STATUS_DOT: Record<IncidentStatus, string> = {
   MONITORING: "#EC9A3C",
   CLOSED: "#738091",
 };
+
+const DAY_MS = 86_400_000;
 
 /** Incidents (INC-06, INC-07): register and detail. */
 export function IncidentsScreen() {
@@ -52,6 +55,10 @@ export function IncidentsScreen() {
           icon="calendar"
           label="Opened · 30 days"
           value={f ? f.opened30 : "—"}
+          trend={{
+            values: buckets((all ?? []).filter((i) => !i.exercise).map((i) => i.opened_at), now, 30 * DAY_MS, 30),
+            label: "Incidents opened per day, last 30 days",
+          }}
           detail={f ? (f.exercise ? `${plural(f.exercise, "exercise incident")} left out` : "Fused from signals") : ""}
         />
         <Kpi

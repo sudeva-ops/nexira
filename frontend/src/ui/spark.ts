@@ -15,6 +15,33 @@ export function buckets(times: string[], now: number, spanMs: number, n: number)
   return out;
 }
 
+/** DC-02: like `buckets`, but each item adds its own `n` (a campaign's deliveries in the hour it
+ *  was sent, when the deliveries carry no times of their own). */
+export function sums(items: { at: string; n: number }[], now: number, spanMs: number, n: number): number[] {
+  const out = new Array<number>(n).fill(0);
+  const width = spanMs / n;
+  for (const item of items) {
+    const age = now - new Date(item.at).getTime();
+    if (age < 0 || age >= spanMs) continue;
+    const i = n - 1 - Math.floor(age / width);
+    out[i] = (out[i] ?? 0) + item.n;
+  }
+  return out;
+}
+
+/** DC-02: counts per calendar month (UTC) of this year, January to `now`'s month. */
+export function months(times: string[], now: number): number[] {
+  const today = new Date(now);
+  const out = new Array<number>(today.getUTCMonth() + 1).fill(0);
+  for (const t of times) {
+    const d = new Date(t);
+    if (d.getUTCFullYear() !== today.getUTCFullYear() || d.getTime() > now) continue;
+    const m = d.getUTCMonth();
+    out[m] = (out[m] ?? 0) + 1;
+  }
+  return out;
+}
+
 /** Whether a series has anything to draw (GFX-07): an all-zero or empty series has no line. */
 export function hasHistory(values: number[]): boolean {
   return values.some((v) => v > 0);
