@@ -1543,3 +1543,65 @@ No 🔒 area (D-29) is touched.
 3. **The 30-day history:** worked out on read and labelled illustrative, not stored (§128). *Default: yes.* (Alternative: seed closed incidents and signals into the record, which would also show in the Incidents list and in AARs.)
 4. **Sparklines:** the three tiles named in GFX-07 now; others in the design consistency module. *Default: yes.*
 5. **🔒:** none. *Default: none.*
+
+## 131. Purpose and starting point (design consistency: panels, tiles, empty and loading states)
+
+Approved by the product owner on 2026-11-12 (PR #195; D-56), with the defaults in §135. It follows the graphics module (D-55), whose §127 left two items here: shared panel and stat-tile components across every screen, and sparklines in the remaining tiles. Most screens already use the shared `Card` and `Kpi` (`ui/primitives.tsx`). The differences are in what each screen puts around them. Seen in a screenshot sweep of every screen at 1440 × 900 as the Administrator, after scene 1 of NBO-CIVIL-UNREST, and in the code:
+
+| Seen in the sweep | Where |
+|---|---|
+| 17 screens open with a row of stat tiles. Incidents, Response Playbooks, Predictive Risk and Audit have none; Safety Check-in and After-Action Review show theirs only once a check-in or review is open | `screens/*` |
+| Only 3 of the 87 tiles in the code have a sparkline (GFX-07) | `ui/primitives.tsx` `Kpi` |
+| Empty states take three forms: a Blueprint `NonIdealState` filling the whole page (Safety Check-in, After-Action Review), a `NonIdealState` inside a card (Decision Queue), and a dim sentence in a card (29 places), some in a monospace font ("No events yet.", "Agents are watching…") | `screens/*` |
+| Loading takes two forms: skeleton rows (53 places) and a spinner (15 places on 12 screens) | `ui/Skeleton.tsx`, Blueprint `Spinner` |
+| Audit is the only screen without panels: a full-width green callout and a bare table | `screens/audit/AuditScreen.tsx` |
+| Card headers mark counts and states three ways: a grey number box (Playbook library "3"), a chip ("Live", "Hash-chained") and plain sub-text ("1 incidents", with the plural wrong) | `screens/*` card headers |
+| A line above the tiles says what the data is on some screens ("Worked out from live data · simulated (D-19)" on Executive, "Illustrative floor plan (simulated)" on Site Twin), a banner says it on others (Predictive Risk, Decision Queue) and most say nothing there | `screens/*` |
+
+## 132. Requirements: design consistency (DC-01..DC-08)
+
+| ID | Requirement | Pri. |
+|---|---|---|
+| DC-01 | **A tile row on every working screen.** Incidents, Response Playbooks, Predictive Risk and Audit open with a row of 4 or 5 stat tiles, like the other screens; Safety Check-in and After-Action Review show theirs at rest too, before a check-in or review is open. Each figure comes from an API the screen already calls (or one it is allowed to call); a figure not yet loaded shows "—". AI Risk Copilot, a conversation, keeps its Grounding context panel instead. | M |
+| DC-02 | **Sparklines in the remaining tiles, from real data.** Every tile whose figure counts events over a period shows a sparkline of that count, from timestamps the screen already loads, as GFX-07 does. A tile with no history, or whose figure is not a count over time, shows none. Illustrative history is drawn lighter, as on Executive Overview. | S |
+| DC-03 | **One empty state.** Inside a panel, "nothing here yet" is one dim sentence in the body font that says what will appear and when, from a shared component. A whole-page empty state is kept only where the screen cannot work at all (an error, no access). Safety Check-in and After-Action Review at rest show their normal layout (tiles and panels) with empty panels, not a blank page. | M |
+| DC-04 | **One loading state.** While a panel's data loads, it shows skeleton rows of about its final height. A spinner is used only inside a button or dialog while an action runs. | S |
+| DC-05 | **Every panel is a card, with one header style.** Audit's chain status and log sit in cards like every other screen. A card header holds its icon, title, an optional short sub-line, and at most one chip on the right. Counts and states in the header use that chip, with correct plurals ("1 incident"). | M |
+| DC-06 | **One context line.** Where a screen says what its data is (simulated, illustrative, worked out on read), it says so in one shared line above the tiles, with any screen-wide action (Export briefing, the site picker) on its right. Banners stay for warnings that need action (kill switch, an exercise running, advisory model output). The SIMULATED DATA badge in the top bar is unchanged. | S |
+| DC-07 | **Monospace only for data.** Times, references, codes, coordinates and figures use the monospace font; sentences, including empty states, use the body font. | S |
+| DC-08 | **Shared, then checked.** The tile row, empty state, card header chip and context line are components in `ui/`, used by every screen. A Playwright sweep of every screen checks DC-01, DC-03, DC-04 and DC-07 on the real stack. | M |
+
+### Not in this module
+- Colours, fonts, the dark theme or the sidebar: unchanged (D-25);
+- map screens' layout (Global Operations, Air Travel, Replay) beyond their tiles and panels;
+- new charts beyond sparklines, or new figures that need a new API;
+- any change to roles, permissions, approvals or the audit trail (Audit's screen is restyled; `audit.py` and the chain are untouched).
+
+## 133. Data changes
+
+None planned: no schema change and no new API. Each new tile reads an API its screen already uses or that its role can already read. If the plan finds a tile that needs a figure no API gives, it lists it as a gap for the product owner's decision, rather than adding an endpoint quietly.
+
+No 🔒 area (D-29) is touched.
+
+## 134. Acceptance for the module
+
+- **Vitest:**
+  - the shared components (tile row, empty state, header chip, context line);
+  - each new tile's figure from its API data, and "—" before it loads;
+  - each new sparkline from real buckets, none without history.
+- **Playwright on the real stack**, at 1440 × 900 for every screen in the sidebar (the Administrator's, so Audit is included):
+  - after `make reset-demo`: each screen in DC-01 has its tile row; no page-filling empty state on a working screen;
+  - once loaded: no spinner outside a button or dialog;
+  - no sentence set in the monospace font;
+  - card headers have at most one chip.
+- **Screenshots** of every changed screen go in each PR, for the product owner's visual review.
+- **Unchanged:** every existing unit test and acceptance spec passes.
+
+## 135. Questions answered by the product owner (2026-11-12: "approved", all defaults)
+
+1. **Which screens get a tile row:** the four new ones and the two at rest in DC-01; AI Risk Copilot keeps its Grounding context panel. *Default: yes.* (Alternative: Copilot too, with the same four counts as tiles.)
+2. **Sparklines:** every tile that counts events over time, where the screen already loads the timestamps. *Default: yes.* (Alternative: only tiles on the Command and Monitor screens.)
+3. **Safety Check-in and After-Action Review at rest:** the normal layout with empty panels (DC-03). *Default: yes.* (Alternative: keep the whole-page empty state and only restyle it.)
+4. **The context line (DC-06):** one shared line, banners kept only for warnings that need action. *Default: yes.* (Alternative: leave each screen's line or banner as it is.)
+5. **Order of work:** shared components and the empty, loading and monospace fixes first (one prompt), then the tile rows, then sparklines, then acceptance. *Default: yes.*
+6. **🔒:** none. *Default: none.*

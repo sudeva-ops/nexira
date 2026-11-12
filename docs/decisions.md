@@ -338,6 +338,11 @@ Rules:
 - **Illustrative, labelled, not stored.** The 30-day trend's days before live data are worked out on read and marked `ILLUSTRATIVE`, as Predictive Risk's history is (PRD-01); no incidents or signals are seeded into the record.
 - **Nothing invented.** Resting states and sparklines read existing data; a tile with no history shows no line. No schema change; nothing is 🔒.
 
+**D-56 · Design consistency: panels, tiles, empty and loading states.** Approved by the product owner on 2026-11-12 (PR #195). Requirements DC-01 to DC-08 (§131–135) in `docs/requirements-pilot.md`, with the defaults in §135.
+- **One way to show each thing.** A tile row on every working screen (AI Risk Copilot keeps its Grounding context panel); one empty state, one loading state, one card header style, one context line; monospace only for data. Banners stay for warnings that need action.
+- **Shared components in `ui/`,** checked by a Playwright sweep of every screen.
+- **Real data only.** Tiles and sparklines read APIs the screens already use; a tile that would need a new API is raised as a gap, not added. No schema change; nothing is 🔒. Colours, fonts and the theme are unchanged (D-25).
+
 ---
 
 ## 7. Phase 1 acceptance scenario: NBO-CIVIL-UNREST
