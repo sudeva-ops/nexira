@@ -181,7 +181,7 @@ describe("Evacuation Management", () => {
     await banner("Route B · Charter · Wilson Airport → Dubai with Atlas Air Evacuation");
     expect(screen.getByRole("combobox", { name: "Mission" })).toHaveValue(NAIROBI.id); // the ACTIVE incident's
     expect(screen.getByText("Built at activation")).toBeInTheDocument();
-    expect(screen.getByText("No manifest yet")).toBeInTheDocument();
+    expect(screen.getByText(/^No manifest yet\./)).toBeInTheDocument();
     await userEvent.click(await screen.findByRole("button", { name: "Activate evacuation" }));
     expect(sent(fetchMock, "/api/evacuations")).toEqual([{ mission_id: NAIROBI.id }]);
     expect(

@@ -1,9 +1,10 @@
-import { Button, Spinner } from "@blueprintjs/core";
+import { Button } from "@blueprintjs/core";
 import { Link } from "react-router-dom";
 
 import { useIncident } from "../../api/intel";
 import { initials, locationSourceLabel, personnelFirst, personTypeLabel } from "../../ui/format";
 import { Card, ConfidenceBar, Sev } from "../../ui/primitives";
+import { SkeletonRows } from "../../ui/Skeleton";
 
 const AVATAR: Record<string, string> = {
   DIPLOMAT: "#8ABBFF",
@@ -26,7 +27,7 @@ export function ImpactPanel({
   if (isPending || !incident) {
     return (
       <Card icon="locate" title="Impact analysis" className="nx-side">
-        <Spinner size={20} />
+        <SkeletonRows rows={3} />
       </Card>
     );
   }

@@ -1,10 +1,13 @@
-import { Button, Icon, InputGroup, NonIdealState, Spinner } from "@blueprintjs/core";
+import { Button, Icon, InputGroup } from "@blueprintjs/core";
 import { useEffect, useState } from "react";
 
 import { useOperationsSummary } from "../../api/intel";
 import { usePeople, useSites } from "../../api/people";
 import { drillAge, initials, locationSourceLabel, personTypeLabel } from "../../ui/format";
 import { Card, ConfidenceBar, Kpi } from "../../ui/primitives";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
+import { SkeletonRows } from "../../ui/Skeleton";
 
 const PAGE = 100;
 const COLOURS = ["#8ABBFF", "#72CA9B", "#FBB360", "#BDADFF", "#F5498B", "#68C1EE", "#D1980B", "#E76A6E"];
@@ -31,8 +34,8 @@ function ZoneStatus({ inZone, reference }: { inZone: boolean; reference?: string
 function PeopleTable({ q }: { q: string }) {
   const [limit, setLimit] = useState(PAGE); // reset by key={q} on a new search
   const { data, isPending, isFetching } = usePeople(q, limit);
-  if (isPending) return <Spinner />;
-  if (!data?.items.length) return <NonIdealState icon="search" title="No people match" />;
+  if (isPending) return <SkeletonRows rows={8} />;
+  if (!data?.items.length) return <Empty>No people match.</Empty>;
   return (
     <>
       <table className="nx-table-plain" aria-label="People">
@@ -92,8 +95,8 @@ function PeopleTable({ q }: { q: string }) {
 
 function SitesTable({ q }: { q: string }) {
   const { data, isPending } = useSites(q);
-  if (isPending) return <Spinner />;
-  if (!data?.items.length) return <NonIdealState icon="search" title="No sites match" />;
+  if (isPending) return <SkeletonRows rows={8} />;
+  if (!data?.items.length) return <Empty>No sites match.</Empty>;
   return (
     <table className="nx-table-plain" aria-label="Sites">
       <thead>
@@ -151,7 +154,7 @@ export function PeopleScreen() {
 
   return (
     <div className="nx-pad">
-      <div className="nx-g4">
+      <TileRow>
         <Kpi
           icon="people"
           label="Personnel"
@@ -176,7 +179,7 @@ export function PeopleScreen() {
           value={summary?.citizens ?? "—"}
           detail="Consular registration"
         />
-      </div>
+      </TileRow>
       <Card
         title={
           <div className="nx-tabs" role="tablist">

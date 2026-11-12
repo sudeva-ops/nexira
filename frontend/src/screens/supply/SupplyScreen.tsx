@@ -1,10 +1,4 @@
-import {
-  Button,
-  HTMLSelect,
-  Icon,
-  InputGroup,
-  NonIdealState,
-} from "@blueprintjs/core";
+import { Button, HTMLSelect, Icon, InputGroup } from "@blueprintjs/core";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -33,6 +27,8 @@ import { formatStamp } from "../../app/time";
 import { FlashRow } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
 
 function errorText(error: unknown): string {
   return error instanceof ApiError ? error.message : "Not done";
@@ -94,11 +90,7 @@ function SuppliersCard({
       {loading ? (
         <SkeletonRows rows={6} />
       ) : !suppliers.length ? (
-        <NonIdealState
-          icon="box"
-          title="No suppliers"
-          description="No third parties for this mission."
-        />
+        <Empty>No suppliers. No third parties for this mission.</Empty>
       ) : (
         <table
           className="nx-table-plain nx-sup-table"
@@ -282,7 +274,7 @@ function RoutesCard({ detail }: { detail: SupplierDetail }) {
   return (
     <Card icon="route" title={`Logistics routes · ${detail.city ?? "Global"}`}>
       {!detail.routes.length ? (
-        <div className="nx-bd nx-dim">No logistics routes monitored.</div>
+        <Empty>No logistics routes monitored.</Empty>
       ) : (
         <table
           className="nx-table-plain nx-sup-table"
@@ -363,7 +355,7 @@ export function SupplyScreen() {
         </span>
       </div>
       <ImpactBanner banners={summary?.banners ?? []} />
-      <div className="nx-g4 nx-mb">
+      <TileRow>
         <Kpi
           icon="box"
           label="Third parties monitored"
@@ -395,7 +387,7 @@ export function SupplyScreen() {
           value={summary?.routes ?? "—"}
           detail="Courier, fuel, staff transport"
         />
-      </div>
+      </TileRow>
       <div className="nx-ev-grid nx-sup-grid">
         <SuppliersCard
           suppliers={rows}

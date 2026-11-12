@@ -1,4 +1,4 @@
-import { Button, Icon, NonIdealState } from "@blueprintjs/core";
+import { Button, Icon } from "@blueprintjs/core";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -31,6 +31,8 @@ import { FlashRow } from "../../ui/motion";
 import { Card, Kpi, Sev } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { useNow } from "../../ui/useNow";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
 
 const ALL = "ALL";
 const LEVELS: Severity[] = ["CRITICAL", "HIGH", "MODERATE", "LOW"];
@@ -180,7 +182,7 @@ function EventsCard({ events, until, advance }: { events: HazardEvent[]; until: 
       }
     >
       {rows.length === 0 ? (
-        <NonIdealState icon="globe" title="No hazard events" description="Nothing active of this type." />
+        <Empty>No hazard events. Nothing active of this type.</Empty>
       ) : (
         <table className="nx-table-plain nx-hz-table" aria-label="Live hazard events">
           <thead>
@@ -266,7 +268,7 @@ export function HazardsScreen() {
 
   return (
     <div className="nx-pad">
-      <div className="nx-g4 nx-mb">
+      <TileRow>
         <Kpi
           icon="warning-sign"
           label="Active hazard events"
@@ -292,7 +294,7 @@ export function HazardsScreen() {
           value={data ? data.sources : "—"}
           detail="xWeather · seismic · air quality · climate model (simulated)"
         />
-      </div>
+      </TileRow>
       <div className="nx-hz-grid">
         {hazards.isLoading ? (
           <Card icon="globe" title="Live hazard events">

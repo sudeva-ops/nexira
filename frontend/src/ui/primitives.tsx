@@ -32,10 +32,18 @@ export function SourceChip({ source }: { source: Pick<SourceRef, "name" | "simul
   return <span className="nx-src">{sourceLabel(source)}</span>;
 }
 
+/** DC-05 (plan G-5): a card header's one chip. A tone adds a coloured dot: live (green, data
+ *  arriving), ok (green), warn (amber). */
+export interface Chip {
+  text: string;
+  tone?: "live" | "ok" | "warn";
+}
+
 export function Card({
   icon,
   title,
   sub,
+  chip,
   actions,
   children,
   className,
@@ -43,6 +51,7 @@ export function Card({
   icon?: IconName;
   title: ReactNode;
   sub?: ReactNode;
+  chip?: Chip; // DC-05: at most one count or state, on the right
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
@@ -58,6 +67,12 @@ export function Card({
           </span>
         )}
         <span className="nx-grow" />
+        {chip && (
+          <span className="nx-chip nx-card-chip" data-tone={chip.tone}>
+            {chip.tone && <i />}
+            {chip.text}
+          </span>
+        )}
         {actions && <span className="nx-card-actions">{actions}</span>}
       </header>
       {children}

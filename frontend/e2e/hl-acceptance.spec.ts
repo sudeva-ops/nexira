@@ -114,7 +114,7 @@ test("Health Intelligence acceptance: advisories, Avoid, NBO-CHOLERA, second per
 
   const page = await signedIn(browser, "duty.officer", "/health");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Health Intelligence");
-  await expect(page.getByText(/Simulated samples for demonstration/)).toBeVisible();
+  await expect(page.getByText(/simulated samples for demonstration/)).toBeVisible();
   const table = page.getByRole("table", { name: "Health advisories" });
   await expect(table.locator("tbody tr")).toHaveCount(seeded.length);
   await expect(table.getByRole("row", { name: /Cholera/ })).toContainText("Affects Nairobi mission");

@@ -167,7 +167,7 @@ describe("Natural Hazards & Climate", () => {
     expect(within(table).getAllByRole("row").slice(1)).toHaveLength(1);
     expect(within(table).getByText(QUAKE.title)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "Heat" }));
-    expect(screen.getByText("No hazard events")).toBeInTheDocument();
+    expect(screen.getByText(/^No hazard events\./)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "All" }));
     expect(within(await eventsTable()).getAllByRole("row").slice(1)).toHaveLength(5);
   });

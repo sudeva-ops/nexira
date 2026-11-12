@@ -1,4 +1,4 @@
-import { Button, HTMLSelect, NonIdealState, Spinner } from "@blueprintjs/core";
+import { Button, HTMLSelect, NonIdealState } from "@blueprintjs/core";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -21,6 +21,8 @@ import { Donut } from "./Donut";
 import { escalationText } from "./escalation";
 import { type RequestFor, RequestDialog } from "../partners/RequestDialog";
 import { PhonePreview } from "./PhonePreview";
+import { TileRow } from "../../ui/TileRow";
+import { SkeletonRows } from "../../ui/Skeleton";
 
 const SAFE = "#32A467";
 const HELP = "#E76A6E";
@@ -51,7 +53,7 @@ export function CheckinScreen() {
       />
     );
   }
-  if (!summary) return <Spinner />;
+  if (!summary) return <SkeletonRows rows={6} />;
   const p = summary.personnel;
   const c = summary.citizens;
   return (
@@ -70,7 +72,7 @@ export function CheckinScreen() {
           <span className="nx-dim">This check-in belongs to an exercise; it is left out of leadership figures.</span>
         </div>
       )}
-      <div className="nx-g4" aria-label="Personnel figures">
+      <TileRow label="Personnel figures">
         <Kpi
           icon="people"
           label="Personnel accounted"
@@ -91,7 +93,7 @@ export function CheckinScreen() {
           value={<span className="nx-pending">{p.pending}</span>}
           detail={escalationText(summary, pending)}
         />
-      </div>
+      </TileRow>
       <div className="nx-cigrid">
         <Card
           icon="people"
@@ -164,7 +166,7 @@ export function CheckinScreen() {
           icon="feed"
           title="Live responses"
           className="nx-side nx-responses"
-          actions={<span className="nx-chip"><i style={{ background: SAFE }} />Live</span>}
+          chip={{ text: "Live", tone: "live" }}
         >
           <div className="nx-plist" aria-label="Live responses">
             {responses.length ? (

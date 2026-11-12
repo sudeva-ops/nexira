@@ -1,4 +1,4 @@
-import { Button, HTMLSelect, Icon, NonIdealState, Spinner } from "@blueprintjs/core";
+import { Button, HTMLSelect, Icon, NonIdealState } from "@blueprintjs/core";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -20,8 +20,10 @@ import {
 } from "../../api/playbooks";
 import { formatStamp } from "../../app/time";
 import { Card } from "../../ui/primitives";
-import { roleLabel } from "../../ui/format";
+import { plural, roleLabel } from "../../ui/format";
 import { ACTION_ICON, STEP_CLASS, stepDetail } from "./steps";
+import { Empty } from "../../ui/Empty";
+import { SkeletonRows } from "../../ui/Skeleton";
 
 const LIVE = ["RUNNING", "AWAITING_APPROVAL"];
 
@@ -174,12 +176,7 @@ function AuditTrail({ runId }: { runId: string | undefined }) {
       icon="history"
       title="Audit trail"
       className="nx-side"
-      actions={
-        <span className="nx-chip">
-          <i style={{ background: "#32A467" }} />
-          Hash-chained
-        </span>
-      }
+      chip={{ text: "Hash-chained", tone: "ok" }}
     >
       <div className="nx-bd nx-log" aria-label="Audit trail">
         {data?.length ? (
@@ -192,7 +189,7 @@ function AuditTrail({ runId }: { runId: string | undefined }) {
             </div>
           ))
         ) : (
-          <div className="nx-dim">No events yet.</div>
+          <Empty>No events yet.</Empty>
         )}
       </div>
     </Card>
@@ -211,14 +208,14 @@ export function PlaybooksScreen() {
   const runQuery = useRun(runId);
   const run = runQuery.data;
 
-  if (playbooks.isPending) return <Spinner />;
+  if (playbooks.isPending) return <SkeletonRows rows={6} />;
   if (!playbook) return <NonIdealState icon="flash" title="No playbooks" />;
   return (
     <div className="nx-pbgrid">
       <Card
         icon="flash"
         title="Playbook library"
-        actions={<span className="nx-chip">{playbooks.data?.length}</span>}
+        chip={{ text: plural(playbooks.data?.length ?? 0, "playbook") }}
         className="nx-scroll"
       >
         {playbooks.data?.map((p) => {
@@ -260,7 +257,7 @@ export function PlaybooksScreen() {
       </Card>
       {runId && runQuery.isPending ? (
         <Card title={`${playbook.code} · ${playbook.name}`}>
-          <Spinner />
+          <SkeletonRows />
         </Card>
       ) : (
         <RunView playbook={playbook} run={run} />

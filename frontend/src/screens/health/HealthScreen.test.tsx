@@ -183,7 +183,7 @@ describe("Health Intelligence", () => {
     renderApp("/health");
     expect(await screen.findByText("2 affecting mission countries")).toBeInTheDocument();
     expect(screen.getByText(/Health intelligence fused from WHO Disease Outbreak News/)).toBeInTheDocument();
-    expect(screen.getByText(/Simulated samples for demonstration/)).toBeInTheDocument();
+    expect(screen.getByText(/simulated samples for demonstration/)).toBeInTheDocument();
     expect(screen.getByText("1 High · 1 Moderate")).toBeInTheDocument();
     expect(screen.getByText("Staff not yet offered a vaccine")).toBeInTheDocument();
     expect(screen.getByText("73")).toBeInTheDocument();

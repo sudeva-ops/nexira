@@ -32,6 +32,7 @@ import {
 } from "../../api/vip";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { TileRow } from "../../ui/TileRow";
 
 const EAT = "Africa/Addis_Ababa";
 
@@ -127,7 +128,7 @@ function Kpis({ visit }: { visit: Visit }) {
     (c) => !c.done && c.label.toLowerCase().endsWith("venue survey"),
   );
   return (
-    <div className="nx-g4 nx-mb">
+    <TileRow>
       <Kpi
         icon="route"
         label="Programme segments"
@@ -163,7 +164,7 @@ function Kpis({ visit }: { visit: Visit }) {
         }
         alert={visit.risk === "HIGH" || visit.risk === "CRITICAL"}
       />
-    </div>
+    </TileRow>
   );
 }
 

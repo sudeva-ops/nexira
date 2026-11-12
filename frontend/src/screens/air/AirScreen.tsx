@@ -1,4 +1,4 @@
-import { Icon, NonIdealState } from "@blueprintjs/core";
+import { Icon } from "@blueprintjs/core";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -12,6 +12,8 @@ import { FlashRow, type FlashTone } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { PendingProposals } from "../queue/PendingProposals";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
 
 const NO_FLIGHTS: never[] = [];
 const STATUS_LABEL: Record<string, string> = {
@@ -138,7 +140,7 @@ function Detail({ flight }: { flight: FlightDetail }) {
         <PendingProposals tripId={flight.trip_id} />
         <div className="nx-lbl">Flight events</div>
         {flight.events.length === 0 ? (
-          <div className="nx-dim">Nothing yet</div>
+          <Empty>Nothing yet</Empty>
         ) : (
           <div className="nx-tl" aria-label="Flight events">
             {flight.events.map((e, n) => (
@@ -194,7 +196,7 @@ export function AirScreen() {
         .map((f) => (
           <Banner key={f.id} flight={f} />
         ))}
-      <div className="nx-g4">
+      <TileRow>
         <Kpi
           icon="people"
           label="Officials airborne"
@@ -210,7 +212,7 @@ export function AirScreen() {
         />
         <Kpi icon="airplane" label="Tracked flights" value={list.length} detail="Next 24 hours and in the air" />
         <Kpi icon="satellite" label="Position source" value="Simulated" detail="Flight-data provider not connected (D-19)" />
-      </div>
+      </TileRow>
 
       <div className="nx-air-grid">
         <div className="nx-col">
@@ -224,11 +226,11 @@ export function AirScreen() {
               />
             </div>
           </Card>
-          <Card icon="airplane" title="Tracked flights" sub={`${list.length} shown`}>
+          <Card icon="airplane" title="Tracked flights" chip={{ text: `${list.length} shown` }}>
             {flights.isLoading ? (
               <SkeletonRows />
             ) : list.length === 0 ? (
-              <NonIdealState icon="airplane" title="No tracked flights" description="Approved trips' flights appear 24 hours before departure." />
+              <Empty>No tracked flights. Approved trips' flights appear 24 hours before departure.</Empty>
             ) : (
               <table className="nx-table-plain" aria-label="Tracked flights">
                 <thead>

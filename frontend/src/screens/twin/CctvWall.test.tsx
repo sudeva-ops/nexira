@@ -100,11 +100,8 @@ describe("the CCTV wall", () => {
       "CAM-13 · Safe room (hardened)",
       "CAM-14 · Muster point",
     ]);
-    expect(
-      screen.getByText(
-        /7 \/ 8 online · simulated feeds; nothing is recorded/,
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText("7 / 8 online")).toBeInTheDocument(); // DC-05: the header's chip
+    expect(screen.getByText("Simulated feeds; nothing is recorded")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Show all 8" }));
     expect(tiles()).toHaveLength(8);
     await userEvent.click(screen.getByRole("button", { name: "Key cameras" }));

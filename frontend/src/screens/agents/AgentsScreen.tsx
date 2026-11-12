@@ -1,4 +1,4 @@
-import { Button, HTMLSelect, Icon, Spinner } from "@blueprintjs/core";
+import { Button, HTMLSelect, Icon } from "@blueprintjs/core";
 import { useState } from "react";
 
 import { ApiError } from "../../api/client";
@@ -20,6 +20,9 @@ import { buckets } from "../../ui/spark";
 import { Sparkline } from "../../ui/Sparkline";
 import { useNow } from "../../ui/useNow";
 import { useAssessing } from "./useAssessing";
+import { TileRow } from "../../ui/TileRow";
+import { SkeletonRows } from "../../ui/Skeleton";
+import { ContextLine } from "../../ui/ContextLine";
 
 const HOUR_MS = 3_600_000;
 
@@ -83,7 +86,7 @@ export function AgentsScreen() {
   const assessing = useAssessing(data?.agents ?? []);
   const activity = useAgentActivity().data ?? [];
   const now = useNow(true, 30_000);
-  if (!data) return <Spinner />;
+  if (!data) return <SkeletonRows rows={8} />;
 
   const decided = proposals.filter((p) => ["APPROVED", "EDITED_APPROVED", "REJECTED"].includes(p.status));
   const overridden = decided.filter((p) => p.status !== "APPROVED").length;
@@ -96,15 +99,22 @@ export function AgentsScreen() {
 
   return (
     <div className="nx-pad">
-      <div className={`nx-banner ${data.paused ? "red" : "green"}`} role="status">
-        <Icon icon={data.paused ? "pause" : "predictive-analysis"} />
-        <div className="nx-grow">
-          <b>{data.paused ? "Agents paused." : "Agents active."}</b> Agents act only through the
-          platform's services, with the approvals their level requires; every output is logged.
+      {data.paused ? (
+        <div className="nx-banner red" role="status">
+          <Icon icon="pause" />
+          <div className="nx-grow">
+            <b>Agents paused.</b> Agents act only through the platform's services, with the
+            approvals their level requires; every output is logged.
+          </div>
+          {admin && <KillSwitch paused />}
         </div>
-        {admin && <KillSwitch paused={data.paused} />}
-      </div>
-      <div className="nx-g4">
+      ) : (
+        <ContextLine actions={admin && <KillSwitch paused={false} />}>
+          Agents active. They act only through the platform&apos;s services, with the approvals their
+          level requires; every output is logged.
+        </ContextLine>
+      )}
+      <TileRow>
         <Kpi
           icon="predictive-analysis"
           label="Agents"
@@ -124,7 +134,7 @@ export function AgentsScreen() {
           value={<span className={outside ? "nx-help" : "nx-safe"}><CountUp value={outside} /></span>}
           detail="Checked against each proposal's approvals"
         />
-      </div>
+      </TileRow>
       <Card
         icon="predictive-analysis"
         title="Agent roster"

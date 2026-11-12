@@ -25,6 +25,9 @@ import { CctvWall } from "./CctvWall";
 import { furniture } from "./furniture";
 import { drift, shareFill, spots } from "./motion";
 import { cone, type Coverage, coverage, placed, target } from "./coverage";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
+import { ContextLine } from "../../ui/ContextLine";
 
 const KINDS: OccupantKind[] = ["STAFF", "GUARD", "VISITOR"];
 const ACCESS = new Set(["GATE", "BADGE_READER"]);
@@ -93,7 +96,7 @@ function Kpis({ twin, cover }: { twin: Twin; cover: Coverage }) {
   const ago = drillAgo(twin.readiness.last_drill_on);
   const down = twin.sensors.filter((s) => s.kind === "CCTV" && !s.online).length;
   return (
-    <div className="nx-g5 nx-mb">
+    <TileRow columns={5}>
       <Kpi
         icon="people"
         label="On site now"
@@ -132,7 +135,7 @@ function Kpis({ twin, cover }: { twin: Twin; cover: Coverage }) {
         value={twin.readiness.score ?? "—"}
         detail={ago ? `Last drill ${ago}` : "No drill recorded"}
       />
-    </div>
+    </TileRow>
   );
 }
 
@@ -314,6 +317,7 @@ function MovementStrip({ siteId }: { siteId: string }) {
         Today <b>{data.arrivals_today}</b> in · <b>{data.departures_today}</b> out ·{" "}
         <b>{data.visitors_waiting}</b> visitor{data.visitors_waiting === 1 ? "" : "s"} waiting
       </span>
+      {data.movements.length === 0 && <Empty>No movement recorded yet.</Empty>}
       <ol>
         {data.movements.slice(0, 6).map((m) => (
           <li key={`${m.at}-${m.kind}`}>
@@ -321,7 +325,6 @@ function MovementStrip({ siteId }: { siteId: string }) {
             <span className="nx-dim">{OCCUPANT_LABEL[m.kind]}</span>
           </li>
         ))}
-        {data.movements.length === 0 && <li className="nx-dim">No movement recorded yet</li>}
       </ol>
     </div>
   );
@@ -517,18 +520,19 @@ export function TwinScreen() {
   const asked = shown && (ask.camera || ask.zone) ? target(shown, ask) : null;
   return (
     <div className="nx-pad">
-      <div className="nx-row nx-mb nx-ev-picker">
-        <span className="nx-dim">Site</span>
-        <HTMLSelect
-          minimal
-          aria-label="Site"
-          value={siteId}
-          onChange={(e) => setParams({ site: e.currentTarget.value })}
-          options={list.map((s) => ({ value: s.id, label: `${s.name} · ${s.mission_code}` }))}
-        />
-        <span className="nx-grow" />
-        <span className="nx-dim">Illustrative floor plan (simulated)</span>
-      </div>
+      <ContextLine
+        actions={
+          <HTMLSelect
+            minimal
+            aria-label="Site"
+            value={siteId}
+            onChange={(e) => setParams({ site: e.currentTarget.value })}
+            options={list.map((s) => ({ value: s.id, label: `${s.name} · ${s.mission_code}` }))}
+          />
+        }
+      >
+        Illustrative floor plan (simulated)
+      </ContextLine>
       {twin.isError ? (
         <NonIdealState icon="grid-view" title="No floor plan yet" description={errorText(twin.error)} />
       ) : !shown ? (
