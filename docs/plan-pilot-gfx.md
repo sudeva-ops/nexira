@@ -1,0 +1,41 @@
+# Plan · Pilot module 27: graphics (the NASA globe, resting states, charts)
+
+For the product owner and the coding agent. It maps GFX-01 to GFX-08 onto the code after pilot module 26, and lists the gaps found, each with a proposed answer. The requirements are D-55, in `docs/requirements-pilot.md` §126–130.
+
+No schema change, and nothing here is 🔒 under D-29. The one API change is a `source` on each Executive Overview trend day (§128).
+
+## 1. Requirements against existing code
+
+| Req. | Exists today | New work | Prompt |
+|---|---|---|---|
+| GFX-02 Imagery build | `infra/scripts/build-tiles.sh` downloads the Protomaps world and Nairobi extracts, fonts and sprites, with pinned versions and SHA-256 checks | A second step builds `earth-day.pmtiles` and `earth-night.pmtiles` (raster, zoom 0–5) from the NASA images (G-1, G-2) | 143 |
+| GFX-01 Imagery on the map | `map/style.ts` `baseStyle()`: a dark vector style, with a plain background without tiles; shared by Operations, Air, Replay and the sign-in globe | A raster `earth-day` source under the vector layers, toned down by raster paint, fading out by zoom 6; the vector land and water fills made transparent at world zoom so the imagery shows (G-3); "Imagery: NASA" in the attribution | 143 |
+| GFX-03 Night lights | `map/daylight.ts`: a translucent night polygon and a blurred terminator line | A short spike for blending `earth-night` on the night side without a custom WebGL layer (§130 Q2); the expected result is the fallback (G-4) | 143 |
+| GFX-04 Globe edge | Global Operations shows a shaded band outside the rim; Air Travel does not | Find the layer drawing it (the night fill or the wide terminator line are the suspects), test first with a pixel check, then fix (G-5) | 143 |
+| GFX-05 30-day trend | `executive/service.py` `_trend()` counts signals and incidents per day from the record; `ExecutiveScreen.tsx` `Trend` draws them | Days before the first live data are filled with deterministic illustrative counts on read, and each day carries `source` (G-6); illustrative days are drawn lighter and labelled | 144 |
+| GFX-07 Sparklines | `ui/Sparkline.tsx` and `ui/spark.ts` `buckets()`, used on AI Agents; `Kpi` has no chart | An optional `trend` on `Kpi`, drawn with `Sparkline`; wired into three tiles from data each screen already loads (G-7) | 144 |
+| GFX-06 Resting states | Decision Queue: a `NonIdealState` card; Executive Overview: "No incident opened or closed in the last 7 days." | Queue: a "Watching now" panel with counts from existing hooks and each agent's latest check; Executive: "Quiet for N days · last incident <ref>"; layout so no column is blank for more than a third of the height (G-8) | 145 |
+| GFX-08 Incident mini-map | Incident detail has "Open in map", a text place label, and no map | `map/MiniMap.tsx`: a non-interactive MapLibre map with the base style, the incident marker, the mission and the people exposed; a click opens `/operations?incident=…` (G-9) | 145 |
+| Acceptance | `uip-acceptance` checks the Air globe from pixels; `map-acceptance` checks that no request leaves the stack | `gfx-acceptance.spec.ts` (§129) | 146 |
+
+## 2. Gaps and conflicts, with proposed answers
+
+| # | Gap | Proposed answer |
+|---|---|---|
+| G-1 | **Sources.** Visible Earth now redirects to `science.nasa.gov`. | Checked on 2026-11-12 under `assets.science.nasa.gov/content/dam/science/esd/eo/images/`:<br>• Blue Marble Next Generation with topography and bathymetry, December 2004, whole world: `bmng/bmng-topography-bathymetry/december/world.topo.bathy.200412.3x21600x10800.jpg`, 21600 × 10800, about 2 km a pixel, 29.9 MB.<br>• Black Marble 2016 colour: `imagerecords/144000/144898/BlackMarble_2016_3km.jpg`, 13500 × 6750, 8.1 MB.<br>Both are pinned by SHA-256 in the script. Zoom 5 needs 8192 px across the world, so both are ample. The NASA pages state no licence on the page. NASA imagery is generally not under copyright, and the credit line will be "Imagery: NASA Earth Observatory". The PR records the NASA media-use guidelines it relied on. |
+| G-2 | **The raster tooling.** There is no GDAL on the build machine. | The script runs GDAL from its official container image (`ghcr.io/osgeo/gdal`), pinned by digest and run only at build time. The steps are:<br>1. Georeference with `gdal_translate -a_srs EPSG:4326 -a_ullr -180 90 180 -90`.<br>2. Reproject with `gdalwarp` to EPSG:3857, clipped at ±85.05°.<br>3. Make MBTiles with WebP tiles and overviews.<br>4. Convert with `pmtiles convert` (the binary the script already pins).<br>The estimate is about 1,365 tiles per layer and 20–60 MB in all. The script prints the real sizes, which go in the PR. Docker is already needed to run the stack. |
+| G-3 | **Imagery under a dark vector style.** The dark flavour's earth and water fills would cover the imagery. | At zoom 5 and below, those fills' opacity goes to zero, and above that it rises back to today's. Roads, borders and labels are unchanged. The raster is toned down with `raster-brightness-max` and `raster-saturation` and fades out between zoom 5 and 6. The product owner sees screenshots of the Operations and Air globes in the PR. |
+| G-4 | **City lights only on the night side.** MapLibre cannot clip a raster layer by a polygon, and §130 Q2 rules out a custom WebGL layer. | The spike has two hours. It tries one way within plain style layers. If that way isn't clean, Prompt 143 ships Blue Marble under today's night shade and records this in the PR (D-55). City lights are then left out, not shown over the day side. |
+| G-5 | **The band outside the rim on Global Operations.** | Investigate before fixing:<br>1. Turn the layers off one at a time on Operations, comparing with Air, which has the same daylight layers but a different centre and overlays.<br>2. Write the check first: no pixel outside the measured disc differs from space. `IntroGlobe` already measures the disc (`globeFrame`).<br>3. Fix at the cause. |
+| G-6 | **Where the illustrative trend starts and how it is made.** | It runs from the day before the earliest live signal or incident (or the whole 30 days when there are none) back to the start of the window. The counts come from a hash of the date: signals 6–30 a day, incidents 0–3 a day, with a weekly rhythm. The same date always gives the same counts. `TrendDayOut` gains `source: Literal["LIVE", "ILLUSTRATIVE"]`. The illustrative days are not counted in "N incidents · N signals", whose label says "live". |
+| G-7 | **Sparkline data per tile.** | Each tile uses data its screen already loads:<br>• **Operations, "Signals · 24h":** `buckets()` over the signal list (hourly, 24 buckets). It needs a larger list limit than the feed panel uses.<br>• **Executive, "Active incidents":** the trend's incidents per day, with illustrative days drawn lighter.<br>• **Queue, "Awaiting decision":** proposals created per hour over 24 hours.<br>No history means no sparkline. |
+| G-8 | **"No column blank for more than a third of the height"** can be measured several ways. | At 1440 × 900, in each top-level column of the screen body, the lowest card's bottom must sit within a third of the viewport height of the content area's bottom, or the page must scroll. The Queue gets a "Watching now" card in the left column under Decisions. Executive gets the trend and region panels at matched heights, with Recent activity widened. |
+| G-9 | **Mini-map cost.** A second MapLibre map on Incidents uses a WebGL context. | One mini-map, mounted only while an incident is open. It has `interactive: false`, the flat projection and no stars or atmosphere. Nairobi is shown at zoom 12; other places at zoom 5. It reuses `missionFeatures` and the Operations marker colours. |
+
+## 3. Prompts
+
+As `docs/prompts-pilot.md` Prompts 143–146. None is 🔒.
+
+## 4. After this module
+
+The design consistency module follows: shared panel and stat-tile components across all screens, and sparklines in the remaining tiles. Paid imagery is looked at only if the product owner finds the NASA globe falls short.
