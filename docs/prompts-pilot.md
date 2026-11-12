@@ -1269,3 +1269,46 @@ Playwright, real stack (§124; plan G-4): uip-acceptance.spec.ts over every scre
 and 1920 × 1080 as the Duty Officer, plus the specific cases; in make acceptance before
 twa-acceptance.spec.ts. Report the real output; make acceptance (all specs) still passes.
 ```
+
+## Pilot module 27 · Graphics (D-55)
+
+Requirements GFX-01..GFX-08 (`docs/requirements-pilot.md` §126–130); plan `docs/plan-pilot-gfx.md`. None of these prompts is 🔒.
+
+### Prompt 143 · The NASA globe
+```
+GFX-01..GFX-04 (plan §1, G-1..G-5). build-tiles.sh: Blue Marble December 2004 and Black Marble
+2016 pinned by SHA-256, GDAL from a digest-pinned container, earth-day/earth-night.pmtiles at zoom
+0-5. style.ts: the raster under the vector layers, toned down, fading out by zoom 6, the dark
+fills clear at world zoom, "Imagery: NASA Earth Observatory"; the fallback without the file.
+Night lights: a short spike, otherwise today's shade (G-4, recorded in the PR). The band outside
+the rim: find the cause first, pixel check before the fix. Tests: Vitest for the style with and
+without imagery; screenshots of Operations and Air in the PR; file sizes in the PR.
+```
+
+### Prompt 144 · The trend and sparklines
+```
+GFX-05, GFX-07 (plan G-6, G-7). executive/service.py: illustrative days on read, deterministic
+from the date, before the first live data; TrendDayOut.source. ExecutiveScreen: illustrative
+days lighter and labelled; totals count live days only. Kpi gains an optional trend drawn with
+Sparkline; Signals · 24h, Active incidents, Awaiting decision. Tests: pytest (30 days, source,
+same counts on every read, live days match the record) as nexira_api; Vitest (no history, no line).
+```
+
+### Prompt 145 · Resting states and the mini-map
+```
+GFX-06, GFX-08 (plan G-8, G-9). Decision Queue: "Watching now" from existing hooks and each
+agent's latest check; Executive: quiet for N days and the last incident on record; layout per
+G-8. map/MiniMap.tsx on incident detail: still, flat, the incident, mission and people exposed;
+a click opens Global Operations on the incident. Tests: Vitest for the texts and the click;
+screenshots in the PR.
+```
+
+### Prompt 146 · Acceptance
+```
+Playwright, real stack (§129): gfx-acceptance.spec.ts. After make reset-demo: the trend is not
+flat and illustrative days are labelled; Queue and Executive pass the G-8 check at 1440 × 900;
+imagery tiles load from /tiles/ with no request leaving the stack; nothing outside the globe's
+disc on Operations and Air; after scene 1 the mini-map shows the incident and opens Global
+Operations. In make acceptance before twa-acceptance.spec.ts. Report the real output; make
+acceptance (all specs) still passes.
+```
