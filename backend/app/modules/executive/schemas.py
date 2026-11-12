@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -44,6 +45,9 @@ class TrendDayOut(BaseModel):
     day: date
     signals: int
     incidents: int
+    # GFX-05 (D-55): LIVE from the record; ILLUSTRATIVE for days before the first live data,
+    # worked out on read and never stored.
+    source: Literal["LIVE", "ILLUSTRATIVE"] = "LIVE"
 
 
 class RegionOut(BaseModel):

@@ -4,12 +4,14 @@ is audited and the chain verifies. The seeded world's figures are in the simulat
 test_executive_nbo.py. Against real PostgreSQL, as nexira_api."""
 
 import uuid
+from datetime import date, timedelta
 
 from httpx import AsyncClient
 from sqlalchemy import text
 
 from app.core.db import tenant_session
 from app.modules.executive import service as executive
+from app.modules.executive.schemas import TrendDayOut
 from app.modules.people.schemas import MissionOut
 from app.tests.auth_helpers import Idp
 
@@ -55,6 +57,40 @@ def test_regions_are_the_mean_of_risk_points() -> None:
         ("Europe", 20, 1),
         ("Other", 75, 1),
     ]
+
+
+def test_an_illustrative_day_is_the_same_on_every_read() -> None:
+    """GFX-05 (D-55; plan-pilot-gfx G-6): from the date alone, within the stated ranges."""
+    days = [date(2026, 10, 1) + timedelta(days=n) for n in range(60)]
+    counts = [executive.illustrative_day(d) for d in days]
+    assert counts == [executive.illustrative_day(d) for d in days]
+    assert all(0 <= s <= 30 and 0 <= i <= 3 for s, i in counts)
+    weekday = [s for d, (s, _) in zip(days, counts, strict=True) if d.weekday() < 5]
+    assert min(weekday) >= 6
+    assert len(set(counts)) > 10  # it varies from day to day
+
+
+def test_days_before_the_first_live_data_are_illustrative() -> None:
+    today = date(2026, 11, 12)
+    days = [
+        TrendDayOut(day=today - timedelta(days=29 - n), signals=0, incidents=0) for n in range(30)
+    ]
+    days[20] = days[20].model_copy(update={"signals": 4})
+    out = executive.with_illustrative(days, today)
+    assert [d.source for d in out] == ["ILLUSTRATIVE"] * 20 + ["LIVE"] * 10
+    assert out[20].signals == 4
+    assert (out[21].signals, out[21].incidents) == (0, 0)  # a quiet live day stays quiet
+    assert (out[0].signals, out[0].incidents) == executive.illustrative_day(out[0].day)
+
+
+def test_today_is_always_live() -> None:
+    today = date(2026, 11, 12)
+    days = [
+        TrendDayOut(day=today - timedelta(days=29 - n), signals=0, incidents=0) for n in range(30)
+    ]
+    out = executive.with_illustrative(days, today)
+    assert [d.source for d in out] == ["ILLUSTRATIVE"] * 29 + ["LIVE"]
+    assert (out[-1].signals, out[-1].incidents) == (0, 0)
 
 
 def test_a_check_in_entry_is_shown_without_the_name() -> None:

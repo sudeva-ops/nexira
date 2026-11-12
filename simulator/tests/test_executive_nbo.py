@@ -46,6 +46,7 @@ async def test_the_calm_state(db: DbUrls) -> None:
     try:
         await seed(db, engine, tenant_id)
         out = await _overview(engine, tenant_id)
+        again = await _overview(engine, tenant_id)
         async with tenant_session(tenant_id, engine) as session:
             scores = list(
                 await session.scalars(
@@ -67,6 +68,12 @@ async def test_the_calm_state(db: DbUrls) -> None:
     assert [r.region for r in out.regions] == list(executive.REGIONS)  # none unmapped
     assert sorted(a.mission_code for a in out.attention) == ["ABV", "BGW", "ISB", "JKT"]
     assert len(out.trend) == 30
+    # GFX-05 (D-55): illustrative days, then live ones, ending today; the same on every read.
+    sources = [d.source for d in out.trend]
+    assert sources[-1] == "LIVE"
+    assert sources == sorted(sources)  # every ILLUSTRATIVE day before every LIVE one
+    assert sum(d.signals for d in out.trend if d.source == "ILLUSTRATIVE") > 0
+    assert again.trend == out.trend
     assert out.timeline.incident is None
     _no_names(out)
 
@@ -128,6 +135,7 @@ async def test_the_unrest_through_the_check_in(db: DbUrls) -> None:
     assert out.detection.current_s is not None
     assert out.detection.current_s >= 0
     assert out.detection.incidents == 1
+    assert (out.trend[-1].source, out.trend[-1].incidents) == ("LIVE", 1)  # from the record
     assert {r.region: r.exposure for r in out.regions}["Africa"] == 38  # Nairobi CRITICAL
     first = out.attention[0]
     assert (first.mission_code, first.risk) == ("NBO", "CRITICAL")

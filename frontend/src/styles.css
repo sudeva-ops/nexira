@@ -2468,6 +2468,24 @@ tr.nx-flash-b > td {
   fill: #8abbff;
 }
 
+/* Illustrative points (GFX-05): the same line, fainter and dashed. */
+.nx-spark polyline.faint {
+  stroke: #5f6b7c;
+  stroke-dasharray: 2 2;
+}
+
+/* A stat tile's value with its sparkline at the right (GFX-07). */
+.nx-kpi-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.nx-kpi-row .nx-spark {
+  margin-bottom: 4px;
+}
+
 /* An agent assessing an event it watches: three dots. */
 .nx-assessing i {
   display: inline-block;

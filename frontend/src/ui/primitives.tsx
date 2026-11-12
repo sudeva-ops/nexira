@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import type { Severity, SourceRef } from "../api/intel";
 import { sourceLabel } from "./format";
 import { CountUp } from "./motion";
+import { hasHistory } from "./spark";
+import { Sparkline } from "./Sparkline";
 import { useFlash } from "./useMotion";
 
 const SEV_CLASS: Record<Severity, string> = {
@@ -69,12 +71,14 @@ export function Kpi({
   value,
   detail,
   alert,
+  trend,
 }: {
   icon: IconName;
   label: string;
   value: ReactNode;
   detail?: ReactNode;
   alert?: boolean;
+  trend?: { values: number[]; label: string; faint?: number }; // GFX-07, from the screen's data
 }) {
   // A plain number counts to its new value; any plain value glows when it changes.
   const flash = useFlash(typeof value === "number" || typeof value === "string" ? String(value) : "");
@@ -84,7 +88,12 @@ export function Kpi({
         <Icon icon={icon} size={11} />
         {label}
       </div>
-      <div className={`v ${flash}`}>{typeof value === "number" ? <CountUp value={value} /> : value}</div>
+      <div className="nx-kpi-row">
+        <div className={`v ${flash}`}>{typeof value === "number" ? <CountUp value={value} /> : value}</div>
+        {trend && hasHistory(trend.values) && (
+          <Sparkline values={trend.values} label={trend.label} faint={trend.faint} width={72} height={18} />
+        )}
+      </div>
       {detail && <div className="d">{detail}</div>}
     </div>
   );

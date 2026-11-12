@@ -11,6 +11,8 @@ import { addPoint, canFinish, type Draft } from "../../map/annotations";
 import { MapSearch } from "../../map/MapSearch";
 import { RECORD_ZOOM, type Result } from "../../map/search";
 import { Card, Kpi } from "../../ui/primitives";
+import { buckets } from "../../ui/spark";
+import { useNow } from "../../ui/useNow";
 import { AnnotationCard, AnnotationForm, AnnotationTools } from "./Annotations";
 import { ImpactPanel } from "./ImpactPanel";
 import { LiveFeed } from "./LiveFeed";
@@ -30,6 +32,8 @@ const OperationsMap = lazy(() =>
 );
 
 /** Global Operations (OPS-01..04). Every figure comes from the API (D-27). */
+const DAY_MS = 24 * 3_600_000;
+
 export function OperationsScreen() {
   const [params, setParams] = useSearchParams();
   const selectedId = params.get("incident");
@@ -48,6 +52,9 @@ export function OperationsScreen() {
   const incidentsQuery = useIncidents("ACTIVE");
   const incidents = incidentsQuery.data ?? NO_INCIDENTS;
   const signals = useSignals(50).data ?? [];
+  // GFX-07: signals per hour over the last day, from the same list at its largest page.
+  const daySignals = useSignals(500).data ?? [];
+  const now = useNow(true, 60_000);
   const selected = useIncident(selectedId ?? undefined).data;
   const weatherQuery = useWeather();
   const weather = weatherQuery.data ?? NO_WEATHER;
@@ -166,6 +173,10 @@ export function OperationsScreen() {
           icon="feed"
           label="Signals · 24h"
           value={summary?.signals_24h ?? "—"}
+          trend={{
+            values: buckets(daySignals.map((x) => x.received_at), now, DAY_MS, 24),
+            label: "Signals per hour, last 24 hours",
+          }}
           alert={!!summary?.incidents_active}
           detail={
             summary &&
