@@ -1546,7 +1546,7 @@ No 🔒 area (D-29) is touched.
 
 ## 131. Purpose and starting point (design consistency: panels, tiles, empty and loading states)
 
-Draft for the product owner. It follows the graphics module (D-55), whose §127 left two items here: shared panel and stat-tile components across every screen, and sparklines in the remaining tiles. Most screens already use the shared `Card` and `Kpi` (`ui/primitives.tsx`). The differences are in what each screen puts around them. Seen in a screenshot sweep of every screen at 1440 × 900 as the Administrator, after scene 1 of NBO-CIVIL-UNREST, and in the code:
+Approved by the product owner on 2026-11-12 (PR #195; D-56), with the defaults in §135. It follows the graphics module (D-55), whose §127 left two items here: shared panel and stat-tile components across every screen, and sparklines in the remaining tiles. Most screens already use the shared `Card` and `Kpi` (`ui/primitives.tsx`). The differences are in what each screen puts around them. Seen in a screenshot sweep of every screen at 1440 × 900 as the Administrator, after scene 1 of NBO-CIVIL-UNREST, and in the code:
 
 | Seen in the sweep | Where |
 |---|---|
@@ -1597,7 +1597,7 @@ No 🔒 area (D-29) is touched.
 - **Screenshots** of every changed screen go in each PR, for the product owner's visual review.
 - **Unchanged:** every existing unit test and acceptance spec passes.
 
-## 135. Questions for the product owner
+## 135. Questions answered by the product owner (2026-11-12: "approved", all defaults)
 
 1. **Which screens get a tile row:** the four new ones and the two at rest in DC-01; AI Risk Copilot keeps its Grounding context panel. *Default: yes.* (Alternative: Copilot too, with the same four counts as tiles.)
 2. **Sparklines:** every tile that counts events over time, where the screen already loads the timestamps. *Default: yes.* (Alternative: only tiles on the Command and Monitor screens.)
