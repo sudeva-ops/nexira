@@ -46,12 +46,12 @@ export function AirMap({ flights, selectedId, onSelect, fly = null }: Props) {
     let stopDaylight = () => {};
     let stopStars = () => {};
     registerPmtiles();
-    void tilesAvailable().then((available) => {
+    void tilesAvailable().then((tiles) => {
       if (disposed || !container.current) return;
-      setBaseMissing(!available);
+      setBaseMissing(!tiles.base);
       const m = new MapLibreMap({
         container: container.current,
-        style: baseStyle(window.location.origin, available),
+        style: baseStyle(window.location.origin, tiles),
         center: [40, 15],
         zoom: globeRef.current ? 2 : 1.6, // a globe at 1.6 is small
         attributionControl: { compact: false, customAttribution: ATTRIBUTION },
@@ -125,7 +125,7 @@ export function AirMap({ flights, selectedId, onSelect, fly = null }: Props) {
           });
         }
         // Labels need the self-hosted glyphs, installed with the tiles (D-24).
-        if (available) m.addLayer({
+        if (tiles.base) m.addLayer({
           id: "flight-labels",
           type: "symbol",
           source: "flights",

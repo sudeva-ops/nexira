@@ -28,15 +28,15 @@ export function ReplayMap({ replay, moment }: { replay: Replay; moment: Moment }
     let disposed = false;
     let created: MapLibreMap | null = null;
     registerPmtiles();
-    void tilesAvailable().then((available) => {
+    void tilesAvailable().then((tiles) => {
       if (disposed || !container.current) return;
-      setBaseMissing(!available);
+      setBaseMissing(!tiles.base);
       const zone = circlePolygon(lon, lat, radius);
       const fit = new LngLatBounds();
       for (const c of zone.coordinates[0] ?? []) fit.extend(c as [number, number]);
       const m = new MapLibreMap({
         container: container.current,
-        style: baseStyle(window.location.origin, available),
+        style: baseStyle(window.location.origin, tiles),
         bounds: fit,
         fitBoundsOptions: { padding: 60 },
         attributionControl: { compact: false, customAttribution: ATTRIBUTION },

@@ -4,6 +4,7 @@
 #   world.pmtiles    Protomaps basemap, whole world, zoom 0-6
 #   nairobi.pmtiles  Protomaps basemap, Nairobi area, zoom 0-15
 #   fonts/, sprites/ glyphs and sprites for the dark style (protomaps/basemaps-assets)
+#   earth-day.pmtiles  NASA Blue Marble (December 2004), raster, zoom 0-5 (GFX-02, D-55)
 #
 # This is the only step that downloads map data (approved at build time, plan Q3).
 # The running app never fetches tiles, fonts or sprites from the internet.
@@ -31,6 +32,13 @@ case "$(uname -s)_$(uname -m)" in
   Linux_x86_64)  ARCHIVE=go-pmtiles_${PMTILES_VERSION}_Linux_x86_64.tar.gz; SHA=3ed7dbf4ec2e6dfe5e25b6f70d1ffc932729f93c86db353bf514dd71010a312f ;;
   *) echo "tiles: unsupported platform $(uname -s) $(uname -m)" >&2; exit 1 ;;
 esac
+
+# NASA imagery (GFX-02, plan-pilot-gfx G-1, G-2): pinned files, and GDAL from its official image,
+# pinned by digest and run only here.
+NASA=https://assets.science.nasa.gov/content/dam/science/esd/eo/images
+DAY_URL=$NASA/bmng/bmng-topography-bathymetry/december/world.topo.bathy.200412.3x21600x10800.jpg
+DAY_SHA=3006c58b1272362db0a8c2df02dc07cea4b12dfe820b7dc4a159a075caf5d4d4
+GDAL_IMAGE=ghcr.io/osgeo/gdal@sha256:dab45abca3ca83695d442018692f4f8a0f41955871c57e6101d7f89a92375caa  # ubuntu-small-3.10.3
 
 sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1"; else shasum -a 256 "$1"; fi | cut -d' ' -f1; }
 
@@ -85,12 +93,42 @@ if [ ! -f "$OUT/fonts/.commit" ] || [ "$(cat "$OUT/fonts/.commit")" != "$ASSETS_
   echo "$ASSETS_COMMIT" > "$OUT/fonts/.commit"
 fi
 
+imagery() {  # name, url, sha
+  local name="$1" url="$2" sha="$3" src="$OUT/.src/$(basename "$2")"
+  if [ -s "$OUT/$name" ] && [ -z "${FORCE:-}" ]; then
+    echo "tiles: $name exists (FORCE=1 to rebuild)"; return
+  fi
+  mkdir -p "$OUT/.src"
+  if [ ! -s "$src" ] || [ "$(sha256 "$src")" != "$sha" ]; then
+    echo "tiles: downloading $(basename "$url")"
+    curl -fsSL -o "$src" "$url"
+  fi
+  if [ "$(sha256 "$src")" != "$sha" ]; then
+    echo "tiles: checksum mismatch for $(basename "$url")" >&2; exit 1
+  fi
+  echo "tiles: building $name"
+  local work="$OUT/.src/${name%.pmtiles}"
+  rm -rf "$work"; mkdir -p "$work"
+  # Plate carrée in, Web Mercator out, 8192 px square (zoom 5 at 256 px tiles), WebP tiles.
+  docker run --rm --user "$(id -u):$(id -g)" -v "$OUT/.src:/src" "$GDAL_IMAGE" sh -euc "
+    gdal_translate -q -of VRT -a_srs EPSG:4326 -a_ullr -180 90 180 -90 /src/$(basename "$src") /tmp/in.vrt
+    gdalwarp -q -t_srs EPSG:3857 -te -20037508.34 -20037508.34 20037508.34 20037508.34 \
+      -ts 8192 8192 -r lanczos -co TILED=YES /tmp/in.vrt /tmp/merc.tif
+    gdal_translate -q -of MBTiles -co TILE_FORMAT=WEBP -co QUALITY=80 /tmp/merc.tif /src/${name%.pmtiles}/out.mbtiles
+    gdaladdo -q -r average /src/${name%.pmtiles}/out.mbtiles 2 4 8 16 32"
+  "$PMTILES" convert "$work/out.mbtiles" "$OUT/$name.tmp"
+  mv "$OUT/$name.tmp" "$OUT/$name"
+  rm -rf "$work"
+}
+imagery earth-day.pmtiles "$DAY_URL" "$DAY_SHA"
+
 cat > "$OUT/BUILD.txt" <<INFO
 Protomaps build: $BUILD ($SOURCE)
 pmtiles: $PMTILES_VERSION
 basemaps-assets: $ASSETS_COMMIT
+Imagery: NASA Blue Marble Next Generation (December 2004); GDAL $GDAL_IMAGE
 Built: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-Map data © OpenStreetMap contributors (ODbL). Basemap © Protomaps.
+Map data © OpenStreetMap contributors (ODbL). Basemap © Protomaps. Imagery: NASA Earth Observatory.
 INFO
-du -sh "$OUT"/world.pmtiles "$OUT"/nairobi.pmtiles "$OUT"/fonts "$OUT"/sprites
+du -sh "$OUT"/world.pmtiles "$OUT"/nairobi.pmtiles "$OUT"/earth-day.pmtiles "$OUT"/fonts "$OUT"/sprites
 echo "tiles: done. Served by the frontend container at /tiles/."
