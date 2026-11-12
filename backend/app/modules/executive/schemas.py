@@ -89,6 +89,9 @@ class TimelineOut(BaseModel):
     incident: IncidentRefOut | None  # the most severe ACTIVE incident, if any
     events: list[TimelineEventOut]
     recent: list[RecentOut]  # with no ACTIVE incident: the last 7 days
+    # GFX-06 (D-55): with nothing in those 7 days, the last change on record, to say how long
+    # it has been quiet; None when no incident is on record at all.
+    last: RecentOut | None = None
 
 
 class OverviewOut(BaseModel):

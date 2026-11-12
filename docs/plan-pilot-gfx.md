@@ -38,6 +38,13 @@ No schema change, and nothing here is 🔒 under D-29. The one API change is a `
 - **G-1, the NASA terms.** NASA's guidelines, read on 2026-11-12 at `nasa.gov/nasa-brand-center/images-and-media/`, say NASA content is "generally not subject to copyright in the United States". NASA should be acknowledged as the source, and commercial use must not imply NASA's endorsement. The map credits "Imagery: NASA Earth Observatory" and uses no NASA insignia. For a commercial release, the guidelines name NASA's brand team as the contact for confirmation.
 - **Inland water.** Blue Marble's lakes (Victoria, Tanganyika, Malawi) are very dark once toned down. They are left as the imagery shows them.
 
+**As built in Prompt 145** (each a deviation for approval in its PR):
+- **GFX-06, the last incident on record needs one API field.** §128 says the resting states read existing APIs. The Executive Overview API had no way to name the last incident once the 7-day window is empty, so its timeline gains `last` (the latest open or close on record, exercises left out), filled only when `recent` is empty. This changes the API, not the database. In a fresh demo there is no incident on record, so the line reads "No incident on record yet." rather than inventing one.
+- **GFX-06, "each agent's latest check".** No agent records a check time today. The card shows each agent's latest entry in the existing activity log; with none, it says how many event types the agent watches and that it has proposed nothing yet (or that it is switched off or paused). Recording real check times would touch the agent runner and is left out.
+- **GFX-06, feeds.** "Feeds" counts the sources heard from in the last 24 hours, from the signal list Global Operations already loads; after a reset that is 0.
+- **G-8, layout.** The Queue's Agent activity card and Executive's paired panels stretch to their row, and the trend chart grows with its card. At 1440 × 900 after a reset, the lowest card in each column ends 160 px (Queue) and 184 px (Executive) above the bottom of the content area, against a limit of 300 px.
+- **GFX-08, the credit.** The mini-map shows the full credit line, not MapLibre's compact one: a still map is never moved, so the compact credit would stay open over the map, and its button could not be clicked inside a map that opens Global Operations.
+
 ## 3. Prompts
 
 As `docs/prompts-pilot.md` Prompts 143–146. None is 🔒.

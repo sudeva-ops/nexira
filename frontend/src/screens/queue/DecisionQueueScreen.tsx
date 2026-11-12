@@ -2,7 +2,17 @@ import { Icon, NonIdealState } from "@blueprintjs/core";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { LEVEL_COLOUR, LEVELS, useAgentActivity, useAgents, useProposals } from "../../api/proposals";
+import { useFlights } from "../../api/flights";
+import { useOperationsSummary, useSignals } from "../../api/intel";
+import {
+  type Activity,
+  type AgentsState,
+  LEVEL_COLOUR,
+  LEVELS,
+  useAgentActivity,
+  useAgents,
+  useProposals,
+} from "../../api/proposals";
 import { formatTime, HOME_TZ } from "../../app/time";
 import { CountUp } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
@@ -11,6 +21,7 @@ import { buckets } from "../../ui/spark";
 import { useNow } from "../../ui/useNow";
 import { metrics, queueOrder } from "./format";
 import { ProposalCard } from "./ProposalCard";
+import { agentChecks, watchingRows } from "./watching";
 
 const POLICY = [
   "Logging, notes, enrichment",
@@ -23,6 +34,44 @@ const POLICY = [
 type Tab = "pending" | "decided" | "all";
 
 const DAY_MS = 24 * 3_600_000;
+
+/** GFX-06 (D-55): what the agents are watching, from existing APIs, and each agent's latest entry
+ *  in the activity log. It sits under Decisions so the left column is never blank (plan G-8). */
+function WatchingNow({ agents, activity, now }: { agents: AgentsState | undefined; activity: Activity[]; now: number }) {
+  const summary = useOperationsSummary().data;
+  const flights = useFlights().data;
+  const signals = useSignals(500).data; // the list Global Operations loads, so the same cache
+  const rows = watchingRows(summary, flights, signals, now);
+  const checks = agentChecks(agents?.agents ?? [], activity, agents?.paused ?? false);
+  return (
+    <Card icon="eye-open" title="Watching now" sub="From live data · simulated (D-19)" className="nx-watching">
+      <div className="nx-istat nx-watch" aria-label="Watching now">
+        {rows.map((r) => (
+          <div key={r.label}>
+            <b>{r.value}</b>
+            <span>{r.label}</span>
+            {r.detail && (
+              <small className="nx-dim" title={r.detail}>
+                {r.detail}
+              </small>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="nx-bd nx-checks" aria-label="Latest from each agent">
+        {checks.map((c) => (
+          <div key={c.code} className="nx-row">
+            <b className="nx-agent">{c.name}</b>
+            <span className="nx-grow nx-dim" title={c.text}>
+              {c.text}
+            </span>
+            {c.at && <span className="nx-mono nx-dim">{formatTime(new Date(c.at), HOME_TZ)}</span>}
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 /** Decision Queue, the home screen (DQ-01..08). */
 export function DecisionQueueScreen() {
@@ -122,9 +171,15 @@ export function DecisionQueueScreen() {
               />
             </Card>
           )}
+          <WatchingNow agents={agents} activity={activity} now={now} />
         </div>
         <div className="nx-col">
-          <Card icon="predictive-analysis" title="Agent activity" actions={<span className="nx-chip">Live</span>}>
+          <Card
+            icon="predictive-analysis"
+            title="Agent activity"
+            actions={<span className="nx-chip">Live</span>}
+            className="nx-fill"
+          >
             <div className="nx-bd nx-log nx-activity" aria-label="Agent activity">
               {activity.length ? (
                 activity.map((a, i) => (

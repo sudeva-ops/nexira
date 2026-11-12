@@ -6,6 +6,9 @@ import type { Me } from "../../api/me";
 import { at, DETAIL, HOM_CAIRO, HOM_NAIROBI, INCIDENT, VIEWER } from "../../test/fixtures";
 import { DUTY_OFFICER, mockApi, renderApp } from "../../test/render";
 
+// GFX-08: the mini-map needs WebGL; map/MiniMap.test.tsx covers it with MapLibre stubbed.
+vi.mock("../../map/MiniMap", () => ({ MiniMap: () => <div data-testid="mini-map" /> }));
+
 function setup(me: Me) {
   return mockApi({
     "/api/me": { body: me },

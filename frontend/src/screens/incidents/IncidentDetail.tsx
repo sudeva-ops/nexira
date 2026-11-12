@@ -12,12 +12,15 @@ import {
   useIncident,
 } from "../../api/intel";
 import { useMe } from "../../api/me";
+import { type Mission, useMissions } from "../../api/people";
 import { canAddIncidentNote, canChangeIncidentStatus } from "../../api/permissions";
 import { formatStamp } from "../../app/time";
 import { SEVERITY_COLOUR } from "../../map/geo";
+import { MiniMap } from "../../map/MiniMap";
 import { categoryLabel } from "../../ui/format";
 import { Card, ExerciseTag, Sev, SourceChip } from "../../ui/primitives";
 
+const NO_MISSIONS: Mission[] = [];
 const STATUSES: IncidentStatus[] = ["ACTIVE", "MONITORING", "CLOSED"];
 
 const TIMELINE_COLOUR: Record<string, string> = {
@@ -137,6 +140,7 @@ function CameraLink({ data }: { data: Record<string, unknown> }) {
 export function IncidentDetail({ incidentId }: { incidentId: string }) {
   const { data: incident, isPending, error } = useIncident(incidentId);
   const me = useMe().data;
+  const missions = useMissions().data ?? NO_MISSIONS;
   const navigate = useNavigate();
   if (isPending) return <Spinner />;
   if (error || !incident) return <NonIdealState icon="search" title="Incident not found" />;
@@ -226,6 +230,7 @@ export function IncidentDetail({ incidentId }: { incidentId: string }) {
         </div>
       </Card>
       <Card icon="locate" title="Exposure" sub={`within ${incident.impact_radius_m / 1000} km`}>
+        <MiniMap incident={incident} missions={missions} />
         <div className="nx-istat">
           <div>
             <b>{s.people}</b>
