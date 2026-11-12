@@ -28,6 +28,13 @@ export interface Driver {
   reference: string | null;
 }
 
+export interface RecentChange {
+  reference: string;
+  title: string;
+  change: "OPENED" | "CLOSED";
+  at: string;
+}
+
 export interface Attention {
   mission_id: string;
   mission_code: string;
@@ -67,12 +74,8 @@ export interface Overview {
   timeline: {
     incident: IncidentRef | null;
     events: { occurred_at: string; event_type: string; summary: string }[];
-    recent: {
-      reference: string;
-      title: string;
-      change: "OPENED" | "CLOSED";
-      at: string;
-    }[];
+    recent: RecentChange[];
+    last?: RecentChange | null; // GFX-06: with a quiet week, the last change on record
   };
   generated_at: string;
   simulated: boolean;

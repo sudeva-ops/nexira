@@ -345,14 +345,23 @@ async def _timeline(
         rows = await session.execute(
             _RECENT, {"since": since, "limit": RECENT_MAX, "leave_out": leave_out}
         )
-        return schemas.TimelineOut(
-            incident=None,
-            events=[],
-            recent=[
-                schemas.RecentOut(reference=r.reference, title=r.title, change=r.change, at=r.at)
-                for r in rows
-            ],
-        )
+        recent = [
+            schemas.RecentOut(reference=r.reference, title=r.title, change=r.change, at=r.at)
+            for r in rows
+        ]
+        last = None
+        if not recent:  # GFX-06: how long it has been quiet, from the last change on record
+            row = (
+                await session.execute(
+                    _RECENT,
+                    {"since": datetime.min.replace(tzinfo=UTC), "limit": 1, "leave_out": leave_out},
+                )
+            ).first()
+            if row:
+                last = schemas.RecentOut(
+                    reference=row.reference, title=row.title, change=row.change, at=row.at
+                )
+        return schemas.TimelineOut(incident=None, events=[], recent=recent, last=last)
     rows = await session.execute(
         _TIMELINE,
         {"incident": current.id, "types": list(TIMELINE_TYPES), "limit": TIMELINE_MAX},

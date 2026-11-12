@@ -75,6 +75,7 @@ async def test_the_calm_state(db: DbUrls) -> None:
     assert sum(d.signals for d in out.trend if d.source == "ILLUSTRATIVE") > 0
     assert again.trend == out.trend
     assert out.timeline.incident is None
+    assert (out.timeline.recent, out.timeline.last) == ([], None)  # GFX-06: none on record
     _no_names(out)
 
 

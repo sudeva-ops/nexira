@@ -147,3 +147,31 @@ async def test_every_role_reads_it_and_the_export_is_audited(client: AsyncClient
     assert (row.actor_type, row.entity_type) == ("USER", "executive_overview")
     assert row.details["posture"] == "SEVERE"
     assert intact is True
+
+
+async def test_with_a_quiet_week_the_last_incident_on_record_is_named(
+    client: AsyncClient, idp: Idp
+) -> None:
+    """GFX-06 (D-55): nothing opened or closed in 7 days, so the timeline names the last change."""
+    await idp.user("viewer", [("VIEWER", None)])
+    out = (await client.get("/api/executive/overview", headers=idp.headers("viewer"))).json()
+    assert (out["timeline"]["recent"], out["timeline"]["last"]) == ([], None)
+    async with tenant_session(idp.tenant_id, idp.engine) as session:
+        await session.execute(
+            text(
+                "INSERT INTO incident (tenant_id, reference, title, category, severity, "
+                "signal_severity, location, status, opened_at, closed_at) VALUES "
+                "(current_tenant_id(), 'INC-2026-1001', 'Flooding', 'FLOOD', 'HIGH', 'HIGH', "
+                "'SRID=4326;POINT(36.82 -1.28)', 'CLOSED', now() - interval '21 days', "
+                "now() - interval '20 days')"
+            )
+        )
+        await session.commit()
+    out = (await client.get("/api/executive/overview", headers=idp.headers("viewer"))).json()
+    last = out["timeline"]["last"]
+    assert out["timeline"]["recent"] == []
+    assert (last["reference"], last["title"], last["change"]) == (
+        "INC-2026-1001",
+        "Flooding",
+        "CLOSED",
+    )

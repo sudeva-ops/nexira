@@ -13,6 +13,7 @@ import {
 import { formatDate, formatStamp } from "../../app/time";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { quietLine } from "./quiet";
 import { trendParts } from "./trend";
 
 const REGION_COLOUR = (exposure: number) =>
@@ -253,8 +254,8 @@ export function Timeline({ t }: { t: Overview["timeline"] }) {
   }
   if (!t.recent.length)
     return (
-      <div className="nx-bd nx-dim">
-        No incident opened or closed in the last 7 days.
+      <div className="nx-bd nx-dim" aria-label="Recent activity">
+        {quietLine(t.last, new Date())}
       </div>
     );
   return (
@@ -301,11 +302,12 @@ export function ExecutiveScreen() {
       ) : (
         <>
           <Figures o={o} />
-          <div className="nx-ev-grid nx-exe-grid nx-mb">
+          <div className="nx-ev-grid nx-exe-grid nx-exe-matched nx-mb">
             <Card
               icon="timeline-area-chart"
               title="Alerts · last 30 days"
               sub="Fused incidents over raw signals"
+              className="nx-fill"
             >
               <div className="nx-bd">
                 <Trend trend={o.trend} />
@@ -315,7 +317,7 @@ export function ExecutiveScreen() {
               <Regions regions={o.regions} />
             </Card>
           </div>
-          <div className="nx-ev-grid nx-exe-grid">
+          <div className="nx-ev-grid nx-exe-grid nx-exe-matched">
             <Card icon="office" title="Missions requiring attention">
               <AttentionTable rows={o.attention} />
             </Card>

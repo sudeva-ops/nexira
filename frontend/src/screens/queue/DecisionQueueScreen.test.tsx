@@ -4,7 +4,7 @@ import { vi } from "vitest";
 
 import type { Me } from "../../api/me";
 import type { AgentsState, Proposal } from "../../api/proposals";
-import { HOM_NAIROBI, INCIDENT, VIEWER } from "../../test/fixtures";
+import { HOM_NAIROBI, INCIDENT, SUMMARY, VIEWER } from "../../test/fixtures";
 import { DUTY_OFFICER, mockApi, renderApp } from "../../test/render";
 
 const NOW = Date.now();
@@ -153,6 +153,37 @@ describe("Decision Queue", () => {
     expect(within(card).getByText(/^Decide in (9:5\d|10:00)$/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Decisions pending" })).toHaveTextContent("1 decision pending");
     expect(screen.getByLabelText("Agent activity")).toHaveTextContent("Response Planner · proposed Run PB-07");
+  });
+
+  it("at rest, says what the agents are watching from the APIs, and each agent's latest (GFX-06)", async () => {
+    mockApi({
+      "/api/me": { body: DUTY_OFFICER },
+      "/api/proposals": { body: [] },
+      "/api/agents": {
+        body: {
+          paused: false,
+          agents: [
+            { code: "RESPONSE_PLANNER", name: "Response Planner", watches: ["INCIDENT"], is_enabled: true },
+            { code: "WATCH_OFFICER", name: "Watch Officer", watches: ["SIGNAL", "INCIDENT"], is_enabled: true },
+          ],
+        },
+      },
+      "/api/agents/activity": {
+        body: [{ occurred_at: iso(-5), actor: "Response Planner", action: "PROPOSAL.CREATE", proposal_id: "p1", text: "proposed Run PB-07" }],
+      },
+      "/api/operations/summary": { body: SUMMARY },
+      "/api/flights": { body: [] },
+      "/api/signals": { body: [] },
+    });
+    renderApp("/");
+    const watching = await screen.findByLabelText("Watching now");
+    await within(watching).findByText("1338");
+    expect(watching).toHaveTextContent("36Missions");
+    expect(watching).toHaveTextContent("0In transit0 flights in the air · 1 trip under way");
+    const checks = screen.getByLabelText("Latest from each agent");
+    expect(checks).toHaveTextContent("Response Plannerproposed Run PB-07");
+    expect(checks).toHaveTextContent("Watch OfficerWatching 2 event types · nothing proposed yet");
+    expect(screen.getByText("No decisions waiting")).toBeInTheDocument();
   });
 
   it("approves, rejects with a reason and uses an alternative", async () => {
