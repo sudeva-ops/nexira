@@ -3,8 +3,8 @@ import { expect, type Page, test } from "@playwright/test";
 import { as, cspViolations, PASSWORD, signedIn, until } from "./support";
 
 // Site Twin live activity acceptance (Prompt 138; requirements-pilot.md §119, D-53;
-// plan-pilot-twa §6) on the real stack. `make acceptance` runs it last, after the Exercise &
-// Training run's reset, which leaves the normal day off (G-2). The Duty Officer switches it on
+// plan-pilot-twa §6) on the real stack. `make acceptance` runs it last, after the graphics
+// spec's reset, which leaves the normal day off (G-2). The Duty Officer switches it on
 // from the presenter bar; a move then reaches the plan and "Recent movements" for the Duty
 // Officer and the Viewer, by kind and zone, with no name; it is audited and the chain verifies.
 // NBO-SITE mid-scenario pauses the day; after its last scene it resumes. The camera wall's
