@@ -67,6 +67,17 @@ afterEach(() => {
 });
 
 describe("Safety Check-in", () => {
+  it("at rest, shows its tiles and panels with nothing counted yet (DC-01, DC-03)", async () => {
+    mockApi({ "/api/me": { body: DUTY_OFFICER }, "/api/campaigns": { body: [] } });
+    const { container } = renderApp("/checkin");
+    const figures = await screen.findByRole("group", { name: "Personnel figures" });
+    expect(within(figures).getAllByText("—")).toHaveLength(4);
+    expect(within(figures).getAllByText("No check-in running")).toHaveLength(4);
+    expect(screen.getByText(/^No safety check-in yet\./)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Live responses" })).toBeInTheDocument();
+    expect(container.querySelector(".bp6-non-ideal-state")).toBeNull();
+  });
+
   it("shows personnel and citizen figures (CHK-03)", async () => {
     setup(DUTY_OFFICER);
     renderApp("/checkin");

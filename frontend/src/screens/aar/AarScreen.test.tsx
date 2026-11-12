@@ -328,8 +328,12 @@ describe("After-Action Review", () => {
     });
     renderApp("/aar");
     expect(
-      await screen.findByText("No incident to review yet"),
+      await screen.findByText(/^No incident to review yet\. A review is built/),
     ).toBeInTheDocument();
+    // DC-01: the screen's figures, at rest
+    const figures = screen.getByRole("group", { name: "Review figures" });
+    expect(figures).toHaveTextContent(`Reviews00 draft · 0 final`);
+    expect(figures).toHaveTextContent(`Ready for review${LIST.ready.length}`);
     await userEvent.click(
       await screen.findByRole("button", { name: "Start review" }),
     );

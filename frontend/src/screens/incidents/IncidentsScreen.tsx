@@ -4,11 +4,14 @@ import { useSearchParams } from "react-router-dom";
 import { type IncidentStatus, useIncidents } from "../../api/intel";
 import { ago } from "../../app/time";
 import { FlashRow } from "../../ui/motion";
-import { Card, ExerciseTag, Sev } from "../../ui/primitives";
+import { Card, ExerciseTag, Kpi, Sev } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { IncidentDetail } from "./IncidentDetail";
 import { Empty } from "../../ui/Empty";
 import { plural } from "../../ui/format";
+import { incidentFigures } from "../../ui/figures";
+import { TileRow } from "../../ui/TileRow";
+import { useNow } from "../../ui/useNow";
 
 const TABS: { label: string; status?: IncidentStatus }[] = [
   { label: "All" },
@@ -29,9 +32,36 @@ export function IncidentsScreen() {
   const [params, setParams] = useSearchParams();
   const { data: incidents, isPending } = useIncidents(TABS[tab]?.status);
   const selectedId = params.get("id") ?? incidents?.[0]?.id ?? null;
+  const all = useIncidents().data; // the "All" tab's list: the tiles count every status
+  const now = useNow(true, 60_000);
+  const f = all && incidentFigures(all, now);
 
   return (
-    <div className="nx-split">
+    <div className="nx-pad">
+      {/* DC-01 (plan G-1): from the register's own list; exercises counted apart (EXR-03) */}
+      <TileRow label="Incident figures">
+        <Kpi
+          icon="warning-sign"
+          label="Active"
+          value={f ? f.active : "—"}
+          detail={f ? (f.highest ? `Highest: ${f.highest.toLowerCase()}` : "None active") : ""}
+          alert={f?.highest === "CRITICAL"}
+        />
+        <Kpi icon="eye-open" label="Monitoring" value={f ? f.monitoring : "—"} detail="Past the peak, still watched" />
+        <Kpi
+          icon="calendar"
+          label="Opened · 30 days"
+          value={f ? f.opened30 : "—"}
+          detail={f ? (f.exercise ? `${plural(f.exercise, "exercise incident")} left out` : "Fused from signals") : ""}
+        />
+        <Kpi
+          icon="git-merge"
+          label="Signals fused"
+          value={f ? f.signals : "—"}
+          detail={f ? `Into active incidents · ${plural(f.sources, "source")}` : ""}
+        />
+      </TileRow>
+      <div className="nx-split">
       <Card
         icon="warning-sign"
         title="Incidents"
@@ -101,6 +131,7 @@ export function IncidentsScreen() {
         )}
       </Card>
       {selectedId ? <IncidentDetail key={selectedId} incidentId={selectedId} /> : <div />}
+      </div>
     </div>
   );
 }
