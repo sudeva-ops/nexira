@@ -131,11 +131,13 @@ test("Natural Hazards acceptance: events, a Dhaka cyclone, PB-06 armed and start
   // --- 2. Category 2, landfall in 60 h, exposing Dhaka; the arming proposal (HZ-02, HZ-04, HZ-06)
   await bar.getByRole("button", { name: "Next scene" }).click();
   await sceneDone(2);
+  // HIGH from Category 2, raised to CRITICAL by D-11: the chancery is in the zone (G-13). Fusion
+  // records the forecast first and exposure raises it after, so wait for both; a raise that never
+  // comes still fails here, on the timeout.
   const cyclone = await until(async () => {
     const c = await find("TROPICAL_CYCLONE", "DAC");
-    return c?.hazard.cyclone_category === 2 ? c : undefined;
-  }, "the Category 2 forecast for Dhaka");
-  // HIGH from Category 2, raised to CRITICAL by D-11: the chancery is in the zone (G-13).
+    return c?.hazard.cyclone_category === 2 && c.severity === "CRITICAL" ? c : undefined;
+  }, "the Category 2 forecast for Dhaka, raised to CRITICAL by D-11");
   expect([cyclone.severity, cyclone.exposed]).toEqual(["CRITICAL", true]);
   expect(cyclone.landfall_in_h).toBeGreaterThan(59);
   expect(cyclone.landfall_in_h).toBeLessThanOrEqual(60);
