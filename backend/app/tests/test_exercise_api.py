@@ -508,8 +508,10 @@ async def test_executive_and_predictive_leave_the_exercise_out(
     assert overview["posture"]["level"] == "GUARDED"
     assert overview["detection"]["incidents"] == 0
     assert overview["accounted"]["asked"] == 0
-    assert sum(d["incidents"] for d in overview["trend"]) == 0
-    assert sum(d["signals"] for d in overview["trend"]) == 0
+    live = [d for d in overview["trend"] if d["source"] == "LIVE"]  # GFX-05: illustrative aside
+    assert live[-1]["day"] == overview["trend"][-1]["day"]  # today, where the exercise ran
+    assert sum(d["incidents"] for d in live) == 0
+    assert sum(d["signals"] for d in live) == 0
     assert overview["timeline"]["incident"] is None
     assert overview["timeline"]["recent"] == []
     assert all(m["mission_code"] != "NBO" for m in overview["attention"])
