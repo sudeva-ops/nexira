@@ -159,7 +159,7 @@ function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; lar
         data-testid={overlay ? `figures-${camera.sensor.code}` : undefined}
       />
       <div className="nx-cctv-hud">
-        <span className="tl">
+        <span className="tl" title={`${camera.sensor.code} · ${camera.zone.name}`}>
           {camera.sensor.code} · {camera.zone.name.toUpperCase()}
         </span>
         <span className="tr">{stamp(now, large)}</span>
