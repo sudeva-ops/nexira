@@ -1479,7 +1479,7 @@ None. Every requirement is display only. UIP-07 hides a sidebar entry using the 
 
 ## 126. Purpose and starting point (graphics: the globe, resting states, charts)
 
-Draft for the product owner's approval. It follows the UI polish pass (D-54), whose §122 left these items to this module. For the globe, the product owner chose on 2026-11-11 to start with NASA Blue Marble (day) and Black Marble (night lights) imagery, which is public domain, self-hosted under D-24. Paid imagery (MapTiler on-prem, EOX Sentinel-2 cloudless, Cesium self-hosted) is looked at only if NASA's does not work. Seen in a screenshot sweep at 1440 × 900 as the Duty Officer, straight after `make reset-demo` (scene 0, "Calm"):
+Approved by the product owner on 2026-11-12 (PR #189; D-55), with the defaults in §130. It follows the UI polish pass (D-54), whose §122 left these items to this module. For the globe, the product owner chose on 2026-11-11 to start with NASA Blue Marble (day) and Black Marble (night lights) imagery, which is public domain, self-hosted under D-24. Paid imagery (MapTiler on-prem, EOX Sentinel-2 cloudless, Cesium self-hosted) is looked at only if NASA's does not work. Seen in a screenshot sweep at 1440 × 900 as the Duty Officer, straight after `make reset-demo` (scene 0, "Calm"):
 
 | Seen in the sweep | Where |
 |---|---|
@@ -1536,7 +1536,7 @@ No 🔒 area (D-29) is touched.
 - **Screenshots** of every changed screen go in each PR, for the product owner's visual review.
 - **Unchanged:** every existing unit test and acceptance spec passes.
 
-## 130. Questions for the product owner (defaults marked)
+## 130. Questions answered by the product owner (2026-11-12: "approved", all defaults)
 
 1. **Imagery size and detail:** NASA imagery to zoom 5 (about 5 km a pixel, roughly 100–200 MB for day and night together), with the vector map taking over from zoom 6. *Default: yes.* (Alternative: to zoom 6, about four times the size.)
 2. **Night lights:** try the Black Marble blend (GFX-03); if MapLibre cannot blend it cleanly in the current stack, ship Blue Marble with today's night shade and record it in the PR, without adding a 3D library. *Default: yes.* (Alternative: add a custom WebGL layer, more code to review.)
