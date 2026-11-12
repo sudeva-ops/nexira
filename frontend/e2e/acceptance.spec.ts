@@ -138,9 +138,19 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
   // --- Scene 1 · Signals fused ---------------------------------------------------------
   await presenter.getByRole("button", { name: "Next scene" }).click();
   await expect(dutyPage.getByRole("heading", { level: 1 })).toHaveText("Global Operations");
-  const marker = dutyPage.locator(`[data-testid="incident-marker-INC-${year}-1042"]`);
-  await expect(marker).toBeVisible({ timeout: 10_000 });
-  const markerSeenAt = Date.now();
+  // Checked on every animation frame, so the time is when the marker first appeared.
+  // toBeVisible polls at widening intervals and can add a second.
+  const markerSelector = `[data-testid="incident-marker-INC-${year}-1042"]`;
+  const seen = await dutyPage.waitForFunction(
+    (selector) => {
+      const box = document.querySelector(selector)?.getBoundingClientRect();
+      return box && box.width > 0 && box.height > 0 ? Date.now() : false;
+    },
+    markerSelector,
+    { polling: "raf", timeout: 10_000 },
+  );
+  const markerSeenAt = (await seen.jsonValue()) as number;
+  await expect(dutyPage.locator(markerSelector)).toBeVisible();
   const nairobi = await until(async () => {
     const all = await duty.get<Incident[]>("/api/incidents");
     const inc = all.find((i) => i.reference === `INC-${year}-1042`);
@@ -159,8 +169,7 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
   };
   perf.signal_to_incident_s = timings.signal_to_incident_s;
   perf.incident_to_exposure_s = timings.incident_to_exposure_s;
-  // The marker was checked once a second at most after the incident row appeared,
-  // so this is an upper bound for "UI update".
+  // From the incident row's creation to the marker's first frame on the Duty Officer's map.
   perf.incident_to_ui_s = Math.round((markerSeenAt - Date.parse(timings.incident_created_at)) / 10) / 100;
 
   // --- Scene 2 · Impact ------------------------------------------------------------------
