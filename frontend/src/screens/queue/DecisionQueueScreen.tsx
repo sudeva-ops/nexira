@@ -7,6 +7,8 @@ import { formatTime, HOME_TZ } from "../../app/time";
 import { CountUp } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { buckets } from "../../ui/spark";
+import { useNow } from "../../ui/useNow";
 import { metrics, queueOrder } from "./format";
 import { ProposalCard } from "./ProposalCard";
 
@@ -19,6 +21,8 @@ const POLICY = [
 ];
 
 type Tab = "pending" | "decided" | "all";
+
+const DAY_MS = 24 * 3_600_000;
 
 /** Decision Queue, the home screen (DQ-01..08). */
 export function DecisionQueueScreen() {
@@ -33,6 +37,7 @@ export function DecisionQueueScreen() {
     all,
   };
   const m = metrics(all);
+  const now = useNow(true, 60_000);
   const list = lists[tab];
 
   return (
@@ -63,6 +68,10 @@ export function DecisionQueueScreen() {
           label="Awaiting decision"
           value={<span className={m.pending ? "nx-pending" : "nx-safe"}><CountUp value={m.pending} /></span>}
           detail={m.pending ? "Oldest deadline first" : "Queue clear"}
+          trend={{
+            values: buckets(all.map((p) => p.created_at), now, DAY_MS, 24),
+            label: "Proposals raised per hour, last 24 hours",
+          }}
         />
         <Kpi icon="trending-up" label="Raised proactively" value={m.proactive} detail="Before an incident" />
         <Kpi

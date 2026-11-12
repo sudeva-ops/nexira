@@ -1,7 +1,9 @@
 """Executive Overview (EXE-01..04, D-45; docs/plan-pilot-exe.md).
 
-- Every figure is worked out on read from what the other modules hold; nothing is stored, no
-  history is seeded and no baseline is invented (§78 Q3, Q4).
+- Every figure is worked out on read from what the other modules hold; nothing is stored and
+  no history is seeded (§78 Q3, Q4). The one exception is the trend's days before the first live
+  data: illustrative counts, worked out from the date on read and marked ILLUSTRATIVE (GFX-05,
+  D-55), as Predictive Risk marks its history.
 - The attention drivers come from the modules' own read functions, so each rule lives in one
   place (§4).
 - Aggregates and references only: no person's name, in the figures or the timeline (EXE-04,
@@ -11,6 +13,7 @@
   Each query takes them as :leave_out.
 """
 
+import hashlib
 import uuid
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
@@ -201,13 +204,42 @@ async def _accounted(session: AsyncSession, leave_out: list[uuid.UUID]) -> schem
     )
 
 
+def illustrative_day(day: date) -> tuple[int, int]:
+    """Signals and incidents for a day before the live data (GFX-05, plan-pilot-gfx G-6): from a
+    hash of the date, so every read gives the same counts; quieter at weekends."""
+    digest = hashlib.sha256(f"nexira-trend-{day.isoformat()}".encode()).digest()
+    weekend = day.weekday() >= 5
+    signals = 6 + digest[0] % 25  # 6..30
+    incidents = digest[1] % 4  # 0..3
+    if weekend:
+        signals, incidents = (signals * 3) // 5, incidents // 2
+    return signals, incidents
+
+
+def with_illustrative(days: list[schemas.TrendDayOut], today: date) -> list[schemas.TrendDayOut]:
+    """Days before the first one with live data become illustrative; today is always live."""
+    first_live = next(
+        (i for i, d in enumerate(days) if d.signals or d.incidents or d.day >= today), len(days)
+    )
+    out = []
+    for i, d in enumerate(days):
+        if i < first_live:
+            signals, incidents = illustrative_day(d.day)
+            d = schemas.TrendDayOut(
+                day=d.day, signals=signals, incidents=incidents, source="ILLUSTRATIVE"
+            )
+        out.append(d)
+    return out
+
+
 async def _trend(
     session: AsyncSession, today: date, leave_out: list[uuid.UUID]
 ) -> list[schemas.TrendDayOut]:
     first = datetime.combine(today - timedelta(days=TREND_DAYS - 1), datetime.min.time(), UTC)
     last = datetime.combine(today, datetime.min.time(), UTC)
     rows = await session.execute(_TREND, {"first": first, "last": last, "leave_out": leave_out})
-    return [schemas.TrendDayOut(day=r.day, signals=r.signals, incidents=r.incidents) for r in rows]
+    live = [schemas.TrendDayOut(day=r.day, signals=r.signals, incidents=r.incidents) for r in rows]
+    return with_illustrative(live, today)
 
 
 async def _drivers(

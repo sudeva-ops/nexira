@@ -10,9 +10,10 @@ import {
   RISK_SEV,
   useOverview,
 } from "../../api/executive";
-import { formatStamp } from "../../app/time";
+import { formatDate, formatStamp } from "../../app/time";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { trendParts } from "./trend";
 
 const REGION_COLOUR = (exposure: number) =>
   exposure >= 60 ? "#E76A6E" : exposure >= 35 ? "#EC9A3C" : "#4C90F0";
@@ -35,6 +36,11 @@ export function Figures({ o }: { o: Overview }) {
         icon="warning-sign"
         label="Active incidents"
         value={o.active_incidents}
+        trend={{
+          values: o.trend.map((d) => d.incidents),
+          label: "Incidents opened per day, last 30 days",
+          faint: trendParts(o.trend).faint,
+        }}
         detail={
           o.latest_incident
             ? `Latest: ${o.latest_incident.reference}`
@@ -73,9 +79,8 @@ export function Figures({ o }: { o: Overview }) {
   );
 }
 
-/** EXE-02: incidents as an area over a faint bar per day of raw signals. */
-
-
+/** EXE-02: incidents as an area over a faint bar per day of raw signals. Days before the first
+ *  live data are illustrative (GFX-05): dimmed, the line dashed, and said so in each day's tip. */
 function Trend({ trend }: { trend: Overview["trend"] }) {
   const w = 300;
   const h = 80;
@@ -87,15 +92,15 @@ function Trend({ trend }: { trend: Overview["trend"] }) {
     (d, i) =>
       `${(i * step).toFixed(1)},${(h - (h - 6) * (d.incidents / maxIncidents)).toFixed(1)}`,
   );
-  const signals = trend.reduce((n, d) => n + d.signals, 0);
-  const incidents = trend.reduce((n, d) => n + d.incidents, 0);
+  const { faint, signals, incidents } = trendParts(trend);
+  const edge = faint * step; // where the live days start
   return (
     <div className="nx-exe-trend">
       <svg
         viewBox={`0 0 ${w} ${h}`}
         preserveAspectRatio="none"
         role="img"
-        aria-label={`Last 30 days: ${incidents} incidents from ${signals} signals`}
+        aria-label={`Last 30 days: ${incidents} incidents from ${signals} signals${faint ? `; the first ${faint} days illustrative` : ""}`}
       >
         {trend.map((d, i) => (
           <rect
@@ -104,15 +109,31 @@ function Trend({ trend }: { trend: Overview["trend"] }) {
             width={bar * 0.6}
             y={h - (h * 0.9 * d.signals) / maxSignals}
             height={(h * 0.9 * d.signals) / maxSignals}
-            fill="#404854"
-          />
+            fill={d.source === "ILLUSTRATIVE" ? "#2f343c" : "#404854"}
+          >
+            <title>
+              {`${formatDate(d.day)}: ${d.incidents} incidents, ${d.signals} signals${d.source === "ILLUSTRATIVE" ? " (illustrative)" : ""}`}
+            </title>
+          </rect>
         ))}
         <polygon
           points={`0,${h} ${points.join(" ")} ${w},${h}`}
           fill="rgba(76,144,240,0.25)"
         />
+        {faint > 0 && (
+          <>
+            <rect x={0} y={0} width={Math.min(w, edge)} height={h} fill="rgba(14,16,19,0.55)" />
+            <polyline
+              points={points.slice(0, faint + 1).join(" ")}
+              fill="none"
+              stroke="#5f6b7c"
+              strokeWidth="1.5"
+              strokeDasharray="3 3"
+            />
+          </>
+        )}
         <polyline
-          points={points.join(" ")}
+          points={points.slice(faint).join(" ")}
           fill="none"
           stroke="#4C90F0"
           strokeWidth="1.5"
@@ -122,7 +143,8 @@ function Trend({ trend }: { trend: Overview["trend"] }) {
         <span>30 days ago</span>
         <span className="nx-grow" />
         <span>
-          {incidents} incidents · {signals} signals (simulated feeds)
+          {incidents} incidents · {signals} signals live (simulated feeds)
+          {faint > 0 && ` · first ${faint} days illustrative`}
         </span>
         <span className="nx-grow" />
         <span>Today</span>

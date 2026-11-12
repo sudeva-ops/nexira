@@ -39,10 +39,12 @@ const OVERVIEW: Overview = {
     incident_references: [INC.reference],
   },
   readiness: { mean: 84, sites: 36 },
+  // GFX-05: 20 illustrative days, then live ones (quiet until today).
   trend: Array.from({ length: 30 }, (_, n) => ({
     day: day(n),
-    signals: n === 29 ? 4 : 0,
-    incidents: n === 29 ? 1 : 0,
+    signals: n < 20 ? 12 : n === 29 ? 4 : 0,
+    incidents: n < 20 ? n % 3 : n === 29 ? 1 : 0,
+    source: n < 20 ? ("ILLUSTRATIVE" as const) : ("LIVE" as const),
   })),
   regions: [
     { region: "Africa", exposure: 38, missions: 6 },
@@ -158,9 +160,16 @@ describe("Executive Overview", () => {
     expect(screen.getByText("84/100")).toBeInTheDocument();
     expect(
       screen.getByRole("img", {
-        name: "Last 30 days: 1 incidents from 4 signals",
+        name: "Last 30 days: 1 incidents from 4 signals; the first 20 days illustrative",
       }),
     ).toBeInTheDocument();
+    // GFX-05: the totals are live only, and the illustrative days are said to be so.
+    expect(
+      screen.getByText(/1 incidents · 4 signals live \(simulated feeds\) · first 20 days illustrative/),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/\(illustrative\)$/)).toHaveLength(20);
+    // GFX-07: the Active incidents tile has its sparkline.
+    expect(screen.getByRole("img", { name: "Incidents opened per day, last 30 days" })).toBeInTheDocument();
     const regions = screen.getByLabelText("Risk exposure by region");
     expect(regions).toHaveTextContent("Africa38");
     const table = screen.getByRole("table", {

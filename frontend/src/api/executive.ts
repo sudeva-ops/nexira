@@ -60,7 +60,8 @@ export interface Overview {
   };
   // EXR-07: each embassy's latest exercise; illustrative while that is the seeded history.
   readiness: { mean: number | null; sites: number; from_exercises?: number; illustrative?: number };
-  trend: { day: string; signals: number; incidents: number }[];
+  // GFX-05 (D-55): days before the first live data are illustrative, worked out on read.
+  trend: { day: string; signals: number; incidents: number; source: "LIVE" | "ILLUSTRATIVE" }[];
   regions: { region: string; exposure: number; missions: number }[];
   attention: Attention[];
   timeline: {

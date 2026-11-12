@@ -15,6 +15,11 @@ export function buckets(times: string[], now: number, spanMs: number, n: number)
   return out;
 }
 
+/** Whether a series has anything to draw (GFX-07): an all-zero or empty series has no line. */
+export function hasHistory(values: number[]): boolean {
+  return values.some((v) => v > 0);
+}
+
 /** How much of a window is left at `now` (1 at `from`, 0 at `to` and after). */
 export function remaining(from: string, to: string, now: number): number {
   const start = new Date(from).getTime();
