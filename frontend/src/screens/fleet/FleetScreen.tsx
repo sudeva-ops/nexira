@@ -1,4 +1,4 @@
-import { Button, HTMLSelect, Icon, InputGroup, NonIdealState } from "@blueprintjs/core";
+import { Button, HTMLSelect, Icon, InputGroup } from "@blueprintjs/core";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -29,6 +29,8 @@ import { formatStamp } from "../../app/time";
 import { FlashRow } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
 
 function errorText(error: unknown): string {
   return error instanceof ApiError ? error.message : "Not done";
@@ -98,7 +100,7 @@ function AssetsCard({
       {loading ? (
         <SkeletonRows rows={6} />
       ) : !assets.length ? (
-        <NonIdealState icon="truck" title="No assets" description="No vehicles or equipment for this mission." />
+        <Empty>No assets. No vehicles or equipment for this mission.</Empty>
       ) : (
         <table className="nx-table-plain nx-flt-table" aria-label="Vehicles and critical assets">
           <thead>
@@ -200,7 +202,7 @@ function MaintenanceCard({
   return (
     <Card icon="wrench" title="Maintenance alerts" sub="Overdue or due within 14 days">
       {!alerts.length ? (
-        <div className="nx-bd nx-dim">No maintenance due.</div>
+        <Empty>No maintenance due.</Empty>
       ) : (
         <table className="nx-table-plain nx-flt-table" aria-label="Maintenance alerts">
           <tbody>
@@ -353,7 +355,7 @@ export function FleetScreen() {
         <span className="nx-dim">Illustrative asset register (simulated)</span>
       </div>
       <ZoneAlert assets={rows} crossed={crossed} />
-      <div className="nx-g4 nx-mb">
+      <TileRow>
         <Kpi
           icon="truck"
           label="Vehicles"
@@ -380,7 +382,7 @@ export function FleetScreen() {
           detail="Within 14 days"
           alert={!!summary?.maintenance_due}
         />
-      </div>
+      </TileRow>
       <div className="nx-ev-grid nx-flt-grid">
         <AssetsCard assets={rows} loading={assets.isLoading} selected={selected} onSelect={setSelected} />
         <div className="nx-col">

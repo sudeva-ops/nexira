@@ -1,4 +1,4 @@
-import { Icon, NonIdealState } from "@blueprintjs/core";
+import { Icon } from "@blueprintjs/core";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -22,6 +22,9 @@ import { useNow } from "../../ui/useNow";
 import { metrics, queueOrder } from "./format";
 import { ProposalCard } from "./ProposalCard";
 import { agentChecks, watchingRows } from "./watching";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
+import { ContextLine } from "../../ui/ContextLine";
 
 const POLICY = [
   "Logging, notes, enrichment",
@@ -101,17 +104,13 @@ export function DecisionQueueScreen() {
           <Link to="/agents">Agent console →</Link>
         </div>
       ) : (
-        <div className="nx-banner" role="status">
-          <Icon icon="predictive-analysis" />
-          <div className="nx-grow">
-            <b>{agents?.agents.length ?? 4} agents are watching incidents, exposure and playbooks.</b>{" "}
-            They prepare decisions; a named person approves anything that sends messages, starts a
-            playbook or moves people.
-          </div>
-          <Link to="/agents">Agent console →</Link>
-        </div>
+        <ContextLine actions={<Link to="/agents">Agent console →</Link>}>
+          {agents?.agents.length ?? 4} agents are watching incidents, exposure and playbooks. They
+          prepare decisions; a named person approves anything that sends messages, starts a playbook
+          or moves people.
+        </ContextLine>
       )}
-      <div className="nx-g4">
+      <TileRow>
         <Kpi
           icon="inbox"
           label="Awaiting decision"
@@ -135,7 +134,7 @@ export function DecisionQueueScreen() {
           value={m.acceptedPct === null ? "—" : `${m.acceptedPct}%`}
           detail={`${m.decided} decisions`}
         />
-      </div>
+      </TileRow>
       <div className="nx-queue">
         <div>
           <div className="nx-tabs nx-mb" role="tablist">
@@ -164,11 +163,10 @@ export function DecisionQueueScreen() {
             list.map((p) => <ProposalCard key={p.id} p={p} />)
           ) : (
             <Card title="Decisions">
-              <NonIdealState
-                icon="inbox"
-                title={tab === "pending" ? "No decisions waiting" : "Nothing here yet"}
-                description={agents?.paused ? "Agents are paused." : "Agents raise proposals as conditions change."}
-              />
+              <Empty>
+                {tab === "pending" ? "No decisions waiting." : "Nothing here yet."}{" "}
+                {agents?.paused ? "Agents are paused." : "Agents raise proposals as conditions change."}
+              </Empty>
             </Card>
           )}
           <WatchingNow agents={agents} activity={activity} now={now} />
@@ -177,7 +175,7 @@ export function DecisionQueueScreen() {
           <Card
             icon="predictive-analysis"
             title="Agent activity"
-            actions={<span className="nx-chip">Live</span>}
+            chip={{ text: "Live", tone: "live" }}
             className="nx-fill"
           >
             <div className="nx-bd nx-log nx-activity" aria-label="Agent activity">
@@ -189,7 +187,7 @@ export function DecisionQueueScreen() {
                   </div>
                 ))
               ) : (
-                <div className="nx-dim">Agents are watching…</div>
+                <Empty>Agents are watching…</Empty>
               )}
             </div>
           </Card>

@@ -183,7 +183,7 @@ describe("Decision Queue", () => {
     const checks = screen.getByLabelText("Latest from each agent");
     expect(checks).toHaveTextContent("Response Plannerproposed Run PB-07");
     expect(checks).toHaveTextContent("Watch OfficerWatching 2 event types · nothing proposed yet");
-    expect(screen.getByText("No decisions waiting")).toBeInTheDocument();
+    expect(screen.getByText(/^No decisions waiting\./)).toBeInTheDocument();
   });
 
   it("approves, rejects with a reason and uses an alternative", async () => {

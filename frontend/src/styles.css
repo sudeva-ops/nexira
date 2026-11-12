@@ -651,12 +651,6 @@ tr.click:focus-visible,
   background: #ec9a3c;
 }
 
-.nx-g4 {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-}
-
 .nx-pager {
   justify-content: space-between;
   padding: 8px;
@@ -707,11 +701,8 @@ tr.click:focus-visible,
   box-sizing: border-box;
 }
 
-.nx-kpis {
-  display: grid;
+.nx-ops > .nx-tiles {
   grid-column: 1 / -1;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
 }
 
 .nx-mapwrap {
@@ -1326,6 +1317,7 @@ tr.click:focus-visible,
 
 .nx-await {
   color: #fbb360;
+  font-family: inherit; /* DC-07: a phrase, inside the monospace step time */
 }
 
 .nx-running {
@@ -1341,8 +1333,7 @@ tr.click:focus-visible,
 .nx-log {
   flex: 1;
   overflow: auto;
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 11px;
+  font-size: 12px; /* DC-07: entries are sentences; their times stay monospace */
 }
 
 .nx-log div {
@@ -1354,6 +1345,8 @@ tr.click:focus-visible,
 .nx-log span {
   margin-right: 8px;
   color: var(--nx-tx3);
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 11px;
 }
 
 /* --- Safety Check-in (Prompt 11) ---------------------------------------------- */
@@ -3129,18 +3122,6 @@ tr.nx-flash-b > td {
 }
 
 /* --- Executive Overview (EXE-05, D-45) -------------------------------------------- */
-.nx-g5 {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-}
-
-@media (max-width: 1100px) {
-  .nx-g5 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 .nx-exe-grid {
   grid-template-columns: 1fr 1fr;
 }
@@ -4610,4 +4591,77 @@ tr.nx-flash-b > td {
   position: absolute;
   inset: 0;
   pointer-events: none;
+}
+
+/* --- Design consistency (D-56) --------------------------------------------------- */
+/* DC-03: nothing here yet, inside a panel */
+.nx-empty {
+  padding: 10px 12px;
+  color: var(--nx-tx3);
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+/* DC-05: the card header's one chip */
+.nx-card-chip i {
+  background: #8abbff;
+}
+
+.nx-card-chip[data-tone="live"] i,
+.nx-card-chip[data-tone="ok"] i {
+  background: #72ca9b;
+}
+
+.nx-card-chip[data-tone="warn"] i {
+  background: #fbb360;
+}
+
+/* DC-06: what the screen's data is, above the tiles */
+.nx-context {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 30px;
+  margin-bottom: 8px;
+  color: var(--nx-tx3);
+}
+
+.nx-context-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.nx-context-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* DC-01: a screen's tile row */
+.nx-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.nx-tiles-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.nx-tiles-6 {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px) {
+  .nx-tiles,
+  .nx-tiles-5,
+  .nx-tiles-6 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.nx-log > .nx-empty {
+  padding: 4px 0;
+  border-bottom: 0;
 }

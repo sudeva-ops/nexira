@@ -32,6 +32,8 @@ import { Card, ExerciseTag, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { REJECT_REASONS } from "../queue/format";
 import { inDays, metricTarget, metricValue } from "./format";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
 
 const PRIORITY_SEV: Record<Priority, string> = {
   HIGH: "high",
@@ -78,7 +80,7 @@ function Figures({ r }: { r: Review }) {
     );
   };
   return (
-    <div className="nx-g4 nx-mb">
+    <TileRow>
       {kpi("detection_to_incident", "time", "Detection → incident")}
       {kpi(
         "detection_to_notification",
@@ -92,7 +94,7 @@ function Figures({ r }: { r: Review }) {
         value={`${accepted} / ${total}`}
         detail="Accepted"
       />
-    </div>
+    </TileRow>
   );
 }
 
@@ -121,7 +123,7 @@ function Metrics({ metrics }: { metrics: Metric[] }) {
 
 function Timeline({ r }: { r: Review }) {
   if (!r.timeline.length)
-    return <div className="nx-bd nx-dim">Nothing recorded.</div>;
+    return <Empty>Nothing recorded.</Empty>;
   return (
     <ul className="nx-bd nx-aar-timeline" aria-label="Reconstructed timeline">
       {r.timeline.map((t, i) => (
@@ -394,9 +396,7 @@ function Lessons({ r }: { r: Review }) {
           </tbody>
         </table>
       ) : (
-        <div className="nx-bd nx-dim">
-          The record shows nothing to draft. Add a lesson of your own.
-        </div>
+        <Empty>The record shows nothing to draft. Add a lesson of your own.</Empty>
       )}
     </Card>
   );
@@ -524,7 +524,7 @@ export function AarScreen() {
               ))}
             </ul>
           ) : (
-            <div className="nx-bd nx-dim">No review yet.</div>
+            <Empty>No review yet.</Empty>
           )}
         </Card>
         <Card icon="inbox" title="Ready for review" sub="Monitoring or closed">
@@ -559,9 +559,7 @@ export function AarScreen() {
               ))}
             </ul>
           ) : (
-            <div className="nx-bd nx-dim">
-              {data ? "No incident to review yet." : ""}
-            </div>
+            data && <Empty>No incident to review yet.</Empty>
           )}
           {start.isError && (
             <div className="nx-bd nx-error">{errorText(start.error)}</div>

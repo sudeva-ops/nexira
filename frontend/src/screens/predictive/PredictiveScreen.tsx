@@ -13,6 +13,7 @@ import {
 } from "../../api/predictive";
 import { Card } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { Empty } from "../../ui/Empty";
 
 const RISING_ROWS = 8;
 
@@ -167,7 +168,7 @@ function RisingTable({
 }
 
 function Calendar({ events }: { events: CalendarEvent[] }) {
-  if (!events.length) return <div className="nx-bd nx-dim">No scheduled event in the next 14 days.</div>;
+  if (!events.length) return <Empty>No scheduled event in the next 14 days.</Empty>;
   return (
     <ul className="nx-bd nx-prd-events" aria-label="Events calendar">
       {events.map((e) => (
@@ -262,9 +263,7 @@ export function PredictiveScreen() {
                   ))}
                 </ul>
               ) : (
-                <div className="nx-bd nx-dim">
-                  No action recommended: every forecast stays below {o.threshold}.
-                </div>
+                <Empty>No action recommended: every forecast stays below {o.threshold}.</Empty>
               )}
             </Card>
           </div>

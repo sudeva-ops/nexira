@@ -144,6 +144,6 @@ describe("Air Travel Tracking", () => {
     renderApp("/air");
     const safeguards = await screen.findByLabelText("Safeguards");
     expect(safeguards).toHaveTextContent("restricted) trips are never tracked or shown");
-    expect(await screen.findByText("No tracked flights")).toBeInTheDocument();
+    expect(await screen.findByText(/^No tracked flights\./)).toBeInTheDocument();
   });
 });

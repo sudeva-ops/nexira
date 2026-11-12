@@ -25,6 +25,8 @@ import { formatDate, formatStamp } from "../../app/time";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { measuredText } from "./format";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
 
 // EXR-08 (plan-pilot-exr §8): the KPIs, the recent exercises, Run an exercise and the scoring
 // breakdown, as the design. Launch, Next inject, End and Abandon show only to those the API
@@ -55,7 +57,7 @@ function Figures({ k, templates }: { k: Kpis; templates: Template[] }) {
     k.average !== null && k.average_last_year !== null ? k.average - k.average_last_year : null;
   const themes = [...new Set(templates.map((t) => t.theme).filter(Boolean))];
   return (
-    <div className="nx-g4 nx-mb" aria-label="Exercise figures">
+    <TileRow label="Exercise figures">
       <Kpi icon="locate" label={`Exercises · ${year}`} value={k.this_year} detail="Completed this year" />
       <Kpi
         icon="chart"
@@ -80,7 +82,7 @@ function Figures({ k, templates }: { k: Kpis; templates: Template[] }) {
         value={k.templates}
         detail={themes.join(" · ") || undefined}
       />
-    </div>
+    </TileRow>
   );
 }
 
@@ -93,7 +95,7 @@ function Recent({
   selected: string | undefined;
   onSelect: (id: string) => void;
 }) {
-  if (!rows.length) return <div className="nx-bd nx-dim">No exercise yet.</div>;
+  if (!rows.length) return <Empty>No exercise yet.</Empty>;
   return (
     <table className="nx-table-plain" aria-label="Recent exercises">
       <thead>
@@ -339,7 +341,7 @@ export function ExercisesScreen() {
             ) : selected ? (
               <SkeletonRows rows={5} />
             ) : (
-              <div className="nx-bd nx-dim">No exercise yet.</div>
+              <Empty>No exercise yet.</Empty>
             )}
           </Card>
         </div>

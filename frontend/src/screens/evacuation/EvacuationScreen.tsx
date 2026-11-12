@@ -1,4 +1,4 @@
-import { Button, HTMLSelect, Icon, InputGroup, NonIdealState } from "@blueprintjs/core";
+import { Button, HTMLSelect, Icon, InputGroup } from "@blueprintjs/core";
 import { type CSSProperties, type ReactNode, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -30,6 +30,8 @@ import { formatStamp } from "../../app/time";
 import { FlashRow } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
 
 const ROLE_SEV: Record<string, string> = { PRIMARY: "ok", BACKUP: "low", CONTINGENCY: "low" };
 const MESSAGE_STATUS: Record<string, string> = {
@@ -157,11 +159,7 @@ function ManifestCard({
       {loading ? (
         <SkeletonRows />
       ) : !detail || detail.status === "PENDING_ACTIVATION" ? (
-        <NonIdealState
-          icon="people"
-          title="No manifest yet"
-          description="It is built and locked when two people activate the evacuation (EV-03)."
-        />
+        <Empty>No manifest yet. It is built and locked when two people activate the evacuation (EV-03).</Empty>
       ) : (
         <>
           {!detail.names_shown && (
@@ -267,7 +265,7 @@ function OptionsCard({ plan, evacuation }: { plan: Plan | undefined; evacuation:
   return (
     <Card icon="globe" title="Options" sub={plan ? `${plan.reference} · to ${plan.destination} (simulated)` : undefined}>
       {!plan ? (
-        <div className="nx-bd nx-dim">No evacuation plan for this mission.</div>
+        <Empty>No evacuation plan for this mission.</Empty>
       ) : (
         <table className="nx-table-plain nx-ev-table" aria-label="Evacuation options">
           <tbody>
@@ -362,7 +360,7 @@ export function EvacuationScreen() {
         <span className="nx-dim">{plan?.source ?? "Illustrative evacuation plan (simulated)"}</span>
       </div>
       <Banner plan={plan} mission={mission} evacuation={latest} allowed={allowed} />
-      <div className="nx-g4 nx-mb">
+      <TileRow>
         <Kpi
           icon="people"
           label="Evacuees on manifest"
@@ -388,7 +386,7 @@ export function EvacuationScreen() {
           detail="Could block evacuation (DX-03)"
           alert={!!shown?.documents_flagged}
         />
-      </div>
+      </TileRow>
       <div className="nx-ev-grid">
         <ManifestCard detail={detail.data} allowed={allowed} loading={!!latest && detail.isLoading} />
         <div className="nx-col">

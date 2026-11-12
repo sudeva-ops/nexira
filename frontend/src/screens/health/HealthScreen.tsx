@@ -1,4 +1,4 @@
-import { Button, HTMLSelect, Icon, NonIdealState } from "@blueprintjs/core";
+import { Button, HTMLSelect, Icon } from "@blueprintjs/core";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { ApiError } from "../../api/client";
@@ -25,6 +25,9 @@ import { formatStamp } from "../../app/time";
 import { FlashRow } from "../../ui/motion";
 import { Card, Kpi, Sev } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
+import { ContextLine } from "../../ui/ContextLine";
 
 const LEVEL_WORD: Record<Severity, string> = { CRITICAL: "Critical", HIGH: "High", MODERATE: "Moderate", LOW: "Low" };
 
@@ -59,7 +62,7 @@ function AdvisoriesCard({ advisories, loading }: { advisories: Advisory[]; loadi
       {loading ? (
         <SkeletonRows />
       ) : advisories.length === 0 ? (
-        <NonIdealState icon="heart" title="No health advisories" description="Nothing open or closed in the last 7 days." />
+        <Empty>No health advisories. Nothing open or closed in the last 7 days.</Empty>
       ) : (
         <table className="nx-table-plain nx-hl-table" aria-label="Health advisories">
           <thead>
@@ -175,7 +178,7 @@ function ReadinessCard({ city, r, topics }: { city: string; r: Readiness | null;
   return (
     <Card icon="people" title={`Staff health readiness · ${city}`} sub="Counts only (D-39)">
       {!r ? (
-        <div className="nx-bd nx-dim">No readiness counts for this mission.</div>
+        <Empty>No readiness counts for this mission.</Empty>
       ) : (
         <div className="nx-bd" aria-label="Staff health readiness">
           <Tick
@@ -276,7 +279,7 @@ function MissionPanel({
         {health.isLoading || !data ? (
           <SkeletonRows />
         ) : data.facilities.length === 0 ? (
-          <div className="nx-bd nx-dim">No facilities recorded for this mission.</div>
+          <Empty>No facilities recorded for this mission.</Empty>
         ) : (
           <table className="nx-table-plain nx-hl-table" aria-label="Medical facilities">
             <thead>
@@ -314,17 +317,11 @@ export function HealthScreen() {
 
   return (
     <div className="nx-pad">
-      <div className="nx-banner nx-mb" role="note">
-        <Icon icon="heart" />
-        <div>
-          <b>
-            Health intelligence fused from WHO Disease Outbreak News, national health ministries and medical-assistance
-            partners.
-          </b>{" "}
-          Simulated samples for demonstration.
-        </div>
-      </div>
-      <div className="nx-g4 nx-mb">
+      <ContextLine>
+        Health intelligence fused from WHO Disease Outbreak News, national health ministries and
+        medical-assistance partners · simulated samples for demonstration (D-19)
+      </ContextLine>
+      <TileRow>
         <Kpi
           icon="warning-sign"
           label="Open health advisories"
@@ -353,7 +350,7 @@ export function HealthScreen() {
           value={summary ? summary.vetted_facilities : "—"}
           detail="Vetted by an assistance partner"
         />
-      </div>
+      </TileRow>
       <div className="nx-hl-grid">
         <div className="nx-col">
           <AdvisoriesCard advisories={list} loading={advisories.isLoading} />

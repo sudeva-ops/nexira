@@ -85,7 +85,7 @@ test("Phase 1 acceptance: NBO-CIVIL-UNREST scenes 0-6", async ({ browser, reques
   const dutyPage = await signedIn(browser, "duty.officer");
   expect(await duty.get<Incident[]>("/api/incidents?status=ACTIVE")).toEqual([]);
   expect(await proposals()).toEqual([]);
-  await expect(dutyPage.getByText("No decisions waiting")).toBeVisible();
+  await expect(dutyPage.getByText(/^No decisions waiting\./)).toBeVisible();
   const missions = await duty.get<{ code: string; display_risk: string; id: string }[]>("/api/missions");
   const nbo = missions.find((m) => m.code === "NBO");
   expect(nbo?.display_risk).toBe("LOW");

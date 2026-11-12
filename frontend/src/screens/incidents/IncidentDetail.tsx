@@ -1,4 +1,4 @@
-import { Button, Callout, HTMLSelect, Icon, NonIdealState, Spinner, TextArea } from "@blueprintjs/core";
+import { Button, Callout, HTMLSelect, Icon, NonIdealState, TextArea } from "@blueprintjs/core";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -19,6 +19,7 @@ import { SEVERITY_COLOUR } from "../../map/geo";
 import { MiniMap } from "../../map/MiniMap";
 import { categoryLabel } from "../../ui/format";
 import { Card, ExerciseTag, Sev, SourceChip } from "../../ui/primitives";
+import { SkeletonRows } from "../../ui/Skeleton";
 
 const NO_MISSIONS: Mission[] = [];
 const STATUSES: IncidentStatus[] = ["ACTIVE", "MONITORING", "CLOSED"];
@@ -142,7 +143,7 @@ export function IncidentDetail({ incidentId }: { incidentId: string }) {
   const me = useMe().data;
   const missions = useMissions().data ?? NO_MISSIONS;
   const navigate = useNavigate();
-  if (isPending) return <Spinner />;
+  if (isPending) return <SkeletonRows rows={8} />;
   if (error || !incident) return <NonIdealState icon="search" title="Incident not found" />;
 
   const s = incident.exposure_summary;

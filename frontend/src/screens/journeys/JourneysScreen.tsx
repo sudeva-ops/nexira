@@ -1,4 +1,4 @@
-import { Button, HTMLSelect, Icon, NonIdealState } from "@blueprintjs/core";
+import { Button, HTMLSelect, Icon } from "@blueprintjs/core";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -12,6 +12,8 @@ import { Card, Kpi, Sev } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { RiskCard, TripDetail } from "./TripDetail";
 import { TripPlanner } from "./TripPlanner";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
 
 const APPROVAL: Record<string, [string, string]> = {
   DRAFT: ["Draft", "nx-dim"],
@@ -72,7 +74,7 @@ export function JourneysScreen() {
           </div>
         </div>
       ))}
-      <div className="nx-g4">
+      <TileRow>
         <Kpi icon="airplane" label="Active trips" value={active.length} detail="Pending or approved, not yet over" />
         <Kpi
           icon="time"
@@ -94,13 +96,13 @@ export function JourneysScreen() {
           value={active.length ? `${Math.round((briefed / active.length) * 100)}%` : "—"}
           detail="Of active trips"
         />
-      </div>
+      </TileRow>
 
       <div className="nx-ntf-grid">
         <Card
           icon="airplane"
           title="Trips"
-          sub={`${list.length} shown`}
+          chip={{ text: `${list.length} shown` }}
           actions={
             <div className="nx-row">
               <HTMLSelect
@@ -149,7 +151,7 @@ export function JourneysScreen() {
           {trips.isLoading ? (
             <SkeletonRows />
           ) : list.length === 0 ? (
-            <NonIdealState icon="airplane" title="No trips" description="Nothing matches these filters." />
+            <Empty>No trips. Nothing matches these filters.</Empty>
           ) : (
             <div className="nx-ntf-scroll">
               <table className="nx-table-plain" aria-label="Trips">

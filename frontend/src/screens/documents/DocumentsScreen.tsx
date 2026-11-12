@@ -24,6 +24,8 @@ import { formatStamp } from "../../app/time";
 import { FlashRow } from "../../ui/motion";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
 
 const URGENCY_SEV: Record<Urgency, string> = {
   EXPIRED: "crit",
@@ -205,7 +207,8 @@ function DocumentList({ missionScope }: { missionScope: string[] | null }) {
       className="nx-docs"
       icon="document"
       title="Expiring documents"
-      sub={`Sorted by urgency · ${rows.length} shown · simulated`}
+      sub="Sorted by urgency · simulated"
+      chip={{ text: `${rows.length} shown` }}
       actions={
         <div className="nx-row">
           <HTMLSelect
@@ -268,7 +271,7 @@ function DocumentList({ missionScope }: { missionScope: string[] | null }) {
       {query.isLoading ? (
         <SkeletonRows />
       ) : rows.length === 0 ? (
-        <NonIdealState icon="document" title="No documents" description="Nothing matches these filters." />
+        <Empty>No documents. Nothing matches these filters.</Empty>
       ) : (
         <div className="nx-ntf-scroll">
           <table className="nx-table-plain" aria-label="Expiring documents">
@@ -321,7 +324,7 @@ export function DocumentsScreen() {
 
   return (
     <div className="nx-pad">
-      <div className="nx-g4">
+      <TileRow>
         <Kpi icon="document" label="Documents tracked" value={summary?.tracked ?? "—"} detail="Staff & dependants" />
         <Kpi
           icon="warning-sign"
@@ -344,7 +347,7 @@ export function DocumentsScreen() {
           value={pct === null || pct === undefined ? "—" : `${pct}%`}
           detail={summary ? `${summary.ready} of ${summary.people} people · passport valid 180+ days` : undefined}
         />
-      </div>
+      </TileRow>
       {allowed.isLoading ? (
         <SkeletonRows />
       ) : allowed.data?.read_documents ? (

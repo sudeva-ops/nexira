@@ -1,4 +1,4 @@
-import { Callout, HTMLTable, NonIdealState, Spinner, Tag } from "@blueprintjs/core";
+import { Callout, HTMLTable, NonIdealState, Tag } from "@blueprintjs/core";
 
 import { useAuditLog, useAuditVerify } from "../../api/audit";
 import { ApiError } from "../../api/client";
@@ -13,7 +13,7 @@ export function AuditScreen() {
   const log = useAuditLog();
   const verify = useAuditVerify(isAdmin);
 
-  if (me.isPending) return <Spinner />;
+  if (me.isPending) return <SkeletonRows rows={8} />;
   if (!isAdmin || (log.error instanceof ApiError && log.error.status === 403)) {
     return <NonIdealState icon="lock" title="Administrators only" />;
   }

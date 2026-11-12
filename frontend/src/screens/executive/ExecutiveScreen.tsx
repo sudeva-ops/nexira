@@ -15,6 +15,9 @@ import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { quietLine } from "./quiet";
 import { trendParts } from "./trend";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
+import { ContextLine } from "../../ui/ContextLine";
 
 const REGION_COLOUR = (exposure: number) =>
   exposure >= 60 ? "#E76A6E" : exposure >= 35 ? "#EC9A3C" : "#4C90F0";
@@ -23,7 +26,7 @@ const REGION_COLOUR = (exposure: number) =>
 export function Figures({ o }: { o: Overview }) {
   const p = o.posture;
   return (
-    <div className="nx-g5 nx-mb">
+    <TileRow columns={5}>
       <Kpi
         icon="shield"
         label="Global posture"
@@ -76,7 +79,7 @@ export function Figures({ o }: { o: Overview }) {
         value={o.readiness.mean === null ? "—" : `${o.readiness.mean}/100`}
         detail={readinessDetail(o.readiness)}
       />
-    </div>
+    </TileRow>
   );
 }
 
@@ -189,7 +192,7 @@ function Regions({ regions }: { regions: Overview["regions"] }) {
 /** EXE-02: the missions and why, from the other modules (shared with the briefing). */
 export function AttentionTable({ rows }: { rows: Attention[] }) {
   if (!rows.length)
-    return <div className="nx-bd nx-dim">No mission requires attention.</div>;
+    return <Empty>No mission requires attention.</Empty>;
   return (
     <table
       className="nx-table-plain nx-exe-table"
@@ -254,9 +257,7 @@ export function Timeline({ t }: { t: Overview["timeline"] }) {
   }
   if (!t.recent.length)
     return (
-      <div className="nx-bd nx-dim" aria-label="Recent activity">
-        {quietLine(t.last, new Date())}
-      </div>
+      <Empty label="Recent activity">{quietLine(t.last, new Date())}</Empty>
     );
   return (
     <ul className="nx-bd nx-exe-timeline" aria-label="Recent activity">
@@ -285,18 +286,13 @@ export function ExecutiveScreen() {
   }
   return (
     <div className="nx-pad">
-      <div className="nx-row nx-mb">
-        <span className="nx-dim">
-          Worked out from live data
-          {o ? ` · ${formatStamp(o.generated_at)}` : ""} · simulated (D-19)
-        </span>
-        <span className="nx-grow" />
-        <Button
-          icon="document-share"
-          text="Export briefing"
-          onClick={() => navigate("/executive/briefing")}
-        />
-      </div>
+      <ContextLine
+        actions={
+          <Button icon="document-share" text="Export briefing" onClick={() => navigate("/executive/briefing")} />
+        }
+      >
+        Worked out from live data{o ? ` · ${formatStamp(o.generated_at)}` : ""} · simulated (D-19)
+      </ContextLine>
       {!o ? (
         <SkeletonRows rows={8} />
       ) : (

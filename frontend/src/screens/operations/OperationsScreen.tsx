@@ -10,6 +10,7 @@ import { useWeather } from "../../api/weather";
 import { addPoint, canFinish, type Draft } from "../../map/annotations";
 import { MapSearch } from "../../map/MapSearch";
 import { RECORD_ZOOM, type Result } from "../../map/search";
+import { TileRow } from "../../ui/TileRow";
 import { Card, Kpi } from "../../ui/primitives";
 import { buckets } from "../../ui/spark";
 import { useNow } from "../../ui/useNow";
@@ -136,7 +137,7 @@ export function OperationsScreen() {
 
   return (
     <div className="nx-ops">
-      <div className="nx-kpis">
+      <TileRow columns={5}>
         <Kpi
           icon="office"
           label="Missions monitored"
@@ -192,7 +193,7 @@ export function OperationsScreen() {
           alert={posture === "CRITICAL"}
           detail={worst ? `Driven by ${worst.reference}` : "No active incidents"}
         />
-      </div>
+      </TileRow>
       <div className="nx-card nx-mapwrap">
         <Suspense fallback={<Spinner className="nx-map-loading" />}>
           <OperationsMap

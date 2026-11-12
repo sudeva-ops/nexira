@@ -1,4 +1,4 @@
-import { HTMLSelect, NonIdealState } from "@blueprintjs/core";
+import { HTMLSelect } from "@blueprintjs/core";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -15,6 +15,8 @@ import { Card, ExerciseTag, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { CampaignDetail } from "./CampaignDetail";
 import { Composer } from "./Composer";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
 
 const DAY_MS = 86_400_000;
 const STATUS: Record<string, [string, string]> = {
@@ -62,7 +64,7 @@ export function NotifyScreen() {
 
   return (
     <div className="nx-pad">
-      <div className="nx-g4">
+      <TileRow>
         <Kpi
           icon="time"
           label="Awaiting approval"
@@ -83,14 +85,15 @@ export function NotifyScreen() {
           value={totals.FAILED ?? 0}
           detail="No fallback in the pilot (MN-11 deferred)"
         />
-      </div>
+      </TileRow>
 
       <div className="nx-ntf-grid">
         <div className="nx-col">
           <Card
             icon="send-message"
             title="Campaigns"
-            sub={`${list.length} shown · playbooks, agents and people`}
+            sub="Playbooks, agents and people"
+            chip={{ text: `${list.length} shown` }}
             actions={
               <div className="nx-row">
                 <HTMLSelect
@@ -133,7 +136,7 @@ export function NotifyScreen() {
             {campaigns.isLoading ? (
               <SkeletonRows />
             ) : list.length === 0 ? (
-              <NonIdealState icon="send-message" title="No campaigns" description="Nothing matches these filters." />
+              <Empty>No campaigns. Nothing matches these filters.</Empty>
             ) : (
               <div className="nx-ntf-scroll">
               <table className="nx-table-plain" aria-label="Campaigns">

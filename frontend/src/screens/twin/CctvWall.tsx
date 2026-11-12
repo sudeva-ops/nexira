@@ -222,7 +222,8 @@ export function CctvWall({
     <Card
       icon="mobile-video"
       title="CCTV"
-      sub={`${online} / ${cameras.length} online · simulated feeds; nothing is recorded`}
+      sub="Simulated feeds; nothing is recorded"
+      chip={{ text: `${online} / ${cameras.length} online`, tone: online === cameras.length ? "ok" : "warn" }}
       actions={
         cameras.length > key.length ? (
           <Button

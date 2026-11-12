@@ -6,6 +6,8 @@ import { type Replay, useReplay } from "../../api/replay";
 import { Card, ExerciseTag, Kpi, Sev } from "../../ui/primitives";
 import { useReducedMotion } from "../../ui/useMotion";
 import { axis, bounds, elapsed, entryAt, rate, SPEEDS, STATE_COLOUR, stateAt, step, toPlay, toRecord } from "./state";
+import { SkeletonRows } from "../../ui/Skeleton";
+import { plural } from "../../ui/format";
 
 // MapLibre is most of the bundle; load it only with this screen.
 const ReplayMap = lazy(() => import("../../map/ReplayMap").then((m) => ({ default: m.ReplayMap })));
@@ -141,7 +143,7 @@ function Player({ replay, initial }: { replay: Replay; initial: number | null })
             alert={(tally?.need_help ?? 0) > 0}
           />
         </div>
-        <Card icon="timeline-events" title="Timeline" sub={`${replay.timeline.length} entries`} className="nx-rpl-tl">
+        <Card icon="timeline-events" title="Timeline" chip={{ text: plural(replay.timeline.length, "entry", "entries") }} className="nx-rpl-tl">
           <div className="nx-bd nx-tl" ref={list} aria-label="Replay timeline">
             {replay.timeline.map((e, i) => (
               <div
@@ -228,7 +230,7 @@ export function ReplayScreen() {
   const [initialT] = useState(initial); // read once: the player writes t back as it moves
   if (!id) return <NonIdealState icon="play" title="No incident chosen" description={<Link to="/incidents">Choose an incident</Link>} />;
   if (replay.isError) return <NonIdealState icon="error" title="The replay could not be loaded" />;
-  if (!replay.data) return <NonIdealState icon={<Spinner />} title="Loading the record…" />;
+  if (!replay.data) return <SkeletonRows rows={8} />;
   const r = replay.data;
   return (
     <div className="nx-rpl-page">

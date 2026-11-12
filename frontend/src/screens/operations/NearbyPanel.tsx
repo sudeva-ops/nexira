@@ -1,10 +1,12 @@
-import { Button, ButtonGroup, NonIdealState, Spinner } from "@blueprintjs/core";
+import { Button, ButtonGroup, NonIdealState } from "@blueprintjs/core";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { annotationWhat, type AnnotationKind, type AnnotationSymbol } from "../../api/annotations";
 import { distanceText, type Near, RADII_KM, useNearby } from "../../api/nearby";
 import { Card, Sev } from "../../ui/primitives";
+import { Empty } from "../../ui/Empty";
+import { SkeletonRows } from "../../ui/Skeleton";
 
 // Nearby on Global Operations (NBY-01..06; D-52; plan-pilot-map §3): what is within the chosen
 // radius of a point, nearest first. Each row flies the map to it; an incident opens its impact
@@ -18,7 +20,7 @@ function Section({ title, count, children }: { title: string; count: number; chi
       <h4>
         {title} <span className="nx-dim">{count}</span>
       </h4>
-      {count === 0 ? <div className="nx-dim">None in range</div> : children}
+      {count === 0 ? <Empty>None in range</Empty> : children}
     </section>
   );
 }
@@ -69,7 +71,7 @@ export function NearbyPanel({
       {isError ? (
         <NonIdealState icon="error" title="Nearby could not be loaded" />
       ) : isPending || !data ? (
-        <Spinner size={20} />
+        <SkeletonRows rows={3} />
       ) : (
         <div className="nx-near-body">
           <Section

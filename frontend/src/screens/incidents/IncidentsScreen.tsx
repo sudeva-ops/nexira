@@ -1,4 +1,3 @@
-import { NonIdealState } from "@blueprintjs/core";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
@@ -8,6 +7,8 @@ import { FlashRow } from "../../ui/motion";
 import { Card, ExerciseTag, Sev } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { IncidentDetail } from "./IncidentDetail";
+import { Empty } from "../../ui/Empty";
+import { plural } from "../../ui/format";
 
 const TABS: { label: string; status?: IncidentStatus }[] = [
   { label: "All" },
@@ -34,7 +35,7 @@ export function IncidentsScreen() {
       <Card
         icon="warning-sign"
         title="Incidents"
-        sub={incidents && `${incidents.length} incidents`}
+        chip={incidents && { text: plural(incidents.length, "incident") }}
         actions={
           <div className="nx-tabs" role="tablist">
             {TABS.map((t, i) => (
@@ -96,7 +97,7 @@ export function IncidentsScreen() {
             </tbody>
           </table>
         ) : (
-          <NonIdealState icon="tick-circle" title="No incidents" />
+          <Empty>No incidents.</Empty>
         )}
       </Card>
       {selectedId ? <IncidentDetail key={selectedId} incidentId={selectedId} /> : <div />}

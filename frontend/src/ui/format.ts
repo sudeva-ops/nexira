@@ -86,3 +86,8 @@ export function roleLabel(roles: string): string {
     .map((r) => ROLE_LABEL[r.trim()] ?? r.trim())
     .join(" or ");
 }
+
+/** DC-05: "1 incident", "3 incidents"; `many` for an irregular plural ("1 entry", "2 entries"). */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n.toLocaleString("en-GB")} ${n === 1 ? one : many}`;
+}

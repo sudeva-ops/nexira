@@ -15,6 +15,7 @@ import { formatStamp } from "../../app/time";
 import { flightColour } from "../../map/geo";
 import { Card, Sev } from "../../ui/primitives";
 import { PendingProposals } from "../queue/PendingProposals";
+import { Empty } from "../../ui/Empty";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "Draft",
@@ -83,7 +84,7 @@ export function TripDetail({ trip, onEdit }: { trip: Detail; onEdit: (trip: Deta
           <div>
             <div className="nx-lbl">Itinerary</div>
             {trip.segments.length === 0 ? (
-              <div className="nx-dim">No itinerary yet</div>
+              <Empty>No itinerary yet</Empty>
             ) : (
               <div className="nx-tl" aria-label="Itinerary">
                 {trip.segments.map((s) => (

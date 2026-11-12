@@ -8,6 +8,7 @@ import { SEVERITY_COLOUR } from "../../map/geo";
 import { feedItems, MERGE_MS } from "./feed";
 import { categoryLabel } from "../../ui/format";
 import { Sev, SourceChip } from "../../ui/primitives";
+import { Empty } from "../../ui/Empty";
 
 /** Ids of signals that just fused, each kept for MERGE_MS. */
 function useMergingSignals(): Set<number> {
@@ -41,7 +42,7 @@ export function LiveFeed({ incidents, signals, onSelect }: Props) {
   const merging = useMergingSignals();
   const items = feedItems(incidents, signals, merging);
   if (items.length === 0) {
-    return <div className="nx-feed-empty nx-dim">No signals yet.</div>;
+    return <Empty>No signals yet.</Empty>;
   }
   return (
     <div className="nx-feed" aria-label="Live intelligence feed">

@@ -1,4 +1,4 @@
-import { Button, Icon, NonIdealState } from "@blueprintjs/core";
+import { Button, Icon } from "@blueprintjs/core";
 import { useState } from "react";
 
 import { useCampaigns, useCheckinResponses } from "../../api/checkin";
@@ -20,7 +20,7 @@ import {
 } from "../../api/partners";
 import { canRequestPartner } from "../../api/permissions";
 import { formatStamp } from "../../app/time";
-import { initials } from "../../ui/format";
+import { initials, plural } from "../../ui/format";
 import { FlashRow } from "../../ui/motion";
 import { Ring } from "../../ui/Ring";
 import { remaining } from "../../ui/spark";
@@ -28,6 +28,8 @@ import { useNow } from "../../ui/useNow";
 import { Card, Kpi } from "../../ui/primitives";
 import { SkeletonRows } from "../../ui/Skeleton";
 import { type RequestFor, RequestDialog } from "./RequestDialog";
+import { TileRow } from "../../ui/TileRow";
+import { Empty } from "../../ui/Empty";
 
 const STATUS_SEV: Record<RequestStatus, string> = {
   REQUESTED: "med",
@@ -156,7 +158,7 @@ export function PartnersScreen() {
           />
         </div>
       )}
-      <div className="nx-g4">
+      <TileRow>
         <Kpi
           icon="heart"
           label="Contracted partners"
@@ -177,14 +179,14 @@ export function PartnersScreen() {
           detail={coverage.gaps.length ? `${coverage.gaps.length} gaps flagged` : "Every service everywhere"}
         />
         <Kpi icon="satellite" label="Partner systems" value="Simulated" detail="No partner is contacted (D-36)" />
-      </div>
+      </TileRow>
 
       <div className="nx-partners-grid">
         <Card icon="heart" title="Partner network" sub="Fictional partners · simulated">
           {partners.isLoading ? (
             <SkeletonRows />
           ) : list.length === 0 ? (
-            <NonIdealState icon="heart" title="No partners" description="Seeded with `make reset-demo` (D-36)." />
+            <Empty>No partners. Seeded with `make reset-demo` (D-36).</Empty>
           ) : (
             <div className="nx-plist" aria-label="Partner network">
               {list.map((p, n) => {
@@ -212,9 +214,9 @@ export function PartnersScreen() {
           )}
         </Card>
         <div className="nx-col">
-          <Card icon="flash" title="Requests" sub={`${requests.length} · live`}>
+          <Card icon="flash" title="Requests" chip={{ text: plural(requests.length, "request"), tone: "live" }}>
             {requests.length === 0 ? (
-              <div className="nx-feed-empty nx-dim">No requests. Partners are engaged by playbooks or by a person.</div>
+              <Empty>No requests. Partners are engaged by playbooks or by a person.</Empty>
             ) : (
               <table className="nx-table-plain" aria-label="Partner requests">
                 <thead>

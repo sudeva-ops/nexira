@@ -1,4 +1,4 @@
-import { Icon, Spinner } from "@blueprintjs/core";
+import { Icon } from "@blueprintjs/core";
 
 import { ago } from "../../app/time";
 import {
@@ -12,6 +12,8 @@ import {
 } from "../../api/weather";
 import { FlashRow } from "../../ui/motion";
 import { Card } from "../../ui/primitives";
+import { Empty } from "../../ui/Empty";
+import { SkeletonRows } from "../../ui/Skeleton";
 
 /** WX-02: current conditions at every mission, worst first; stale readings flagged (G-6). */
 export function WeatherPanel() {
@@ -36,9 +38,9 @@ export function WeatherPanel() {
       }
     >
       {weather.isLoading ? (
-        <Spinner size={20} />
+        <SkeletonRows rows={3} />
       ) : rows.length === 0 ? (
-        <div className="nx-feed-empty nx-dim">No conditions yet: the weather feed runs in the worker.</div>
+        <Empty>No conditions yet: the weather feed runs in the worker.</Empty>
       ) : (
         <div className="nx-weather-body">
           <table className="nx-table-plain nx-weather-table" aria-label="Weather at missions">
