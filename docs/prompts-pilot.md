@@ -1312,3 +1312,43 @@ disc on Operations and Air; after scene 1 the mini-map shows the incident and op
 Operations. In make acceptance before twa-acceptance.spec.ts. Report the real output; make
 acceptance (all specs) still passes.
 ```
+
+## Pilot module 28 · Design consistency (D-56)
+
+Requirements DC-01..DC-08 (`docs/requirements-pilot.md` §131–135); plan `docs/plan-pilot-dc.md`. None of these prompts is 🔒.
+
+### Prompt 147 · Shared components and the style fixes
+```
+DC-03..DC-08 (plan §1, G-5..G-8). ui/: Empty, ContextLine, TileRow, Card's chip, plural().
+Every card's NonIdealState and dim sentence becomes Empty; NonIdealState stays for errors, no
+access and not found (G-6). Panel spinners become SkeletonRows (G-7). Header counts move to the
+chip. ContextLine on Executive, Site Twin, Decision Queue, AI Agents and Health (G-8). Sentences
+out of monospace. Tests: Vitest for each component; existing tests updated, none deleted.
+Screenshots of every changed screen in the PR.
+```
+
+### Prompt 148 · Tile rows
+```
+DC-01, DC-05 (G-1..G-4). TileRow on Incidents, Response Playbooks, Predictive Risk and Audit;
+Safety Check-in and After-Action Review show theirs at rest, with empty panels. Audit's chain
+status and log in cards. Figures from APIs each screen already calls; "—" before they load;
+"200+" for Audit's day count when the page is full. Tests: Vitest for each tile's figure and
+the at-rest layouts. Screenshots in the PR.
+```
+
+### Prompt 149 · Sparklines
+```
+DC-02 (G-9). Kpi trend on Mass Notification's 24h tiles, AI Agents' Proposals, Exercises ·
+year, Incidents' Opened · 30 days, Playbooks' Runs · 30 days and Audit's Entries · 24 h, from
+buckets() over times the screens load. None without history; none on state tiles. Tests:
+Vitest for each tile's buckets. Screenshots in the PR.
+```
+
+### Prompt 150 · Acceptance
+```
+Playwright, real stack (§134): dc-acceptance.spec.ts as the Administrator at 1440 × 900, every
+screen in the sidebar. After make reset-demo: the DC-01 screens have their tile row; no
+page-filling empty state on a working screen; once loaded, no spinner outside a button or
+dialog; no sentence in monospace; at most one chip per card header. In make acceptance
+before twa-acceptance.spec.ts. Report the real output; make acceptance (all specs) still passes.
+```
