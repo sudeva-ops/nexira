@@ -16,6 +16,7 @@ import { ATTRIBUTION, baseStyle } from "./style";
 export function MiniMap({ incident, missions }: { incident: IncidentDetail; missions: Mission[] }) {
   const container = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<MapLibreMap | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
   const navigate = useNavigate();
   const { lon, lat } = incident;
 
@@ -25,14 +26,20 @@ export function MiniMap({ incident, missions }: { incident: IncidentDetail; miss
     registerPmtiles();
     void tilesAvailable().then((tiles) => {
       if (disposed || !container.current) return;
-      const m = new MapLibreMap({
-        container: container.current,
-        style: baseStyle(window.location.origin, tiles),
-        center: [lon, lat],
-        zoom: miniZoom(lon, lat),
-        interactive: false,
-        attributionControl: { compact: false, customAttribution: ATTRIBUTION },
-      });
+      let m: MapLibreMap;
+      try {
+        m = new MapLibreMap({
+          container: container.current,
+          style: baseStyle(window.location.origin, tiles),
+          center: [lon, lat],
+          zoom: miniZoom(lon, lat),
+          interactive: false,
+          attributionControl: { compact: false, customAttribution: ATTRIBUTION },
+        });
+      } catch {
+        setUnavailable(true); // no WebGL here: say so, and the link still works
+        return;
+      }
       created = m;
       m.on("load", () => {
         if (disposed) return;
@@ -109,7 +116,9 @@ export function MiniMap({ incident, missions }: { incident: IncidentDetail; miss
       title="Open in Global Operations"
       onClick={() => void navigate(`/operations?incident=${incident.id}`)}
     >
-      <div className="nx-minimap-map" ref={container} data-testid="mini-map" />
+      <div className="nx-minimap-map" ref={container} data-testid="mini-map">
+        {unavailable && <div className="nx-map-note">This browser cannot draw the map (WebGL).</div>}
+      </div>
     </button>
   );
 }

@@ -7,9 +7,11 @@ import { DETAIL, MISSIONS } from "../test/fixtures";
 import { MiniMap } from "./MiniMap";
 
 const created = vi.hoisted(() => [] as Record<string, unknown>[]);
+const gpu = vi.hoisted(() => ({ missing: false }));
 vi.mock("maplibre-gl", () => ({
   Map: class {
     constructor(options: Record<string, unknown>) {
+      if (gpu.missing) throw new Error("WebGL2 is required to display this map.");
       created.push(options);
     }
     on() {}
@@ -41,5 +43,17 @@ describe("MiniMap (GFX-08)", () => {
     expect(created[0]).not.toHaveProperty("projection");
     await userEvent.click(screen.getByRole("button", { name: `Open ${DETAIL.reference} in Global Operations` }));
     expect(screen.getByTestId("where")).toHaveTextContent(`/operations?incident=${DETAIL.id}`);
+  });
+
+  it("says so, and still links, where the browser has no WebGL", async () => {
+    gpu.missing = true;
+    render(
+      <MemoryRouter>
+        <MiniMap incident={DETAIL} missions={MISSIONS} />
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText("This browser cannot draw the map (WebGL).")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: `Open ${DETAIL.reference} in Global Operations` })).toBeEnabled();
+    gpu.missing = false;
   });
 });
