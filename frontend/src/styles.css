@@ -4174,6 +4174,7 @@ tr.nx-flash-b > td {
 
 .nx-cctv-feed video.mirrored.tight {
   transform: scaleX(-1) scale(1.3);
+  transform-origin: 50% 60%; /* flipped about its centre, or the picture slides out of the tile */
 }
 
 .nx-cctv-feed.clip::after {
@@ -4585,14 +4586,6 @@ tr.nx-flash-b > td {
   margin: 0;
   padding: 0;
   list-style: none;
-}
-
-/* TWN-15 (D-53): the zone's people as flat figures over a clip, on a transparent layer, drawn
-   from presence and never from the picture (plan-pilot-twa G-8). */
-.nx-cctv-feed canvas.nx-cctv-figures {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
 }
 
 /* --- Design consistency (D-56) --------------------------------------------------- */

@@ -116,6 +116,8 @@ test("Site Twin live activity: a normal day, moves for every role, paused by NBO
   const cameras = (await twin()).sensors.filter((s) => s.kind === "CCTV" && s.status !== "OFFLINE");
   const tiles = page.locator(".nx-cctv-tile [data-camera]");
   await expect(tiles.first()).toBeVisible();
+  // TWN-18 (D-57): nothing is drawn over a clip.
+  await expect(page.locator(".nx-cctv-feed.clip canvas")).toHaveCount(0);
   for (const tile of await tiles.all()) {
     const code = await tile.getAttribute("data-camera");
     const zone = cameras.find((c) => c.code === code)?.zone_code;

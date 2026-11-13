@@ -101,7 +101,7 @@ describe("the CCTV wall", () => {
       "CAM-14 · Muster point",
     ]);
     expect(screen.getByText("7 / 8 online")).toBeInTheDocument(); // DC-05: the header's chip
-    expect(screen.getByText("Simulated feeds; nothing is recorded")).toBeInTheDocument();
+    expect(screen.getByText("Stock footage, looped · counts come from access control")).toBeInTheDocument(); // TWN-19
     await userEvent.click(screen.getByRole("button", { name: "Show all 8" }));
     expect(tiles()).toHaveLength(8);
     await userEvent.click(screen.getByRole("button", { name: "Key cameras" }));
@@ -118,9 +118,15 @@ describe("the CCTV wall", () => {
     expect(feed("CAM-05")).toHaveTextContent("CAM-05 · LOBBY & RECEPTION");
     expect(feed("CAM-07")).toHaveTextContent("NO SIGNAL");
     expect(feed("CAM-07")).not.toHaveTextContent("REC");
-    // TWN-15: over a clip, the zone's people as figures from presence; none on a dead camera.
-    expect(feed("CAM-05").querySelector('[data-testid="figures-CAM-05"]')).not.toBeNull();
-    expect(feed("CAM-07").querySelector("canvas.nx-cctv-figures")).toBeNull();
+    // TWN-18 (D-57): a clip plays with nothing drawn over it; a dead camera has no clip.
+    expect(feed("CAM-05").querySelector("video")).not.toBeNull();
+    expect(feed("CAM-05").querySelector("canvas")).toBeNull();
+    expect(feed("CAM-07").querySelector("video")).toBeNull();
+    // With no clip installed, the camera falls back to its generated view, figures and all.
+    fireEvent.error(feed("CAM-05").querySelector("video") as HTMLVideoElement);
+    expect(feed("CAM-05").querySelector("video")).toBeNull();
+    expect(feed("CAM-05").querySelector('[data-testid="drawn-CAM-05"]')).not.toBeNull();
+    expect(feed("CAM-05")).toHaveTextContent("2 in zone · access control (simulated)");
     expect(feed("CAM-07")).not.toHaveTextContent("in zone");
     await userEvent.click(
       screen.getByRole("button", { name: "CAM-05 · Lobby & reception" }),

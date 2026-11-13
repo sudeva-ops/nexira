@@ -83,6 +83,8 @@ Each tile gets a corner label, "7 in zone · access control (simulated)", from p
 
 **As built in Prompt 137:** the figures over a clip are the generated views' own walkers (`cctv.ts` `walkers`, `people`) at 72% opacity on a transparent canvas, under the same camera filter as the picture; the tile's label reads "N in zone · access control (simulated)", with a tooltip saying where the count comes from. An offline camera shows NO SIGNAL with no figures and no count.
 
+**Changed in Prompt 151 (D-57, TWN-17..19):** nothing is drawn over a clip any more. The clips for the gates, the lobby and the offices now show people seen from behind or from far away; no suitable clip was found for the consular hall, the conference room or the muster point, which keep their empty clips, as do the safe room, the comms room and the suite (§139 Q1, Q4). The figures remain only in generated views, shown when no clip is installed. The card's sub-line reads "Stock footage, looped · counts come from access control".
+
 ## 6. Acceptance (§119)
 
 `frontend/e2e/twa-acceptance.spec.ts` runs at the end of `make acceptance`, after the Exercise & Training run's reset, with the normal day switched on by the spec. It checks:
