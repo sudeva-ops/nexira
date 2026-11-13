@@ -9,8 +9,9 @@ import { CLIP, grain, H, noiseTile, people, rng, scene, step, W, walkers } from 
 
 // TWN-03 (simulated): the site's CCTV, one view per camera. A camera plays its zone kind's
 // clip from /cctv/ (self-hosted, looped, muted; frontend/public/cctv/README.md), each camera at
-// its own point in the loop and a zone's second camera mirrored, so the wall looks live. With no
-// clip, it draws a generated view peopled from the twin's occupancy. Six key cameras, all on
+// its own point in the loop and a zone's second camera mirrored, so the wall looks live. A clip
+// is stock footage and nothing is drawn over it (TWN-18, D-57). With no clip, it draws a
+// generated view peopled from the twin's occupancy. Six key cameras, all on
 // request; an offline camera shows NO SIGNAL. Nothing is filmed or stored. Under reduced motion
 // each view is a still frame. A camera opens enlarged from its tile, or from the plan, the sensor
 // list or an incident's SITE entry (TWN-10).
@@ -77,9 +78,9 @@ function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; lar
   const reduced = useReducedMotion();
   const offline = !camera.sensor.online;
   const [drawn, setDrawn] = useState(false); // no clip for this zone kind: draw the view
-  // TWN-15 (D-53, plan-pilot-twa G-8): over a clip, the zone's people as flat figures on a
-  // transparent layer; never derived from the picture (§108 Q5).
-  const overlay = !offline && !drawn;
+  // TWN-18 (D-57): a clip plays as it is, with no figures drawn over it. The count in the corner
+  // is presence's, never the picture's (TWN-19, §108 Q5).
+  const clip = !offline && !drawn;
   const kinds = useMemo(
     () => twin.occupants.filter((o) => o.zone_code === camera.zone.code).map((o) => o.kind),
     [twin.occupants, camera.zone.code],
@@ -88,7 +89,7 @@ function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; lar
   useEffect(() => {
     const el = canvas.current;
     const ctx = el?.getContext("2d");
-    if (!el || !ctx) return undefined; // no canvas (tests): the overlay still says what it is
+    if (!el || !ctx) return undefined; // a clip is playing (no canvas), or no canvas support (tests)
     const r = rng(camera.sensor.code);
     const noise = noiseTile(r);
     const still = document.createElement("canvas");
@@ -109,13 +110,6 @@ function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; lar
         return;
       }
       step(crowd, camera.zone.kind, dt, r);
-      if (overlay) {
-        ctx.clearRect(0, 0, W, H);
-        ctx.globalAlpha = 0.72;
-        people(ctx, crowd);
-        ctx.globalAlpha = 1;
-        return;
-      }
       ctx.drawImage(still, 0, 0);
       people(ctx, crowd);
       grain(ctx, noise, r, 0.07);
@@ -141,7 +135,7 @@ function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; lar
       cancelAnimationFrame(frame);
       seen?.disconnect();
     };
-  }, [camera.sensor.code, camera.zone.kind, kinds, offline, reduced, drawn, overlay]);
+  }, [camera.sensor.code, camera.zone.kind, kinds, offline, reduced, clip]);
 
   const now = useNow(!reduced);
   return (
@@ -149,15 +143,11 @@ function Feed({ camera, twin, large = false }: { camera: Camera; twin: Twin; lar
       className={`nx-cctv-feed${offline ? " off" : ""}${offline || drawn ? "" : " clip"}${large ? " large" : ""}`}
       data-camera={camera.sensor.code}
     >
-      {overlay && <Clip camera={camera} still={reduced} onMissing={() => setDrawn(true)} />}
-      <canvas
-        ref={canvas}
-        width={W}
-        height={H}
-        aria-hidden="true"
-        className={overlay ? "nx-cctv-figures" : undefined}
-        data-testid={overlay ? `figures-${camera.sensor.code}` : undefined}
-      />
+      {clip ? (
+        <Clip camera={camera} still={reduced} onMissing={() => setDrawn(true)} />
+      ) : (
+        <canvas ref={canvas} width={W} height={H} aria-hidden="true" data-testid={`drawn-${camera.sensor.code}`} />
+      )}
       <div className="nx-cctv-hud">
         <span className="tl" title={`${camera.sensor.code} · ${camera.zone.name}`}>
           {camera.sensor.code} · {camera.zone.name.toUpperCase()}
@@ -222,7 +212,7 @@ export function CctvWall({
     <Card
       icon="mobile-video"
       title="CCTV"
-      sub="Simulated feeds; nothing is recorded"
+      sub="Stock footage, looped · counts come from access control"
       chip={{ text: `${online} / ${cameras.length} online`, tone: online === cameras.length ? "ok" : "warn" }}
       actions={
         cameras.length > key.length ? (

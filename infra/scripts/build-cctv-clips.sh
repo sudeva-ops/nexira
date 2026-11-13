@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # The Site Twin's CCTV clips (TWN-03, simulated), built into frontend/public/cctv/ (git-ignored).
 #
-# Nine free stock clips of empty places from Pexels (https://www.pexels.com/license/: free to
+# Nine free stock clips from Pexels (https://www.pexels.com/license/: free to
 # use and modify, no attribution required; not to be redistributed on other stock sites or sold
 # unaltered). Each is trimmed, re-timed and made into a seamless loop, so what the app serves
 # is altered; and the files stay out of git, so this public repository never redistributes
-# them. No clip shows a person. The running app never fetches them from the internet: the
+# them. Three clips show people, only from behind or from far away, so that no face can be made
+# out (TWN-17, D-57): the gates, the lobby and the offices. Every frame of those loops was
+# checked by eye; check again before changing a row. The other six are empty places: no
+# suitable clip was found for the consular hall, the conference room or the muster point. The running app never fetches them from the internet: the
 # frontend image serves them (D-24). Without them the CCTV wall draws generated views.
 #
 #   make cctv-clips          # download (checked against SHA-256), then build the loops
@@ -24,10 +27,10 @@ sha256() { if command -v sha256sum >/dev/null; then sha256sum "$1"; else shasum 
 # mode: loop     a static camera; the last second cross-fades into the first
 #       sweep    a slow pan, played forward then back, as a patrolling PTZ camera
 CLIPS=(
-  "gate|40293228|17211280_2560_1440_24fps.mp4|99e74ea221b8afd46a403653c9fa3cb18ce2bbd71b9c45f19e2447cfe8b116fc|0|7.3|1.1|sweep|AP Vibes"
-  "lobby|5203510|5203510-hd_1280_720_60fps.mp4|f97f3722eac7f3918338276906955f585f906bfbf6e37dfaffdc9e1a278d7795|0|3.6|2|sweep|Enrique Silva"
+  "gate|5899392|5899392-hd_1280_720_24fps.mp4|f9a186fa09e3b1228aa6990528cc50957d6ba9c824205f74ac2da9ef48e57558|1|10|1|loop|RDNE Stock project"
+  "lobby|10868348|10868348-hd_1280_720_30fps.mp4|9bf7af548092de3d09b21dac9419a8688f48fe710bbabda2a0e4ba0246f6a1ed|0|10|1|loop|see the Pexels page"
   "consular|5203514|5203514-hd_1280_720_60fps.mp4|465b23a19af9be00275c607602926561ea6c71c875f55d634468e212d31b9cc1|0|2.8|2.5|sweep|Enrique Silva"
-  "office|5483080|5483080-hd_1366_720_25fps.mp4|d1460710ddae9f094056ee1539bc974741f848f4a0baf7253b621a45c289427e|1|10|1|loop|cottonbro studio"
+  "office|11903990|11903990-hd_1280_720_25fps.mp4|35d5215a60fc8454c29f10e4a6cfe55d1d47882d9765c6226b8e03bddb6ab68f|5.8|10|1|loop|see the Pexels page"
   "conference|5716999|5716999-hd_1280_720_25fps.mp4|3d07f77e0d8894c43218b95b612b49e0d03c1ffd07e5b620999dcf8274fb3df4|2|8|1|sweep|Tima Miroshnichenko"
   "comms|5028622|5028622-hd_1280_720_25fps.mp4|6f21f24a028347ae3b2c1d872b71f88ff3abdf734eadaf122ec901add3f0664d|4|6|1.3|sweep|ALL IZ Well"
   "safe-room|19217894|19217894-hd_1280_720_30fps.mp4|8c1bdb25627ba7f98db18ce3a6f3626fa50e0b95812457b40452488282ab3b7f|0|9.5|1|sweep|Nino Souza"
