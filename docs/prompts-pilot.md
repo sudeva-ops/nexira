@@ -1352,3 +1352,21 @@ page-filling empty state on a working screen; once loaded, no spinner outside a 
 dialog; no sentence in monospace; at most one chip per card header. In make acceptance
 before twa-acceptance.spec.ts. Report the real output; make acceptance (all specs) still passes.
 ```
+
+## Pilot module 29 · Site Twin: people in the camera clips (D-57)
+
+Requirements TWN-17..TWN-19 (`docs/requirements-pilot.md` §136–139). One prompt; the change is
+small enough that its plan is the prompt. Not 🔒.
+
+### Prompt 151 · People in the camera clips
+```
+TWN-17..19 (D-57). infra/scripts/build-cctv-clips.sh: replace the clips for the gates, lobby,
+consular hall, offices, conference room and muster point with free-licence stock clips of
+people seen from behind or at a distance (SHA-256 pinned, as now); a zone kind with no suitable
+clip keeps its empty one. Check every frame of each built loop; contact sheets in the PR.
+CctvWall.tsx: no figures layer over a clip; generated views and NO SIGNAL unchanged; the card's
+sub-line "Stock footage, looped · counts come from access control". README.md in
+frontend/public/cctv and plan-pilot-twa.md ("As built") updated. Tests: Vitest for the wall;
+twa-acceptance.spec.ts checks no figures layer over a clip and the counts as before. Report the
+real output; make acceptance (all specs) still passes.
+```
