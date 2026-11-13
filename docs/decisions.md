@@ -343,6 +343,11 @@ Rules:
 - **Shared components in `ui/`,** checked by a Playwright sweep of every screen.
 - **Real data only.** Tiles and sparklines read APIs the screens already use; a tile that would need a new API is raised as a gap, not added. No schema change; nothing is 🔒. Colours, fonts and the theme are unchanged (D-25).
 
+**D-57 · Site Twin: people in the camera clips.** Option chosen by the product owner on 2026-11-13. Requirements TWN-17 to TWN-19 (§136–139) in `docs/requirements-pilot.md`, with the defaults in §139. It changes D-53's TWN-15 and §120 Q3.
+- **Stock footage of people, never a face.** The camera clips may show people seen from behind or at a distance, under a licence that allows use and modification, checked frame by frame; no clip in which a person could be identified. Self-hosted and out of git, as before (D-24).
+- **No drawn figures over a clip.** Generated views, shown only when no clip is installed, keep theirs.
+- **The count is still not the picture.** Counts come from presence; the wall says the footage is looped stock. No schema change; nothing is 🔒.
+
 ---
 
 ## 7. Phase 1 acceptance scenario: NBO-CIVIL-UNREST
