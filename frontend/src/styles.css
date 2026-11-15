@@ -3007,17 +3007,18 @@ tr.nx-flash-b > td {
   }
 }
 
-/* A faint radar sweep over the operations map. The gradient turns, not the element, so the clip
-   that keeps it on the globe (GFX-04, map/three.ts clipSweep) stays put. */
-@property --nx-sweep-angle {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-
+/* A faint scan over the operations map: a band of light that crosses it from left to right, its
+   bright edge leading and a trail fading behind, then a short pause off-screen before the next
+   pass. The band moves through the background, not the element, so the clip that keeps it on the
+   globe (GFX-04, map/three.ts clipSweep) stays put. The band is 30% of the frame wide, so -43% and
+   143% put it just off the left and right edges. */
 @keyframes nx-sweep {
-  to {
-    --nx-sweep-angle: 360deg;
+  0% {
+    background-position-x: -43%;
+  }
+  80%,
+  100% {
+    background-position-x: 143%;
   }
 }
 
@@ -3026,15 +3027,17 @@ tr.nx-flash-b > td {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: conic-gradient(
-    from var(--nx-sweep-angle),
-    rgba(76, 144, 240, 0.2),
-    rgba(76, 144, 240, 0.05) 12%,
-    transparent 22%
-  );
+  background: linear-gradient(
+      to right,
+      transparent,
+      rgba(76, 144, 240, 0.05) 70%,
+      rgba(76, 144, 240, 0.2) 97%,
+      transparent
+    )
+    -43% 0 / 30% 100% no-repeat;
   clip-path: var(--nx-sweep-clip, none);
   pointer-events: none;
-  animation: nx-sweep 9s linear infinite;
+  animation: nx-sweep 6s linear infinite;
 }
 
 /* Calm mode (user menu): no motion at all, as with reduced motion. */

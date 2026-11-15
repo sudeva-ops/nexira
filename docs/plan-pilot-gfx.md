@@ -45,6 +45,8 @@ No schema change, and nothing here is 🔒 under D-29. The one API change is a `
 - **G-8, layout.** The Queue's Agent activity card and Executive's paired panels stretch to their row, and the trend chart grows with its card. At 1440 × 900 after a reset, the lowest card in each column ends 160 px (Queue) and 184 px (Executive) above the bottom of the content area, against a limit of 300 px.
 - **GFX-08, the credit.** The mini-map shows the full credit line, not MapLibre's compact one: a still map is never moved, so the compact credit would stay open over the map, and its button could not be clicked inside a map that opens Global Operations.
 
+**Changed in Prompt 152 (product owner's request, 2026-11-15; display only, no requirement changed):** the sweep no longer turns around the centre of the map, which on the starting view sat over Africa. It is now a band of light that crosses the map from left to right every 6 s, its bright edge leading, then rests off-screen briefly. The band moves through the background (`background-position-x`), so the element and its clip to the globe (GFX-04) stay where they are; `@property --nx-sweep-angle` is gone. The GFX-04 check in `gfx-acceptance.spec.ts` found the rim from the picture alone; where the globe's edge is dark ocean the limb is only 2–3 px wide, the search ran on into the globe and read its ocean as space (score 26–31 against 12). Since the globe turns from the start, whether that happened depended on the moment, and the new band's timing made it frequent. On Global Operations the check now never puts the rim inside the disc the sweep is clipped to; Air Travel is measured as before.
+
 ## 3. Prompts
 
 As `docs/prompts-pilot.md` Prompts 143–146. None is 🔒.
