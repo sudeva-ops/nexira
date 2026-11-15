@@ -47,6 +47,8 @@ No schema change, and nothing here is 🔒 under D-29. The one API change is a `
 
 **Changed in Prompt 152 (product owner's request, 2026-11-15; display only, no requirement changed):** the sweep no longer turns around the centre of the map, which on the starting view sat over Africa. It is now a band of light that crosses the map from left to right every 6 s, its bright edge leading, then rests off-screen briefly. The band moves through the background (`background-position-x`), so the element and its clip to the globe (GFX-04) stay where they are; `@property --nx-sweep-angle` is gone. The GFX-04 check in `gfx-acceptance.spec.ts` found the rim from the picture alone; where the globe's edge is dark ocean the limb is only 2–3 px wide, the search ran on into the globe and read its ocean as space (score 26–31 against 12). Since the globe turns from the start, whether that happened depended on the moment, and the new band's timing made it frequent. On Global Operations the check now never puts the rim inside the disc the sweep is clipped to; Air Travel is measured as before.
 
+**Changed in Prompt 153 (product owner's request, 2026-11-15; display only):** the band now goes back as well: left to right, then right to left, 12 s for the round trip, its bright edge leading both ways. The gradient's direction is `@property --nx-sweep-dir` (90deg, then 270deg), flipped while the band rests off-screen at each turn, so the flip is never seen.
+
 ## 3. Prompts
 
 As `docs/prompts-pilot.md` Prompts 143–146. None is 🔒.
