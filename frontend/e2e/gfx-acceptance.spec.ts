@@ -40,14 +40,30 @@ async function blankBelow(page: Page, grid: string) {
 /** GFX-04: along the middle row of the map, the space from each edge to just short of the globe's
  *  rim. Each 16 px stretch's median colour must match the space at the map's left edge: a star is
  *  a dot and does not move a median, a band or glow would. The space itself must be dark and
- *  plain. Returns the worst distance from it. */
+ *  plain. Returns the worst distance from it.
+ *  The rim is found from the picture, but where the globe's edge is dark ocean the bright limb is
+ *  only 2-3 px wide and the search runs on into the globe, reading its ocean as space. So on a map
+ *  that knows its disc (Global Operations: the sweep's clip, set from MapLibre's globe), the rim is
+ *  never taken to lie inside that disc. */
 async function outsideTheDisc(page: Page, testId: string) {
   const map = page.getByTestId(testId);
   const box = await map.boundingBox();
   if (!box) return null;
+  const disc = await map.evaluate((e) => {
+    const frame = e.closest(".nx-mapwrap");
+    if (!frame) return null;
+    const m = /^circle\(([\d.]+)px at ([\d.]+)px ([\d.]+)px\)$/.exec(getComputedStyle(frame, "::after").clipPath);
+    if (!m) return null;
+    const [own, at] = [e.getBoundingClientRect(), frame.getBoundingClientRect()];
+    const [r, cx, cy] = [Number(m[1]), Number(m[2]) + at.left - own.left, Number(m[3]) + at.top - own.top];
+    const dy = Math.round(own.height / 2) - cy; // the middle row, where the disc is measured
+    if (Math.abs(dy) >= r) return null;
+    const half = Math.sqrt(r * r - dy * dy);
+    return { left: Math.floor(cx - half), right: Math.ceil(cx + half) };
+  });
   const shot = (await page.screenshot({ clip: box })).toString("base64");
   return page.evaluate(
-    async (shot) => {
+    async ([shot, disc]) => {
       const img = new Image();
       img.src = `data:image/png;base64,${shot}`;
       await img.decode();
@@ -74,17 +90,18 @@ async function outsideTheDisc(page: Page, testId: string) {
         }
         return -1;
       };
-      const left = rim(0, 1);
-      const right = rim(img.width - 1, -1);
+      const found: [number, number] = [rim(0, 1), rim(img.width - 1, -1)];
+      const left = disc && found[0] >= 0 ? Math.min(found[0], disc.left) : found[0];
+      const right = disc && found[1] >= 0 ? Math.max(found[1], disc.right) : found[1];
       if (left < 0 || right < 0) return null;
       let worst = 0;
       const stretches: [number, number][] = [];
       for (let x = 4; x + 16 <= left - 16; x += 16) stretches.push([x, x + 16]);
       for (let x = right + 16; x + 16 <= img.width - 4; x += 16) stretches.push([x, x + 16]);
       for (const [a] of stretches) worst = Math.max(worst, off(stretch(a)));
-      return { space, left, right, width: img.width, stretches: stretches.length, worst };
+      return { space, left, right, found, width: img.width, stretches: stretches.length, worst };
     },
-    shot,
+    [shot, disc] as const,
   );
 }
 
@@ -159,6 +176,9 @@ test("Graphics: the trend, resting layouts, NASA imagery, the globe's edge and t
       // The radar sweep, the band this requirement was written for, is clipped to the rim.
       const clip = await page.locator(".nx-mapwrap").evaluate((e) => getComputedStyle(e, "::after").clipPath);
       expect(clip, "the sweep is clipped to the globe").toMatch(/^circle\(/);
+      // It crosses from left to right; it no longer turns around the centre of the map.
+      const band = await page.locator(".nx-mapwrap").evaluate((e) => getComputedStyle(e, "::after").backgroundImage);
+      expect(band, "the sweep is a band moving left to right").toMatch(/^linear-gradient\((90deg|to right)/);
     }
   }
 
