@@ -176,9 +176,10 @@ test("Graphics: the trend, resting layouts, NASA imagery, the globe's edge and t
       // The radar sweep, the band this requirement was written for, is clipped to the rim.
       const clip = await page.locator(".nx-mapwrap").evaluate((e) => getComputedStyle(e, "::after").clipPath);
       expect(clip, "the sweep is clipped to the globe").toMatch(/^circle\(/);
-      // It crosses from left to right; it no longer turns around the centre of the map.
+      // It crosses the map left to right and back (90deg one way, 270deg the other); it no longer
+      // turns around the centre of the map.
       const band = await page.locator(".nx-mapwrap").evaluate((e) => getComputedStyle(e, "::after").backgroundImage);
-      expect(band, "the sweep is a band moving left to right").toMatch(/^linear-gradient\((90deg|to right)/);
+      expect(band, "the sweep is a band crossing the map").toMatch(/^linear-gradient\((90|270)deg/);
     }
   }
 

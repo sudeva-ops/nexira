@@ -3007,18 +3007,38 @@ tr.nx-flash-b > td {
   }
 }
 
-/* A faint scan over the operations map: a band of light that crosses it from left to right, its
-   bright edge leading and a trail fading behind, then a short pause off-screen before the next
-   pass. The band moves through the background, not the element, so the clip that keeps it on the
-   globe (GFX-04, map/three.ts clipSweep) stays put. The band is 30% of the frame wide, so -43% and
-   143% put it just off the left and right edges. */
+/* A faint scan over the operations map: a band of light that crosses it from left to right, then
+   back from right to left, its bright edge always leading and a trail fading behind. At each turn
+   the band rests off-screen, and that is when the gradient flips (--nx-sweep-dir), so the flip is
+   never seen. The band moves through the background, not the element, so the clip that keeps it on
+   the globe (GFX-04, map/three.ts clipSweep) stays put. The band is 30% of the frame wide, so -43%
+   and 143% put it just off the left and right edges. */
+@property --nx-sweep-dir {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 90deg;
+}
+
 @keyframes nx-sweep {
   0% {
     background-position-x: -43%;
+    --nx-sweep-dir: 90deg;
   }
-  80%,
-  100% {
+  45% {
     background-position-x: 143%;
+    --nx-sweep-dir: 90deg;
+  }
+  50% {
+    background-position-x: 143%;
+    --nx-sweep-dir: 270deg;
+  }
+  95% {
+    background-position-x: -43%;
+    --nx-sweep-dir: 270deg;
+  }
+  100% {
+    background-position-x: -43%;
+    --nx-sweep-dir: 90deg;
   }
 }
 
@@ -3028,7 +3048,7 @@ tr.nx-flash-b > td {
   inset: 0;
   z-index: 1;
   background: linear-gradient(
-      to right,
+      var(--nx-sweep-dir),
       transparent,
       rgba(76, 144, 240, 0.05) 70%,
       rgba(76, 144, 240, 0.2) 97%,
@@ -3037,7 +3057,7 @@ tr.nx-flash-b > td {
     -43% 0 / 30% 100% no-repeat;
   clip-path: var(--nx-sweep-clip, none);
   pointer-events: none;
-  animation: nx-sweep 6s linear infinite;
+  animation: nx-sweep 12s linear infinite;
 }
 
 /* Calm mode (user menu): no motion at all, as with reduced motion. */
